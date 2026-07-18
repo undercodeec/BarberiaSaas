@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "Barbería",
+    "slug": "barber-saas-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "barbersaas",
+    "userInterfaceStyle": "dark",
+    "plugins": ["expo-router"],
+    "experiments": { "typedRoutes": true },
+    "web": { "bundler": "metro" },
+    "android": { "package": "com.barbersaas.mobile" },
+    "ios": { "bundleIdentifier": "com.barbersaas.mobile" }
+  }
+}

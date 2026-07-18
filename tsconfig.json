@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": [
+    "eslint.config.mjs",
+    "playwright.config.ts",
+    "tests/**/*.ts",
+    "vitest.workspace.ts"
+  ],
+  "exclude": ["apps", "node_modules", "packages"]
+}

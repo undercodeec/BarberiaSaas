@@ -1,0 +1,120 @@
+@import 'tailwindcss';
+
+:root {
+  --surface: #101816;
+  --surface-raised: #18231f;
+  --ink: #f7f3e8;
+  --muted: #aab7b1;
+  --accent: #d9ff70;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--surface);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  font-family: Arial, Helvetica, sans-serif;
+  background: var(--surface);
+}
+
+.ambient {
+  position: fixed;
+  border-radius: 999px;
+  filter: blur(90px);
+  pointer-events: none;
+  opacity: 0.16;
+}
+
+.ambient-top {
+  width: 28rem;
+  height: 28rem;
+  right: -10rem;
+  top: -12rem;
+  background: var(--accent);
+}
+.ambient-bottom {
+  width: 22rem;
+  height: 22rem;
+  left: -9rem;
+  bottom: -10rem;
+  background: #43a889;
+}
+
+.brand-mark {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border-radius: 0.75rem;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 1.1rem;
+  font-weight: 900;
+  transform: rotate(-5deg);
+}
+
+.status-pill {
+  border: 1px solid rgb(217 255 112 / 0.3);
+  border-radius: 999px;
+  padding: 0.45rem 0.75rem;
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.foundation-card {
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 1.75rem;
+  background: rgb(24 35 31 / 0.78);
+  padding: 1.5rem;
+  box-shadow: 0 30px 80px rgb(0 0 0 / 0.28);
+  backdrop-filter: blur(18px);
+}
+
+.pulse-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 7px rgb(217 255 112 / 0.1);
+}
+.step-number {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  place-items: center;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.07);
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pulse-dot {
+    animation: pulse 2.4s ease-out infinite;
+  }
+  @keyframes pulse {
+    50% {
+      box-shadow: 0 0 0 12px rgb(217 255 112 / 0);
+    }
+  }
+}

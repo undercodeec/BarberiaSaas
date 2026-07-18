@@ -1,0 +1,12 @@
+node_modules
+.next
+.expo
+.turbo
+dist
+coverage
+playwright-report
+test-results
+pnpm-lock.yaml
+INSTRUCCIONES_CODEX_BARBER_SAAS.md
+Investigación y definición del MVP para un SaaS de barberías.md
+
