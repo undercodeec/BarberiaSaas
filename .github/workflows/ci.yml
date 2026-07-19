@@ -25,6 +25,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
@@ -34,9 +35,26 @@ jobs:
       - run: pnpm test:e2e
 
   database:
-    name: Supabase local
+    name: PostgreSQL y aislamiento multi-tenant
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: barber_saas_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d barber_saas_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/barber_saas_test?schema=public
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/barber_saas_test?schema=public
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -48,8 +66,6 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm supabase:start
-      - run: pnpm exec supabase db lint --local --level warning
-      - name: Detener Supabase
-        if: always()
-        run: pnpm supabase:stop --no-backup
+      - run: pnpm db:validate
+      - run: pnpm db:migrate:deploy
+      - run: pnpm --filter @barber-saas/api test

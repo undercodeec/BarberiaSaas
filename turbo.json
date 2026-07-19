@@ -1,6 +1,12 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalPassThroughEnv": ["EXPO_NO_TELEMETRY", "__UNSAFE_EXPO_HOME_DIRECTORY"],
+  "globalPassThroughEnv": [
+    "DATABASE_URL",
+    "EXPO_NO_TELEMETRY",
+    "EXPO_PUBLIC_API_URL",
+    "TEST_DATABASE_URL",
+    "__UNSAFE_EXPO_HOME_DIRECTORY"
+  ],
   "ui": "stream",
   "tasks": {
     "build": {

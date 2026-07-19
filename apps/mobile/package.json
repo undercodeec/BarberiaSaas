@@ -10,12 +10,18 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@babel/runtime": "7.29.7",
+    "@barber-saas/api-client": "workspace:*",
+    "@barber-saas/validation": "workspace:*",
     "@expo/log-box": "57.0.1",
     "@expo/metro-runtime": "57.0.6",
+    "@hookform/resolvers": "5.4.0",
+    "@tanstack/react-query": "5.101.2",
     "expo": "57.0.7",
     "expo-constants": "57.0.6",
     "expo-linking": "57.0.3",
     "expo-router": "57.0.7",
+    "expo-secure-store": "57.0.1",
     "expo-status-bar": "57.0.1",
     "react": "19.2.7",
     "react-dom": "19.2.7",
@@ -23,7 +29,10 @@
     "react-native-safe-area-context": "5.6.2",
     "react-native-screens": "4.25.2",
     "react-native-worklets": "0.10.2",
-    "react-native-web": "0.21.2"
+    "react-native-web": "0.21.2",
+    "react-hook-form": "7.82.0",
+    "zod": "4.4.3",
+    "zustand": "5.0.14"
   },
   "devDependencies": {
     "@testing-library/react-native": "14.0.1",

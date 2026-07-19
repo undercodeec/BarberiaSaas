@@ -1,19 +1,32 @@
 # Estrategia de pruebas
 
-## Capas
+## Niveles
 
-- **Unitarias:** Vitest para paquetes compartidos y Jest Expo con Testing Library para React Native.
-- **Integración:** Supabase local para migraciones, RLS, RPC y concurrencia desde la Fase 1.
-- **End-to-end:** Playwright con viewport móvil y escritorio para la aplicación web.
+- Unitarias: validadores, permisos, cliente HTTP, criptografía y componentes.
+- Integración: API + Prisma + PostgreSQL real.
+- E2E: flujos web y, cuando exista infraestructura de dispositivos, móvil.
+
+## Aislamiento multi-tenant
+
+`apps/api/src/app.integration.test.ts` crea dos propietarios y dos organizaciones. Luego intenta influir en la consulta del primer usuario enviando el identificador de la segunda organización. La API debe devolver únicamente el tenant derivado de la primera sesión y no filtrar datos del segundo.
+
+La suite destructiva de integración solo se habilita con `TEST_DATABASE_URL`, para evitar limpiar accidentalmente una base de desarrollo o producción. GitHub Actions levanta PostgreSQL, aplica las migraciones y ejecuta esa suite.
 
 ## Comandos
 
 ```bash
+pnpm format:check
+pnpm lint
+pnpm typecheck
 pnpm test
+pnpm build
 pnpm test:e2e
-pnpm exec supabase db lint --local --level warning
 ```
 
-## Reglas
+Para integración local use una base exclusiva:
 
-Las pruebas de reglas financieras y de agenda serán obligatorias al introducir esas funciones. Los casos de concurrencia y aislamiento no se sustituirán por mocks: se ejecutarán contra PostgreSQL/Supabase local.
+```bash
+TEST_DATABASE_URL=postgresql://... pnpm --filter @barber-saas/api test
+```
+
+No use una base con datos reales como `TEST_DATABASE_URL`.

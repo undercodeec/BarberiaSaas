@@ -23,4 +23,35 @@ describe('createApiClient', () => {
       expect.any(Object),
     );
   });
+
+  it('adjunta la sesión y conserva el error del backend', async () => {
+    const fetchImplementation = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          code: 'INVALID_SESSION',
+          message: 'Sesión vencida.',
+        }),
+        { status: 401 },
+      ),
+    );
+    const client = createApiClient({
+      baseUrl: 'https://example.test',
+      fetchImplementation,
+      getAccessToken: async () => 'token-secreto',
+    });
+
+    await expect(client.request('/private')).rejects.toMatchObject({
+      code: 'INVALID_SESSION',
+      message: 'Sesión vencida.',
+      statusCode: 401,
+    });
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      'https://example.test/private',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          authorization: 'Bearer token-secreto',
+        }),
+      }),
+    );
+  });
 });

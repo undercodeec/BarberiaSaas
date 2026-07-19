@@ -1,82 +1,125 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Redirect, useRouter } from 'expo-router';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-export default function HomeScreen() {
+import { InlineMessage } from '../src/components/InlineMessage';
+import { PrimaryButton } from '../src/components/PrimaryButton';
+import { useCurrentOrganization } from '../src/features/organization/useCurrentOrganization';
+import { useAuth } from '../src/providers/AuthProvider';
+import { theme } from '../src/theme';
+
+export function WelcomeContent({
+  onLogin,
+  onRegister,
+}: {
+  readonly onLogin: () => void;
+  readonly onRegister: () => void;
+}) {
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>BASE LISTA</Text>
-        </View>
-        <Text accessibilityRole="header" style={styles.title}>
-          Tu barbería en la palma de tu mano.
-        </Text>
-        <Text style={styles.description}>
-          La aplicación móvil está preparada para comenzar el flujo de
-          onboarding en la siguiente fase.
-        </Text>
-        <View style={styles.card}>
-          <View style={styles.dot} />
-          <View style={styles.cardCopy}>
-            <Text style={styles.cardTitle}>Infraestructura operativa</Text>
-            <Text style={styles.cardText}>
-              Expo Router · TypeScript estricto
-            </Text>
-          </View>
-        </View>
+    <View style={styles.welcome}>
+      <View style={styles.badge}>
+        <Text style={styles.badgeText}>OPERACIÓN MÓVIL</Text>
       </View>
-    </SafeAreaView>
+      <Text accessibilityRole="header" style={styles.title}>
+        Tu barbería en la palma de tu mano.
+      </Text>
+      <Text style={styles.description}>
+        Administra tu negocio desde el celular con una experiencia simple y
+        segura.
+      </Text>
+      <View style={styles.actions}>
+        <PrimaryButton label="Crear mi barbería" onPress={onRegister} />
+        <PrimaryButton
+          label="Ya tengo una cuenta"
+          onPress={onLogin}
+          variant="secondary"
+        />
+      </View>
+    </View>
+  );
+}
+
+export default function EntryScreen() {
+  const router = useRouter();
+  const { configurationError, isLoading, session } = useAuth();
+  const organizationQuery = useCurrentOrganization();
+
+  if (configurationError) {
+    return (
+      <View style={styles.centered}>
+        <InlineMessage message={configurationError} />
+      </View>
+    );
+  }
+  if (isLoading || (session && organizationQuery.isLoading)) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator color={theme.colors.accent} size="large" />
+        <Text style={styles.loading}>Preparando tu espacio…</Text>
+      </View>
+    );
+  }
+  if (session && organizationQuery.isError) {
+    return (
+      <View style={styles.centered}>
+        <InlineMessage message="No pudimos cargar tu barbería. Revisa tu conexión e inténtalo nuevamente." />
+        <PrimaryButton
+          label="Reintentar"
+          onPress={() => void organizationQuery.refetch()}
+        />
+      </View>
+    );
+  }
+  if (session && organizationQuery.data) return <Redirect href="/(app)" />;
+  if (session) return <Redirect href="/(onboarding)/organization" />;
+  return (
+    <WelcomeContent
+      onLogin={() => router.push('/(auth)/login')}
+      onRegister={() => router.push('/(auth)/register')}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#101816' },
-  container: { flex: 1, justifyContent: 'center', padding: 28 },
+  actions: { marginTop: 36 },
   badge: {
     alignSelf: 'flex-start',
+    backgroundColor: theme.colors.accent,
     borderRadius: 99,
-    backgroundColor: '#d9ff70',
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
   badgeText: {
-    color: '#101816',
+    color: theme.colors.background,
     fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 1.5,
+    letterSpacing: 1.4,
   },
-  title: {
-    marginTop: 24,
-    color: '#f7f3e8',
-    fontSize: 46,
-    lineHeight: 48,
-    fontWeight: '900',
-    letterSpacing: -2,
+  centered: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
   },
   description: {
-    marginTop: 20,
-    color: '#aab7b1',
+    color: theme.colors.muted,
     fontSize: 17,
     lineHeight: 27,
+    marginTop: 20,
   },
-  card: {
-    marginTop: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#2a3934',
-    borderRadius: 20,
-    backgroundColor: '#18231f',
-    padding: 18,
+  loading: { color: theme.colors.muted, marginTop: 14 },
+  title: {
+    color: theme.colors.text,
+    fontSize: 46,
+    fontWeight: '900',
+    letterSpacing: -2,
+    lineHeight: 48,
+    marginTop: 24,
   },
-  dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#d9ff70',
-    marginRight: 14,
+  welcome: {
+    backgroundColor: theme.colors.background,
+    flex: 1,
+    justifyContent: 'center',
+    padding: 28,
   },
-  cardCopy: { flex: 1 },
-  cardTitle: { color: '#f7f3e8', fontSize: 15, fontWeight: '700' },
-  cardText: { marginTop: 3, color: '#7f9189', fontSize: 13 },
 });

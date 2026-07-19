@@ -18,6 +18,7 @@ test-results/
 
 supabase/.branches/
 supabase/.temp/
+packages/database/src/generated/
 
 .DS_Store
 Thumbs.db

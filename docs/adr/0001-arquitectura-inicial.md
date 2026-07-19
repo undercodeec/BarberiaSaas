@@ -1,6 +1,6 @@
 # ADR 0001: Arquitectura inicial del monorepositorio
 
-- Estado: Aceptada
+- Estado: Aceptada, backend reemplazado por ADR 0003
 - Fecha: 2026-07-18
 
 ## Contexto

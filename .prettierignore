@@ -6,7 +6,7 @@ dist
 coverage
 playwright-report
 test-results
+**/next-env.d.ts
 pnpm-lock.yaml
 INSTRUCCIONES_CODEX_BARBER_SAAS.md
 Investigación y definición del MVP para un SaaS de barberías.md
-

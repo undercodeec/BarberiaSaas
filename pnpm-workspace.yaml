@@ -3,8 +3,12 @@ packages:
   - packages/*
 
 allowBuilds:
+  '@prisma/engines': true
   '@swc/core': true
   esbuild: true
+  prisma: true
   sharp: true
-  supabase: true
   unrs-resolver: true
+
+minimumReleaseAgeExclude:
+  - react-hook-form@7.82.0

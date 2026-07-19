@@ -1,0 +1,11 @@
+DROP TABLE IF EXISTS "audit_logs";
+DROP TABLE IF EXISTS "member_locations";
+DROP TABLE IF EXISTS "memberships";
+DROP TABLE IF EXISTS "locations";
+DROP TABLE IF EXISTS "organizations";
+DROP TABLE IF EXISTS "password_reset_tokens";
+DROP TABLE IF EXISTS "sessions";
+DROP TABLE IF EXISTS "users";
+DROP TYPE IF EXISTS "OrganizationStatus";
+DROP TYPE IF EXISTS "MembershipStatus";
+DROP TYPE IF EXISTS "MembershipRole";
