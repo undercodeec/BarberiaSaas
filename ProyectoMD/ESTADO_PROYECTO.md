@@ -89,7 +89,8 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Sesión persistida con Expo Secure Store.
 - [x] Cliente Supabase eliminado; Expo consume exclusivamente la API HTTP propia.
 - [x] URL pública de la API validada mediante Zod.
-- [x] Bienvenida original conservada como entrada a autenticación y registro.
+- [x] Portada móvil NAVA restaurada como entrada principal: fondo blanco, logo, mensaje `Bienvenido a Nava` y botones `Crear cuenta` e `Iniciar sesión`.
+- [x] La antigua portada verdosa fue retirada de `app/index.tsx`; ambos botones enlazan exclusivamente con los flujos actuales.
 - [x] Inicio de sesión actual en `/login`, con fondo móvil `loginbanner.png`, correo, contraseña, recuperación y regreso al inicio; la UI anterior fue retirada.
 - [x] Registro guiado dentro de un panel inferior: tipo inicial, información del negocio, ubicación, horario, credenciales y revisión editable.
 - [x] Catálogo mundial de países y ciudades integrado con `country-state-city`; la ciudad depende del país seleccionado.

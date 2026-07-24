@@ -12,6 +12,7 @@ import {
 const NAVY = '#101C2D';
 
 interface NavaButtonProps {
+  readonly compact?: boolean;
   readonly disabled?: boolean;
   readonly icon: ComponentProps<typeof Ionicons>['name'];
   readonly label: string;
@@ -22,6 +23,7 @@ interface NavaButtonProps {
 }
 
 export function NavaButton({
+  compact = false,
   disabled = false,
   icon,
   label,
@@ -42,6 +44,7 @@ export function NavaButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
+        compact ? styles.compactButton : null,
         variant === 'primary' ? styles.primary : styles.outline,
         style,
         pressed ? styles.pressed : null,
@@ -52,13 +55,14 @@ export function NavaButton({
         <ActivityIndicator color={foreground} />
       ) : (
         <>
-          <Ionicons color={foreground} name={icon} size={27} />
+          <Ionicons color={foreground} name={icon} size={compact ? 23 : 27} />
           <Text
             adjustsFontSizeToFit
             minimumFontScale={0.65}
             numberOfLines={1}
             style={[
               styles.label,
+              compact ? styles.compactLabel : null,
               variant === 'primary' ? styles.primaryLabel : styles.outlineLabel,
             ]}
           >
@@ -85,6 +89,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 5,
     elevation: 2,
+  },
+  compactButton: {
+    gap: 7,
+    paddingHorizontal: 9,
+  },
+  compactLabel: {
+    fontSize: 15,
   },
   disabled: { opacity: 0.55 },
   label: {
