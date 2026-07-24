@@ -2,6 +2,7 @@ node_modules
 .next
 .expo
 .turbo
+.tools
 dist
 coverage
 playwright-report

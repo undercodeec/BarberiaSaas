@@ -204,11 +204,10 @@ barber-saas/
 │   ├── design-tokens/
 │   ├── config/
 │   └── test-utils/
-├── supabase/
-│   ├── migrations/
-│   ├── functions/
-│   ├── seed.sql
-│   └── config.toml
+├── apps/api/
+├── packages/database/
+│   └── prisma/
+├── compose.yaml
 ├── docs/
 │   ├── adr/
 │   ├── product/
@@ -267,19 +266,23 @@ Utilizar:
 
 ## 4.4 Backend
 
-Utilizar Supabase:
+La decisión vigente está definida en ADR 0003:
 
 - PostgreSQL;
-- Auth;
-- Storage;
-- Realtime;
-- Row Level Security;
-- Edge Functions;
-- RPC de PostgreSQL para operaciones críticas.
+- Prisma ORM para esquema, cliente tipado y migraciones;
+- API Node/Fastify como única frontera de datos;
+- sesiones opacas gestionadas por la API;
+- autorización multi-tenant y permisos aplicados en backend;
+- eventos incrementales mediante la API para sincronización móvil;
+- despliegue inicial en VPS.
+
+Supabase Auth, RLS, RPC, Storage y Realtime no forman parte de la implementación
+actual. PostgreSQL podrá trasladarse posteriormente a Supabase como servicio
+administrado sin cambiar el contrato de los clientes.
 
 No conectar lógica crítica directamente desde la UI mediante inserciones simples.
 
-Operaciones críticas que deben ejecutarse con RPC o funciones de servidor:
+Operaciones críticas que deben ejecutarse en servicios transaccionales de la API:
 
 - creación de citas;
 - reprogramación;
@@ -842,7 +845,7 @@ where (
 );
 ```
 
-Además, la RPC de creación debe:
+Además, el servicio transaccional de creación en la API debe:
 
 1. validar organización y sucursal;
 2. comprobar membresía o token público válido;
@@ -1182,23 +1185,17 @@ Los límites deben poder verificarse en backend.
 
 ---
 
-## 8. Seguridad y Row Level Security
+## 8. Seguridad y autorización multi-tenant
 
 ## 8.1 Principio general
 
-Toda tabla multi-tenant debe tener RLS habilitado.
+Toda operación multi-tenant debe derivar la organización desde la sesión y la
+membresía activa en el servidor. Ningún identificador enviado por el cliente puede
+otorgar acceso por sí mismo. Los permisos por rol deben centralizarse y probarse.
 
-Crear funciones SQL reutilizables:
-
-```text
-is_platform_admin()
-is_organization_member(organization_id)
-has_organization_role(organization_id, roles[])
-can_access_location(location_id)
-current_membership_role(organization_id)
-```
-
-Las funciones deben ser seguras y evitar recursión de políticas.
+La versión actual admite una sola organización activa por cuenta. Aceptar una
+invitación de otra organización debe rechazarse hasta que exista un selector de
+contexto explícito y seguro.
 
 ## 8.2 Reglas mínimas
 
@@ -1214,7 +1211,7 @@ Las funciones deben ser seguras y evitar recursión de políticas.
 - Un `platform_admin` no se obtiene mediante metadatos editables del usuario.
 - El rol interno debe verificarse en una tabla protegida.
 - Las páginas públicas no deben usar credenciales privadas.
-- Las reservas públicas deben ejecutarse mediante una Edge Function o RPC pública controlada.
+- Las reservas públicas deben ejecutarse mediante endpoints públicos controlados de la API.
 - Los tokens públicos de gestión de reserva deben ser:
   - aleatorios;
   - con vencimiento;
@@ -1229,7 +1226,7 @@ Las funciones deben ser seguras y evitar recursión de políticas.
 - No registrar secretos de proveedores en `notification_logs`.
 - Sanitizar nombres de archivos.
 - Separar buckets públicos y privados.
-- Usar URLs firmadas para fotografías privadas.
+- Usar URLs firmadas o endpoints autenticados para fotografías privadas.
 - Implementar eliminación lógica para clientes y organizaciones.
 - Implementar exportación básica de clientes en CSV para el propietario.
 
@@ -1669,9 +1666,9 @@ Probar como mínimo:
 
 ## 15.2 Integración
 
-Probar contra Supabase local:
+Probar contra PostgreSQL real mediante Prisma y la API:
 
-- RLS;
+- aislamiento multi-tenant del backend;
 - creación de organización;
 - invitación;
 - creación de cita;
@@ -1802,18 +1799,26 @@ Crear `.env.example` con nombres de variables, nunca valores reales.
 Variables sugeridas:
 
 ```text
-EXPO_PUBLIC_SUPABASE_URL
-EXPO_PUBLIC_SUPABASE_ANON_KEY
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY
 APP_ENV
+DATABASE_URL
+TEST_DATABASE_URL
+API_HOST
+API_PORT
+EXPO_PUBLIC_API_URL
+NEXT_PUBLIC_API_URL
+SMTP_HOST
+SMTP_PORT
+SMTP_SECURE
+SMTP_FROM
+SMTP_USER
+SMTP_PASSWORD
 PUBLIC_WEB_URL
 MOBILE_DEEP_LINK_SCHEME
 NOTIFICATION_PROVIDER
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` solo puede existir en servidor.
+`DATABASE_URL`, `TEST_DATABASE_URL` y las credenciales SMTP solo pueden existir en
+servidor o en el entorno de CI correspondiente.
 
 ---
 
@@ -1864,7 +1869,7 @@ Crear una base limpia, ejecutable y documentada.
 - configurar TypeScript estricto;
 - configurar ESLint y Prettier;
 - configurar variables de entorno;
-- configurar Supabase local;
+- configurar PostgreSQL y Mailpit locales;
 - configurar Vitest;
 - configurar Playwright para web;
 - configurar pruebas de React Native;
@@ -1881,7 +1886,7 @@ Crear una base limpia, ejecutable y documentada.
 - móvil abre una pantalla inicial;
 - web abre una pantalla inicial;
 - admin abre una pantalla inicial;
-- Supabase local inicia;
+- PostgreSQL y Mailpit locales inician;
 - no existen secretos en el repositorio.
 
 ---
@@ -1905,7 +1910,7 @@ Permitir que un propietario cree su cuenta y barbería.
 - creación de primera sucursal;
 - zona horaria;
 - moneda;
-- RLS;
+- autorización multi-tenant en backend;
 - pruebas de aislamiento.
 
 ### Pantallas
@@ -1974,13 +1979,13 @@ Construir una agenda confiable antes de continuar con otras funciones.
 - modelo de citas;
 - appointment services;
 - disponibilidad;
-- RPC de creación;
-- RPC de reprogramación;
+- servicio transaccional de creación en la API;
+- servicio transaccional de reprogramación en la API;
 - cancelación;
 - estados;
 - exclusión de doble reserva;
 - agenda diaria móvil;
-- realtime;
+- sincronización incremental entre dispositivos;
 - pruebas de concurrencia.
 
 ### Criterios de aceptación
@@ -2278,7 +2283,7 @@ Preparar pilotos reales.
 ### Tareas
 
 - revisión de seguridad;
-- revisión de RLS;
+- revisión de autorización multi-tenant;
 - pruebas E2E completas;
 - rendimiento;
 - accesibilidad;
@@ -2367,7 +2372,7 @@ Una tarea se considera terminada únicamente cuando:
 - la función está implementada;
 - las entradas están validadas;
 - los permisos están aplicados;
-- RLS está verificado;
+- el aislamiento multi-tenant está verificado;
 - estados de error están cubiertos;
 - pruebas relevantes pasan;
 - documentación está actualizada;
@@ -2400,7 +2405,7 @@ Durante la implementación:
 - Mantén TypeScript estricto.
 - Respeta la arquitectura existente.
 - No implementes funciones de fases posteriores.
-- Aplica RLS y permisos.
+- Aplica aislamiento multi-tenant y permisos en backend.
 - Añade pruebas.
 - No uses datos hardcodeados.
 - No expongas secretos.
@@ -2427,7 +2432,7 @@ Lee INSTRUCCIONES_CODEX_BARBER_SAAS.md completo.
 
 Inicializa únicamente la Fase 0 del proyecto.
 
-Crea el monorepositorio con pnpm y Turborepo, las aplicaciones mobile, web y admin, los paquetes compartidos, Supabase local, TypeScript estricto, lint, formato, pruebas básicas, variables de entorno de ejemplo, CI y documentación inicial.
+Crea el monorepositorio con pnpm y Turborepo, las aplicaciones mobile, web, admin y API, los paquetes compartidos, PostgreSQL y Mailpit locales, TypeScript estricto, lint, formato, pruebas básicas, variables de entorno de ejemplo, CI y documentación inicial.
 
 No implementes todavía autenticación, base de datos de negocio, agenda, reservas, caja ni comisiones.
 
@@ -2443,7 +2448,7 @@ Después de aprobar la Fase 0:
 ```text
 Lee INSTRUCCIONES_CODEX_BARBER_SAAS.md y revisa lo implementado en la Fase 0.
 
-Implementa únicamente la Fase 1: autenticación, perfiles, organizaciones, sucursales, memberships, roles, onboarding y Row Level Security.
+Implementa únicamente la Fase 1: autenticación, perfiles, organizaciones, sucursales, memberships, roles, onboarding y autorización multi-tenant en backend.
 
 Primero crea las migraciones y pruebas de aislamiento multi-tenant. Después implementa las pantallas móviles y el flujo de sesión.
 

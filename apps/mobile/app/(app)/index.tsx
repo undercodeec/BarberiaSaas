@@ -49,6 +49,14 @@ export default function ApplicationHomeScreen() {
         <Text style={styles.detail}>Cargando organización…</Text>
       )}
       <PrimaryButton
+        label="Agenda diaria"
+        onPress={() => router.push('/(app)/agenda')}
+      />
+      <PrimaryButton
+        label="Equipo, servicios y horarios"
+        onPress={() => router.push('/(app)/operations')}
+      />
+      <PrimaryButton
         label="Actualizar"
         loading={organizationQuery.isRefetching}
         onPress={() => void organizationQuery.refetch()}

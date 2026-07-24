@@ -1,0 +1,20 @@
+Create a premium 3.2-second preload animation using the supplied transparent PNG layers.
+
+ASSEMBLY ORDER
+1. 01-icon-left
+2. 02-icon-right
+3. 03-icon-diagonal
+4. 04-wordmark-nava
+
+ANIMATION
+Start on a transparent background. During the first 1.25 seconds, assemble the isotipo naturally: the left body enters from 6% left and 2% below with -3 degrees rotation; the right body enters from 6% right and 2% above with +3 degrees rotation; the diagonal metallic piece arrives last from slightly above-right with +4 degrees rotation. Use staggered timing of 80-120 ms, smooth ease-out motion, subtle motion blur, and a restrained 2% overshoot before every piece locks into its exact original position. No bouncing or exaggerated movement.
+
+At 1.25 seconds, all icon layers must align perfectly and become visually identical to reference-full-icon.png. Add a very soft, narrow metallic light sweep across the diagonal piece only, lasting about 450 ms. Keep the original black/silver material, proportions, edges, highlights, and transparency unchanged.
+
+From 1.55 to 2.3 seconds, reveal 04-wordmark-nava from left to right using opacity plus a 24 px horizontal displacement. Do not type or redraw the letters; animate the supplied wordmark layer. Hold the completed logo until 3.2 seconds.
+
+STYLE
+Premium, restrained, minimal, professional, cinematic product-brand motion. Smooth 30 or 60 fps. No particles, sparks, smoke, lens flares, camera shake, 3D extrusion, color changes, added text, sound, or background.
+
+OUTPUT
+Transparent canvas, 16:9, ideally 1920x1080. Export WebM VP9 with alpha. Also export H.264 MP4 on pure black as fallback.

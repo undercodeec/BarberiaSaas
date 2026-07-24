@@ -14,6 +14,10 @@ const environmentSchema = z
       .default('local'),
     CORS_ORIGIN: z.string().min(1).default('http://localhost:3000'),
     DATABASE_URL: z.url().startsWith('postgresql://'),
+    MOBILE_INVITATION_URL: z
+      .string()
+      .min(1)
+      .default('barbersaas://accept-invitation'),
     MOBILE_RESET_URL: z.string().min(1).default('barbersaas://reset-password'),
     SMTP_FROM: optionalText,
     SMTP_HOST: optionalText,
@@ -40,5 +44,18 @@ export type ApiConfig = z.infer<typeof environmentSchema>;
 export function readConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): ApiConfig {
-  return environmentSchema.parse(environment);
+  return environmentSchema.parse({
+    ...environment,
+    SMTP_FROM:
+      environment.SMTP_FROM ??
+      environment.EMAIL_BUSINESS ??
+      environment.EMAIL_USER,
+    SMTP_HOST: environment.SMTP_HOST ?? environment.EMAIL_HOST,
+    SMTP_PASSWORD: environment.SMTP_PASSWORD ?? environment.EMAIL_PASSWORD,
+    SMTP_PORT: environment.SMTP_PORT ?? environment.EMAIL_PORT,
+    SMTP_SECURE:
+      environment.SMTP_SECURE ??
+      (environment.EMAIL_PORT === '465' ? 'true' : undefined),
+    SMTP_USER: environment.SMTP_USER ?? environment.EMAIL_USER,
+  });
 }

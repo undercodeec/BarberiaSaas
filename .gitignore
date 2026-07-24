@@ -1,5 +1,6 @@
 node_modules/
 .pnpm-store/
+.tools/
 .turbo/
 dist/
 coverage/
@@ -23,3 +24,4 @@ packages/database/src/generated/
 .DS_Store
 Thumbs.db
 *.log
+logs.md

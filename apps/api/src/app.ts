@@ -8,18 +8,27 @@ import {
 import {
   completeOnboardingSchema,
   recoverAccessSchema,
+  resendVerificationSchema,
   resetPasswordSchema,
   signInSchema,
   signUpSchema,
+  verifyEmailSchema,
 } from '@barber-saas/validation';
 import Fastify, { type FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
 
 import type { ApiConfig } from './config';
 import { ApiError, isUniqueConstraintError } from './errors';
-import type { RecoveryMailer } from './recovery-mailer';
+import { registerAgendaRoutes } from './agenda';
+import { registerOperationsRoutes } from './operations';
+import type {
+  InvitationMailer,
+  RecoveryMailer,
+  VerificationMailer,
+} from './recovery-mailer';
 import {
   createOpaqueToken,
+  createVerificationCode,
   hashOpaqueToken,
   hashPassword,
   verifyPassword,
@@ -27,11 +36,14 @@ import {
 
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const RESET_DURATION_MS = 30 * 60 * 1000;
+const VERIFICATION_DURATION_MS = 10 * 60 * 1000;
 
 interface BuildApiOptions {
   readonly config: ApiConfig;
   readonly database?: DatabaseClient;
+  readonly invitationMailer?: InvitationMailer | null;
   readonly recoveryMailer?: RecoveryMailer | null;
+  readonly verificationMailer?: VerificationMailer | null;
 }
 
 function normalizeEmail(email: string): string {
@@ -49,6 +61,45 @@ async function createSession(database: DatabaseClient, userId: string) {
     data: { expiresAt, tokenHash: hashOpaqueToken(token), userId },
   });
   return { expiresAt: expiresAt.toISOString(), token };
+}
+
+async function issueVerificationCode({
+  appEnvironment,
+  database,
+  email,
+  userId,
+  verificationMailer,
+}: {
+  readonly appEnvironment: ApiConfig['APP_ENV'];
+  readonly database: DatabaseClient;
+  readonly email: string;
+  readonly userId: string;
+  readonly verificationMailer: VerificationMailer | null;
+}) {
+  const code = createVerificationCode();
+  const now = new Date();
+  await database.$transaction([
+    database.emailVerificationCode.updateMany({
+      data: { usedAt: now },
+      where: { userId, usedAt: null },
+    }),
+    database.emailVerificationCode.create({
+      data: {
+        codeHash: hashOpaqueToken(code),
+        expiresAt: new Date(Date.now() + VERIFICATION_DURATION_MS),
+        userId,
+      },
+    }),
+  ]);
+  if (verificationMailer) await verificationMailer.send({ code, email });
+  else if (appEnvironment !== 'local') {
+    throw new ApiError(
+      503,
+      'VERIFICATION_DELIVERY_UNAVAILABLE',
+      'El servicio de verificación por correo no está disponible.',
+    );
+  }
+  return appEnvironment === 'local' ? code : undefined;
 }
 
 function getBearerToken(request: FastifyRequest): string {
@@ -82,7 +133,9 @@ async function authenticate(database: DatabaseClient, request: FastifyRequest) {
 export async function buildApi({
   config,
   database = createDatabaseClient({ connectionString: config.DATABASE_URL }),
+  invitationMailer = null,
   recoveryMailer = null,
+  verificationMailer = null,
 }: BuildApiOptions) {
   const app = Fastify({ logger: config.APP_ENV === 'production' });
   await app.register(cors, {
@@ -95,15 +148,35 @@ export async function buildApi({
     const input = signUpSchema.parse(request.body);
     const email = normalizeEmail(input.email);
     try {
-      const user = await database.user.create({
-        data: {
-          email,
-          fullName: input.fullName.trim(),
-          passwordHash: await hashPassword(input.password),
-        },
+      const passwordHash = await hashPassword(input.password);
+      const existingUser = await database.user.findUnique({ where: { email } });
+      if (existingUser?.passwordHash && existingUser.emailVerifiedAt) {
+        throw new ApiError(
+          409,
+          'EMAIL_ALREADY_EXISTS',
+          'Ya existe una cuenta con ese correo.',
+        );
+      }
+      const user = existingUser
+        ? await database.user.update({
+            data: { fullName: input.fullName.trim(), passwordHash },
+            where: { id: existingUser.id },
+          })
+        : await database.user.create({
+            data: { email, fullName: input.fullName.trim(), passwordHash },
+          });
+      const developmentVerificationCode = await issueVerificationCode({
+        appEnvironment: config.APP_ENV,
+        database,
+        email: user.email,
+        userId: user.id,
+        verificationMailer,
       });
-      const session = await createSession(database, user.id);
-      return reply.code(201).send({ session, user: publicUser(user) });
+      return reply.code(201).send({
+        ...(developmentVerificationCode ? { developmentVerificationCode } : {}),
+        email: user.email,
+        verificationRequired: true,
+      });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
         throw new ApiError(
@@ -121,16 +194,96 @@ export async function buildApi({
     const user = await database.user.findUnique({
       where: { email: normalizeEmail(input.email) },
     });
-    if (!user || !(await verifyPassword(input.password, user.passwordHash))) {
+    if (
+      !user?.passwordHash ||
+      !(await verifyPassword(input.password, user.passwordHash))
+    ) {
       throw new ApiError(
         401,
         'INVALID_CREDENTIALS',
         'El correo o la contraseña son incorrectos.',
       );
     }
+    if (!user.emailVerifiedAt) {
+      throw new ApiError(
+        403,
+        'EMAIL_NOT_VERIFIED',
+        'Verifica tu correo antes de iniciar sesión.',
+      );
+    }
     return {
       session: await createSession(database, user.id),
       user: publicUser(user),
+    };
+  });
+
+  app.post('/v1/auth/verify-email', async (request) => {
+    const input = verifyEmailSchema.parse(request.body);
+    const email = normalizeEmail(input.email);
+    const user = await database.user.findUnique({ where: { email } });
+    if (!user) {
+      throw new ApiError(
+        400,
+        'INVALID_VERIFICATION_CODE',
+        'El código no es válido o ya venció.',
+      );
+    }
+    await database.$transaction(async (transaction) => {
+      const verification = await transaction.emailVerificationCode.findFirst({
+        where: {
+          codeHash: hashOpaqueToken(input.code),
+          expiresAt: { gt: new Date() },
+          usedAt: null,
+          userId: user.id,
+        },
+      });
+      if (!verification) {
+        throw new ApiError(
+          400,
+          'INVALID_VERIFICATION_CODE',
+          'El código no es válido o ya venció.',
+        );
+      }
+      const now = new Date();
+      const consumed = await transaction.emailVerificationCode.updateMany({
+        data: { usedAt: now },
+        where: { id: verification.id, usedAt: null },
+      });
+      if (consumed.count !== 1) {
+        throw new ApiError(
+          400,
+          'INVALID_VERIFICATION_CODE',
+          'El código no es válido o ya fue utilizado.',
+        );
+      }
+      await transaction.user.update({
+        data: { emailVerifiedAt: now },
+        where: { id: user.id },
+      });
+    });
+    return {
+      session: await createSession(database, user.id),
+      user: publicUser(user),
+    };
+  });
+
+  app.post('/v1/auth/resend-verification', async (request) => {
+    const { email: rawEmail } = resendVerificationSchema.parse(request.body);
+    const email = normalizeEmail(rawEmail);
+    const user = await database.user.findUnique({ where: { email } });
+    let developmentVerificationCode: string | undefined;
+    if (user && !user.emailVerifiedAt) {
+      developmentVerificationCode = await issueVerificationCode({
+        appEnvironment: config.APP_ENV,
+        database,
+        email: user.email,
+        userId: user.id,
+        verificationMailer,
+      });
+    }
+    return {
+      ...(developmentVerificationCode ? { developmentVerificationCode } : {}),
+      message: 'Si la cuenta está pendiente, recibirás un nuevo código.',
     };
   });
 
@@ -313,6 +466,15 @@ export async function buildApi({
       organization: membership.organization,
     };
   });
+
+  registerOperationsRoutes(
+    app,
+    database,
+    authenticate,
+    invitationMailer,
+    config,
+  );
+  registerAgendaRoutes(app, database, authenticate);
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof ZodError) {

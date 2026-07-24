@@ -74,6 +74,11 @@ export default function OrganizationOnboardingScreen() {
         loading={formState.isSubmitting}
         onPress={() => void submit()}
       />
+      <PrimaryButton
+        label="Tengo una invitación"
+        onPress={() => router.push('/(onboarding)/accept-invitation')}
+        variant="secondary"
+      />
     </Screen>
   );
 }

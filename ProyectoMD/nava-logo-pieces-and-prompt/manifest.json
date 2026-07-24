@@ -1,0 +1,46 @@
+{
+  "source": "logo (1).png",
+  "canvas": {
+    "width": 988,
+    "height": 454
+  },
+  "assembly": "Overlay all canvas layers at x=0, y=0 in filename order.",
+  "layers": [
+    {
+      "name": "01-icon-left",
+      "file_canvas": "layers-canvas/01-icon-left.png",
+      "file_cropped": "layers-cropped/01-icon-left.png",
+      "x": 40,
+      "y": 72,
+      "width": 141,
+      "height": 275
+    },
+    {
+      "name": "02-icon-right",
+      "file_canvas": "layers-canvas/02-icon-right.png",
+      "file_cropped": "layers-cropped/02-icon-right.png",
+      "x": 181,
+      "y": 44,
+      "width": 139,
+      "height": 303
+    },
+    {
+      "name": "03-icon-diagonal",
+      "file_canvas": "layers-canvas/03-icon-diagonal.png",
+      "file_cropped": "layers-cropped/03-icon-diagonal.png",
+      "x": 41,
+      "y": 43,
+      "width": 279,
+      "height": 304
+    },
+    {
+      "name": "04-wordmark-nava",
+      "file_canvas": "layers-canvas/04-wordmark-nava.png",
+      "file_cropped": "layers-cropped/04-wordmark-nava.png",
+      "x": 386,
+      "y": 139,
+      "width": 579,
+      "height": 181
+    }
+  ]
+}

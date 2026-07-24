@@ -29,6 +29,17 @@ export interface AuthResponse {
   readonly user: AuthenticatedUser;
 }
 
+export interface RegistrationResponse {
+  readonly developmentVerificationCode?: string;
+  readonly email: string;
+  readonly verificationRequired: true;
+}
+
+export interface ResendVerificationResponse {
+  readonly developmentVerificationCode?: string;
+  readonly message: string;
+}
+
 export interface SessionResponse {
   readonly session: { readonly expiresAt: string };
   readonly user: AuthenticatedUser;
@@ -58,6 +69,112 @@ export interface CurrentOrganizationResponse {
     readonly name: string;
     readonly slug: string;
   };
+}
+
+export interface TeamMember {
+  readonly id: string;
+  readonly locations: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+  }>;
+  readonly role: 'barber' | 'manager' | 'owner' | 'receptionist';
+  readonly status: 'active' | 'invited' | 'suspended';
+  readonly user: AuthenticatedUser;
+}
+
+export interface TeamResponse {
+  readonly members: readonly TeamMember[];
+  readonly pendingInvitations: ReadonlyArray<{
+    readonly email: string;
+    readonly expiresAt: string;
+    readonly id: string;
+    readonly role: 'barber' | 'manager' | 'receptionist';
+  }>;
+}
+
+export interface ServiceRecord {
+  readonly assignments: ReadonlyArray<{
+    readonly locationId: string;
+    readonly membershipId: string;
+  }>;
+  readonly categoryId: string | null;
+  readonly durationMinutes: number;
+  readonly id: string;
+  readonly name: string;
+  readonly priceCents: number;
+}
+
+export interface ServicesResponse {
+  readonly categories: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+  }>;
+  readonly services: readonly ServiceRecord[];
+}
+
+export interface SchedulesResponse {
+  readonly blocks: ReadonlyArray<{
+    readonly endsAt: string;
+    readonly id: string;
+    readonly membershipId: string;
+    readonly reason: string | null;
+    readonly startsAt: string;
+  }>;
+  readonly schedules: ReadonlyArray<{
+    readonly endMinute: number;
+    readonly id: string;
+    readonly membershipId: string;
+    readonly startMinute: number;
+    readonly weekday: number;
+  }>;
+}
+
+export interface AppointmentRecord {
+  readonly clientEmail: string | null;
+  readonly clientName: string;
+  readonly clientPhone: string | null;
+  readonly endsAt: string;
+  readonly id: string;
+  readonly locationId: string;
+  readonly notes: string | null;
+  readonly professionalMembershipId: string;
+  readonly services: ReadonlyArray<{
+    readonly durationMinutes: number;
+    readonly id: string;
+    readonly priceCents: number;
+    readonly serviceId: string;
+    readonly serviceName: string;
+  }>;
+  readonly startsAt: string;
+  readonly status:
+    | 'cancelled'
+    | 'checked_in'
+    | 'completed'
+    | 'confirmed'
+    | 'in_progress'
+    | 'no_show'
+    | 'scheduled';
+}
+
+export interface AppointmentsResponse {
+  readonly appointments: readonly AppointmentRecord[];
+}
+
+export interface AvailabilityResponse {
+  readonly durationMinutes: number;
+  readonly slots: ReadonlyArray<{
+    readonly endsAt: string;
+    readonly startsAt: string;
+  }>;
+}
+
+export interface AppointmentEventsResponse {
+  readonly events: ReadonlyArray<{
+    readonly appointmentId: string;
+    readonly id: string;
+    readonly type: 'cancelled' | 'created' | 'rescheduled' | 'status_changed';
+  }>;
+  readonly latestEventId: string;
 }
 
 export class ApiClientError extends Error {

@@ -1,4 +1,10 @@
-import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
+import {
+  createHash,
+  randomBytes,
+  randomInt,
+  scrypt,
+  timingSafeEqual,
+} from 'node:crypto';
 
 const KEY_LENGTH = 64;
 const SCRYPT_COST = 16_384;
@@ -68,6 +74,10 @@ export async function verifyPassword(
 
 export function createOpaqueToken(): string {
   return randomBytes(32).toString('base64url');
+}
+
+export function createVerificationCode(): string {
+  return randomInt(0, 1_000_000).toString().padStart(6, '0');
 }
 
 export function hashOpaqueToken(token: string): string {

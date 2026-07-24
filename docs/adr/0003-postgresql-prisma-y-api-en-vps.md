@@ -15,9 +15,12 @@ La arquitectura original proponía consumir Supabase directamente. El proyecto s
 - Las contraseñas se derivan con `scrypt`, sal aleatoria y comparación en tiempo constante.
 - El móvil guarda únicamente el token de sesión en Expo Secure Store.
 - El aislamiento multi-tenant se aplica en servicios de backend: la organización se resuelve desde la membresía del usuario autenticado y no desde un `organizationId` aportado por el cliente.
+- Hasta que exista un selector de contexto explícito, una cuenta solo puede tener una membresía activa de organización; onboarding y aceptación de invitaciones rechazan una segunda organización.
 - El onboarding crea organización, primera sucursal, membresía owner, asignación y auditoría dentro de una única transacción Prisma.
 - Las migraciones se ejecutan con `prisma migrate deploy` en un paso controlado del despliegue.
 - La recuperación de contraseña usa SMTP configurable. Solo en entorno `local`, si SMTP no está configurado, la API puede devolver el token de desarrollo para permitir pruebas manuales.
+- La verificación SMTP real se realizará en la VPS durante las pruebas piloto; hasta entonces permanece en revisión y Mailpit cubre el flujo local.
+- Las pruebas destructivas usan un PostgreSQL separado mediante `TEST_DATABASE_URL`; `compose.yaml` lo expone como `postgres-test` en el puerto 5433.
 
 ## Migración futura a Supabase
 

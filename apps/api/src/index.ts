@@ -2,7 +2,11 @@ import { config as loadEnvironment } from 'dotenv';
 
 import { buildApi } from './app';
 import { readConfig } from './config';
-import { createRecoveryMailer } from './recovery-mailer';
+import {
+  createInvitationMailer,
+  createRecoveryMailer,
+  createVerificationMailer,
+} from './recovery-mailer';
 
 async function main(): Promise<void> {
   loadEnvironment({ path: '../../.env', quiet: true });
@@ -10,7 +14,9 @@ async function main(): Promise<void> {
   const config = readConfig();
   const app = await buildApi({
     config,
+    invitationMailer: createInvitationMailer(config),
     recoveryMailer: createRecoveryMailer(config),
+    verificationMailer: createVerificationMailer(config),
   });
 
   const shutdown = async () => {

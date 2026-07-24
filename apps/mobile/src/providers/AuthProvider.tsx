@@ -1,9 +1,15 @@
 import type {
   AuthenticatedUser,
   AuthResponse,
+  RegistrationResponse,
+  ResendVerificationResponse,
   SessionResponse,
 } from '@barber-saas/api-client';
-import type { SignInInput, SignUpInput } from '@barber-saas/validation';
+import type {
+  SignInInput,
+  SignUpInput,
+  VerifyEmailInput,
+} from '@barber-saas/validation';
 import {
   createContext,
   type PropsWithChildren,
@@ -28,7 +34,11 @@ interface AuthContextValue {
   readonly session: { readonly expiresAt: string } | null;
   readonly signIn: (input: SignInInput) => Promise<void>;
   readonly signOut: () => Promise<void>;
-  readonly signUp: (input: SignUpInput) => Promise<void>;
+  readonly signUp: (input: SignUpInput) => Promise<RegistrationResponse>;
+  readonly resendVerification: (
+    email: string,
+  ) => Promise<ResendVerificationResponse>;
+  readonly verifyEmail: (input: VerifyEmailInput) => Promise<void>;
   readonly user: AuthenticatedUser | null;
 }
 
@@ -73,16 +83,30 @@ export function AuthProvider({ children }: PropsWithChildren) {
     [applyAuthResponse],
   );
 
-  const signUp = useCallback(
-    async (input: SignUpInput) => {
+  const signUp = useCallback(async (input: SignUpInput) => {
+    return requireApiClient().request<RegistrationResponse>(
+      '/v1/auth/register',
+      { body: input, method: 'POST' },
+    );
+  }, []);
+
+  const verifyEmail = useCallback(
+    async (input: VerifyEmailInput) => {
       const response = await requireApiClient().request<AuthResponse>(
-        '/v1/auth/register',
+        '/v1/auth/verify-email',
         { body: input, method: 'POST' },
       );
       await applyAuthResponse(response);
     },
     [applyAuthResponse],
   );
+
+  const resendVerification = useCallback(async (email: string) => {
+    return requireApiClient().request<ResendVerificationResponse>(
+      '/v1/auth/resend-verification',
+      { body: { email }, method: 'POST' },
+    );
+  }, []);
 
   const signOut = useCallback(async () => {
     try {
@@ -101,12 +125,23 @@ export function AuthProvider({ children }: PropsWithChildren) {
       configurationError: apiConfigurationError,
       isLoading,
       session,
+      resendVerification,
       signIn,
       signOut,
       signUp,
       user,
+      verifyEmail,
     }),
-    [isLoading, session, signIn, signOut, signUp, user],
+    [
+      isLoading,
+      resendVerification,
+      session,
+      signIn,
+      signOut,
+      signUp,
+      user,
+      verifyEmail,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -4,9 +4,13 @@ Monorepositorio del MVP descrito en `INSTRUCCIONES_CODEX_BARBER_SAAS.md`. La dec
 
 ## Estado
 
-La Fase 0 está completada. La Fase 1 contiene autenticación, sesiones, organizaciones, sucursales y onboarding; su verificación de integración con PostgreSQL está preparada para CI y pendiente de ejecutarse en esta máquina. El detalle verificable vive en [`ESTADO_PROYECTO.md`](./ESTADO_PROYECTO.md).
+Las fases 0–3 contienen la base técnica, autenticación y onboarding, equipo,
+servicios, horarios y el motor interno de agenda. La reserva web pública, clientes,
+caja y comisiones comienzan en las fases siguientes. El estado verificable y sus
+pendientes viven en [`ESTADO_PROYECTO.md`](./ESTADO_PROYECTO.md).
 
-Todavía no existen profesionales, servicios, agenda, reservas, caja ni comisiones.
+Las invitaciones de equipo y la recuperación de contraseña usan SMTP. En local
+puede utilizarse Mailpit; en producción debe configurarse un proveedor real.
 
 ## Requisitos
 
@@ -42,6 +46,7 @@ Servicios locales:
 
 - API: `http://127.0.0.1:4000`; salud en `/health`.
 - PostgreSQL: `127.0.0.1:5432`.
+- PostgreSQL exclusivo de pruebas: `127.0.0.1:5433`.
 - Mailpit SMTP: `127.0.0.1:1025`; interfaz en `http://127.0.0.1:8025`.
 - Web pública: `http://localhost:3000`.
 - Panel interno: `http://localhost:3001`.
@@ -60,7 +65,11 @@ pnpm build
 pnpm test:e2e
 ```
 
-Las pruebas PostgreSQL usan exclusivamente `TEST_DATABASE_URL`, ya que limpian sus tablas durante la ejecución.
+Las pruebas PostgreSQL usan exclusivamente `TEST_DATABASE_URL`, ya que limpian
+sus tablas durante la ejecución. `compose.yaml` expone la base exclusiva
+`barber_saas_test` en el puerto `5433`; nunca apunte esta variable a desarrollo o
+producción. Antes de ejecutarlas aplique las migraciones usando temporalmente esa
+URL como `DATABASE_URL`.
 
 ## Estructura
 

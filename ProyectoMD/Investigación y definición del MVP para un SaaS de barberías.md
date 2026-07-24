@@ -218,6 +218,11 @@ El onboarding debe solicitar únicamente:
 
 El objetivo debe ser que el propietario tenga su agenda disponible para recibir reservas en menos de 30 minutos.
 
+Para evitar que el onboarding dependa de terceros, el propietario debe poder crear
+y configurar el perfil operativo de cada profesional antes de que acepte la
+invitación. La invitación se envía por correo y su aceptación es obligatoria
+únicamente para que ese integrante acceda y opere con su propia cuenta.
+
 La primera versión comercial puede limitarse a una sola sucursal, pero toda la base de datos debe incluir `organization_id` y `location_id` para habilitar múltiples sucursales posteriormente.
 
 ---
@@ -701,6 +706,9 @@ Todas las tablas operativas deben identificar la organización y, cuando corresp
 ---
 
 # 9. Roadmap recomendado
+
+> Nota: las fases de esta sección son etapas comerciales de investigación y no
+> corresponden a las fases técnicas 0–13 de `INSTRUCCIONES_CODEX_BARBER_SAAS.md`.
 
 ## Fase 1 — MVP operativo móvil
 

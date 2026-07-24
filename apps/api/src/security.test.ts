@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createOpaqueToken,
+  createVerificationCode,
   hashOpaqueToken,
   hashPassword,
   verifyPassword,
@@ -25,5 +26,9 @@ describe('seguridad de credenciales', () => {
     expect(first).not.toBe(second);
     expect(hashOpaqueToken(first)).toHaveLength(64);
     expect(hashOpaqueToken(first)).not.toBe(first);
+  });
+
+  it('genera códigos numéricos de seis dígitos', () => {
+    expect(createVerificationCode()).toMatch(/^\d{6}$/);
   });
 });
