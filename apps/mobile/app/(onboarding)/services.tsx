@@ -13,23 +13,23 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import {
-  type CollaboratorDraft,
-  CollaboratorFormSheet,
-} from '../../src/components/CollaboratorFormSheet';
 import { NavaButton } from '../../src/components/NavaButton';
+import {
+  type ServiceDraft,
+  ServiceFormSheet,
+} from '../../src/components/ServiceFormSheet';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const teamIllustration = require('../../assets/onboarding-team.png') as number;
+const servicesImage = require('../../assets/imagenServicios.png') as number;
 
-export default function OrganizationOnboardingScreen() {
+export default function ServicesOnboardingScreen() {
   const router = useRouter();
   const { session } = useAuth();
   const { height, width } = useWindowDimensions();
   const compact = height < 740;
-  const [collaboratorSheetOpen, setCollaboratorSheetOpen] = useState(false);
-  const [collaborators, setCollaborators] = useState<CollaboratorDraft[]>([]);
+  const [serviceSheetOpen, setServiceSheetOpen] = useState(false);
+  const [services, setServices] = useState<ServiceDraft[]>([]);
 
   if (!session) return <Redirect href="/(auth)/login" />;
 
@@ -66,12 +66,12 @@ export default function OrganizationOnboardingScreen() {
           <Text style={styles.eyebrow}>Configura tu cuenta</Text>
 
           <View
-            accessibilityLabel="Paso 1 de 4"
+            accessibilityLabel="Paso 2 de 4"
             accessibilityRole="progressbar"
             style={styles.progress}
           >
+            <View style={styles.completedStep} />
             <View style={styles.activeStep} />
-            <View style={styles.step} />
             <View style={styles.step} />
             <View style={styles.step} />
           </View>
@@ -79,9 +79,9 @@ export default function OrganizationOnboardingScreen() {
 
         <View style={styles.main}>
           <Image
-            accessibilityLabel="Equipo profesional de barbería"
+            accessibilityLabel="Cliente de barbería rodeado de herramientas profesionales"
             resizeMode="contain"
-            source={teamIllustration}
+            source={servicesImage}
             style={[
               styles.illustration,
               compact ? styles.illustrationCompact : null,
@@ -91,55 +91,53 @@ export default function OrganizationOnboardingScreen() {
 
           <View style={styles.copy}>
             <Text accessibilityRole="header" style={styles.title}>
-              Colabora con tu equipo de trabajo
+              Crea los servicios de tu negocio
             </Text>
             <Text style={styles.description}>
-              Ahora, vamos a configurar a tus colaboradores para que queden
-              registrados y puedan realizar servicios dentro de la aplicación.
+              Configura los servicios que ofrecerá tu equipo, indicando su
+              duración y precio para que tus clientes puedan reservarlos.
             </Text>
           </View>
 
           <NavaButton
             compact={width < 390}
-            icon="person-add-outline"
+            icon="cut-outline"
             label={
-              collaborators.length > 0
-                ? 'Añadir otro colaborador'
-                : 'Añadir colaborador'
+              services.length > 0 ? 'Añadir otro servicio' : 'Añadir servicio'
             }
-            onPress={() => setCollaboratorSheetOpen(true)}
+            onPress={() => setServiceSheetOpen(true)}
             style={styles.actionButton}
             variant="outline"
           />
-          {collaborators.length > 0 ? (
+          {services.length > 0 ? (
             <Text style={styles.savedLabel}>
-              {collaborators.length}{' '}
-              {collaborators.length === 1
-                ? 'colaborador añadido'
-                : 'colaboradores añadidos'}
+              {services.length}{' '}
+              {services.length === 1
+                ? 'servicio añadido'
+                : 'servicios añadidos'}
             </Text>
           ) : null}
         </View>
 
         <View style={styles.footer}>
           <NavaButton
-            disabled={collaborators.length === 0}
+            disabled
             icon="arrow-forward-outline"
             label="Siguiente"
-            onPress={() => router.push('/(onboarding)/services')}
+            onPress={() => undefined}
             style={styles.nextButton}
             variant="primary"
           />
         </View>
       </ScrollView>
 
-      <CollaboratorFormSheet
-        onClose={() => setCollaboratorSheetOpen(false)}
-        onSave={(collaborator) => {
-          setCollaborators((current) => [...current, collaborator]);
-          setCollaboratorSheetOpen(false);
+      <ServiceFormSheet
+        onClose={() => setServiceSheetOpen(false)}
+        onSave={(service) => {
+          setServices((current) => [...current, service]);
+          setServiceSheetOpen(false);
         }}
-        visible={collaboratorSheetOpen}
+        visible={serviceSheetOpen}
       />
     </SafeAreaView>
   );
@@ -186,6 +184,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 430,
   },
+  completedStep: {
+    backgroundColor: '#88a9ee',
+    borderRadius: 6,
+    height: 10,
+    width: 10,
+  },
   content: {
     alignSelf: 'center',
     flexGrow: 1,
@@ -201,7 +205,7 @@ const styles = StyleSheet.create({
   },
   copy: {
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 8,
   },
   description: {
     color: '#667080',
@@ -228,11 +232,11 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   illustration: {
-    aspectRatio: 1.437,
+    aspectRatio: 1.5,
     width: '108%',
   },
   illustrationCompact: {
-    maxHeight: 225,
+    maxHeight: 220,
   },
   main: {
     alignItems: 'center',
@@ -251,15 +255,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  screen: {
-    backgroundColor: '#f9fbff',
-    flex: 1,
-  },
   savedLabel: {
     color: '#667080',
     fontSize: 13,
     fontWeight: '700',
     marginTop: 10,
+  },
+  screen: {
+    backgroundColor: '#f9fbff',
+    flex: 1,
   },
   step: {
     backgroundColor: '#dce7fb',

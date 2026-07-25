@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { StatusBar } from 'expo-status-bar';
 import {
   Image,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,11 +18,13 @@ const teamIllustration = require('../../assets/onboarding-team.png') as number;
 
 interface AccountSetupWelcomeScreenProps {
   readonly fullName: string;
+  readonly onBack: () => void;
   readonly onContinue: () => void;
 }
 
 export function AccountSetupWelcomeScreen({
   fullName,
+  onBack,
   onContinue,
 }: AccountSetupWelcomeScreenProps) {
   const { height, width } = useWindowDimensions();
@@ -52,6 +55,16 @@ export function AccountSetupWelcomeScreen({
         ]}
         showsVerticalScrollIndicator={false}
       >
+        <Pressable
+          accessibilityLabel="Regresar al inicio"
+          accessibilityRole="button"
+          onPress={onBack}
+          style={styles.backButton}
+        >
+          <Ionicons color="#101c2d" name="arrow-back" size={23} />
+          <Text style={styles.backLabel}>Regresar al inicio</Text>
+        </Pressable>
+
         <View style={styles.header}>
           <Text style={styles.brand}>NAVA</Text>
           <View style={styles.badge}>
@@ -124,6 +137,20 @@ export function AccountSetupWelcomeScreen({
 }
 
 const styles = StyleSheet.create({
+  backButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+    paddingHorizontal: 2,
+    paddingVertical: 8,
+  },
+  backLabel: {
+    color: '#101c2d',
+    fontSize: 15,
+    fontWeight: '800',
+  },
   background: {
     ...StyleSheet.absoluteFill,
     overflow: 'hidden',
@@ -179,7 +206,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   bottomGlow: {
-    backgroundColor: 'rgba(168, 221, 217, 0.15)',
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
     borderRadius: 250,
     bottom: -170,
     height: 360,

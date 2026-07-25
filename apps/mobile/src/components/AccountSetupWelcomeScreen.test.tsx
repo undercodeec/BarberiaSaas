@@ -1,13 +1,16 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { render, userEvent } from '@testing-library/react-native';
 
 import { AccountSetupWelcomeScreen } from './AccountSetupWelcomeScreen';
 
 describe('AccountSetupWelcomeScreen', () => {
   it('personaliza la bienvenida y permite comenzar la configuración', async () => {
+    const onBack = jest.fn();
     const onContinue = jest.fn();
+    const user = userEvent.setup();
     const view = await render(
       <AccountSetupWelcomeScreen
         fullName="Ana Torres"
+        onBack={onBack}
         onContinue={onContinue}
       />,
     );
@@ -15,9 +18,14 @@ describe('AccountSetupWelcomeScreen', () => {
     expect(view.getByText('¡Hola, Ana!')).toBeOnTheScreen();
     expect(view.getByRole('header')).toHaveTextContent('Configura tu cuenta');
 
-    fireEvent.press(
+    await user.press(
       view.getByRole('button', { name: 'Comenzar configuración' }),
     );
     expect(onContinue).toHaveBeenCalledTimes(1);
+
+    await user.press(
+      view.getByRole('button', { name: 'Regresar al inicio' }),
+    );
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });

@@ -73,7 +73,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] La API no confía en `organizationId` enviado por el cliente.
 - [x] Bundle ejecutable de la API generado para Node.js; despliegue en VPS no iniciado.
 - [x] Bundle iniciado y endpoint `/health` verificado con HTTP 200.
-- [ ] Conectividad autenticada con el proveedor SMTP real y entrega a bandeja verificadas en el entorno de despliegue.
+- [x] Conectividad autenticada con el proveedor SMTP real y entrega a bandeja verificadas en el entorno de despliegue.
 
 ### Aplicación móvil
 
@@ -99,6 +99,10 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Banner final para ingresar un código OTP de seis dígitos, reenviarlo y completar la verificación de cuenta.
 - [x] El código de desarrollo local no se muestra en la interfaz; el banner presenta una cuenta regresiva `mm:ss`, bloquea la confirmación al vencer y reinicia el contador al reenviar.
 - [x] Pantalla inicial de configuración de cuenta tras la verificación o el primer inicio de sesión, con acceso al onboarding de barbería y sucursal.
+- [x] Onboarding visual de colaboradores como paso 1 de 4, con navegación de regreso, progreso, ilustración Nava y controles coherentes con la pantalla de inicio de sesión.
+- [x] Panel inferior para añadir colaboradores con fotografía de perfil, nombre y tipo obligatorios, descripción, roles de barbero/administrador y creación de roles personalizados con permiso para realizar servicios.
+- [x] Onboarding visual de servicios como paso 2 de 4, accesible al registrar al menos un colaborador y pulsar `Siguiente`.
+- [x] Panel inferior para añadir borradores de servicios con nombre, descripción, duración y precio validados, usando la ilustración `imagenServicios.png`.
 - [x] Formulario y componentes antiguos de login/registro retirados; las rutas cargan exclusivamente `LoginFullScreen` y `RegistrationFlow`.
 
 ### Flujo vigente de registro y verificación
@@ -147,6 +151,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Bundle de la API generado correctamente.
 - [x] Ocho pruebas de integración PostgreSQL ejecutadas correctamente, incluida la ausencia de `users` antes de verificar y el bloqueo tras cinco OTP incorrectos.
 - [x] Lint, tipos, pruebas unitarias y builds del monorepositorio aprobados después del cambio de arquitectura.
+- [x] UI de onboarding de colaboradores y servicios verificada con TypeScript, ESLint, export web de Expo y tres pruebas de componentes.
 
 ## Fases funcionales
 
@@ -248,6 +253,8 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - Seguridad de invitaciones: el token original no se persiste ni se devuelve al
   cliente; una nueva invitación revoca la pendiente anterior y un fallo de envío
   revoca el token emitido.
+- Onboarding móvil de colaboradores y servicios: tres pruebas de componentes,
+  TypeScript, ESLint y export web de Expo aprobados el 2026-07-25.
 
 ## Siguiente tarea recomendada
 
