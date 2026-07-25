@@ -97,6 +97,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Prefijo telefónico internacional seleccionable y detección inicial por zona horaria/región del dispositivo.
 - [x] Horarios de apertura y cierre seleccionables mediante ruedas deslizables de horas y minutos.
 - [x] Banner final para ingresar un código OTP de seis dígitos, reenviarlo y completar la verificación de cuenta.
+- [x] Pantalla inicial de configuración de cuenta tras la verificación o el primer inicio de sesión, con acceso al onboarding de barbería y sucursal.
 - [x] Formulario y componentes antiguos de login/registro retirados; las rutas cargan exclusivamente `LoginFullScreen` y `RegistrationFlow`.
 
 ### Flujo vigente de registro y verificación

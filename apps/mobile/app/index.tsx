@@ -47,7 +47,7 @@ export default function EntryScreen() {
     );
   }
   if (session && organizationQuery.data) return <Redirect href="/(app)" />;
-  if (session) return <Redirect href="/(onboarding)/organization" />;
+  if (session) return <Redirect href="/(onboarding)/account-setup" />;
   return (
     <NavaWelcomeScreen
       onLogin={() => router.push('/(auth)/login')}

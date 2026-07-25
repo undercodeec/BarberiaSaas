@@ -142,7 +142,7 @@ export function RegistrationFlow({
               params: { token: invitationToken },
               pathname: '/(onboarding)/accept-invitation',
             }
-          : '/(onboarding)/organization',
+          : '/(onboarding)/account-setup',
       );
     } catch (error) {
       setVerificationError(
