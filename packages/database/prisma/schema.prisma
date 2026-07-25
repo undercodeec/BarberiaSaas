@@ -87,6 +87,23 @@ model EmailVerificationCode {
   @@map("email_verification_codes")
 }
 
+model PendingRegistration {
+  id             String    @id @default(uuid()) @db.Uuid
+  email          String    @unique @db.VarChar(254)
+  fullName       String    @map("full_name") @db.VarChar(120)
+  passwordHash   String    @map("password_hash") @db.Text
+  codeHash       String    @map("code_hash") @db.Char(64)
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(3)
+  failedAttempts Int       @default(0) @map("failed_attempts")
+  lockedUntil    DateTime? @map("locked_until") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([expiresAt])
+  @@index([lockedUntil])
+  @@map("pending_registrations")
+}
+
 model Session {
   id        String    @id @default(uuid()) @db.Uuid
   userId    String    @map("user_id") @db.Uuid

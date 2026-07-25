@@ -50,6 +50,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     await database.location.deleteMany();
     await database.organization.deleteMany();
     await database.passwordResetToken.deleteMany();
+    await database.pendingRegistration.deleteMany();
     await database.session.deleteMany();
     await database.user.deleteMany();
   });
@@ -73,7 +74,11 @@ describeWithDatabase('API con PostgreSQL', () => {
     const registration = response.json<{
       developmentVerificationCode: string;
       email: string;
+      verificationExpiresAt: string;
     }>();
+    expect(
+      new Date(registration.verificationExpiresAt).getTime(),
+    ).toBeGreaterThan(Date.now());
     const verification = await app.inject({
       method: 'POST',
       payload: {
@@ -211,14 +216,22 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(registrationResponse.statusCode).toBe(201);
     const registration = registrationResponse.json<{
       developmentVerificationCode: string;
+      verificationExpiresAt: string;
     }>();
+    expect(
+      new Date(registration.verificationExpiresAt).getTime(),
+    ).toBeGreaterThan(Date.now());
+    expect(await database.user.findUnique({ where: { email } })).toBeNull();
+    expect(
+      await database.pendingRegistration.findUnique({ where: { email } }),
+    ).not.toBeNull();
 
     const loginBeforeVerification = await app.inject({
       method: 'POST',
       payload: { email, password },
       url: '/v1/auth/login',
     });
-    expect(loginBeforeVerification.statusCode).toBe(403);
+    expect(loginBeforeVerification.statusCode).toBe(401);
 
     const verification = await app.inject({
       method: 'POST',
@@ -226,6 +239,12 @@ describeWithDatabase('API con PostgreSQL', () => {
       url: '/v1/auth/verify-email',
     });
     expect(verification.statusCode).toBe(200);
+    expect(await database.user.findUnique({ where: { email } })).toMatchObject({
+      emailVerifiedAt: expect.any(Date),
+    });
+    expect(
+      await database.pendingRegistration.findUnique({ where: { email } }),
+    ).toBeNull();
 
     const reusedCode = await app.inject({
       method: 'POST',
@@ -233,6 +252,80 @@ describeWithDatabase('API con PostgreSQL', () => {
       url: '/v1/auth/verify-email',
     });
     expect(reusedCode.statusCode).toBe(400);
+  });
+
+  it('bloquea la verificación después de cinco códigos incorrectos', async () => {
+    const email = 'verification-limit@example.com';
+    const password = 'Clave-segura-123';
+    const registrationPayload = {
+      confirmPassword: password,
+      email,
+      fullName: 'Cuenta con límite',
+      password,
+    };
+    const registrationResponse = await app.inject({
+      method: 'POST',
+      payload: registrationPayload,
+      url: '/v1/auth/register',
+    });
+    expect(registrationResponse.statusCode).toBe(201);
+    const registration = registrationResponse.json<{
+      developmentVerificationCode: string;
+    }>();
+    const wrongCode =
+      registration.developmentVerificationCode === '000000'
+        ? '000001'
+        : '000000';
+
+    for (let attempt = 1; attempt < 5; attempt += 1) {
+      const response = await app.inject({
+        method: 'POST',
+        payload: { code: wrongCode, email },
+        url: '/v1/auth/verify-email',
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.json<{ code: string }>().code).toBe(
+        'INVALID_VERIFICATION_CODE',
+      );
+    }
+
+    const fifthAttempt = await app.inject({
+      method: 'POST',
+      payload: { code: wrongCode, email },
+      url: '/v1/auth/verify-email',
+    });
+    expect(fifthAttempt.statusCode).toBe(429);
+    expect(fifthAttempt.json<{ code: string }>().code).toBe(
+      'VERIFICATION_RATE_LIMITED',
+    );
+
+    const correctCodeWhileLocked = await app.inject({
+      method: 'POST',
+      payload: { code: registration.developmentVerificationCode, email },
+      url: '/v1/auth/verify-email',
+    });
+    expect(correctCodeWhileLocked.statusCode).toBe(429);
+
+    const resendWhileLocked = await app.inject({
+      method: 'POST',
+      payload: { email },
+      url: '/v1/auth/resend-verification',
+    });
+    expect(resendWhileLocked.statusCode).toBe(429);
+
+    const registerWhileLocked = await app.inject({
+      method: 'POST',
+      payload: registrationPayload,
+      url: '/v1/auth/register',
+    });
+    expect(registerWhileLocked.statusCode).toBe(429);
+    expect(await database.user.findUnique({ where: { email } })).toBeNull();
+    expect(
+      await database.pendingRegistration.findUnique({ where: { email } }),
+    ).toMatchObject({
+      failedAttempts: 5,
+      lockedUntil: expect.any(Date),
+    });
   });
 
   it('aísla la organización usando la identidad de cada sesión', async () => {

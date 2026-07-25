@@ -2,7 +2,7 @@
 
 Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión posterior documentada en `docs/adr/0003-postgresql-prisma-y-api-en-vps.md`. Se marca `[x]` solo cuando la tarea está implementada y cuenta con la verificación indicada; `[ ]` significa pendiente o aún no demostrada.
 
-Última actualización: 2026-07-24
+Última actualización: 2026-07-25
 
 ## Decisión de infraestructura vigente
 
@@ -97,6 +97,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Prefijo telefónico internacional seleccionable y detección inicial por zona horaria/región del dispositivo.
 - [x] Horarios de apertura y cierre seleccionables mediante ruedas deslizables de horas y minutos.
 - [x] Banner final para ingresar un código OTP de seis dígitos, reenviarlo y completar la verificación de cuenta.
+- [x] El código de desarrollo local no se muestra en la interfaz; el banner presenta una cuenta regresiva `mm:ss`, bloquea la confirmación al vencer y reinicia el contador al reenviar.
 - [x] Pantalla inicial de configuración de cuenta tras la verificación o el primer inicio de sesión, con acceso al onboarding de barbería y sucursal.
 - [x] Formulario y componentes antiguos de login/registro retirados; las rutas cargan exclusivamente `LoginFullScreen` y `RegistrationFlow`.
 
@@ -109,28 +110,32 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 5. Se seleccionan apertura y cierre mediante ruedas de hora y minutos.
 6. Se recopilan correo, contraseña y confirmación.
 7. Se muestra un resumen editable de toda la información.
-8. `Completar registro` crea una cuenta pendiente y genera un OTP numérico de seis dígitos.
-9. La API guarda únicamente SHA-256 del OTP; el código vence en 10 minutos y un reenvío invalida los anteriores.
-10. El correo se envía mediante el SMTP configurable del proyecto. En entorno local, la respuesta incluye el código de desarrollo para facilitar pruebas.
-11. El banner de verificación permite ingresar o reenviar el código.
-12. Un código válido se consume atómicamente, marca `users.email_verified_at` y crea la primera sesión.
-13. Un código vencido, incorrecto o reutilizado es rechazado. El inicio de sesión también se rechaza mientras el correo no esté verificado.
-14. Después de verificar, continúa el onboarding de organización o la aceptación de invitación conservada.
+8. `Completar registro` crea únicamente una solicitud temporal en `pending_registrations`; todavía no inserta ni activa una cuenta en `users`.
+9. La solicitud temporal conserva los hashes de contraseña y OTP, correo, nombre y expiración. El OTP vence en 10 minutos y un reenvío reemplaza el código anterior.
+10. El correo se envía mediante el SMTP configurable del proyecto. En entorno local, la API puede incluir el código de desarrollo para pruebas automatizadas, pero la interfaz nunca lo muestra.
+11. El banner de verificación permite ingresar o reenviar el código y presenta la vigencia restante como cuenta regresiva `mm:ss`.
+12. Un código válido elimina atómicamente la solicitud temporal, crea o activa `users`, establece `email_verified_at` y crea la primera sesión.
+13. Un código vencido, incorrecto o reutilizado es rechazado. Cada fallo reduce los intentos disponibles.
+14. Al quinto código incorrecto, el correo queda bloqueado durante 15 minutos con respuesta HTTP `429 VERIFICATION_RATE_LIMITED`. El bloqueo también impide registrar o reenviar otro código y se serializa mediante bloqueo de fila PostgreSQL.
+15. Después de verificar, continúa el onboarding de organización o la aceptación de invitación conservada.
 
 ### Persistencia y API de verificación
 
 - [x] Campo `users.email_verified_at` modelado en Prisma.
 - [x] Tabla `email_verification_codes` con hash, expiración, consumo y relación en cascada con usuario.
 - [x] Migración `20260724180000_email_verification_codes` y reversa SQL creadas.
-- [x] `POST /v1/auth/register` devuelve cuenta pendiente en lugar de sesión.
+- [x] Tabla `pending_registrations` para conservar la solicitud temporal sin crear `users`, con hashes, expiración, intentos fallidos y bloqueo.
+- [x] Migraciones `20260725183000_pending_registrations` y `20260725190000_verification_attempt_limits`, con reversas SQL, creadas y aplicadas en desarrollo y pruebas.
+- [x] `POST /v1/auth/register` devuelve una solicitud pendiente en lugar de crear cuenta o sesión.
 - [x] `POST /v1/auth/verify-email` valida y consume el OTP, verifica usuario y crea sesión.
 - [x] `POST /v1/auth/resend-verification` invalida códigos pendientes y emite uno nuevo.
 - [x] `POST /v1/auth/login` bloquea cuentas no verificadas.
+- [x] Máximo de cinco intentos OTP fallidos por correo, bloqueo de 15 minutos y HTTP `429`; generar o reenviar otro código no restablece el límite.
 - [x] Plantilla SMTP `Verifica tu cuenta de Nava` implementada.
-- [ ] Migración OTP pendiente de aplicar a PostgreSQL local: Docker Desktop no estuvo disponible durante esta actualización.
+- [x] Migraciones OTP y solicitudes pendientes aplicadas a PostgreSQL local (`5434`) y a la base aislada de pruebas (`5433`).
 - [ ] Entrega del OTP pendiente de comprobar con el proveedor SMTP real.
 - [ ] Los datos ampliados del registro (negocio, teléfono, país, ciudad y horario) todavía se conservan durante el asistente móvil, pero su persistencia definitiva se realizará al ampliar el contrato de onboarding/API.
-- [ ] Añadir limitación de frecuencia por IP/correo para registro, verificación y reenvío antes de producción.
+- [ ] Añadir limitación general de frecuencia por IP para registro y reenvío antes de producción; la limitación de intentos OTP por correo ya está implementada.
 
 ### Pruebas y calidad
 
@@ -140,7 +145,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Tipos aprobados en base de datos, validación, cliente API, API y móvil.
 - [x] Pruebas unitarias ejecutadas: 23 aprobadas.
 - [x] Bundle de la API generado correctamente.
-- [x] Seis pruebas de integración PostgreSQL ejecutadas correctamente.
+- [x] Ocho pruebas de integración PostgreSQL ejecutadas correctamente, incluida la ausencia de `users` antes de verificar y el bloqueo tras cinco OTP incorrectos.
 - [x] Lint, tipos, pruebas unitarias y builds del monorepositorio aprobados después del cambio de arquitectura.
 
 ## Fases funcionales

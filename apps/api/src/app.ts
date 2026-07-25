@@ -37,6 +37,8 @@ import {
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const RESET_DURATION_MS = 30 * 60 * 1000;
 const VERIFICATION_DURATION_MS = 10 * 60 * 1000;
+const VERIFICATION_LOCK_DURATION_MS = 15 * 60 * 1000;
+const MAX_VERIFICATION_ATTEMPTS = 5;
 
 interface BuildApiOptions {
   readonly config: ApiConfig;
@@ -54,6 +56,23 @@ function publicUser(user: { email: string; fullName: string; id: string }) {
   return { email: user.email, fullName: user.fullName, id: user.id };
 }
 
+function verificationRateLimitError(lockedUntil: Date): ApiError {
+  const remainingMinutes = Math.max(
+    1,
+    Math.ceil((lockedUntil.getTime() - Date.now()) / 60_000),
+  );
+  return new ApiError(
+    429,
+    'VERIFICATION_RATE_LIMITED',
+    `Demasiados intentos. Inténtalo nuevamente en ${remainingMinutes} minuto${remainingMinutes === 1 ? '' : 's'}.`,
+  );
+}
+
+function assertVerificationNotLocked(lockedUntil: Date | null): void {
+  if (!lockedUntil || lockedUntil <= new Date()) return;
+  throw verificationRateLimitError(lockedUntil);
+}
+
 async function createSession(database: DatabaseClient, userId: string) {
   const token = createOpaqueToken();
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
@@ -67,30 +86,36 @@ async function issueVerificationCode({
   appEnvironment,
   database,
   email,
-  userId,
+  fullName,
+  passwordHash,
   verificationMailer,
 }: {
   readonly appEnvironment: ApiConfig['APP_ENV'];
   readonly database: DatabaseClient;
   readonly email: string;
-  readonly userId: string;
+  readonly fullName: string;
+  readonly passwordHash: string;
   readonly verificationMailer: VerificationMailer | null;
 }) {
   const code = createVerificationCode();
   const now = new Date();
-  await database.$transaction([
-    database.emailVerificationCode.updateMany({
-      data: { usedAt: now },
-      where: { userId, usedAt: null },
-    }),
-    database.emailVerificationCode.create({
-      data: {
-        codeHash: hashOpaqueToken(code),
-        expiresAt: new Date(Date.now() + VERIFICATION_DURATION_MS),
-        userId,
-      },
-    }),
-  ]);
+  const expiresAt = new Date(now.getTime() + VERIFICATION_DURATION_MS);
+  await database.pendingRegistration.upsert({
+    create: {
+      codeHash: hashOpaqueToken(code),
+      email,
+      expiresAt,
+      fullName,
+      passwordHash,
+    },
+    update: {
+      codeHash: hashOpaqueToken(code),
+      expiresAt,
+      fullName,
+      passwordHash,
+    },
+    where: { email },
+  });
   if (verificationMailer) await verificationMailer.send({ code, email });
   else if (appEnvironment !== 'local') {
     throw new ApiError(
@@ -99,7 +124,10 @@ async function issueVerificationCode({
       'El servicio de verificación por correo no está disponible.',
     );
   }
-  return appEnvironment === 'local' ? code : undefined;
+  return {
+    developmentVerificationCode: appEnvironment === 'local' ? code : undefined,
+    verificationExpiresAt: expiresAt.toISOString(),
+  };
 }
 
 function getBearerToken(request: FastifyRequest): string {
@@ -157,24 +185,27 @@ export async function buildApi({
           'Ya existe una cuenta con ese correo.',
         );
       }
-      const user = existingUser
-        ? await database.user.update({
-            data: { fullName: input.fullName.trim(), passwordHash },
-            where: { id: existingUser.id },
-          })
-        : await database.user.create({
-            data: { email, fullName: input.fullName.trim(), passwordHash },
-          });
-      const developmentVerificationCode = await issueVerificationCode({
+      const pendingRegistration = await database.pendingRegistration.findUnique(
+        { where: { email } },
+      );
+      assertVerificationNotLocked(pendingRegistration?.lockedUntil ?? null);
+      const verification = await issueVerificationCode({
         appEnvironment: config.APP_ENV,
         database,
-        email: user.email,
-        userId: user.id,
+        email,
+        fullName: input.fullName.trim(),
+        passwordHash,
         verificationMailer,
       });
       return reply.code(201).send({
-        ...(developmentVerificationCode ? { developmentVerificationCode } : {}),
-        email: user.email,
+        ...(verification.developmentVerificationCode
+          ? {
+              developmentVerificationCode:
+                verification.developmentVerificationCode,
+            }
+          : {}),
+        email,
+        verificationExpiresAt: verification.verificationExpiresAt,
         verificationRequired: true,
       });
     } catch (error) {
@@ -220,70 +251,118 @@ export async function buildApi({
   app.post('/v1/auth/verify-email', async (request) => {
     const input = verifyEmailSchema.parse(request.body);
     const email = normalizeEmail(input.email);
-    const user = await database.user.findUnique({ where: { email } });
-    if (!user) {
+    const outcome = await database.$transaction(async (transaction) => {
+      const now = new Date();
+      await transaction.$queryRaw`
+        SELECT "id"
+        FROM "pending_registrations"
+        WHERE "email" = ${email}
+        FOR UPDATE
+      `;
+      const verification = await transaction.pendingRegistration.findUnique({
+        where: { email },
+      });
+      if (!verification || verification.expiresAt <= now) {
+        return { kind: 'invalid' as const, remainingAttempts: null };
+      }
+      if (verification.lockedUntil && verification.lockedUntil > now) {
+        return {
+          kind: 'locked' as const,
+          lockedUntil: verification.lockedUntil,
+        };
+      }
+      if (verification.codeHash !== hashOpaqueToken(input.code)) {
+        const updated = await transaction.pendingRegistration.update({
+          data: verification.lockedUntil
+            ? { failedAttempts: 1, lockedUntil: null }
+            : { failedAttempts: { increment: 1 } },
+          where: { id: verification.id },
+        });
+        if (updated.failedAttempts >= MAX_VERIFICATION_ATTEMPTS) {
+          const lockedUntil = new Date(
+            now.getTime() + VERIFICATION_LOCK_DURATION_MS,
+          );
+          await transaction.pendingRegistration.update({
+            data: { lockedUntil },
+            where: { id: verification.id },
+          });
+          return { kind: 'locked' as const, lockedUntil };
+        }
+        return {
+          kind: 'invalid' as const,
+          remainingAttempts: MAX_VERIFICATION_ATTEMPTS - updated.failedAttempts,
+        };
+      }
+      const consumed = await transaction.pendingRegistration.deleteMany({
+        where: {
+          codeHash: verification.codeHash,
+          id: verification.id,
+        },
+      });
+      if (consumed.count !== 1) {
+        return { kind: 'invalid' as const, remainingAttempts: null };
+      }
+      const user = await transaction.user.upsert({
+        create: {
+          email: verification.email,
+          emailVerifiedAt: now,
+          fullName: verification.fullName,
+          passwordHash: verification.passwordHash,
+        },
+        update: {
+          emailVerifiedAt: now,
+          fullName: verification.fullName,
+          passwordHash: verification.passwordHash,
+        },
+        where: { email: verification.email },
+      });
+      return { kind: 'verified' as const, user };
+    });
+    if (outcome.kind === 'locked') {
+      throw verificationRateLimitError(outcome.lockedUntil);
+    }
+    if (outcome.kind === 'invalid') {
       throw new ApiError(
         400,
         'INVALID_VERIFICATION_CODE',
-        'El código no es válido o ya venció.',
+        outcome.remainingAttempts === null
+          ? 'El código no es válido o ya venció.'
+          : `El código no es válido. Te quedan ${outcome.remainingAttempts} intento${outcome.remainingAttempts === 1 ? '' : 's'}.`,
       );
     }
-    await database.$transaction(async (transaction) => {
-      const verification = await transaction.emailVerificationCode.findFirst({
-        where: {
-          codeHash: hashOpaqueToken(input.code),
-          expiresAt: { gt: new Date() },
-          usedAt: null,
-          userId: user.id,
-        },
-      });
-      if (!verification) {
-        throw new ApiError(
-          400,
-          'INVALID_VERIFICATION_CODE',
-          'El código no es válido o ya venció.',
-        );
-      }
-      const now = new Date();
-      const consumed = await transaction.emailVerificationCode.updateMany({
-        data: { usedAt: now },
-        where: { id: verification.id, usedAt: null },
-      });
-      if (consumed.count !== 1) {
-        throw new ApiError(
-          400,
-          'INVALID_VERIFICATION_CODE',
-          'El código no es válido o ya fue utilizado.',
-        );
-      }
-      await transaction.user.update({
-        data: { emailVerifiedAt: now },
-        where: { id: user.id },
-      });
-    });
     return {
-      session: await createSession(database, user.id),
-      user: publicUser(user),
+      session: await createSession(database, outcome.user.id),
+      user: publicUser(outcome.user),
     };
   });
 
   app.post('/v1/auth/resend-verification', async (request) => {
     const { email: rawEmail } = resendVerificationSchema.parse(request.body);
     const email = normalizeEmail(rawEmail);
-    const user = await database.user.findUnique({ where: { email } });
+    const pendingRegistration = await database.pendingRegistration.findUnique({
+      where: { email },
+    });
+    assertVerificationNotLocked(pendingRegistration?.lockedUntil ?? null);
     let developmentVerificationCode: string | undefined;
-    if (user && !user.emailVerifiedAt) {
-      developmentVerificationCode = await issueVerificationCode({
+    let verificationExpiresAt = new Date(
+      Date.now() + VERIFICATION_DURATION_MS,
+    ).toISOString();
+    if (pendingRegistration) {
+      const verification = await issueVerificationCode({
         appEnvironment: config.APP_ENV,
         database,
-        email: user.email,
-        userId: user.id,
+        email: pendingRegistration.email,
+        fullName: pendingRegistration.fullName,
+        passwordHash: pendingRegistration.passwordHash,
         verificationMailer,
       });
+      developmentVerificationCode = verification.developmentVerificationCode;
+      verificationExpiresAt = verification.verificationExpiresAt;
     }
     return {
       ...(developmentVerificationCode ? { developmentVerificationCode } : {}),
       message: 'Si la cuenta está pendiente, recibirás un nuevo código.',
+      verificationExpiresAt,
     };
   });
 

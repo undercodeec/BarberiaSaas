@@ -15,7 +15,7 @@ import {
   type TextInputProps,
   View,
 } from 'react-native';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NavaButton } from './NavaButton';
@@ -30,6 +30,20 @@ import { useAuth } from '../providers/AuthProvider';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const logoImage = require('../../assets/nava-logo.png') as number;
+const VERIFICATION_DURATION_SECONDS = 10 * 60;
+
+function remainingVerificationSeconds(expiresAt: string): number {
+  return Math.max(
+    0,
+    Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 1000),
+  );
+}
+
+function formatCountdown(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+}
 
 type AccountType = 'business' | 'professional';
 type Step =
@@ -66,9 +80,24 @@ export function RegistrationFlow({
   const [verificationError, setVerificationError] = useState<string | null>(
     null,
   );
-  const [developmentCode, setDevelopmentCode] = useState<string | null>(null);
+  const [verificationExpiresAt, setVerificationExpiresAt] = useState<
+    string | null
+  >(null);
+  const [remainingSeconds, setRemainingSeconds] = useState(
+    VERIFICATION_DURATION_SECONDS,
+  );
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
+  useEffect(() => {
+    if (step !== 'verification' || !verificationExpiresAt) return;
+    const updateCountdown = () => {
+      setRemainingSeconds(remainingVerificationSeconds(verificationExpiresAt));
+    };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [step, verificationExpiresAt]);
+  const verificationExpired = remainingSeconds === 0;
   const defaultCountry =
     COUNTRIES.find((country) => country.code === countryCode) ?? COUNTRIES[0]!;
   const phoneCountry =
@@ -120,7 +149,10 @@ export function RegistrationFlow({
           password,
         });
         setVerificationEmail(response.email);
-        setDevelopmentCode(response.developmentVerificationCode ?? null);
+        setVerificationExpiresAt(response.verificationExpiresAt);
+        setRemainingSeconds(
+          remainingVerificationSeconds(response.verificationExpiresAt),
+        );
         setStep('verification');
       } catch (error) {
         setFormError(
@@ -133,6 +165,10 @@ export function RegistrationFlow({
   );
   const confirmVerification = async () => {
     setVerificationError(null);
+    if (verificationExpired) {
+      setVerificationError('El código venció. Solicita uno nuevo.');
+      return;
+    }
     setVerifying(true);
     try {
       await verifyEmail({ code: verificationCode, email: verificationEmail });
@@ -159,7 +195,11 @@ export function RegistrationFlow({
     setResending(true);
     try {
       const response = await resendVerification(verificationEmail);
-      setDevelopmentCode(response.developmentVerificationCode ?? null);
+      setVerificationCode('');
+      setVerificationExpiresAt(response.verificationExpiresAt);
+      setRemainingSeconds(
+        remainingVerificationSeconds(response.verificationExpiresAt),
+      );
     } catch (error) {
       setVerificationError(
         error instanceof Error
@@ -502,7 +542,7 @@ export function RegistrationFlow({
                     ) : null}
                     {step === 'verification' ? (
                       <Section
-                        description={`Enviamos un código de 6 dígitos a ${verificationEmail}. Vence en 10 minutos.`}
+                        description={`Enviamos un código de 6 dígitos a ${verificationEmail}.`}
                         title="Verifica tu cuenta"
                       >
                         {verificationError ? (
@@ -510,11 +550,19 @@ export function RegistrationFlow({
                             {verificationError}
                           </Text>
                         ) : null}
-                        {developmentCode ? (
-                          <Text style={verificationStyles.developmentCode}>
-                            Código local: {developmentCode}
-                          </Text>
-                        ) : null}
+                        <Text
+                          accessibilityLiveRegion="polite"
+                          style={[
+                            verificationStyles.countdown,
+                            verificationExpired
+                              ? verificationStyles.countdownExpired
+                              : null,
+                          ]}
+                        >
+                          {verificationExpired
+                            ? 'El código venció. Solicita uno nuevo.'
+                            : `El código vence en ${formatCountdown(remainingSeconds)}`}
+                        </Text>
                         <View style={s.field}>
                           <Text style={s.label}>Código de verificación</Text>
                           <TextInput
@@ -531,7 +579,11 @@ export function RegistrationFlow({
                           />
                         </View>
                         <NavaButton
-                          disabled={verificationCode.length !== 6 || verifying}
+                          disabled={
+                            verificationCode.length !== 6 ||
+                            verificationExpired ||
+                            verifying
+                          }
                           icon="shield-checkmark-outline"
                           label="Verificar cuenta"
                           loading={verifying}
@@ -879,8 +931,8 @@ const verificationStyles = StyleSheet.create({
     paddingHorizontal: 18,
     textAlign: 'center',
   },
-  developmentCode: {
-    backgroundColor: '#edf6ff',
+  countdown: {
+    backgroundColor: '#f0f7ff',
     borderRadius: 12,
     color: '#1855a3',
     fontSize: 15,
@@ -888,6 +940,10 @@ const verificationStyles = StyleSheet.create({
     marginBottom: 18,
     padding: 12,
     textAlign: 'center',
+  },
+  countdownExpired: {
+    backgroundColor: '#fff1f0',
+    color: '#b42318',
   },
   resendButton: { alignItems: 'center', marginTop: 18, paddingVertical: 10 },
   resendText: { color: '#2464e8', fontSize: 15, fontWeight: '800' },

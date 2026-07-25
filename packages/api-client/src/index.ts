@@ -32,12 +32,14 @@ export interface AuthResponse {
 export interface RegistrationResponse {
   readonly developmentVerificationCode?: string;
   readonly email: string;
+  readonly verificationExpiresAt: string;
   readonly verificationRequired: true;
 }
 
 export interface ResendVerificationResponse {
   readonly developmentVerificationCode?: string;
   readonly message: string;
+  readonly verificationExpiresAt: string;
 }
 
 export interface SessionResponse {
