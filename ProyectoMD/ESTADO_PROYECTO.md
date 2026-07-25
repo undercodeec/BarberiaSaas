@@ -169,6 +169,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Dependencia `@react-native-masked-view/masked-view` instalada para limitar el brillo a la pieza diagonal.
 - [x] Recursos del preloader almacenados en `apps/mobile/assets/preloader`.
 - [x] Separador y franja decorativa de la bienvenida ajustados a negro translúcido.
+- [x] Indicador activo de los pasos de colaboradores y servicios ajustado a negro.
 - [x] Prompt visual del onboarding reorganizado en `ProyectoMD/prompt/prompt.md`.
 
 ### Pruebas y calidad

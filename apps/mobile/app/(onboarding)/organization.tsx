@@ -147,7 +147,7 @@ export default function OrganizationOnboardingScreen() {
 
 const styles = StyleSheet.create({
   activeStep: {
-    backgroundColor: '#275fdb',
+    backgroundColor: '#000000',
     borderRadius: 6,
     height: 10,
     width: 31,
