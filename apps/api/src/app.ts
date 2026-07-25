@@ -3,21 +3,24 @@ import {
   createDatabaseClient,
   MembershipRole,
   MembershipStatus,
+  OnboardingCollaboratorRole,
   RegistrationAccountType,
   type DatabaseClient,
 } from '@barber-saas/database';
 import {
   completeOnboardingSchema,
+  createOnboardingCollaboratorSchema,
   recoverAccessSchema,
   registrationAvailabilitySchema,
   resendVerificationSchema,
   resetPasswordSchema,
   signInSchema,
   signUpSchema,
+  updateOnboardingCollaboratorSchema,
   verifyEmailSchema,
 } from '@barber-saas/validation';
 import Fastify, { type FastifyRequest } from 'fastify';
-import { ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 
 import type { ApiConfig } from './config';
 import { ApiError, isUniqueConstraintError } from './errors';
@@ -41,6 +44,9 @@ const RESET_DURATION_MS = 30 * 60 * 1000;
 const VERIFICATION_DURATION_MS = 10 * 60 * 1000;
 const VERIFICATION_LOCK_DURATION_MS = 15 * 60 * 1000;
 const MAX_VERIFICATION_ATTEMPTS = 5;
+const onboardingCollaboratorParamsSchema = z.object({
+  id: z.uuid('El identificador no es válido.'),
+});
 
 interface BuildApiOptions {
   readonly config: ApiConfig;
@@ -88,6 +94,68 @@ function completeRegistrationProfile(input: {
     countryCode: input.countryCode,
     openingTime: input.openingTime,
     phone: input.phone,
+  };
+}
+
+function onboardingCollaboratorData(input: {
+  readonly agendaColor: string;
+  readonly canPerformServices: boolean;
+  readonly customRoleDescription?: string | null | undefined;
+  readonly customRoleName?: string | null | undefined;
+  readonly description?: string | null | undefined;
+  readonly identification?: string | null | undefined;
+  readonly name: string;
+  readonly phone?: string | null | undefined;
+  readonly photoUri?: string | null | undefined;
+  readonly role: 'administrator' | 'barber' | 'custom';
+}) {
+  const role: Record<
+    'administrator' | 'barber' | 'custom',
+    OnboardingCollaboratorRole
+  > = {
+    administrator: OnboardingCollaboratorRole.ADMINISTRATOR,
+    barber: OnboardingCollaboratorRole.BARBER,
+    custom: OnboardingCollaboratorRole.CUSTOM,
+  };
+  return {
+    agendaColor: input.agendaColor.toUpperCase(),
+    canPerformServices: input.canPerformServices,
+    customRoleDescription: input.customRoleDescription ?? null,
+    customRoleName: input.customRoleName ?? null,
+    description: input.description ?? null,
+    identification: input.identification ?? null,
+    name: input.name,
+    phone: input.phone ?? null,
+    photoUri: input.photoUri ?? null,
+    role: role[input.role],
+  };
+}
+
+function publicOnboardingCollaborator(collaborator: {
+  readonly agendaColor: string;
+  readonly canPerformServices: boolean;
+  readonly customRoleDescription: string | null;
+  readonly customRoleName: string | null;
+  readonly description: string | null;
+  readonly id: string;
+  readonly identification: string | null;
+  readonly name: string;
+  readonly phone: string | null;
+  readonly photoUri: string | null;
+  readonly role: OnboardingCollaboratorRole;
+}) {
+  return {
+    agendaColor: collaborator.agendaColor,
+    canPerformServices: collaborator.canPerformServices,
+    customRoleDescription: collaborator.customRoleDescription,
+    customRoleName: collaborator.customRoleName,
+    description: collaborator.description,
+    id: collaborator.id,
+    identification: collaborator.identification,
+    name: collaborator.name,
+    phone: collaborator.phone,
+    photoUri: collaborator.photoUri,
+    role: collaborator.role.toLowerCase(),
   };
 }
 
@@ -691,6 +759,69 @@ export async function buildApi({
         where: { revokedAt: null, userId: resetToken.userId },
       }),
     ]);
+    return reply.code(204).send();
+  });
+
+  app.get('/v1/onboarding/collaborators', async (request) => {
+    const { user } = await authenticate(database, request);
+    const collaborators = await database.onboardingCollaborator.findMany({
+      orderBy: { createdAt: 'asc' },
+      where: { ownerUserId: user.id },
+    });
+    return {
+      collaborators: collaborators.map(publicOnboardingCollaborator),
+    };
+  });
+
+  app.post('/v1/onboarding/collaborators', async (request, reply) => {
+    const { user } = await authenticate(database, request);
+    const input = createOnboardingCollaboratorSchema.parse(request.body);
+    const collaborator = await database.onboardingCollaborator.create({
+      data: {
+        ...onboardingCollaboratorData(input),
+        ownerUserId: user.id,
+      },
+    });
+    return reply
+      .code(201)
+      .send({ collaborator: publicOnboardingCollaborator(collaborator) });
+  });
+
+  app.patch('/v1/onboarding/collaborators/:id', async (request) => {
+    const { user } = await authenticate(database, request);
+    const { id } = onboardingCollaboratorParamsSchema.parse(request.params);
+    const input = updateOnboardingCollaboratorSchema.parse(request.body);
+    const existing = await database.onboardingCollaborator.findFirst({
+      where: { id, ownerUserId: user.id },
+    });
+    if (!existing)
+      throw new ApiError(
+        404,
+        'ONBOARDING_COLLABORATOR_NOT_FOUND',
+        'El colaborador no existe.',
+      );
+    const collaborator = await database.onboardingCollaborator.update({
+      data: onboardingCollaboratorData(input),
+      where: { id: existing.id },
+    });
+    return { collaborator: publicOnboardingCollaborator(collaborator) };
+  });
+
+  app.delete('/v1/onboarding/collaborators/:id', async (request, reply) => {
+    const { user } = await authenticate(database, request);
+    const { id } = onboardingCollaboratorParamsSchema.parse(request.params);
+    const existing = await database.onboardingCollaborator.findFirst({
+      where: { id, ownerUserId: user.id },
+    });
+    if (!existing)
+      throw new ApiError(
+        404,
+        'ONBOARDING_COLLABORATOR_NOT_FOUND',
+        'El colaborador no existe.',
+      );
+    await database.onboardingCollaborator.delete({
+      where: { id: existing.id },
+    });
     return reply.code(204).send();
   });
 

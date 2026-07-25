@@ -56,6 +56,12 @@ enum RegistrationAccountType {
   PROFESSIONAL
 }
 
+enum OnboardingCollaboratorRole {
+  BARBER
+  ADMINISTRATOR
+  CUSTOM
+}
+
 model User {
   id                     String                   @id @default(uuid()) @db.Uuid
   email                  String                   @unique @db.VarChar(254)
@@ -76,6 +82,7 @@ model User {
   appointmentsUpdated    Appointment[]            @relation("AppointmentUpdater")
   appointmentEvents      AppointmentEvent[]
   registrationProfile    UserRegistrationProfile?
+  onboardingCollaborators OnboardingCollaborator[]
 
   @@map("users")
 }
@@ -134,6 +141,27 @@ model UserRegistrationProfile {
   user            User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_registration_profiles")
+}
+
+model OnboardingCollaborator {
+  id                    String                     @id @default(uuid()) @db.Uuid
+  ownerUserId           String                     @map("owner_user_id") @db.Uuid
+  name                  String                     @db.VarChar(120)
+  description           String?                    @db.VarChar(500)
+  photoUri              String?                    @map("photo_uri") @db.VarChar(2048)
+  role                  OnboardingCollaboratorRole
+  customRoleName        String?                    @map("custom_role_name") @db.VarChar(80)
+  customRoleDescription String?                    @map("custom_role_description") @db.VarChar(500)
+  canPerformServices    Boolean                    @default(false) @map("can_perform_services")
+  identification        String?                    @db.VarChar(64)
+  phone                 String?                    @db.VarChar(24)
+  agendaColor           String                     @default("#2464E8") @map("agenda_color") @db.Char(7)
+  createdAt             DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  owner                 User                       @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@index([ownerUserId, createdAt])
+  @@map("onboarding_collaborators")
 }
 
 model Session {

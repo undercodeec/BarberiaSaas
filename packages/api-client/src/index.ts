@@ -81,6 +81,24 @@ export interface CurrentOrganizationResponse {
   };
 }
 
+export interface OnboardingCollaboratorRecord {
+  readonly agendaColor: string;
+  readonly canPerformServices: boolean;
+  readonly customRoleDescription: string | null;
+  readonly customRoleName: string | null;
+  readonly description: string | null;
+  readonly id: string;
+  readonly identification: string | null;
+  readonly name: string;
+  readonly phone: string | null;
+  readonly photoUri: string | null;
+  readonly role: 'administrator' | 'barber' | 'custom';
+}
+
+export interface OnboardingCollaboratorsResponse {
+  readonly collaborators: readonly OnboardingCollaboratorRecord[];
+}
+
 export interface TeamMember {
   readonly id: string;
   readonly locations: ReadonlyArray<{

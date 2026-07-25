@@ -1,4 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import type {
+  OnboardingCollaboratorRecord,
+  OnboardingCollaboratorsResponse,
+} from '@barber-saas/api-client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
@@ -19,19 +24,102 @@ import {
 } from '../../src/components/CollaboratorFormSheet';
 import { NavaButton } from '../../src/components/NavaButton';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { requireApiClient } from '../../src/lib/api';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const teamIllustration = require('../../assets/onboarding-team.png') as number;
 
+interface StoredCollaborator extends CollaboratorDraft {
+  readonly id: string;
+}
+
+function toStoredCollaborator(
+  collaborator: OnboardingCollaboratorRecord,
+): StoredCollaborator {
+  return {
+    agendaColor: collaborator.agendaColor,
+    canPerformServices: collaborator.canPerformServices,
+    customRoleDescription: collaborator.customRoleDescription ?? '',
+    customRoleName: collaborator.customRoleName ?? '',
+    description: collaborator.description ?? '',
+    id: collaborator.id,
+    identification: collaborator.identification ?? '',
+    name: collaborator.name,
+    phone: collaborator.phone ?? '',
+    photoUri: collaborator.photoUri,
+    role: collaborator.role,
+  };
+}
+
+function optionalValue(value: string) {
+  return value.trim() || null;
+}
+
 export default function OrganizationOnboardingScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { session } = useAuth();
   const { height, width } = useWindowDimensions();
   const compact = height < 740;
   const [collaboratorSheetOpen, setCollaboratorSheetOpen] = useState(false);
-  const [collaborators, setCollaborators] = useState<CollaboratorDraft[]>([]);
+  const [editingCollaborator, setEditingCollaborator] =
+    useState<StoredCollaborator | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const collaboratorsQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<OnboardingCollaboratorsResponse>(
+        '/v1/onboarding/collaborators',
+      ),
+    queryKey: ['onboarding-collaborators'],
+  });
+  const collaborators = (collaboratorsQuery.data?.collaborators ?? []).map(
+    toStoredCollaborator,
+  );
 
   if (!session) return <Redirect href="/(auth)/login" />;
+
+  const saveCollaborator = async (collaborator: CollaboratorDraft) => {
+    setRequestError(null);
+    const payload = {
+      ...collaborator,
+      customRoleDescription: optionalValue(collaborator.customRoleDescription),
+      customRoleName: optionalValue(collaborator.customRoleName),
+      description: optionalValue(collaborator.description),
+      identification: optionalValue(collaborator.identification),
+      phone: optionalValue(collaborator.phone),
+    };
+    if (editingCollaborator) {
+      await requireApiClient().request(
+        `/v1/onboarding/collaborators/${editingCollaborator.id}`,
+        { body: payload, method: 'PATCH' },
+      );
+    } else {
+      await requireApiClient().request('/v1/onboarding/collaborators', {
+        body: payload,
+        method: 'POST',
+      });
+    }
+    await queryClient.invalidateQueries({
+      queryKey: ['onboarding-collaborators'],
+    });
+    setEditingCollaborator(null);
+    setCollaboratorSheetOpen(false);
+  };
+
+  const deleteCollaborator = async () => {
+    if (!editingCollaborator) return;
+    setRequestError(null);
+    await requireApiClient().request<void>(
+      `/v1/onboarding/collaborators/${editingCollaborator.id}`,
+      { method: 'DELETE' },
+    );
+    await queryClient.invalidateQueries({
+      queryKey: ['onboarding-collaborators'],
+    });
+    setEditingCollaborator(null);
+    setCollaboratorSheetOpen(false);
+  };
 
   return (
     <SafeAreaView
@@ -107,10 +195,57 @@ export default function OrganizationOnboardingScreen() {
                 ? 'Añadir otro colaborador'
                 : 'Añadir colaborador'
             }
-            onPress={() => setCollaboratorSheetOpen(true)}
+            onPress={() => {
+              setEditingCollaborator(null);
+              setCollaboratorSheetOpen(true);
+            }}
             style={styles.actionButton}
             variant="outline"
           />
+          {requestError || collaboratorsQuery.error ? (
+            <Text accessibilityRole="alert" style={styles.requestError}>
+              {requestError ??
+                (collaboratorsQuery.error instanceof Error
+                  ? collaboratorsQuery.error.message
+                  : 'No fue posible cargar los colaboradores.')}
+            </Text>
+          ) : null}
+          {collaboratorsQuery.isPending ? (
+            <Text style={styles.savedLabel}>Cargando colaboradores…</Text>
+          ) : null}
+          {collaborators.map((collaborator) => (
+            <View key={collaborator.id} style={styles.collaboratorRow}>
+              <View
+                style={[
+                  styles.collaboratorColor,
+                  { backgroundColor: collaborator.agendaColor },
+                ]}
+              />
+              <View style={styles.collaboratorCopy}>
+                <Text numberOfLines={1} style={styles.collaboratorName}>
+                  {collaborator.name}
+                </Text>
+                <Text numberOfLines={1} style={styles.collaboratorRole}>
+                  {collaborator.role === 'custom'
+                    ? collaborator.customRoleName || 'Tipo personalizado'
+                    : collaborator.role === 'barber'
+                      ? 'Barbero'
+                      : 'Administrador'}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityLabel={`Editar ${collaborator.name}`}
+                accessibilityRole="button"
+                onPress={() => {
+                  setEditingCollaborator(collaborator);
+                  setCollaboratorSheetOpen(true);
+                }}
+                style={styles.editButton}
+              >
+                <Ionicons color="#101c2d" name="pencil-outline" size={20} />
+              </Pressable>
+            </View>
+          ))}
           {collaborators.length > 0 ? (
             <Text style={styles.savedLabel}>
               {collaborators.length}{' '}
@@ -134,11 +269,17 @@ export default function OrganizationOnboardingScreen() {
       </ScrollView>
 
       <CollaboratorFormSheet
-        onClose={() => setCollaboratorSheetOpen(false)}
-        onSave={(collaborator) => {
-          setCollaborators((current) => [...current, collaborator]);
+        key={
+          editingCollaborator?.id ??
+          (collaboratorSheetOpen ? 'new-collaborator' : 'closed-collaborator')
+        }
+        initialValue={editingCollaborator}
+        onClose={() => {
+          setEditingCollaborator(null);
           setCollaboratorSheetOpen(false);
         }}
+        onDelete={editingCollaborator ? deleteCollaborator : undefined}
+        onSave={saveCollaborator}
         visible={collaboratorSheetOpen}
       />
     </SafeAreaView>
@@ -203,6 +344,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 12,
   },
+  collaboratorColor: {
+    borderRadius: 999,
+    height: 14,
+    width: 14,
+  },
+  collaboratorCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  collaboratorName: {
+    color: '#101c2d',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  collaboratorRole: {
+    color: '#667080',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  collaboratorRow: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderColor: '#dce7fb',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+    minHeight: 72,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
   description: {
     color: '#667080',
     fontSize: 16,
@@ -210,6 +383,14 @@ const styles = StyleSheet.create({
     marginTop: 12,
     maxWidth: 490,
     textAlign: 'center',
+  },
+  editButton: {
+    alignItems: 'center',
+    backgroundColor: '#e8efff',
+    borderRadius: 12,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
   },
   eyebrow: {
     color: '#101c2d',
@@ -250,6 +431,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 8,
+  },
+  requestError: {
+    color: '#bd283c',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 10,
   },
   screen: {
     backgroundColor: '#f9fbff',

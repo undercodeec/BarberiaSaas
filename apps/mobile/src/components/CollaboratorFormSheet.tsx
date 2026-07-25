@@ -19,19 +19,67 @@ import { NavaButton } from './NavaButton';
 
 type CollaboratorRole = 'administrator' | 'barber' | 'custom';
 
+export const AGENDA_COLORS = [
+  '#EF4444',
+  '#F97316',
+  '#F59E0B',
+  '#EAB308',
+  '#84CC16',
+  '#22C55E',
+  '#10B981',
+  '#14B8A6',
+  '#06B6D4',
+  '#0EA5E9',
+  '#3B82F6',
+  '#2563EB',
+  '#4F46E5',
+  '#6366F1',
+  '#8B5CF6',
+  '#A855F7',
+  '#C026D3',
+  '#DB2777',
+  '#E11D48',
+  '#F43F5E',
+  '#7F1D1D',
+  '#9A3412',
+  '#92400E',
+  '#854D0E',
+  '#3F6212',
+  '#166534',
+  '#065F46',
+  '#115E59',
+  '#155E75',
+  '#075985',
+  '#2464E8',
+  '#1E40AF',
+  '#3730A3',
+  '#5B21B6',
+  '#6B21A8',
+  '#86198F',
+  '#9D174D',
+  '#BE123C',
+  '#475569',
+  '#111827',
+] as const;
+
 export interface CollaboratorDraft {
+  readonly agendaColor: string;
   readonly canPerformServices: boolean;
   readonly customRoleDescription: string;
   readonly customRoleName: string;
   readonly description: string;
+  readonly identification: string;
   readonly name: string;
+  readonly phone: string;
   readonly photoUri: string | null;
   readonly role: CollaboratorRole;
 }
 
 interface CollaboratorFormSheetProps {
+  readonly initialValue?: CollaboratorDraft | null;
   readonly onClose: () => void;
-  readonly onSave: (collaborator: CollaboratorDraft) => void;
+  readonly onDelete?: (() => Promise<void>) | undefined;
+  readonly onSave: (collaborator: CollaboratorDraft) => Promise<void> | void;
   readonly visible: boolean;
 }
 
@@ -42,20 +90,49 @@ const ROLE_LABELS: Record<CollaboratorRole, string> = {
 };
 
 export function CollaboratorFormSheet({
+  initialValue = null,
   onClose,
+  onDelete,
   onSave,
   visible,
 }: CollaboratorFormSheetProps) {
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [role, setRole] = useState<CollaboratorRole | null>(null);
+  const [photoUri, setPhotoUri] = useState<string | null>(
+    initialValue?.photoUri ?? null,
+  );
+  const [name, setName] = useState(initialValue?.name ?? '');
+  const [description, setDescription] = useState(
+    initialValue?.description ?? '',
+  );
+  const [role, setRole] = useState<CollaboratorRole | null>(
+    initialValue?.role ?? null,
+  );
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
-  const [customRoleName, setCustomRoleName] = useState('');
-  const [customRoleDescription, setCustomRoleDescription] = useState('');
-  const [canPerformServices, setCanPerformServices] = useState(false);
+  const [customRoleName, setCustomRoleName] = useState(
+    initialValue?.customRoleName ?? '',
+  );
+  const [customRoleDescription, setCustomRoleDescription] = useState(
+    initialValue?.customRoleDescription ?? '',
+  );
+  const [canPerformServices, setCanPerformServices] = useState(
+    initialValue?.canPerformServices ?? false,
+  );
+  const [identification, setIdentification] = useState(
+    initialValue?.identification ?? '',
+  );
+  const [phone, setPhone] = useState(initialValue?.phone ?? '');
+  const [agendaColor, setAgendaColor] = useState<string>(
+    initialValue?.agendaColor ?? '#2464E8',
+  );
+  const [additionalOpen, setAdditionalOpen] = useState(
+    Boolean(initialValue?.identification || initialValue?.phone),
+  );
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const isEditing = Boolean(initialValue);
 
   const selectPhoto = async () => {
     setPhotoError(null);
@@ -84,7 +161,12 @@ export function CollaboratorFormSheet({
     setCustomRoleName('');
     setCustomRoleDescription('');
     setCanPerformServices(false);
+    setIdentification('');
+    setPhone('');
+    setAgendaColor('#2464E8');
+    setAdditionalOpen(false);
     setPhotoError(null);
+    setFormError(null);
     setSubmitted(false);
   };
 
@@ -93,7 +175,7 @@ export function CollaboratorFormSheet({
     onClose();
   };
 
-  const save = () => {
+  const save = async () => {
     setSubmitted(true);
     const normalizedName = name.trim();
     const normalizedCustomRoleName = customRoleName.trim();
@@ -104,17 +186,50 @@ export function CollaboratorFormSheet({
     )
       return;
 
-    onSave({
-      canPerformServices:
-        role === 'barber' || (role === 'custom' && canPerformServices),
-      customRoleDescription: customRoleDescription.trim(),
-      customRoleName: normalizedCustomRoleName,
-      description: description.trim(),
-      name: normalizedName,
-      photoUri,
-      role,
-    });
-    reset();
+    setIsSaving(true);
+    setFormError(null);
+    try {
+      await onSave({
+        agendaColor,
+        canPerformServices:
+          role === 'barber' || (role === 'custom' && canPerformServices),
+        customRoleDescription: customRoleDescription.trim(),
+        customRoleName: normalizedCustomRoleName,
+        description: description.trim(),
+        identification: identification.trim(),
+        name: normalizedName,
+        phone: phone.trim(),
+        photoUri,
+        role,
+      });
+      reset();
+    } catch (error) {
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : 'No fue posible guardar el colaborador.',
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!onDelete) return;
+    setIsDeleting(true);
+    setFormError(null);
+    try {
+      await onDelete();
+      reset();
+    } catch (error) {
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : 'No fue posible eliminar el colaborador.',
+      );
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -148,7 +263,7 @@ export function CollaboratorFormSheet({
               <View style={styles.header}>
                 <View>
                   <Text accessibilityRole="header" style={styles.title}>
-                    Añadir colaborador
+                    {isEditing ? 'Editar colaborador' : 'Añadir colaborador'}
                   </Text>
                   <Text style={styles.subtitle}>
                     Completa la información de tu colaborador.
@@ -163,6 +278,12 @@ export function CollaboratorFormSheet({
                   <Ionicons color="#667080" name="close" size={24} />
                 </Pressable>
               </View>
+
+              {formError ? (
+                <Text accessibilityRole="alert" style={styles.formError}>
+                  {formError}
+                </Text>
+              ) : null}
 
               <Pressable
                 accessibilityLabel="Seleccionar foto de perfil"
@@ -301,6 +422,99 @@ export function CollaboratorFormSheet({
                 ) : null}
               </View>
 
+              <Pressable
+                accessibilityLabel="Configuración adicional"
+                accessibilityRole="button"
+                onPress={() => setAdditionalOpen((current) => !current)}
+                style={styles.additionalToggle}
+              >
+                <Text style={styles.additionalToggleLabel}>
+                  Configuración adicional
+                </Text>
+                <Ionicons
+                  color="#101c2d"
+                  name={additionalOpen ? 'chevron-up' : 'chevron-down'}
+                  size={21}
+                />
+              </Pressable>
+
+              {additionalOpen ? (
+                <View style={styles.additionalContent}>
+                  <View style={styles.field}>
+                    <Text style={styles.label}>Identificación</Text>
+                    <TextInput
+                      onChangeText={setIdentification}
+                      placeholder="Cédula, DNI o pasaporte"
+                      placeholderTextColor="#98a0ab"
+                      style={styles.input}
+                      value={identification}
+                    />
+                  </View>
+
+                  <View style={styles.field}>
+                    <Text style={styles.label}>Teléfono</Text>
+                    <TextInput
+                      keyboardType="phone-pad"
+                      onChangeText={setPhone}
+                      placeholder="+593 99 000 0000"
+                      placeholderTextColor="#98a0ab"
+                      style={styles.input}
+                      value={phone}
+                    />
+                  </View>
+
+                  <View style={styles.field}>
+                    <Text style={styles.label}>Color en la agenda</Text>
+                    <View style={styles.colorGrid}>
+                      {AGENDA_COLORS.map((color) => (
+                        <Pressable
+                          key={color}
+                          accessibilityLabel={`Seleccionar color ${color}`}
+                          accessibilityRole="button"
+                          onPress={() => setAgendaColor(color)}
+                          style={[
+                            styles.colorOption,
+                            { backgroundColor: color },
+                            agendaColor === color ? styles.colorSelected : null,
+                          ]}
+                        >
+                          {agendaColor === color ? (
+                            <Ionicons
+                              color="#ffffff"
+                              name="checkmark"
+                              size={16}
+                            />
+                          ) : null}
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+
+                  {isEditing && onDelete ? (
+                    <Pressable
+                      accessibilityLabel="Eliminar colaborador"
+                      accessibilityRole="button"
+                      disabled={isDeleting || isSaving}
+                      onPress={() => void remove()}
+                      style={({ pressed }) => [
+                        styles.deleteButton,
+                        pressed ? styles.deleteButtonPressed : null,
+                        isDeleting || isSaving ? styles.disabled : null,
+                      ]}
+                    >
+                      <Ionicons
+                        color="#bd2d2d"
+                        name="trash-outline"
+                        size={20}
+                      />
+                      <Text style={styles.deleteButtonLabel}>
+                        {isDeleting ? 'Eliminando…' : 'Eliminar colaborador'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
+
               {role === 'custom' ? (
                 <View style={styles.customRole}>
                   <Text style={styles.customRoleTitle}>
@@ -363,9 +577,11 @@ export function CollaboratorFormSheet({
               ) : null}
 
               <NavaButton
+                disabled={isSaving || isDeleting}
                 icon="checkmark-outline"
                 label="Guardar colaborador"
-                onPress={save}
+                loading={isSaving}
+                onPress={() => void save()}
                 style={styles.saveButton}
                 variant="primary"
               />
@@ -378,6 +594,29 @@ export function CollaboratorFormSheet({
 }
 
 const styles = StyleSheet.create({
+  additionalContent: {
+    backgroundColor: '#f7f8fa',
+    borderColor: '#e2e5e9',
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 16,
+    padding: 16,
+  },
+  additionalToggle: {
+    alignItems: 'center',
+    borderBottomColor: '#e6e8eb',
+    borderTopColor: '#e6e8eb',
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    minHeight: 52,
+  },
+  additionalToggleLabel: {
+    color: '#101c2d',
+    fontSize: 15,
+    fontWeight: '800',
+  },
   avatar: {
     alignItems: 'center',
     backgroundColor: '#edf1f5',
@@ -433,6 +672,47 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginBottom: 16,
   },
+  colorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  colorOption: {
+    alignItems: 'center',
+    borderColor: 'rgba(16, 28, 45, 0.18)',
+    borderRadius: 16,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
+  },
+  colorSelected: {
+    borderColor: '#101c2d',
+    borderWidth: 3,
+    transform: [{ scale: 1.12 }],
+  },
+  deleteButton: {
+    alignItems: 'center',
+    borderColor: '#efb6b3',
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 9,
+    justifyContent: 'center',
+    marginTop: 4,
+    minHeight: 52,
+  },
+  deleteButtonLabel: {
+    color: '#bd2d2d',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  deleteButtonPressed: {
+    backgroundColor: '#fff0ee',
+  },
+  disabled: {
+    opacity: 0.55,
+  },
   error: {
     color: '#bd2d2d',
     fontSize: 13,
@@ -440,6 +720,13 @@ const styles = StyleSheet.create({
   },
   field: {
     marginBottom: 16,
+  },
+  formError: {
+    backgroundColor: '#fff0ee',
+    borderRadius: 12,
+    color: '#a72d27',
+    marginBottom: 16,
+    padding: 12,
   },
   handle: {
     alignSelf: 'center',

@@ -39,6 +39,9 @@ const slugSchema = z
     'Usa letras minúsculas, números y guiones.',
   );
 const uuidSchema = z.uuid('El identificador no es válido.');
+const agendaColorSchema = z
+  .string()
+  .regex(/^#[0-9A-Fa-f]{6}$/u, 'El color de agenda no es válido.');
 const durationMinutesSchema = z
   .number()
   .int()
@@ -158,6 +161,36 @@ export const createTeamInvitationSchema = z.object({
 export const acceptTeamInvitationSchema = z.object({
   token: z.string().min(32, 'La invitación no es válida.'),
 });
+
+export const createOnboardingCollaboratorSchema = z
+  .object({
+    agendaColor: agendaColorSchema.default('#2464E8'),
+    canPerformServices: z.boolean().default(false),
+    customRoleDescription: z.string().trim().max(500).nullish(),
+    customRoleName: z.string().trim().max(80).nullish(),
+    description: z.string().trim().max(500).nullish(),
+    identification: z.string().trim().max(64).nullish(),
+    name: z
+      .string()
+      .trim()
+      .min(2, 'Ingresa el nombre del colaborador.')
+      .max(120),
+    phone: z.string().trim().max(24).nullish(),
+    photoUri: z.string().trim().max(2048).nullish(),
+    role: z.enum(['administrator', 'barber', 'custom']),
+  })
+  .superRefine((input, context) => {
+    if (input.role === 'custom' && !input.customRoleName) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Ingresa el nombre del tipo personalizado.',
+        path: ['customRoleName'],
+      });
+    }
+  });
+
+export const updateOnboardingCollaboratorSchema =
+  createOnboardingCollaboratorSchema;
 
 export const createServiceCategorySchema = z.object({
   name: z.string().trim().min(2, 'Ingresa el nombre de la categoría.').max(80),
@@ -288,6 +321,9 @@ export type AcceptTeamInvitationInput = z.infer<
 export type AvailabilityQuery = z.infer<typeof availabilityQuerySchema>;
 export type CancelAppointmentInput = z.infer<typeof cancelAppointmentSchema>;
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;
+export type CreateOnboardingCollaboratorInput = z.infer<
+  typeof createOnboardingCollaboratorSchema
+>;
 export type AssignProfessionalServiceInput = z.infer<
   typeof assignProfessionalServiceSchema
 >;
@@ -324,3 +360,6 @@ export type RescheduleAppointmentInput = z.infer<
 export type SignInInput = z.infer<typeof signInSchema>;
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
+export type UpdateOnboardingCollaboratorInput = z.infer<
+  typeof updateOnboardingCollaboratorSchema
+>;

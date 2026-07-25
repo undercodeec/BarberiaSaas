@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   appEnvironmentSchema,
+  createOnboardingCollaboratorSchema,
   createTeamInvitationSchema,
   createServiceSchema,
   createAppointmentSchema,
@@ -56,6 +57,25 @@ describe('servicios y horarios', () => {
 });
 
 describe('equipo', () => {
+  it('valida colaborador de onboarding con configuración adicional', () => {
+    expect(
+      createOnboardingCollaboratorSchema.safeParse({
+        agendaColor: '#2464E8',
+        identification: '0102030405',
+        name: 'Carlos',
+        phone: '0991234567',
+        role: 'barber',
+      }).success,
+    ).toBe(true);
+    expect(
+      createOnboardingCollaboratorSchema.safeParse({
+        agendaColor: '#12345',
+        name: 'Carlos',
+        role: 'barber',
+      }).success,
+    ).toBe(false);
+  });
+
   it('exige nombre, correo, sucursal y rol al crear un perfil invitado', () => {
     expect(
       createTeamInvitationSchema.safeParse({

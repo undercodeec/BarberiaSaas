@@ -49,6 +49,7 @@ describeWithDatabase('API con PostgreSQL', () => {
       },
     });
     invitationMessages.length = 0;
+    await database.onboardingCollaborator.deleteMany();
     await database.appointmentEvent.deleteMany();
     await database.appointmentService.deleteMany();
     await database.appointment.deleteMany();
@@ -214,6 +215,73 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(membership?.role).toBe('OWNER');
     expect(membership?.memberLocations).toHaveLength(1);
     expect(await database.auditLog.count()).toBe(1);
+  });
+
+  it('persiste, edita y elimina colaboradores durante el onboarding', async () => {
+    const token = await register('collaborator-owner@example.com');
+    const createResponse = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'POST',
+      payload: {
+        agendaColor: '#2464E8',
+        canPerformServices: true,
+        customRoleDescription: 'Especialista en color',
+        customRoleName: 'Colorista',
+        description: 'Atiende cortes y color',
+        identification: '0102030405',
+        name: 'Carlos',
+        phone: '0991234567',
+        role: 'custom',
+      },
+      url: '/v1/onboarding/collaborators',
+    });
+    expect(createResponse.statusCode).toBe(201);
+    const collaborator = createResponse.json<{
+      collaborator: { id: string };
+    }>();
+
+    const listResponse = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: '/v1/onboarding/collaborators',
+    });
+    expect(listResponse.statusCode).toBe(200);
+    expect(
+      listResponse.json<{ collaborators: unknown[] }>().collaborators,
+    ).toHaveLength(1);
+
+    const updateResponse = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'PATCH',
+      payload: {
+        agendaColor: '#EF4444',
+        canPerformServices: true,
+        customRoleDescription: 'Especialista en color',
+        customRoleName: 'Colorista',
+        description: 'Atiende cortes y color',
+        identification: '0102030405',
+        name: 'Carlos Actualizado',
+        phone: '0991234567',
+        role: 'custom',
+      },
+      url: `/v1/onboarding/collaborators/${collaborator.collaborator.id}`,
+    });
+    expect(updateResponse.statusCode).toBe(200);
+    expect(
+      updateResponse.json<{
+        collaborator: { agendaColor: string; name: string };
+      }>(),
+    ).toMatchObject({
+      collaborator: { agendaColor: '#EF4444', name: 'Carlos Actualizado' },
+    });
+
+    const deleteResponse = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'DELETE',
+      url: `/v1/onboarding/collaborators/${collaborator.collaborator.id}`,
+    });
+    expect(deleteResponse.statusCode).toBe(204);
+    expect(await database.onboardingCollaborator.count()).toBe(0);
   });
 
   it('exige y consume una sola vez el código de verificación de correo', async () => {

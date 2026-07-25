@@ -185,6 +185,14 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] UI móvil verificada con TypeScript, ESLint y cuatro pruebas de componentes.
 - [x] Typecheck secuencial aprobado en los 12 paquetes, lint global sin advertencias y export web de Expo completado con los recursos del preloader.
 
+### Colaboradores persistentes durante onboarding
+
+- [x] Colaboradores de onboarding persistidos por usuario antes de crear la organización.
+- [x] Edición y eliminación desde la pantalla de organización.
+- [x] Identificación, teléfono y color de agenda; selector accesible de 40 colores.
+- [x] Migración `20260725230000_onboarding_collaborators` aplicada en desarrollo y `postgres-test` el 2026-07-25.
+- [x] CRUD de API/PostgreSQL (15/15), validación (14/14), Jest Expo (3/3), TypeScript y ESLint aprobados.
+
 ## Fases funcionales
 
 ### Fase 2 — Equipo, servicios y horarios
