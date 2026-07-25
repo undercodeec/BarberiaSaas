@@ -4,6 +4,7 @@ import { useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Modal,
   Platform,
   Pressable,
@@ -173,6 +174,11 @@ export function CollaboratorFormSheet({
   const close = () => {
     reset();
     onClose();
+  };
+
+  const toggleAdditional = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setAdditionalOpen((current) => !current);
   };
 
   const save = async () => {
@@ -425,7 +431,7 @@ export function CollaboratorFormSheet({
               <Pressable
                 accessibilityLabel="Configuración adicional"
                 accessibilityRole="button"
-                onPress={() => setAdditionalOpen((current) => !current)}
+                onPress={toggleAdditional}
                 style={styles.additionalToggle}
               >
                 <Text style={styles.additionalToggleLabel}>
