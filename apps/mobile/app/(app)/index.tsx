@@ -15,7 +15,7 @@ export default function ApplicationHomeScreen() {
 
   if (!session) return <Redirect href="/(auth)/login" />;
   if (!organizationQuery.isLoading && !organizationQuery.data)
-    return <Redirect href="/(onboarding)/organization" />;
+    return <Redirect href="/(onboarding)/account-setup" />;
 
   const handleSignOut = async () => {
     await signOut();

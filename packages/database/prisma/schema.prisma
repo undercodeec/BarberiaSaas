@@ -51,25 +51,31 @@ enum AppointmentEventType {
   STATUS_CHANGED
 }
 
+enum RegistrationAccountType {
+  BUSINESS
+  PROFESSIONAL
+}
+
 model User {
-  id                     String                  @id @default(uuid()) @db.Uuid
-  email                  String                  @unique @db.VarChar(254)
-  passwordHash           String?                 @map("password_hash") @db.Text
-  fullName               String                  @map("full_name") @db.VarChar(120)
-  phone                  String?                 @db.VarChar(24)
-  emailVerifiedAt        DateTime?               @map("email_verified_at") @db.Timestamptz(3)
-  locale                 String                  @default("es") @db.VarChar(10)
-  createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt              DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                     String                   @id @default(uuid()) @db.Uuid
+  email                  String                   @unique @db.VarChar(254)
+  passwordHash           String?                  @map("password_hash") @db.Text
+  fullName               String                   @map("full_name") @db.VarChar(120)
+  phone                  String?                  @db.VarChar(24)
+  emailVerifiedAt        DateTime?                @map("email_verified_at") @db.Timestamptz(3)
+  locale                 String                   @default("es") @db.VarChar(10)
+  createdAt              DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
   sessions               Session[]
   passwordResetTokens    PasswordResetToken[]
   emailVerificationCodes EmailVerificationCode[]
   memberships            Membership[]
-  auditLogs              AuditLog[]              @relation("AuditActor")
-  invitationsSent        TeamInvitation[]        @relation("InvitationInviter")
-  appointmentsCreated    Appointment[]           @relation("AppointmentCreator")
-  appointmentsUpdated    Appointment[]           @relation("AppointmentUpdater")
+  auditLogs              AuditLog[]               @relation("AuditActor")
+  invitationsSent        TeamInvitation[]         @relation("InvitationInviter")
+  appointmentsCreated    Appointment[]            @relation("AppointmentCreator")
+  appointmentsUpdated    Appointment[]            @relation("AppointmentUpdater")
   appointmentEvents      AppointmentEvent[]
+  registrationProfile    UserRegistrationProfile?
 
   @@map("users")
 }
@@ -88,20 +94,46 @@ model EmailVerificationCode {
 }
 
 model PendingRegistration {
-  id             String    @id @default(uuid()) @db.Uuid
-  email          String    @unique @db.VarChar(254)
-  fullName       String    @map("full_name") @db.VarChar(120)
-  passwordHash   String    @map("password_hash") @db.Text
-  codeHash       String    @map("code_hash") @db.Char(64)
-  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(3)
-  failedAttempts Int       @default(0) @map("failed_attempts")
-  lockedUntil    DateTime? @map("locked_until") @db.Timestamptz(3)
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id              String                   @id @default(uuid()) @db.Uuid
+  email           String                   @unique @db.VarChar(254)
+  fullName        String                   @map("full_name") @db.VarChar(120)
+  passwordHash    String                   @map("password_hash") @db.Text
+  codeHash        String                   @map("code_hash") @db.Char(64)
+  expiresAt       DateTime                 @map("expires_at") @db.Timestamptz(3)
+  failedAttempts  Int                      @default(0) @map("failed_attempts")
+  lockedUntil     DateTime?                @map("locked_until") @db.Timestamptz(3)
+  accountType     RegistrationAccountType? @map("account_type")
+  businessName    String?                  @map("business_name") @db.VarChar(120)
+  businessNameKey String?                  @unique @map("business_name_key") @db.VarChar(120)
+  phone           String?                  @db.VarChar(24)
+  phoneKey        String?                  @unique @map("phone_key") @db.VarChar(24)
+  countryCode     String?                  @map("country_code") @db.Char(2)
+  city            String?                  @db.VarChar(120)
+  openingTime     String?                  @map("opening_time") @db.Char(5)
+  closingTime     String?                  @map("closing_time") @db.Char(5)
+  createdAt       DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([expiresAt])
   @@index([lockedUntil])
   @@map("pending_registrations")
+}
+
+model UserRegistrationProfile {
+  userId          String                  @id @map("user_id") @db.Uuid
+  accountType     RegistrationAccountType @map("account_type")
+  businessName    String                  @map("business_name") @db.VarChar(120)
+  businessNameKey String                  @unique @map("business_name_key") @db.VarChar(120)
+  countryCode     String                  @map("country_code") @db.Char(2)
+  city            String                  @db.VarChar(120)
+  openingTime     String                  @map("opening_time") @db.Char(5)
+  closingTime     String                  @map("closing_time") @db.Char(5)
+  phoneKey        String                  @unique @map("phone_key") @db.VarChar(24)
+  createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user            User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_registration_profiles")
 }
 
 model Session {

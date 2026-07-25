@@ -105,12 +105,37 @@ describe('motor de agenda', () => {
 describe('autenticación y onboarding', () => {
   it('rechaza contraseñas distintas', () => {
     const result = signUpSchema.safeParse({
+      accountType: 'business',
+      businessName: 'Barbería Ana',
+      city: 'Quito',
+      closingTime: '18:00',
       confirmPassword: 'otra-clave',
+      countryCode: 'EC',
       email: 'owner@example.com',
       fullName: 'Ana Dueña',
+      openingTime: '09:00',
       password: 'clave-segura',
+      phone: '+593999999999',
     });
     expect(result.success).toBe(false);
+  });
+
+  it('valida todos los datos del perfil de registro', () => {
+    expect(
+      signUpSchema.safeParse({
+        accountType: 'professional',
+        businessName: 'Estudio Ana',
+        city: 'Quito',
+        closingTime: '18:00',
+        confirmPassword: 'clave-segura',
+        countryCode: 'EC',
+        email: 'ana@example.com',
+        fullName: 'Ana Dueña',
+        openingTime: '09:00',
+        password: 'clave-segura',
+        phone: '+593999999999',
+      }).success,
+    ).toBe(true);
   });
 
   it('solo acepta códigos de verificación de seis dígitos', () => {

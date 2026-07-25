@@ -3,11 +3,13 @@ import {
   createDatabaseClient,
   MembershipRole,
   MembershipStatus,
+  RegistrationAccountType,
   type DatabaseClient,
 } from '@barber-saas/database';
 import {
   completeOnboardingSchema,
   recoverAccessSchema,
+  registrationAvailabilitySchema,
   resendVerificationSchema,
   resetPasswordSchema,
   signInSchema,
@@ -48,8 +50,91 @@ interface BuildApiOptions {
   readonly verificationMailer?: VerificationMailer | null;
 }
 
+interface RegistrationProfileDraft {
+  readonly accountType: RegistrationAccountType;
+  readonly businessName: string;
+  readonly city: string;
+  readonly closingTime: string;
+  readonly countryCode: string;
+  readonly openingTime: string;
+  readonly phone: string;
+}
+
+function completeRegistrationProfile(input: {
+  readonly accountType: RegistrationAccountType | null;
+  readonly businessName: string | null;
+  readonly city: string | null;
+  readonly closingTime: string | null;
+  readonly countryCode: string | null;
+  readonly openingTime: string | null;
+  readonly phone: string | null;
+}): RegistrationProfileDraft | null {
+  if (
+    !input.accountType ||
+    !input.businessName ||
+    !input.city ||
+    !input.closingTime ||
+    !input.countryCode ||
+    !input.openingTime ||
+    !input.phone
+  ) {
+    return null;
+  }
+  return {
+    accountType: input.accountType,
+    businessName: input.businessName,
+    city: input.city,
+    closingTime: input.closingTime,
+    countryCode: input.countryCode,
+    openingTime: input.openingTime,
+    phone: input.phone,
+  };
+}
+
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+function normalizeBusinessName(businessName: string): string {
+  return businessName
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLocaleLowerCase('es')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+function normalizePhone(phone: string): string {
+  return phone.replace(/\D/gu, '');
+}
+
+function duplicateRegistrationError(
+  duplicate: {
+    readonly businessNameKey: string | null;
+    readonly phoneKey: string | null;
+  },
+  businessNameKey: string,
+  phoneKey: string,
+): ApiError {
+  if (duplicate.phoneKey === phoneKey) {
+    return new ApiError(
+      409,
+      'PHONE_ALREADY_EXISTS',
+      'Ese número telefónico ya está registrado.',
+    );
+  }
+  if (duplicate.businessNameKey === businessNameKey) {
+    return new ApiError(
+      409,
+      'BUSINESS_NAME_ALREADY_EXISTS',
+      'Ese nombre de negocio ya está en uso.',
+    );
+  }
+  return new ApiError(
+    409,
+    'REGISTRATION_DATA_ALREADY_EXISTS',
+    'El correo, teléfono o nombre del negocio ya está registrado.',
+  );
 }
 
 function publicUser(user: { email: string; fullName: string; id: string }) {
@@ -88,6 +173,7 @@ async function issueVerificationCode({
   email,
   fullName,
   passwordHash,
+  registrationProfile,
   verificationMailer,
 }: {
   readonly appEnvironment: ApiConfig['APP_ENV'];
@@ -95,11 +181,21 @@ async function issueVerificationCode({
   readonly email: string;
   readonly fullName: string;
   readonly passwordHash: string;
+  readonly registrationProfile?: RegistrationProfileDraft;
   readonly verificationMailer: VerificationMailer | null;
 }) {
   const code = createVerificationCode();
   const now = new Date();
   const expiresAt = new Date(now.getTime() + VERIFICATION_DURATION_MS);
+  const registrationData = registrationProfile
+    ? {
+        ...registrationProfile,
+        businessNameKey: normalizeBusinessName(
+          registrationProfile.businessName,
+        ),
+        phoneKey: normalizePhone(registrationProfile.phone),
+      }
+    : {};
   await database.pendingRegistration.upsert({
     create: {
       codeHash: hashOpaqueToken(code),
@@ -107,12 +203,16 @@ async function issueVerificationCode({
       expiresAt,
       fullName,
       passwordHash,
+      ...registrationData,
     },
     update: {
       codeHash: hashOpaqueToken(code),
       expiresAt,
+      failedAttempts: 0,
       fullName,
+      lockedUntil: null,
       passwordHash,
+      ...registrationData,
     },
     where: { email },
   });
@@ -172,9 +272,81 @@ export async function buildApi({
 
   app.get('/health', async () => ({ status: 'ok' }));
 
+  app.post('/v1/auth/registration-availability', async (request) => {
+    const input = registrationAvailabilitySchema.parse(request.body);
+    const now = new Date();
+    const email = input.email ? normalizeEmail(input.email) : null;
+    const businessNameKey = input.businessName
+      ? normalizeBusinessName(input.businessName)
+      : null;
+    const phoneKey = input.phone ? normalizePhone(input.phone) : null;
+    const [
+      existingUser,
+      pendingEmail,
+      profileBusiness,
+      pendingBusiness,
+      profilePhone,
+      pendingPhone,
+    ] = await Promise.all([
+      email
+        ? database.user.findUnique({
+            select: { emailVerifiedAt: true, passwordHash: true },
+            where: { email },
+          })
+        : null,
+      email
+        ? database.pendingRegistration.findFirst({
+            select: { id: true },
+            where: { email, expiresAt: { gt: now } },
+          })
+        : null,
+      businessNameKey
+        ? database.userRegistrationProfile.findUnique({
+            select: { userId: true },
+            where: { businessNameKey },
+          })
+        : null,
+      businessNameKey
+        ? database.pendingRegistration.findFirst({
+            select: { id: true },
+            where: { businessNameKey, expiresAt: { gt: now } },
+          })
+        : null,
+      phoneKey
+        ? database.userRegistrationProfile.findUnique({
+            select: { userId: true },
+            where: { phoneKey },
+          })
+        : null,
+      phoneKey
+        ? database.pendingRegistration.findFirst({
+            select: { id: true },
+            where: { expiresAt: { gt: now }, phoneKey },
+          })
+        : null,
+    ]);
+    return {
+      conflicts: {
+        ...(email &&
+        ((existingUser?.passwordHash && existingUser.emailVerifiedAt) ||
+          pendingEmail)
+          ? { email: 'Ese correo ya está registrado.' }
+          : {}),
+        ...(businessNameKey && (profileBusiness || pendingBusiness)
+          ? { businessName: 'Ese nombre de negocio ya está en uso.' }
+          : {}),
+        ...(phoneKey && (profilePhone || pendingPhone)
+          ? { phone: 'Ese número telefónico ya está registrado.' }
+          : {}),
+      },
+    };
+  });
+
   app.post('/v1/auth/register', async (request, reply) => {
     const input = signUpSchema.parse(request.body);
     const email = normalizeEmail(input.email);
+    const businessNameKey = normalizeBusinessName(input.businessName);
+    const phoneKey = normalizePhone(input.phone);
     try {
       const passwordHash = await hashPassword(input.password);
       const existingUser = await database.user.findUnique({ where: { email } });
@@ -189,12 +361,57 @@ export async function buildApi({
         { where: { email } },
       );
       assertVerificationNotLocked(pendingRegistration?.lockedUntil ?? null);
+      if (pendingRegistration && pendingRegistration.expiresAt > new Date()) {
+        throw new ApiError(
+          409,
+          'EMAIL_ALREADY_EXISTS',
+          'Ese correo ya está registrado o pendiente de verificación.',
+        );
+      }
+      await database.pendingRegistration.deleteMany({
+        where: {
+          email: { not: email },
+          expiresAt: { lte: new Date() },
+          OR: [{ businessNameKey }, { phoneKey }],
+        },
+      });
+      const [duplicateProfile, duplicatePendingRegistration] =
+        await Promise.all([
+          database.userRegistrationProfile.findFirst({
+            select: { businessNameKey: true, phoneKey: true },
+            where: { OR: [{ businessNameKey }, { phoneKey }] },
+          }),
+          database.pendingRegistration.findFirst({
+            select: { businessNameKey: true, phoneKey: true },
+            where: {
+              email: { not: email },
+              expiresAt: { gt: new Date() },
+              OR: [{ businessNameKey }, { phoneKey }],
+            },
+          }),
+        ]);
+      const duplicate = duplicateProfile ?? duplicatePendingRegistration;
+      if (duplicate) {
+        throw duplicateRegistrationError(duplicate, businessNameKey, phoneKey);
+      }
       const verification = await issueVerificationCode({
         appEnvironment: config.APP_ENV,
         database,
         email,
         fullName: input.fullName.trim(),
         passwordHash,
+        registrationProfile: {
+          accountType:
+            input.accountType === 'business'
+              ? RegistrationAccountType.BUSINESS
+              : RegistrationAccountType.PROFESSIONAL,
+          businessName: input.businessName.trim(),
+          city: input.city.trim(),
+          closingTime: input.closingTime,
+          countryCode: input.countryCode,
+          openingTime: input.openingTime,
+          phone: input.phone.trim(),
+        },
         verificationMailer,
       });
       return reply.code(201).send({
@@ -212,8 +429,8 @@ export async function buildApi({
       if (isUniqueConstraintError(error)) {
         throw new ApiError(
           409,
-          'EMAIL_ALREADY_EXISTS',
-          'Ya existe una cuenta con ese correo.',
+          'REGISTRATION_DATA_ALREADY_EXISTS',
+          'El correo, teléfono o nombre del negocio ya está registrado.',
         );
       }
       throw error;
@@ -302,20 +519,48 @@ export async function buildApi({
       if (consumed.count !== 1) {
         return { kind: 'invalid' as const, remainingAttempts: null };
       }
+      const registrationProfile = completeRegistrationProfile(verification);
       const user = await transaction.user.upsert({
         create: {
           email: verification.email,
           emailVerifiedAt: now,
           fullName: verification.fullName,
           passwordHash: verification.passwordHash,
+          ...(registrationProfile ? { phone: registrationProfile.phone } : {}),
         },
         update: {
           emailVerifiedAt: now,
           fullName: verification.fullName,
           passwordHash: verification.passwordHash,
+          ...(registrationProfile ? { phone: registrationProfile.phone } : {}),
         },
         where: { email: verification.email },
       });
+      if (registrationProfile) {
+        const {
+          accountType,
+          businessName,
+          city,
+          closingTime,
+          countryCode,
+          openingTime,
+        } = registrationProfile;
+        const profileData = {
+          accountType,
+          businessName,
+          businessNameKey: normalizeBusinessName(businessName),
+          city,
+          closingTime,
+          countryCode,
+          openingTime,
+          phoneKey: normalizePhone(registrationProfile.phone),
+        };
+        await transaction.userRegistrationProfile.upsert({
+          create: { ...profileData, userId: user.id },
+          update: profileData,
+          where: { userId: user.id },
+        });
+      }
       return { kind: 'verified' as const, user };
     });
     if (outcome.kind === 'locked') {
@@ -348,12 +593,15 @@ export async function buildApi({
       Date.now() + VERIFICATION_DURATION_MS,
     ).toISOString();
     if (pendingRegistration) {
+      const registrationProfile =
+        completeRegistrationProfile(pendingRegistration);
       const verification = await issueVerificationCode({
         appEnvironment: config.APP_ENV,
         database,
         email: pendingRegistration.email,
         fullName: pendingRegistration.fullName,
         passwordHash: pendingRegistration.passwordHash,
+        ...(registrationProfile ? { registrationProfile } : {}),
         verificationMailer,
       });
       developmentVerificationCode = verification.developmentVerificationCode;

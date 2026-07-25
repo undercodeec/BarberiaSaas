@@ -12,7 +12,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Despliegue inicial preparado para una VPS; no se ha realizado ningún despliegue.
 - [x] Estrategia de migración futura a PostgreSQL administrado por Supabase sin acoplar el móvil a Supabase.
 - [x] Supabase Auth, RPC, RLS, Storage y Realtime retirados de la implementación actual.
-- [ ] Snapshot PostgreSQL + Prisma preparado en el árbol de trabajo; pendiente de commit.
+- [x] Snapshot PostgreSQL + Prisma incluido en el repositorio.
 
 ## Resumen por fases
 
@@ -115,7 +115,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 6. Se recopilan correo, contraseña y confirmación.
 7. Se muestra un resumen editable de toda la información.
 8. `Completar registro` crea únicamente una solicitud temporal en `pending_registrations`; todavía no inserta ni activa una cuenta en `users`.
-9. La solicitud temporal conserva los hashes de contraseña y OTP, correo, nombre y expiración. El OTP vence en 10 minutos y un reenvío reemplaza el código anterior.
+9. La solicitud temporal conserva los hashes de contraseña y OTP, correo, nombre, tipo de cuenta, negocio, teléfono, país, ciudad, horario y expiración. El OTP vence en 10 minutos y un reenvío reemplaza el código anterior.
 10. El correo se envía mediante el SMTP configurable del proyecto. En entorno local, la API puede incluir el código de desarrollo para pruebas automatizadas, pero la interfaz nunca lo muestra.
 11. El banner de verificación permite ingresar o reenviar el código y presenta la vigencia restante como cuenta regresiva `mm:ss`.
 12. Un código válido elimina atómicamente la solicitud temporal, crea o activa `users`, establece `email_verified_at` y crea la primera sesión.
@@ -138,8 +138,38 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Plantilla SMTP `Verifica tu cuenta de Nava` implementada.
 - [x] Migraciones OTP y solicitudes pendientes aplicadas a PostgreSQL local (`5434`) y a la base aislada de pruebas (`5433`).
 - [ ] Entrega del OTP pendiente de comprobar con el proveedor SMTP real.
-- [ ] Los datos ampliados del registro (negocio, teléfono, país, ciudad y horario) todavía se conservan durante el asistente móvil, pero su persistencia definitiva se realizará al ampliar el contrato de onboarding/API.
+- [x] Los datos ampliados del registro (tipo de cuenta, negocio, teléfono, país, ciudad y horario) se conservan temporalmente en `pending_registrations` y, tras verificar el correo, se trasladan a `users` y `user_registration_profiles`, relacionados mediante el `user_id` único.
 - [ ] Añadir limitación general de frecuencia por IP para registro y reenvío antes de producción; la limitación de intentos OTP por correo ya está implementada.
+
+### Persistencia de perfil, continuidad del onboarding y unicidad
+
+- [x] El registro móvil envía `accountType`, `businessName`, teléfono con prefijo, `countryCode`, ciudad, apertura y cierre junto con las credenciales.
+- [x] `pending_registrations` conserva esos datos mientras el correo continúa pendiente de verificación, sin crear anticipadamente una cuenta activa.
+- [x] La verificación crea o actualiza `users`, almacena el teléfono y realiza `upsert` de `user_registration_profiles`.
+- [x] `user_registration_profiles.user_id` es simultáneamente clave primaria y clave foránea a `users.id`; cada perfil ampliado pertenece a un único usuario.
+- [x] Migración `20260725203000_user_registration_profiles` creada y aplicada en PostgreSQL de desarrollo y pruebas.
+- [x] Migración `20260725213000_unique_registration_identity` creada y aplicada en PostgreSQL de desarrollo y pruebas.
+- [x] Correo normalizado en minúsculas y protegido por unicidad.
+- [x] Teléfono normalizado ignorando espacios, guiones y caracteres de formato; protegido por claves e índices únicos tanto en solicitudes pendientes como en perfiles verificados.
+- [x] Nombre de negocio normalizado ignorando mayúsculas, acentos, puntuación y espacios equivalentes; protegido por claves e índices únicos.
+- [x] La migración reconcilia duplicados históricos conservando una clave canónica y evita nuevos duplicados.
+- [x] `POST /v1/auth/registration-availability` comprueba simultáneamente correo, teléfono y negocio en registros pendientes vigentes y usuarios verificados.
+- [x] Códigos de conflicto específicos: `EMAIL_ALREADY_EXISTS`, `PHONE_ALREADY_EXISTS` y `BUSINESS_NAME_ALREADY_EXISTS`.
+- [x] Al pulsar `Siguiente` en información del negocio, el móvil consulta disponibilidad de nombre y teléfono; muestra el error bajo el `label` correspondiente y no avanza.
+- [x] Al pulsar `Siguiente` en credenciales, el móvil consulta la disponibilidad del correo; muestra el error bajo el campo y no avanza.
+- [x] Una colisión concurrente detectada al completar el registro devuelve al paso correcto y conserva el mensaje bajo negocio, teléfono o correo.
+- [x] Una sesión autenticada sin organización activa es redirigida a `/(onboarding)/account-setup`, incluso al restaurar o abrir directamente una ruta protegida.
+- [x] El grupo `/(app)` bloquea el acceso hasta confirmar una organización activa; los errores de red presentan reintento y no se interpretan como onboarding incompleto.
+- [x] Una cuenta ya configurada que abre `account-setup` regresa a `/(app)` y no puede duplicar su configuración.
+
+### Preloader y ajustes visuales móviles
+
+- [x] Preloader `NavaPreloader` integrado como capa inicial en el layout raíz durante 3,2 segundos.
+- [x] Logotipo animado compuesto por cuatro recursos rasterizados, entrada escalonada de piezas, brillo enmascarado y aparición del wordmark.
+- [x] Dependencia `@react-native-masked-view/masked-view` instalada para limitar el brillo a la pieza diagonal.
+- [x] Recursos del preloader almacenados en `apps/mobile/assets/preloader`.
+- [x] Separador y franja decorativa de la bienvenida ajustados a negro translúcido.
+- [x] Prompt visual del onboarding reorganizado en `ProyectoMD/prompt/prompt.md`.
 
 ### Pruebas y calidad
 
@@ -149,9 +179,10 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Tipos aprobados en base de datos, validación, cliente API, API y móvil.
 - [x] Pruebas unitarias ejecutadas: 23 aprobadas.
 - [x] Bundle de la API generado correctamente.
-- [x] Ocho pruebas de integración PostgreSQL ejecutadas correctamente, incluida la ausencia de `users` antes de verificar y el bloqueo tras cinco OTP incorrectos.
+- [x] Suite API/PostgreSQL actual: 14 de 14 pruebas aprobadas, incluida persistencia por `user_id`, ausencia de `users` antes de verificar, bloqueo tras cinco OTP incorrectos, disponibilidad y rechazo de correo, teléfono y negocio duplicados.
 - [x] Lint, tipos, pruebas unitarias y builds del monorepositorio aprobados después del cambio de arquitectura.
-- [x] UI de onboarding de colaboradores y servicios verificada con TypeScript, ESLint, export web de Expo y tres pruebas de componentes.
+- [x] UI móvil verificada con TypeScript, ESLint y cuatro pruebas de componentes.
+- [x] Typecheck secuencial aprobado en los 12 paquetes, lint global sin advertencias y export web de Expo completado con los recursos del preloader.
 
 ## Fases funcionales
 
@@ -229,17 +260,17 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - API: bundle de Node.js generado correctamente.
 - API: arranque del bundle y `GET /health` verificados con HTTP 200.
 - Docker Desktop: `postgres-test` en el puerto 5433 y Mailpit iniciados y saludables el 2026-07-20.
-- PostgreSQL de pruebas: las cuatro migraciones fueron aplicadas a `barber_saas_test` usando una URL derivada en memoria desde las variables de `.env`; no se usó `.env.example` ni se modificaron secretos.
-- PostgreSQL de desarrollo: levantado en el puerto 5434 porque Windows impidió vincular el 5432; las cuatro migraciones fueron aplicadas y `pnpm db:status` confirmó el esquema actualizado usando `.env`.
+- PostgreSQL de pruebas: las nueve migraciones fueron aplicadas a `barber_saas_test` usando una URL derivada en memoria desde las variables de `.env`; no se usó `.env.example` ni se modificaron secretos.
+- PostgreSQL de desarrollo: levantado en el puerto 5434 porque Windows impidió vincular el 5432; las nueve migraciones fueron aplicadas y `pnpm db:status` confirmó el esquema actualizado usando `.env`.
 - Migración `20260719170000_team_services_and_schedules`: aplicada correctamente.
 - Migración `20260719210000_appointment_engine`: aplicada correctamente con `btree_gist`.
 - Migración `20260723120000_claimable_team_members`: aplicada correctamente en desarrollo y pruebas; reversa documentada.
 - Fase 2: invitación/aceptación, catálogo, asignación, horarios, bloqueos, permisos y auditoría verificados contra PostgreSQL.
 - Fase 3: disponibilidad, duración, bloqueo, jornada, reprogramación, cancelación, eventos y concurrencia verificados contra PostgreSQL.
-- Pruebas: 23 unitarias aprobadas actualmente y 6 pruebas de integración PostgreSQL creadas.
+- Verificación actual del cambio: API/PostgreSQL 14/14, validación 13/13 y Jest Expo 4/4.
 - Verificación de correo: pruebas unitarias añadidas para formato OTP y validación; prueba de integración añadida para bloqueo previo, consumo y rechazo de reutilización.
 - UI web de autenticación: bienvenida, navegación a login separado, regreso al inicio y conservación del banner de registro verificadas en viewport móvil.
-- Suite de integración PostgreSQL: 6 de 6 aprobadas contra `postgres-test` en el puerto 5433.
+- Suite API/PostgreSQL: 14 de 14 aprobadas contra `postgres-test` en el puerto 5433.
 - Concurrencia de agenda: aprobada 5 veces consecutivas, sin doble reserva.
 - Lint, tipos y builds en los 12 paquetes: aprobados después del flujo reclamable.
 - Formato de todos los archivos modificados por el flujo reclamable y `git diff --check`: aprobados.
@@ -253,8 +284,11 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - Seguridad de invitaciones: el token original no se persiste ni se devuelve al
   cliente; una nueva invitación revoca la pendiente anterior y un fallo de envío
   revoca el token emitido.
-- Onboarding móvil de colaboradores y servicios: tres pruebas de componentes,
-  TypeScript, ESLint y export web de Expo aprobados el 2026-07-25.
+- Onboarding móvil, persistencia de registro, disponibilidad por campo y preloader:
+  cuatro pruebas de componentes, TypeScript y ESLint aprobados el 2026-07-25.
+- Export web móvil aprobado con 1.009 módulos y 27 recursos empaquetados.
+- Next.js regeneró `apps/web/next-env.d.ts` para referenciar los tipos de rutas
+  del modo de desarrollo.
 
 ## Siguiente tarea recomendada
 

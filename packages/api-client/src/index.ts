@@ -36,6 +36,14 @@ export interface RegistrationResponse {
   readonly verificationRequired: true;
 }
 
+export interface RegistrationAvailabilityResponse {
+  readonly conflicts: {
+    readonly businessName?: string;
+    readonly email?: string;
+    readonly phone?: string;
+  };
+}
+
 export interface ResendVerificationResponse {
   readonly developmentVerificationCode?: string;
   readonly message: string;

@@ -1,4 +1,9 @@
-import { type SignUpInput } from '@barber-saas/validation';
+import type { RegistrationAvailabilityResponse } from '@barber-saas/api-client';
+import {
+  type RegistrationAvailabilityInput,
+  registrationAvailabilitySchema,
+  type SignUpInput,
+} from '@barber-saas/validation';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Controller, useForm } from 'react-hook-form';
@@ -26,11 +31,33 @@ import {
   PhoneCountryField,
   TimeField,
 } from './RegistrationSelectors';
+import { requireApiClient } from '../lib/api';
 import { useAuth } from '../providers/AuthProvider';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const logoImage = require('../../assets/nava-logo.png') as number;
 const VERIFICATION_DURATION_SECONDS = 10 * 60;
+
+async function checkRegistrationAvailability(
+  input: RegistrationAvailabilityInput,
+): Promise<RegistrationAvailabilityResponse> {
+  return requireApiClient().request<RegistrationAvailabilityResponse>(
+    '/v1/auth/registration-availability',
+    { body: input, method: 'POST' },
+  );
+}
+
+function apiErrorCode(error: unknown): string | null {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
+  ) {
+    return error.code;
+  }
+  return null;
+}
 
 function remainingVerificationSeconds(expiresAt: string): number {
   return Math.max(
@@ -54,13 +81,8 @@ type Step =
   | 'credentials'
   | 'review'
   | 'verification';
-type Values = SignUpInput & {
-  businessName: string;
-  city: string;
+type Values = Omit<SignUpInput, 'accountType' | 'countryCode'> & {
   country: string;
-  openingTime: string;
-  phone: string;
-  closingTime: string;
 };
 
 export function RegistrationFlow({
@@ -88,6 +110,7 @@ export function RegistrationFlow({
   );
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
   useEffect(() => {
     if (step !== 'verification' || !verificationExpiresAt) return;
     const updateCountdown = () => {
@@ -103,23 +126,31 @@ export function RegistrationFlow({
   const phoneCountry =
     COUNTRIES.find((country) => country.code === phoneCountryCode) ??
     COUNTRIES[0]!;
-  const { control, getValues, handleSubmit, formState, setError, setValue } =
-    useForm<Values>({
-      defaultValues: {
-        businessName: '',
-        city: '',
-        closingTime: '',
-        confirmPassword: '',
-        country: defaultCountry.name,
-        email: '',
-        fullName: '',
-        openingTime: '',
-        password: '',
-        phone: '',
-      },
-    });
+  const {
+    clearErrors,
+    control,
+    getValues,
+    handleSubmit,
+    formState,
+    setError,
+    setValue,
+  } = useForm<Values>({
+    defaultValues: {
+      businessName: '',
+      city: '',
+      closingTime: '',
+      confirmPassword: '',
+      country: defaultCountry.name,
+      email: '',
+      fullName: '',
+      openingTime: '',
+      password: '',
+      phone: '',
+    },
+  });
   const values = getValues();
-  const requireFields = (fields: (keyof Values)[], next: Step) => {
+  const fieldsAreComplete = (fields: (keyof Values)[]): boolean => {
+    clearErrors(fields);
     const current = getValues();
     let invalid = false;
     fields.forEach((field) => {
@@ -128,10 +159,96 @@ export function RegistrationFlow({
         invalid = true;
       }
     });
-    if (!invalid) setStep(next);
+    return !invalid;
+  };
+  const requireFields = (fields: (keyof Values)[], next: Step) => {
+    if (fieldsAreComplete(fields)) setStep(next);
+  };
+  const nextFromBusiness = async () => {
+    if (!fieldsAreComplete(['fullName', 'businessName', 'phone'])) return;
+    const current = getValues();
+    const input = {
+      businessName: current.businessName,
+      phone: `${phoneCountry.dial} ${current.phone.trim()}`,
+    };
+    const parsed = registrationAvailabilitySchema.safeParse(input);
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) {
+        const field = issue.path[0];
+        if (field === 'businessName' || field === 'phone') {
+          setError(field, { message: issue.message });
+        }
+      }
+      return;
+    }
+    setCheckingAvailability(true);
+    try {
+      const { conflicts } = await checkRegistrationAvailability(parsed.data);
+      if (conflicts.businessName) {
+        setError('businessName', { message: conflicts.businessName });
+      }
+      if (conflicts.phone) {
+        setError('phone', { message: conflicts.phone });
+      }
+      if (!conflicts.businessName && !conflicts.phone) setStep('attention');
+    } catch (error) {
+      setError('businessName', {
+        message:
+          error instanceof Error
+            ? error.message
+            : 'No pudimos comprobar la disponibilidad.',
+      });
+    } finally {
+      setCheckingAvailability(false);
+    }
+  };
+  const nextFromCredentials = async () => {
+    if (!fieldsAreComplete(['email', 'password', 'confirmPassword'])) return;
+    const current = getValues();
+    if (current.password !== current.confirmPassword) {
+      setError('confirmPassword', { message: 'Las contraseñas no coinciden.' });
+      return;
+    }
+    const parsed = registrationAvailabilitySchema.safeParse({
+      email: current.email,
+    });
+    if (!parsed.success) {
+      setError('email', {
+        message: parsed.error.issues[0]?.message ?? 'Ingresa un correo válido.',
+      });
+      return;
+    }
+    setCheckingAvailability(true);
+    try {
+      const { conflicts } = await checkRegistrationAvailability(parsed.data);
+      if (conflicts.email) {
+        setError('email', { message: conflicts.email });
+      } else {
+        setStep('review');
+      }
+    } catch (error) {
+      setError('email', {
+        message:
+          error instanceof Error
+            ? error.message
+            : 'No pudimos comprobar la disponibilidad.',
+      });
+    } finally {
+      setCheckingAvailability(false);
+    }
   };
   const submit = handleSubmit(
-    async ({ confirmPassword, email, fullName, password }) => {
+    async ({
+      businessName,
+      city,
+      closingTime,
+      confirmPassword,
+      email,
+      fullName,
+      openingTime,
+      password,
+      phone,
+    }) => {
       if (!email.trim() || !password || !confirmPassword) {
         setFormError('Completa tu correo y contraseña.');
         return;
@@ -140,13 +257,24 @@ export function RegistrationFlow({
         setFormError('Las contraseñas no coinciden.');
         return;
       }
+      if (!account) {
+        setFormError('Selecciona el tipo de cuenta.');
+        return;
+      }
       setFormError(null);
       try {
         const response = await signUp({
+          accountType: account,
+          businessName,
+          city,
+          closingTime,
           confirmPassword,
+          countryCode,
           email,
           fullName,
+          openingTime,
           password,
+          phone: `${phoneCountry.dial} ${phone.trim()}`,
         });
         setVerificationEmail(response.email);
         setVerificationExpiresAt(response.verificationExpiresAt);
@@ -155,6 +283,26 @@ export function RegistrationFlow({
         );
         setStep('verification');
       } catch (error) {
+        const code = apiErrorCode(error);
+        if (code === 'BUSINESS_NAME_ALREADY_EXISTS') {
+          setError('businessName', {
+            message: 'Ese nombre de negocio ya está en uso.',
+          });
+          setStep('business');
+          return;
+        }
+        if (code === 'PHONE_ALREADY_EXISTS') {
+          setError('phone', {
+            message: 'Ese número telefónico ya está registrado.',
+          });
+          setStep('business');
+          return;
+        }
+        if (code === 'EMAIL_ALREADY_EXISTS') {
+          setError('email', { message: 'Ese correo ya está registrado.' });
+          setStep('credentials');
+          return;
+        }
         setFormError(
           error instanceof Error
             ? error.message
@@ -313,7 +461,10 @@ export function RegistrationFlow({
                               error={fieldState.error?.message}
                               label="Nombre del negocio"
                               onBlur={field.onBlur}
-                              onChangeText={field.onChange}
+                              onChangeText={(value) => {
+                                clearErrors('businessName');
+                                field.onChange(value);
+                              }}
                               value={field.value}
                             />
                           )}
@@ -325,19 +476,21 @@ export function RegistrationFlow({
                             <PhoneCountryField
                               countryCode={phoneCountryCode}
                               error={fieldState.error?.message}
-                              onChangeCountry={setPhoneCountryCode}
-                              onChangeText={field.onChange}
+                              onChangeCountry={(code) => {
+                                clearErrors('phone');
+                                setPhoneCountryCode(code);
+                              }}
+                              onChangeText={(value) => {
+                                clearErrors('phone');
+                                field.onChange(value);
+                              }}
                               value={field.value}
                             />
                           )}
                         />
                         <Next
-                          onPress={() =>
-                            requireFields(
-                              ['fullName', 'businessName', 'phone'],
-                              'attention',
-                            )
-                          }
+                          disabled={checkingAvailability}
+                          onPress={() => void nextFromBusiness()}
                         />
                       </Section>
                     ) : null}
@@ -440,7 +593,10 @@ export function RegistrationFlow({
                               keyboardType="email-address"
                               label="Correo electrónico"
                               onBlur={field.onBlur}
-                              onChangeText={field.onChange}
+                              onChangeText={(value) => {
+                                clearErrors('email');
+                                field.onChange(value);
+                              }}
                               value={field.value}
                             />
                           )}
@@ -476,12 +632,8 @@ export function RegistrationFlow({
                           )}
                         />
                         <Next
-                          onPress={() =>
-                            requireFields(
-                              ['email', 'password', 'confirmPassword'],
-                              'review',
-                            )
-                          }
+                          disabled={checkingAvailability}
+                          onPress={() => void nextFromCredentials()}
                         />
                       </Section>
                     ) : null}
@@ -490,6 +642,11 @@ export function RegistrationFlow({
                         description="Revisa los datos antes de completar el registro."
                         title="Información general"
                       >
+                        {formError ? (
+                          <Text accessibilityRole="alert" style={s.formError}>
+                            {formError}
+                          </Text>
+                        ) : null}
                         <ReviewRow
                           label="Nombre"
                           onEdit={() => setStep('business')}

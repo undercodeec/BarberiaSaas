@@ -74,7 +74,7 @@ export function NavaWelcomeScreen({
 
             <View accessibilityElementsHidden style={styles.separator}>
               <View style={styles.separatorLine} />
-              <Ionicons color="#a8ddd9" name="cut-outline" size={30} />
+              <Ionicons color="#000000" name="cut-outline" size={30} />
               <View style={styles.separatorLine} />
             </View>
           </View>
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     marginTop: 48,
   },
   poleStripe: {
-    backgroundColor: 'rgba(168, 221, 217, 0.12)',
+    backgroundColor: 'rgba(0, 0, 0, 0.12)',
     height: 48,
     left: -25,
     position: 'absolute',

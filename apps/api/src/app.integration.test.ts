@@ -7,6 +7,20 @@ import type { InvitationMessage } from './recovery-mailer';
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const describeWithDatabase = testDatabaseUrl ? describe : describe.skip;
+let registrationProfileSequence = 0;
+
+function registrationProfilePayload() {
+  registrationProfileSequence += 1;
+  return {
+    accountType: 'business',
+    businessName: `Barbería de prueba ${registrationProfileSequence}`,
+    city: 'Quito',
+    closingTime: '18:00',
+    countryCode: 'EC',
+    openingTime: '09:00',
+    phone: `+5939${String(registrationProfileSequence).padStart(8, '0')}`,
+  } as const;
+}
 
 describeWithDatabase('API con PostgreSQL', () => {
   const connectionString = testDatabaseUrl ?? 'postgresql://unused/unused';
@@ -60,9 +74,11 @@ describeWithDatabase('API con PostgreSQL', () => {
   });
 
   async function register(email: string) {
+    const profilePayload = registrationProfilePayload();
     const response = await app.inject({
       method: 'POST',
       payload: {
+        ...profilePayload,
         confirmPassword: 'Clave-segura-123',
         email,
         fullName: 'Propietario de prueba',
@@ -203,9 +219,11 @@ describeWithDatabase('API con PostgreSQL', () => {
   it('exige y consume una sola vez el código de verificación de correo', async () => {
     const email = 'verification-owner@example.com';
     const password = 'Clave-segura-123';
+    const profilePayload = registrationProfilePayload();
     const registrationResponse = await app.inject({
       method: 'POST',
       payload: {
+        ...profilePayload,
         confirmPassword: password,
         email,
         fullName: 'Cuenta pendiente',
@@ -239,8 +257,23 @@ describeWithDatabase('API con PostgreSQL', () => {
       url: '/v1/auth/verify-email',
     });
     expect(verification.statusCode).toBe(200);
-    expect(await database.user.findUnique({ where: { email } })).toMatchObject({
+    const verifiedUser = await database.user.findUnique({ where: { email } });
+    expect(verifiedUser).toMatchObject({
       emailVerifiedAt: expect.any(Date),
+      phone: profilePayload.phone,
+    });
+    expect(
+      await database.userRegistrationProfile.findUnique({
+        where: { userId: verifiedUser!.id },
+      }),
+    ).toMatchObject({
+      accountType: 'BUSINESS',
+      businessName: profilePayload.businessName,
+      city: profilePayload.city,
+      closingTime: profilePayload.closingTime,
+      countryCode: profilePayload.countryCode,
+      openingTime: profilePayload.openingTime,
+      userId: verifiedUser!.id,
     });
     expect(
       await database.pendingRegistration.findUnique({ where: { email } }),
@@ -254,10 +287,118 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(reusedCode.statusCode).toBe(400);
   });
 
+  it('rechaza correo, teléfono y nombre de negocio repetidos', async () => {
+    const password = 'Clave-segura-123';
+    const firstProfile = {
+      ...registrationProfilePayload(),
+      businessName: 'Barbería Única',
+    };
+    const firstEmail = 'unique-owner@example.com';
+    const firstRegistration = await app.inject({
+      method: 'POST',
+      payload: {
+        ...firstProfile,
+        confirmPassword: password,
+        email: firstEmail,
+        fullName: 'Cuenta única',
+        password,
+      },
+      url: '/v1/auth/register',
+    });
+    expect(firstRegistration.statusCode).toBe(201);
+    const verificationCode = firstRegistration.json<{
+      developmentVerificationCode: string;
+    }>().developmentVerificationCode;
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          payload: { code: verificationCode, email: firstEmail },
+          url: '/v1/auth/verify-email',
+        })
+      ).statusCode,
+    ).toBe(200);
+
+    const availability = await app.inject({
+      method: 'POST',
+      payload: {
+        businessName: 'BARBERIA UNICA',
+        email: firstEmail.toUpperCase(),
+        phone: `${firstProfile.phone.slice(0, 4)} ${firstProfile.phone.slice(4)}`,
+      },
+      url: '/v1/auth/registration-availability',
+    });
+    expect(availability.statusCode).toBe(200);
+    expect(
+      availability.json<{
+        conflicts: {
+          businessName: string;
+          email: string;
+          phone: string;
+        };
+      }>().conflicts,
+    ).toEqual({
+      businessName: 'Ese nombre de negocio ya está en uso.',
+      email: 'Ese correo ya está registrado.',
+      phone: 'Ese número telefónico ya está registrado.',
+    });
+
+    const duplicateEmail = await app.inject({
+      method: 'POST',
+      payload: {
+        ...registrationProfilePayload(),
+        confirmPassword: password,
+        email: firstEmail.toUpperCase(),
+        fullName: 'Otro usuario',
+        password,
+      },
+      url: '/v1/auth/register',
+    });
+    expect(duplicateEmail.statusCode).toBe(409);
+    expect(duplicateEmail.json<{ code: string }>().code).toBe(
+      'EMAIL_ALREADY_EXISTS',
+    );
+
+    const duplicatePhone = await app.inject({
+      method: 'POST',
+      payload: {
+        ...registrationProfilePayload(),
+        confirmPassword: password,
+        email: 'duplicate-phone@example.com',
+        fullName: 'Teléfono repetido',
+        password,
+        phone: `${firstProfile.phone.slice(0, 4)} ${firstProfile.phone.slice(4)}`,
+      },
+      url: '/v1/auth/register',
+    });
+    expect(duplicatePhone.statusCode).toBe(409);
+    expect(duplicatePhone.json<{ code: string }>().code).toBe(
+      'PHONE_ALREADY_EXISTS',
+    );
+
+    const duplicateBusiness = await app.inject({
+      method: 'POST',
+      payload: {
+        ...registrationProfilePayload(),
+        businessName: 'BARBERIA UNICA',
+        confirmPassword: password,
+        email: 'duplicate-business@example.com',
+        fullName: 'Negocio repetido',
+        password,
+      },
+      url: '/v1/auth/register',
+    });
+    expect(duplicateBusiness.statusCode).toBe(409);
+    expect(duplicateBusiness.json<{ code: string }>().code).toBe(
+      'BUSINESS_NAME_ALREADY_EXISTS',
+    );
+  });
+
   it('bloquea la verificación después de cinco códigos incorrectos', async () => {
     const email = 'verification-limit@example.com';
     const password = 'Clave-segura-123';
     const registrationPayload = {
+      ...registrationProfilePayload(),
       confirmPassword: password,
       email,
       fullName: 'Cuenta con límite',

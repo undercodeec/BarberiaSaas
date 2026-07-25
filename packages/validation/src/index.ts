@@ -16,6 +16,19 @@ const passwordSchema = z
   .string()
   .min(8, 'La contraseña debe tener al menos 8 caracteres.')
   .max(72);
+const timeSchema = z
+  .string()
+  .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/u, 'La hora debe tener formato HH:MM.');
+const businessNameSchema = z
+  .string()
+  .trim()
+  .min(2, 'Ingresa el nombre del negocio.')
+  .max(120);
+const phoneSchema = z
+  .string()
+  .trim()
+  .min(7, 'Ingresa un teléfono válido.')
+  .max(24);
 const slugSchema = z
   .string()
   .trim()
@@ -42,15 +55,39 @@ export const signInSchema = z.object({
 
 export const signUpSchema = z
   .object({
+    accountType: z.enum(['business', 'professional']),
+    businessName: businessNameSchema,
+    city: z.string().trim().min(2, 'Selecciona una ciudad.').max(120),
+    closingTime: timeSchema,
     confirmPassword: passwordSchema,
+    countryCode: z
+      .string()
+      .regex(/^[A-Z]{2}$/u, 'El código de país no es válido.'),
     email: emailSchema,
     fullName: z.string().trim().min(2, 'Ingresa tu nombre completo.').max(120),
+    openingTime: timeSchema,
     password: passwordSchema,
+    phone: phoneSchema,
   })
   .refine((value) => value.password === value.confirmPassword, {
     message: 'Las contraseñas no coinciden.',
     path: ['confirmPassword'],
+  })
+  .refine((value) => value.openingTime !== value.closingTime, {
+    message: 'La hora de cierre debe ser distinta a la de apertura.',
+    path: ['closingTime'],
   });
+
+export const registrationAvailabilitySchema = z
+  .object({
+    businessName: businessNameSchema.optional(),
+    email: emailSchema.optional(),
+    phone: phoneSchema.optional(),
+  })
+  .refine(
+    (value) => Boolean(value.businessName || value.email || value.phone),
+    'Envía al menos un campo para comprobar.',
+  );
 
 export const verifyEmailSchema = z.object({
   code: z
@@ -274,6 +311,9 @@ export type OrganizationOnboardingInput = z.infer<
 >;
 export type PublicApiConfig = z.infer<typeof publicApiConfigSchema>;
 export type RecoverAccessInput = z.infer<typeof recoverAccessSchema>;
+export type RegistrationAvailabilityInput = z.infer<
+  typeof registrationAvailabilitySchema
+>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type ReplaceWeeklySchedulesInput = z.infer<
   typeof replaceWeeklySchedulesSchema
