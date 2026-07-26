@@ -66,7 +66,7 @@ export function NavaWelcomeScreen({
 
           <View style={styles.message}>
             <Text accessibilityRole="header" style={styles.title}>
-              Bienvenido a Nava
+              Bienvenido a <Image resizeMode="contain" source={logoImage} style={styles.inlineBrandLogo} />
             </Text>
             <Text style={styles.description}>
               Reserva tu cita y gestiona{'\n'}tu barbería con facilidad
@@ -187,6 +187,10 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     width: '100%',
+  },
+  inlineBrandLogo: {
+    height: 28,
+    width: 90,
   },
   logo: {
     height: 155,

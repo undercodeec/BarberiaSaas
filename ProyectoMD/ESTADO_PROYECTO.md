@@ -2,7 +2,7 @@
 
 Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión posterior documentada en `docs/adr/0003-postgresql-prisma-y-api-en-vps.md`. Se marca `[x]` solo cuando la tarea está implementada y cuenta con la verificación indicada; `[ ]` significa pendiente o aún no demostrada.
 
-Última actualización: 2026-07-25
+Última actualización: 2026-07-26
 
 ## Decisión de infraestructura vigente
 
@@ -299,6 +299,30 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - Next.js regeneró `apps/web/next-env.d.ts` para referenciar los tipos de rutas
   del modo de desarrollo.
 
-## Siguiente tarea recomendada
+### Servicios persistentes durante onboarding
 
-- [ ] Verificar la entrega del proveedor SMTP y ejecutar el flujo móvil completo: crear perfil, recibir email, registrarse, aceptar y operar. Después, iniciar la Fase 4 — Reservas públicas.
+- [x] Formulario de servicio ampliado con configuración adicional: reserva online, visibilidad de duración, tipo de precio, categoría, impuesto, imagen, color de agenda y porcentaje de abono.
+- [x] Selectores de tipo de precio (`fijo`, `a partir de`, `gratis`, `no mostrar`) y controles de porcentaje para impuesto y abono.
+- [x] Modales para crear categoría e impuesto durante la configuración del servicio.
+- [x] Se sustituyó el azul global `#2464E8` por negro en controles y textos nuevos; el color se conserva exclusivamente como opción de las paletas de agenda.
+- [x] Migración `20260726110000_onboarding_services` creada para `onboarding_services`, vinculada al usuario propietario antes de crear una organización.
+- [x] La tabla guarda nombre, descripción, duración, precio y tipo, reservas online, duración visible, categoría y descripción, impuesto y sus reglas, imagen, color y porcentaje de abono.
+- [x] CRUD autenticado en `/v1/onboarding/services`: listado, creación, actualización y eliminación, siempre restringido al `ownerUserId` de la sesión.
+- [x] La pantalla `apps/mobile/app/(onboarding)/services.tsx` consulta los servicios persistidos y muestra tarjetas con acciones de editar y eliminar, siguiendo el patrón de colaboradores.
+- [x] Al editar, `ServiceFormSheet` recibe los valores almacenados y precarga el formulario.
+- [x] Cliente Prisma regenerado y typecheck de API y móvil aprobados tras el cambio.
+- [ ] Aplicar `20260726110000_onboarding_services` en PostgreSQL de desarrollo, pruebas y despliegue mediante `prisma migrate deploy`; la migración fue creada pero no se aplicó durante este cambio.
+
+## Siguiente tarea recomendada
+### Configuracion final de cuenta y cierre de onboarding
+
+- [x] Paso 3 movil: formulario final de cuenta con portada, nombre, telefono, correo de solo lectura, campos opcionales y selector mundial dependiente de pais y ciudad.
+- [x] GET y PATCH en /v1/onboarding/account-details leen y actualizan el usuario autenticado y su user_registration_profiles en una transaccion.
+- [x] Migracion 20260726130000_onboarding_account_details creada y aplicada en PostgreSQL local; agrega portada, direccion, descripcion y enlaces sociales al perfil.
+- [x] Pantalla movil de felicitaciones creada con Felicidadez.png, enlace de reservas, apertura de URL, compartir y copia de respaldo mediante expo-clipboard.
+- [x] El boton Siguiente de servicios lleva a la configuracion final y, despues de guardar, a /congratulations.
+- [x] Typecheck de API y movil aprobados; API Vitest: 6 pruebas aprobadas y 10 de integracion omitidas sin TEST_DATABASE_URL; export web de Expo aprobado con la ruta y recurso de felicitaciones.
+
+
+
+- [ ] Aplicar y verificar la migración de servicios de onboarding en PostgreSQL, incluyendo pruebas de CRUD y aislamiento por usuario. Luego verificar el flujo móvil completo y continuar con la Fase 4 — Reservas públicas.

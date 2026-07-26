@@ -8,6 +8,7 @@ import { Redirect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import {
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -107,11 +108,10 @@ export default function OrganizationOnboardingScreen() {
     setCollaboratorSheetOpen(false);
   };
 
-  const deleteCollaborator = async () => {
-    if (!editingCollaborator) return;
+  const deleteCollaborator = async (collaborator: StoredCollaborator) => {
     setRequestError(null);
     await requireApiClient().request<void>(
-      `/v1/onboarding/collaborators/${editingCollaborator.id}`,
+      `/v1/onboarding/collaborators/${collaborator.id}`,
       { method: 'DELETE' },
     );
     await queryClient.invalidateQueries({
@@ -244,6 +244,27 @@ export default function OrganizationOnboardingScreen() {
               >
                 <Ionicons color="#101c2d" name="pencil-outline" size={20} />
               </Pressable>
+              <Pressable
+                accessibilityLabel={`Eliminar ${collaborator.name}`}
+                accessibilityRole="button"
+                onPress={() => {
+                  Alert.alert(
+                    'Eliminar colaborador',
+                    `¿Quieres eliminar a ${collaborator.name}? Esta acción no se puede deshacer.`,
+                    [
+                      { style: 'cancel', text: 'Cancelar' },
+                      {
+                        onPress: () => void deleteCollaborator(collaborator),
+                        style: 'destructive',
+                        text: 'Eliminar',
+                      },
+                    ],
+                  );
+                }}
+                style={styles.deleteIconButton}
+              >
+                <Ionicons color="#bd2d2d" name="trash-outline" size={20} />
+              </Pressable>
             </View>
           ))}
           {collaborators.length > 0 ? (
@@ -278,7 +299,11 @@ export default function OrganizationOnboardingScreen() {
           setEditingCollaborator(null);
           setCollaboratorSheetOpen(false);
         }}
-        onDelete={editingCollaborator ? deleteCollaborator : undefined}
+        onDelete={
+          editingCollaborator
+            ? () => deleteCollaborator(editingCollaborator)
+            : undefined
+        }
         onSave={saveCollaborator}
         visible={collaboratorSheetOpen}
       />
@@ -383,6 +408,14 @@ const styles = StyleSheet.create({
     marginTop: 12,
     maxWidth: 490,
     textAlign: 'center',
+  },
+  deleteIconButton: {
+    alignItems: 'center',
+    backgroundColor: '#fff0ee',
+    borderRadius: 12,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
   },
   editButton: {
     alignItems: 'center',

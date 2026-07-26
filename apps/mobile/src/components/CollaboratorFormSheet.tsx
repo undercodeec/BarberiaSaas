@@ -122,7 +122,7 @@ export function CollaboratorFormSheet({
   );
   const [phone, setPhone] = useState(initialValue?.phone ?? '');
   const [agendaColor, setAgendaColor] = useState<string>(
-    initialValue?.agendaColor ?? '#2464E8',
+    initialValue?.agendaColor ?? '#111827',
   );
   const [additionalOpen, setAdditionalOpen] = useState(
     Boolean(initialValue?.identification || initialValue?.phone),
@@ -164,7 +164,7 @@ export function CollaboratorFormSheet({
     setCanPerformServices(false);
     setIdentification('');
     setPhone('');
-    setAgendaColor('#2464E8');
+    setAgendaColor('#111827');
     setAdditionalOpen(false);
     setPhotoError(null);
     setFormError(null);
@@ -313,7 +313,7 @@ export function CollaboratorFormSheet({
                     {photoUri ? 'Cambiar fotografía' : 'Seleccionar fotografía'}
                   </Text>
                 </View>
-                <Ionicons color="#2464e8" name="chevron-forward" size={21} />
+                <Ionicons color="#101c2d" name="chevron-forward" size={21} />
               </Pressable>
               {photoError ? (
                 <Text accessibilityRole="alert" style={styles.error}>
@@ -410,7 +410,7 @@ export function CollaboratorFormSheet({
                           </Text>
                           {role === option ? (
                             <Ionicons
-                              color="#2464e8"
+                              color="#101c2d"
                               name="checkmark-circle"
                               size={21}
                             />
@@ -791,7 +791,7 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
   },
   photoHint: {
-    color: '#2464e8',
+    color: '#101c2d',
     fontSize: 13,
     fontWeight: '700',
     marginTop: 4,

@@ -35,7 +35,7 @@ describe('CollaboratorFormSheet', () => {
 
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
-        agendaColor: '#2464E8',
+        agendaColor: '#111827',
         canPerformServices: true,
         customRoleName: 'Colorista',
         name: 'María',

@@ -402,7 +402,7 @@ export function RegistrationFlow({
                 {step === 'choice' ? (
                   <View style={s.roleContent}>
                     <Text accessibilityRole="header" style={s.title}>
-                      ¿Cómo quieres unirte a Nava?
+                      ¿Cómo quieres unirte a <Image resizeMode="contain" source={logoImage} style={s.inlineBrandLogo} />?
                     </Text>
                     <Text style={s.description}>
                       Elige una opción para crear tu cuenta.
@@ -792,7 +792,7 @@ function RegistrationWelcome() {
           />
           <View style={s.welcomeMessage}>
             <Text accessibilityRole="header" style={s.welcomeTitle}>
-              Bienvenido a Nava
+              Bienvenido a <Image resizeMode="contain" source={logoImage} style={s.inlineBrandLogo} />
             </Text>
             <Text style={s.welcomeDescription}>
               Reserva tu cita y gestiona{`\n`}tu barbería con facilidad
@@ -905,7 +905,7 @@ const s = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(5, 10, 16, 0.66)',
   },
-  backText: { color: '#2464e8', fontSize: 16, fontWeight: '700' },
+  backText: { color: '#101c2d', fontSize: 16, fontWeight: '700' },
   bottom: {
     bottom: -245,
     height: 460,
@@ -932,7 +932,7 @@ const s = StyleSheet.create({
   },
   content: { paddingBottom: 18 },
   description: { color: '#667080', fontSize: 16, lineHeight: 23, marginTop: 7 },
-  edit: { color: '#2464e8', fontSize: 14, fontWeight: '800' },
+  edit: { color: '#101c2d', fontSize: 14, fontWeight: '800' },
   error: { color: '#bd2d2d', fontSize: 13, marginTop: 5 },
   field: { marginBottom: 15 },
   fields: { marginTop: 26 },
@@ -988,6 +988,7 @@ const s = StyleSheet.create({
   label: { color: '#101c2d', fontSize: 14, fontWeight: '700', marginBottom: 7 },
   layer: { flex: 1, justifyContent: 'flex-end' },
   logo: { alignSelf: 'center', height: 190, width: '76%' },
+  inlineBrandLogo: { height: 28, width: 90 },
   nextButton: {
     flexBasis: 'auto',
     flexGrow: 0,
@@ -1103,5 +1104,5 @@ const verificationStyles = StyleSheet.create({
     color: '#b42318',
   },
   resendButton: { alignItems: 'center', marginTop: 18, paddingVertical: 10 },
-  resendText: { color: '#2464e8', fontSize: 15, fontWeight: '800' },
+  resendText: { color: '#101c2d', fontSize: 15, fontWeight: '800' },
 });

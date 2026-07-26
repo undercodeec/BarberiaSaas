@@ -60,6 +60,29 @@ export interface RecoverAccessResponse {
   readonly message: string;
 }
 
+export interface OnboardingAccountDetailsResponse {
+  readonly accountType: 'business' | 'professional' | null;
+  readonly addressLine: string | null;
+  readonly bookingUrl: string | null;
+  readonly coverImageUri: string | null;
+  readonly description: string | null;
+  readonly facebookUrl: string | null;
+  readonly instagramUrl: string | null;
+  readonly businessName: string | null;
+  readonly city: string | null;
+  readonly countryCode: string | null;
+  readonly email: string;
+  readonly fullName: string;
+  readonly openingTime: string | null;
+  readonly closingTime: string | null;
+  readonly phone: string | null;
+}
+
+export interface ApiMessageResponse {
+  readonly message: string;
+  // Reserved for future shared message fields.
+}
+
 export interface CurrentOrganizationResponse {
   readonly location: {
     readonly currencyCode: string;

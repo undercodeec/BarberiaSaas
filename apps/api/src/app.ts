@@ -10,6 +10,7 @@ import {
 import {
   completeOnboardingSchema,
   createOnboardingCollaboratorSchema,
+  createOnboardingServiceSchema,
   recoverAccessSchema,
   registrationAvailabilitySchema,
   resendVerificationSchema,
@@ -17,6 +18,8 @@ import {
   signInSchema,
   signUpSchema,
   updateOnboardingCollaboratorSchema,
+  updateOnboardingServiceSchema,
+  updateOnboardingAccountDetailsSchema,
   verifyEmailSchema,
 } from '@barber-saas/validation';
 import Fastify, { type FastifyRequest } from 'fastify';
@@ -45,6 +48,9 @@ const VERIFICATION_DURATION_MS = 10 * 60 * 1000;
 const VERIFICATION_LOCK_DURATION_MS = 15 * 60 * 1000;
 const MAX_VERIFICATION_ATTEMPTS = 5;
 const onboardingCollaboratorParamsSchema = z.object({
+  id: z.uuid('El identificador no es válido.'),
+});
+const onboardingServiceParamsSchema = z.object({
   id: z.uuid('El identificador no es válido.'),
 });
 
@@ -156,6 +162,64 @@ function publicOnboardingCollaborator(collaborator: {
     phone: collaborator.phone,
     photoUri: collaborator.photoUri,
     role: collaborator.role.toLowerCase(),
+  };
+}
+
+function onboardingServiceData(input: {
+  readonly agendaColor: string;
+  readonly category: { readonly description: string; readonly name: string } | null;
+  readonly description?: string | null | undefined;
+  readonly downPaymentPercentage: number;
+  readonly durationMinutes: number;
+  readonly imageUri?: string | null | undefined;
+  readonly name: string;
+  readonly onlineBooking: boolean;
+  readonly price: number;
+  readonly priceType: 'fixed' | 'from' | 'free' | 'hidden';
+  readonly showServiceTime: boolean;
+  readonly tax: { readonly addAtCheckout: boolean; readonly addAtPurchaseEnd: boolean; readonly name: string; readonly percentage: number } | null;
+}) {
+  return {
+    agendaColor: input.agendaColor.toUpperCase(),
+    categoryDescription: input.category?.description || null,
+    categoryName: input.category?.name || null,
+    description: input.description || null,
+    downPaymentPercentage: input.downPaymentPercentage,
+    durationMinutes: input.durationMinutes,
+    imageUri: input.imageUri || null,
+    name: input.name,
+    onlineBooking: input.onlineBooking,
+    priceCents: Math.round(input.price * 100),
+    priceType: input.priceType,
+    showServiceTime: input.showServiceTime,
+    taxAddAtCheckout: input.tax?.addAtCheckout ?? false,
+    taxAddAtPurchaseEnd: input.tax?.addAtPurchaseEnd ?? false,
+    taxName: input.tax?.name || null,
+    taxPercentage: input.tax?.percentage ?? null,
+  };
+}
+
+function publicOnboardingService(service: {
+  readonly agendaColor: string; readonly categoryDescription: string | null; readonly categoryName: string | null;
+  readonly description: string | null; readonly downPaymentPercentage: number; readonly durationMinutes: number;
+  readonly id: string; readonly imageUri: string | null; readonly name: string; readonly onlineBooking: boolean;
+  readonly priceCents: number; readonly priceType: string; readonly showServiceTime: boolean;
+  readonly taxAddAtCheckout: boolean; readonly taxAddAtPurchaseEnd: boolean; readonly taxName: string | null; readonly taxPercentage: number | null;
+}) {
+  return {
+    agendaColor: service.agendaColor,
+    category: service.categoryName ? { description: service.categoryDescription ?? '', name: service.categoryName } : null,
+    description: service.description,
+    downPaymentPercentage: service.downPaymentPercentage,
+    durationMinutes: service.durationMinutes,
+    id: service.id,
+    imageUri: service.imageUri,
+    name: service.name,
+    onlineBooking: service.onlineBooking,
+    price: service.priceCents / 100,
+    priceType: service.priceType as 'fixed' | 'from' | 'free' | 'hidden',
+    showServiceTime: service.showServiceTime,
+    tax: service.taxName && service.taxPercentage !== null ? { addAtCheckout: service.taxAddAtCheckout, addAtPurchaseEnd: service.taxAddAtPurchaseEnd, name: service.taxName, percentage: service.taxPercentage } : null,
   };
 }
 
@@ -335,6 +399,7 @@ export async function buildApi({
 }: BuildApiOptions) {
   const app = Fastify({ logger: config.APP_ENV === 'production' });
   await app.register(cors, {
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     origin: config.CORS_ORIGIN.split(',').map((origin) => origin.trim()),
   });
 
@@ -762,6 +827,100 @@ export async function buildApi({
     return reply.code(204).send();
   });
 
+  app.get('/v1/onboarding/account-details', async (request) => {
+    const { user } = await authenticate(database, request);
+    const profile = await database.userRegistrationProfile.findUnique({
+      where: { userId: user.id },
+    });
+    return {
+      accountType: profile ? (profile.accountType.toLowerCase() as 'business' | 'professional') : null,
+      addressLine: profile?.addressLine ?? null,
+      businessName: profile?.businessName ?? null,
+      bookingUrl: profile
+        ? `https://book.weibook.co/${profile.businessNameKey}`
+        : null,
+      city: profile?.city ?? null,
+      closingTime: profile?.closingTime ?? null,
+      coverImageUri: profile?.coverImageUri ?? null,
+      countryCode: profile?.countryCode ?? null,
+      description: profile?.description ?? null,
+      email: user.email,
+      fullName: user.fullName,
+      facebookUrl: profile?.facebookUrl ?? null,
+      openingTime: profile?.openingTime ?? null,
+      phone: user.phone,
+      instagramUrl: profile?.instagramUrl ?? null,
+    };
+  });
+
+  app.patch('/v1/onboarding/account-details', async (request) => {
+    const { user } = await authenticate(database, request);
+    const input = updateOnboardingAccountDetailsSchema.parse(request.body);
+    const existingProfile = await database.userRegistrationProfile.findUnique({
+      where: { userId: user.id },
+    });
+    if (!existingProfile) {
+      throw new ApiError(
+        404,
+        'ONBOARDING_ACCOUNT_DETAILS_NOT_FOUND',
+        'No encontramos la informaci\u00f3n de tu cuenta.',
+      );
+    }
+
+    try {
+      const [updatedUser, updatedProfile] = await database.$transaction([
+        database.user.update({
+          data: { phone: input.phone },
+          where: { id: user.id },
+        }),
+        database.userRegistrationProfile.update({
+          data: {
+            addressLine: input.addressLine,
+            businessName: input.businessName,
+            businessNameKey: normalizeBusinessName(input.businessName),
+            city: input.city,
+            countryCode: input.countryCode,
+            coverImageUri: input.coverImageUri,
+            description: input.description,
+            facebookUrl: input.facebookUrl,
+            instagramUrl: input.instagramUrl,
+            phoneKey: normalizePhone(input.phone),
+          },
+          where: { userId: user.id },
+        }),
+      ]);
+      return {
+        accountType: updatedProfile.accountType.toLowerCase() as
+          | 'business'
+          | 'professional',
+        addressLine: updatedProfile.addressLine,
+        businessName: updatedProfile.businessName,
+        bookingUrl: 'https://book.weibook.co/' + updatedProfile.businessNameKey,
+        city: updatedProfile.city,
+        closingTime: updatedProfile.closingTime,
+        coverImageUri: updatedProfile.coverImageUri,
+        countryCode: updatedProfile.countryCode,
+        description: updatedProfile.description,
+        email: updatedUser.email,
+        facebookUrl: updatedProfile.facebookUrl,
+        fullName: updatedUser.fullName,
+        instagramUrl: updatedProfile.instagramUrl,
+        openingTime: updatedProfile.openingTime,
+        phone: updatedUser.phone,
+      };
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new ApiError(
+          409,
+          'ONBOARDING_ACCOUNT_DETAILS_ALREADY_EXISTS',
+          'El nombre del negocio o tel\u00e9fono ya est\u00e1 registrado.',
+        );
+      }
+      throw error;
+    }
+  });
+
+
   app.get('/v1/onboarding/collaborators', async (request) => {
     const { user } = await authenticate(database, request);
     const collaborators = await database.onboardingCollaborator.findMany({
@@ -822,6 +981,38 @@ export async function buildApi({
     await database.onboardingCollaborator.delete({
       where: { id: existing.id },
     });
+    return reply.code(204).send();
+  });
+
+  app.get('/v1/onboarding/services', async (request) => {
+    const { user } = await authenticate(database, request);
+    const services = await database.onboardingService.findMany({ orderBy: { createdAt: 'asc' }, where: { ownerUserId: user.id } });
+    return { services: services.map(publicOnboardingService) };
+  });
+
+  app.post('/v1/onboarding/services', async (request, reply) => {
+    const { user } = await authenticate(database, request);
+    const input = createOnboardingServiceSchema.parse(request.body);
+    const service = await database.onboardingService.create({ data: { ...onboardingServiceData(input), ownerUserId: user.id } });
+    return reply.code(201).send({ service: publicOnboardingService(service) });
+  });
+
+  app.patch('/v1/onboarding/services/:id', async (request) => {
+    const { user } = await authenticate(database, request);
+    const { id } = onboardingServiceParamsSchema.parse(request.params);
+    const input = updateOnboardingServiceSchema.parse(request.body);
+    const existing = await database.onboardingService.findFirst({ where: { id, ownerUserId: user.id } });
+    if (!existing) throw new ApiError(404, 'ONBOARDING_SERVICE_NOT_FOUND', 'El servicio no existe.');
+    const service = await database.onboardingService.update({ data: onboardingServiceData(input), where: { id: existing.id } });
+    return { service: publicOnboardingService(service) };
+  });
+
+  app.delete('/v1/onboarding/services/:id', async (request, reply) => {
+    const { user } = await authenticate(database, request);
+    const { id } = onboardingServiceParamsSchema.parse(request.params);
+    const existing = await database.onboardingService.findFirst({ where: { id, ownerUserId: user.id } });
+    if (!existing) throw new ApiError(404, 'ONBOARDING_SERVICE_NOT_FOUND', 'El servicio no existe.');
+    await database.onboardingService.delete({ where: { id: existing.id } });
     return reply.code(204).send();
   });
 

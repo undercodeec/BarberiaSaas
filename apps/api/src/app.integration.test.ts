@@ -9,6 +9,38 @@ const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const describeWithDatabase = testDatabaseUrl ? describe : describe.skip;
 let registrationProfileSequence = 0;
 
+describe('CORS', () => {
+  it('autoriza PATCH durante el preflight para editar colaboradores', async () => {
+    const app = await buildApi({
+      config: readConfig({
+        API_HOST: '127.0.0.1',
+        API_PORT: '4000',
+        APP_ENV: 'local',
+        CORS_ORIGIN: 'http://localhost:8081',
+        DATABASE_URL: 'postgresql://unused/unused',
+        MOBILE_INVITATION_URL: 'barbersaas://accept-invitation',
+        MOBILE_RESET_URL: 'barbersaas://reset-password',
+      }),
+    });
+
+    try {
+      const response = await app.inject({
+        method: 'OPTIONS',
+        url: '/v1/onboarding/collaborators/example-id',
+        headers: {
+          origin: 'http://localhost:8081',
+          'access-control-request-method': 'PATCH',
+        },
+      });
+
+      expect(response.statusCode).toBe(204);
+      expect(response.headers['access-control-allow-methods']).toContain('PATCH');
+    } finally {
+      await app.close();
+    }
+  });
+});
+
 function registrationProfilePayload() {
   registrationProfileSequence += 1;
   return {

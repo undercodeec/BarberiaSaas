@@ -103,6 +103,25 @@ export const verifyEmailSchema = z.object({
 export const resendVerificationSchema = z.object({ email: emailSchema });
 
 export const recoverAccessSchema = z.object({ email: emailSchema });
+const optionalProfileText = (maximum: number) =>
+  z.string().trim().max(maximum).nullable().transform((value) => value || null);
+
+const optionalProfileUrl = z
+  .union([z.literal(''), z.string().trim().url().max(2048), z.null()])
+  .transform((value) => value || null);
+
+export const updateOnboardingAccountDetailsSchema = z.object({
+  addressLine: optionalProfileText(240),
+  businessName: businessNameSchema,
+  city: z.string().trim().min(2).max(120),
+  countryCode: z.string().regex(/^[A-Z]{2}$/u, 'El c\u00f3digo de pa\u00eds no es v\u00e1lido.'),
+  coverImageUri: optionalProfileText(2048),
+  description: optionalProfileText(500),
+  facebookUrl: optionalProfileUrl,
+  instagramUrl: optionalProfileUrl,
+  phone: phoneSchema,
+});
+
 
 export const resetPasswordSchema = z.object({
   password: passwordSchema,
@@ -191,6 +210,39 @@ export const createOnboardingCollaboratorSchema = z
 
 export const updateOnboardingCollaboratorSchema =
   createOnboardingCollaboratorSchema;
+
+const onboardingServiceCategorySchema = z
+  .object({
+    description: z.string().trim().max(500),
+    name: z.string().trim().min(2).max(80),
+  })
+  .nullable();
+
+const onboardingServiceTaxSchema = z
+  .object({
+    addAtCheckout: z.boolean(),
+    addAtPurchaseEnd: z.boolean(),
+    name: z.string().trim().min(2).max(80),
+    percentage: z.number().int().min(0).max(100),
+  })
+  .nullable();
+
+export const createOnboardingServiceSchema = z.object({
+  agendaColor: agendaColorSchema,
+  category: onboardingServiceCategorySchema,
+  description: z.string().trim().max(500).nullish(),
+  downPaymentPercentage: z.number().int().min(0).max(100),
+  durationMinutes: durationMinutesSchema,
+  imageUri: z.string().trim().max(2048).nullish(),
+  name: z.string().trim().min(2, 'Ingresa el nombre del servicio.').max(120),
+  onlineBooking: z.boolean(),
+  price: z.number().min(0).max(1_000_000),
+  priceType: z.enum(['fixed', 'from', 'free', 'hidden']),
+  showServiceTime: z.boolean(),
+  tax: onboardingServiceTaxSchema,
+});
+
+export const updateOnboardingServiceSchema = createOnboardingServiceSchema;
 
 export const createServiceCategorySchema = z.object({
   name: z.string().trim().min(2, 'Ingresa el nombre de la categoría.').max(80),
@@ -324,6 +376,9 @@ export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;
 export type CreateOnboardingCollaboratorInput = z.infer<
   typeof createOnboardingCollaboratorSchema
 >;
+export type CreateOnboardingServiceInput = z.infer<
+  typeof createOnboardingServiceSchema
+>;
 export type AssignProfessionalServiceInput = z.infer<
   typeof assignProfessionalServiceSchema
 >;
@@ -362,4 +417,7 @@ export type SignUpInput = z.infer<typeof signUpSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export type UpdateOnboardingCollaboratorInput = z.infer<
   typeof updateOnboardingCollaboratorSchema
+>;
+export type UpdateOnboardingServiceInput = z.infer<
+  typeof updateOnboardingServiceSchema
 >;

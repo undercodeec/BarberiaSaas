@@ -1,58 +1,54 @@
-Create a high-fidelity mobile onboarding screen for the Nava barber-services application.
+Create an original high-fidelity onboarding completion screen for the Nava barber-services application.
 
-Design step 1 of a four-step account-setup flow. Use a spacious premium interface with a pale blue-white background and restrained cobalt-blue ambient gradients near the top-right and bottom-left corners.
+Maintain the Nava visual system: pale blue-white background, restrained cobalt-blue gradients, dark-charcoal typography, rounded controls and generous spacing.
 
-TOP AREA
+HERO ILLUSTRATION
 
-Place the title “Configura tu cuenta” on the left and a four-step progress indicator on the right. The first step must be active as an elongated cobalt-blue pill. The remaining three steps are pale-blue circles.
+Show five diverse adult barber professionals and clients of different ages, genders, skin tones and hairstyles as one cohesive group portrait arranged in a gentle upward arc.
 
-ORIGINAL HERO ILLUSTRATION
+Place a subtle cobalt-blue circular success badge with a white check mark behind the central figure.
 
-Show an original collaborative barber team: one male professional and one female professional standing together with confident, welcoming expressions. They hold professional tools such as scissors, comb, straight razor and electric clipper.
+Use premium polished 2D digital rendering, crisp expressive black outlines, refined anatomy, controlled cel shading, graphite-black clothing, metallic-gray details, warm skin tones and cobalt-blue accents.
 
-Use the established Nava illustration system:
-
-- Premium polished 2D digital rendering.
-- Crisp expressive black outlines.
-- Refined anatomy.
-- Controlled cel shading.
-- Graphite-black clothing.
-- Metallic-gray details.
-- Warm skin tones.
-- Cobalt-blue apron accents.
-
-Create new characters, poses and tool arrangements. Reference images may guide only the Nava palette and rendering quality. Never reproduce their exact composition or silhouettes.
+Create original characters and a new composition. Do not use a photographic collage, portrait tiles, cards, frames or reproduce reference people and poses.
 
 CONTENT
 
 Headline:
 
-“Colabora con tu equipo de trabajo”
+“¡Felicitaciones!”
 
-Body:
+First paragraph:
 
-“Ahora, vamos a configurar a tus colaboradores para que queden registrados y puedan realizar servicios dentro de la aplicación.”
+“Has completado tus primeros pasos para empezar a utilizar tu nueva herramienta, diseñada para potenciar tus ventas y reservas.”
 
-Add a wide rounded button labeled:
+Second paragraph:
 
-“Añadir colaborador”
+“Aquí tienes tu enlace de reservas para compartirlo en tus redes sociales.”
 
-Use a pale-blue fill and cobalt-blue text.
+HELP
 
-BOTTOM NAVIGATION
+Create a help row labeled:
 
-Place one wide disabled button near the bottom labeled:
+“¿Cómo configurar el enlace en Instagram?”
 
-“Siguiente”
+Add a simple directional arrow.
 
-Use an almost-white blue fill and muted gray text.
+BOOKING LINK
 
-STYLE
+Create a rounded pale-blue link container containing:
 
-Premium modern mobile UI, generous whitespace, refined spacing, rounded 28–30 px controls, dark-charcoal typography and subtle background gradients.
+- A small link icon.
+- “https://book.weibook.co/figarosfb63f9”
+- Action: “Abrir”
 
-Do not add a main-content card, excessive shadows, decorative clutter, logos or watermarks.
+BOTTOM ACTIONS
 
-OUTPUT
+- “Compartir enlace”: pale-blue secondary style with cobalt text.
+- “Ir al inicio”: solid cobalt-blue primary style with white text.
 
-Vertical mobile mockup at 640 × 1408 px or equivalent. Keep every Spanish text exact, legible and correctly accented.
+“Compartir enlace” should open the system share sheet when available and copy the URL as a fallback. “Abrir” launches the booking URL.
+
+Use minimal shadows and accessible contrast. Do not add confetti, photo cards, decorative clutter, logos or watermarks.
+
+Output at 640 × 1408 px or an equivalent mobile aspect ratio. Keep all Spanish text exact and correctly accented.

@@ -15,6 +15,8 @@ import { NavaButton } from './NavaButton';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const teamIllustration = require('../../assets/onboarding-team.png') as number;
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const logoImage = require('../../assets/nava-logo.png') as number;
 
 interface AccountSetupWelcomeScreenProps {
   readonly fullName: string;
@@ -66,7 +68,12 @@ export function AccountSetupWelcomeScreen({
         </Pressable>
 
         <View style={styles.header}>
-          <Text style={styles.brand}>NAVA</Text>
+          <Image
+            accessibilityLabel="Nava"
+            resizeMode="contain"
+            source={logoImage}
+            style={styles.brand}
+          />
           <View style={styles.badge}>
             <View style={styles.badgeDot} />
             <Text style={styles.badgeLabel}>CONFIGURACIÓN INICIAL</Text>
@@ -92,7 +99,7 @@ export function AccountSetupWelcomeScreen({
             </Text>
             <Text style={styles.description}>
               Prepara tu espacio de trabajo para empezar a gestionar tu barbería
-              con Nava.
+              con <Image resizeMode="contain" source={logoImage} style={styles.inlineBrandLogo} />.
             </Text>
           </View>
         </View>
@@ -101,21 +108,21 @@ export function AccountSetupWelcomeScreen({
           <View style={styles.benefits}>
             <View style={styles.benefit}>
               <View style={styles.iconShell}>
-                <Ionicons color="#245fdf" name="storefront-outline" size={19} />
+                <Ionicons color="#000000" name="storefront-outline" size={19} />
               </View>
               <Text style={styles.benefitLabel}>Tu barbería</Text>
             </View>
             <View style={styles.divider} />
             <View style={styles.benefit}>
               <View style={styles.iconShell}>
-                <Ionicons color="#245fdf" name="location-outline" size={19} />
+                <Ionicons color="#000000" name="location-outline" size={19} />
               </View>
               <Text style={styles.benefitLabel}>Tu sucursal</Text>
             </View>
             <View style={styles.divider} />
             <View style={styles.benefit}>
               <View style={styles.iconShell}>
-                <Ionicons color="#245fdf" name="checkmark-outline" size={19} />
+                <Ionicons color="#000000" name="checkmark-outline" size={19} />
               </View>
               <Text style={styles.benefitLabel}>Todo listo</Text>
             </View>
@@ -171,13 +178,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   badgeDot: {
-    backgroundColor: '#245fdf',
+    backgroundColor: '#000000',
     borderRadius: 5,
     height: 7,
     width: 7,
   },
   badgeLabel: {
-    color: '#245fdf',
+    color: '#000000',
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.8,
@@ -215,10 +222,8 @@ const styles = StyleSheet.create({
     width: 360,
   },
   brand: {
-    color: '#101c2d',
-    fontSize: 23,
-    fontWeight: '900',
-    letterSpacing: 5,
+    height: 32,
+    width: 112,
   },
   content: {
     alignItems: 'center',
@@ -258,7 +263,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   greeting: {
-    color: '#245fdf',
+    color: '#000000',
     fontSize: 15,
     fontWeight: '800',
     marginBottom: 5,
@@ -287,6 +292,10 @@ const styles = StyleSheet.create({
     height: 34,
     justifyContent: 'center',
     width: 34,
+  },
+  inlineBrandLogo: {
+    height: 19,
+    width: 61,
   },
   illustration: {
     aspectRatio: 1.437,

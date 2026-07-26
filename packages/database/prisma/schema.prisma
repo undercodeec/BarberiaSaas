@@ -83,6 +83,7 @@ model User {
   appointmentEvents      AppointmentEvent[]
   registrationProfile    UserRegistrationProfile?
   onboardingCollaborators OnboardingCollaborator[]
+  onboardingServices      OnboardingService[]
 
   @@map("users")
 }
@@ -133,6 +134,11 @@ model UserRegistrationProfile {
   businessNameKey String                  @unique @map("business_name_key") @db.VarChar(120)
   countryCode     String                  @map("country_code") @db.Char(2)
   city            String                  @db.VarChar(120)
+  addressLine     String?                 @map("address_line") @db.VarChar(240)
+  coverImageUri   String?                 @map("cover_image_uri") @db.VarChar(2048)
+  description     String?                 @db.VarChar(500)
+  facebookUrl     String?                 @map("facebook_url") @db.VarChar(2048)
+  instagramUrl    String?                 @map("instagram_url") @db.VarChar(2048)
   openingTime     String                  @map("opening_time") @db.Char(5)
   closingTime     String                  @map("closing_time") @db.Char(5)
   phoneKey        String                  @unique @map("phone_key") @db.VarChar(24)
@@ -162,6 +168,33 @@ model OnboardingCollaborator {
 
   @@index([ownerUserId, createdAt])
   @@map("onboarding_collaborators")
+}
+
+model OnboardingService {
+  id                       String   @id @default(uuid()) @db.Uuid
+  ownerUserId              String   @map("owner_user_id") @db.Uuid
+  name                     String   @db.VarChar(120)
+  description              String?  @db.VarChar(500)
+  durationMinutes          Int      @map("duration_minutes")
+  priceCents               Int      @map("price_cents")
+  priceType                String   @map("price_type") @db.VarChar(16)
+  onlineBooking            Boolean  @default(true) @map("online_booking")
+  showServiceTime          Boolean  @default(true) @map("show_service_time")
+  categoryName             String?  @map("category_name") @db.VarChar(80)
+  categoryDescription      String?  @map("category_description") @db.VarChar(500)
+  taxName                  String?  @map("tax_name") @db.VarChar(80)
+  taxPercentage            Int?     @map("tax_percentage")
+  taxAddAtCheckout         Boolean  @default(false) @map("tax_add_at_checkout")
+  taxAddAtPurchaseEnd      Boolean  @default(false) @map("tax_add_at_purchase_end")
+  imageUri                 String?  @map("image_uri") @db.VarChar(2048)
+  agendaColor              String   @map("agenda_color") @db.Char(7)
+  downPaymentPercentage    Int      @default(0) @map("down_payment_percentage")
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  owner                    User     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@index([ownerUserId, createdAt])
+  @@map("onboarding_services")
 }
 
 model Session {

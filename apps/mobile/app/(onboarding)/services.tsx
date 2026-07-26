@@ -1,8 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import {
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -19,19 +21,40 @@ import {
   ServiceFormSheet,
 } from '../../src/components/ServiceFormSheet';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { requireApiClient } from '../../src/lib/api';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const servicesImage = require('../../assets/imagenServicios.png') as number;
 
+interface StoredService extends ServiceDraft { readonly id: string }
+
 export default function ServicesOnboardingScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { session } = useAuth();
   const { height, width } = useWindowDimensions();
   const compact = height < 740;
   const [serviceSheetOpen, setServiceSheetOpen] = useState(false);
-  const [services, setServices] = useState<ServiceDraft[]>([]);
+  const [editingService, setEditingService] = useState<StoredService | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const servicesQuery = useQuery({ enabled: Boolean(session), queryFn: () => requireApiClient().request<{ readonly services: readonly StoredService[] }>('/v1/onboarding/services'), queryKey: ['onboarding-services'] });
+  const services = servicesQuery.data?.services ?? [];
 
   if (!session) return <Redirect href="/(auth)/login" />;
+
+  const saveService = async (service: ServiceDraft) => {
+    setRequestError(null);
+    if (editingService) await requireApiClient().request(`/v1/onboarding/services/${editingService.id}`, { body: service, method: 'PATCH' });
+    else await requireApiClient().request('/v1/onboarding/services', { body: service, method: 'POST' });
+    await queryClient.invalidateQueries({ queryKey: ['onboarding-services'] });
+    setEditingService(null); setServiceSheetOpen(false);
+  };
+  const deleteService = async (service: StoredService) => {
+    setRequestError(null);
+    await requireApiClient().request<void>(`/v1/onboarding/services/${service.id}`, { method: 'DELETE' });
+    await queryClient.invalidateQueries({ queryKey: ['onboarding-services'] });
+    setEditingService(null); setServiceSheetOpen(false);
+  };
 
   return (
     <SafeAreaView
@@ -105,10 +128,13 @@ export default function ServicesOnboardingScreen() {
             label={
               services.length > 0 ? 'Añadir otro servicio' : 'Añadir servicio'
             }
-            onPress={() => setServiceSheetOpen(true)}
+            onPress={() => { setEditingService(null); setServiceSheetOpen(true); }}
             style={styles.actionButton}
             variant="outline"
           />
+          {requestError || servicesQuery.error ? <Text accessibilityRole="alert" style={styles.requestError}>{requestError ?? (servicesQuery.error instanceof Error ? servicesQuery.error.message : 'No fue posible cargar los servicios.')}</Text> : null}
+          {servicesQuery.isPending ? <Text style={styles.savedLabel}>Cargando servicios…</Text> : null}
+          {services.map((service) => <View key={service.id} style={styles.serviceRow}><View style={[styles.serviceColor, { backgroundColor: service.agendaColor }]} /><View style={styles.serviceCopy}><Text numberOfLines={1} style={styles.serviceName}>{service.name}</Text><Text numberOfLines={1} style={styles.serviceMeta}>{service.durationMinutes} min · {service.priceType === 'free' ? 'Gratis' : `$${service.price.toFixed(2)}`}</Text></View><Pressable accessibilityLabel={`Editar ${service.name}`} onPress={() => { setEditingService(service); setServiceSheetOpen(true); }} style={styles.editButton}><Ionicons color="#101c2d" name="pencil-outline" size={20} /></Pressable><Pressable accessibilityLabel={`Eliminar ${service.name}`} onPress={() => Alert.alert('Eliminar servicio', `¿Quieres eliminar ${service.name}? Esta acción no se puede deshacer.`, [{ style: 'cancel', text: 'Cancelar' }, { onPress: () => void deleteService(service), style: 'destructive', text: 'Eliminar' }])} style={styles.deleteIconButton}><Ionicons color="#bd2d2d" name="trash-outline" size={20} /></Pressable></View>)}
           {services.length > 0 ? (
             <Text style={styles.savedLabel}>
               {services.length}{' '}
@@ -121,10 +147,10 @@ export default function ServicesOnboardingScreen() {
 
         <View style={styles.footer}>
           <NavaButton
-            disabled
+            disabled={services.length === 0}
             icon="arrow-forward-outline"
             label="Siguiente"
-            onPress={() => undefined}
+            onPress={() => router.push('/(onboarding)/account-details')}
             style={styles.nextButton}
             variant="primary"
           />
@@ -132,11 +158,10 @@ export default function ServicesOnboardingScreen() {
       </ScrollView>
 
       <ServiceFormSheet
+        key={editingService?.id ?? (serviceSheetOpen ? 'new-service' : 'closed-service')}
+        initialValue={editingService}
         onClose={() => setServiceSheetOpen(false)}
-        onSave={(service) => {
-          setServices((current) => [...current, service]);
-          setServiceSheetOpen(false);
-        }}
+        onSave={saveService}
         visible={serviceSheetOpen}
       />
     </SafeAreaView>
@@ -261,6 +286,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 10,
   },
+  deleteIconButton: { alignItems: 'center', backgroundColor: '#fff0ee', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
+  editButton: { alignItems: 'center', backgroundColor: '#f1f3f5', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
+  requestError: { color: '#bd283c', fontSize: 13, fontWeight: '600', marginTop: 10 },
+  serviceColor: { borderRadius: 999, height: 14, width: 14 },
+  serviceCopy: { flex: 1, gap: 2 },
+  serviceMeta: { color: '#667080', fontSize: 13, fontWeight: '600' },
+  serviceName: { color: '#101c2d', fontSize: 15, fontWeight: '800' },
+  serviceRow: { alignItems: 'center', backgroundColor: '#fff', borderColor: '#dce7fb', borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 10, marginTop: 10, minHeight: 72, paddingHorizontal: 14, paddingVertical: 10 },
   screen: {
     backgroundColor: '#f9fbff',
     flex: 1,

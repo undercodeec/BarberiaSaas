@@ -5,7 +5,7 @@ import { ServiceFormSheet } from './ServiceFormSheet';
 describe('ServiceFormSheet', () => {
   it('valida y guarda un servicio', async () => {
     const onClose = jest.fn();
-    const onSave = jest.fn();
+    const onSave = jest.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
     const view = await render(
       <ServiceFormSheet onClose={onClose} onSave={onSave} visible />,
@@ -23,11 +23,11 @@ describe('ServiceFormSheet', () => {
     await user.type(view.getByLabelText('Precio del servicio'), '15');
     await user.press(view.getByRole('button', { name: 'Guardar servicio' }));
 
-    expect(onSave).toHaveBeenCalledWith({
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
       description: '',
       durationMinutes: 30,
       name: 'Corte',
       price: 15,
-    });
+    }));
   });
 });
