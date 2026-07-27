@@ -51,7 +51,7 @@ export function BookingLinkSheet({
           style={styles.option}
         >
           <View style={styles.iconCircle}>
-            <Ionicons color="#3478f6" name="qr-code-outline" size={24} />
+            <Ionicons color="#f4f4f5" name="qr-code-outline" size={24} />
           </View>
           <View style={styles.optionCopy}>
             <Text style={styles.optionTitle}>{'C\u00f3digo QR'}</Text>
@@ -67,7 +67,7 @@ export function BookingLinkSheet({
           style={styles.option}
         >
           <View style={styles.iconCircle}>
-            <Ionicons color="#3478f6" name="copy-outline" size={23} />
+            <Ionicons color="#f4f4f5" name="copy-outline" size={23} />
           </View>
           <View style={styles.optionCopy}>
             <Text style={styles.optionTitle}>
@@ -90,7 +90,7 @@ export function BookingLinkSheet({
           style={styles.option}
         >
           <View style={styles.iconCircle}>
-            <Ionicons color="#3478f6" name="globe-outline" size={24} />
+            <Ionicons color="#f4f4f5" name="globe-outline" size={24} />
           </View>
           <View style={styles.optionCopy}>
             <Text style={styles.optionTitle}>{'Ver mi website'}</Text>
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   },
   handle: {
     alignSelf: 'center',
-    backgroundColor: '#cad5e7',
+    backgroundColor: '#a4a7ad',
     borderRadius: 4,
     height: 5,
     marginBottom: 20,
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
   },
   iconCircle: {
     alignItems: 'center',
-    backgroundColor: '#e3edff',
+    backgroundColor: '#1c1f24',
     borderRadius: 20,
     height: 46,
     justifyContent: 'center',
@@ -129,17 +129,17 @@ const styles = StyleSheet.create({
   },
   option: {
     alignItems: 'center',
-    borderTopColor: '#e3eaf6',
+    borderTopColor: '#d3d5d8',
     borderTopWidth: 1,
     flexDirection: 'row',
     gap: 14,
     paddingVertical: 16,
   },
   optionCopy: { flex: 1 },
-  optionDescription: { color: '#667080', fontSize: 13, marginTop: 3 },
-  optionTitle: { color: '#101c2d', fontSize: 16, fontWeight: '800' },
+  optionDescription: { color: '#5d626b', fontSize: 13, marginTop: 3 },
+  optionTitle: { color: '#111318', fontSize: 16, fontWeight: '800' },
   sheet: {
-    backgroundColor: '#f9fbff',
+    backgroundColor: '#f4f4f3',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingBottom: 34,
@@ -157,13 +157,13 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   title: {
-    color: '#101c2d',
+    color: '#111318',
     fontSize: 22,
     fontWeight: '900',
     textAlign: 'center',
   },
   url: {
-    color: '#596b86',
+    color: '#555a63',
     fontSize: 14,
     marginBottom: 18,
     marginTop: 9,

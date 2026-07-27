@@ -2,7 +2,7 @@
 
 Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión posterior documentada en `docs/adr/0003-postgresql-prisma-y-api-en-vps.md`. Se marca `[x]` solo cuando la tarea está implementada y cuenta con la verificación indicada; `[ ]` significa pendiente o aún no demostrada.
 
-Última actualización: 2026-07-26
+Última actualización: 2026-07-27
 
 ## Decisión de infraestructura vigente
 
@@ -346,3 +346,31 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 
 
 - [ ] Aplicar y verificar la migración de servicios de onboarding en PostgreSQL, incluyendo pruebas de CRUD y aislamiento por usuario. Luego verificar el flujo móvil completo y continuar con la Fase 4 — Reservas públicas.
+
+## Actualización 2026-07-27 — banners de dashboard
+
+### Implementado
+
+- [x] `apps/mobile/app/(onboarding)/dashboard.tsx` concentra los tres paneles inferiores de la experiencia posterior al onboarding: `NotificationPermissionSheet`, `WelcomeSurveySheet` y `LocationBannerSheet`.
+- [x] `NotificationPermissionSheet` consulta el permiso de notificaciones con `expo-notifications` en cada inicio de sesión y solicita el permiso nativo al aceptar. Si no está concedido, el panel vuelve a mostrarse en el siguiente inicio de sesión.
+- [x] `WelcomeSurveySheet` incluye selección múltiple, validación de selección obligatoria, confirmación temporal `Respuesta guardada`, bloqueo del fondo y entrada/salida de panel inferior.
+- [x] `LocationBannerSheet` incluye dirección editable, mapa visual simplificado, marcador ajustable al tocar el mapa, validación, acciones `Ahora no` y `Guardar ubicación`, y confirmación temporal `Ubicación guardada`.
+- [x] La dirección guardada por `LocationBannerSheet` actualiza `user_registration_profiles.address_line` mediante el `PATCH /v1/onboarding/account-details` autenticado ya existente.
+- [x] Los paneles Welcome y Location pueden cerrarse tocando el fondo, con el botón Atrás de Android o deslizando el panel hacia abajo; el cierre se anima hacia el borde inferior.
+- [x] El orden actual del flujo es: permiso de notificaciones, encuesta Welcome y banner de ubicación.
+- [x] La visualización y cierre de Welcome y Location se guardan localmente por usuario en SecureStore (móvil) o localStorage (web), por lo que el panel no vuelve a abrirse en ese mismo dispositivo tras ser cerrado o completado.
+- [x] `expo-notifications` se agregó como dependencia compatible con Expo SDK 57.
+- [x] Verificación realizada: `pnpm --filter @barber-saas/mobile typecheck`, `expo export --platform web` y `git diff --check` aprobados tras los cambios de banners.
+
+### Pendiente: activación funcional de Location / Google Maps
+
+- [ ] Configurar una clave de Google Maps Platform en las variables de entorno móviles, sin versionarla en Git.
+- [ ] Habilitar facturación, `Maps SDK for Android` y `Places API (New)` en el proyecto de Google Cloud; para iOS, habilitar también `Maps SDK for iOS` cuando corresponda.
+- [ ] Restringir la clave Android al paquete `com.barbersaas.mobile`, su certificado SHA-1 y las APIs necesarias.
+- [ ] Instalar e integrar el SDK de mapa nativo, `expo-location` y la búsqueda/autocompletado de Places; sustituir el mapa visual actual por Google Maps y solicitar permiso de ubicación para centrar y marcar la posición del dispositivo.
+- [ ] Persistir latitud, longitud, `placeId` y dirección normalizada del negocio en PostgreSQL mediante una migración y una API autenticada.
+
+### Pendiente: persistencia de encuesta Welcome
+
+- [ ] Crear una tabla y endpoint autenticado para almacenar las opciones de `WelcomeSurveySheet` de forma única por usuario en PostgreSQL.
+- [ ] Cambiar el comportamiento de cierre de Welcome para que, si se cierra sin enviar opciones, vuelva a mostrarse hasta completar el envío; actualmente el cierre local también la considera atendida.
