@@ -850,6 +850,7 @@ export async function buildApi({
       openingTime: profile?.openingTime ?? null,
       phone: user.phone,
       instagramUrl: profile?.instagramUrl ?? null,
+      onboardingCompletedAt: profile?.onboardingCompletedAt?.toISOString() ?? null,
     };
   });
 
@@ -905,6 +906,7 @@ export async function buildApi({
         facebookUrl: updatedProfile.facebookUrl,
         fullName: updatedUser.fullName,
         instagramUrl: updatedProfile.instagramUrl,
+        onboardingCompletedAt: updatedProfile.onboardingCompletedAt?.toISOString() ?? null,
         openingTime: updatedProfile.openingTime,
         phone: updatedUser.phone,
       };
@@ -921,6 +923,24 @@ export async function buildApi({
   });
 
 
+  app.post('/v1/onboarding/complete-account-setup', async (request) => {
+    const { user } = await authenticate(database, request);
+    const profile = await database.userRegistrationProfile.findUnique({
+      where: { userId: user.id },
+    });
+    if (!profile) {
+      throw new ApiError(
+        404,
+        'ONBOARDING_ACCOUNT_DETAILS_NOT_FOUND',
+        'No encontramos la informaci\u00f3n de tu cuenta.',
+      );
+    }
+    const completedProfile = await database.userRegistrationProfile.update({
+      data: { onboardingCompletedAt: new Date() },
+      where: { userId: user.id },
+    });
+    return { onboardingCompletedAt: completedProfile.onboardingCompletedAt!.toISOString() };
+  });
   app.get('/v1/onboarding/collaborators', async (request) => {
     const { user } = await authenticate(database, request);
     const collaborators = await database.onboardingCollaborator.findMany({

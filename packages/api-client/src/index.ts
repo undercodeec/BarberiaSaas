@@ -75,6 +75,7 @@ export interface OnboardingAccountDetailsResponse {
   readonly fullName: string;
   readonly openingTime: string | null;
   readonly closingTime: string | null;
+  readonly onboardingCompletedAt: string | null;
   readonly phone: string | null;
 }
 

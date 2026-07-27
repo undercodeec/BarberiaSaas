@@ -1,54 +1,59 @@
-Create an original high-fidelity onboarding completion screen for the Nava barber-services application.
+Create a high-fidelity mobile notification-permission bottom sheet for the Nava barber-services application.
 
-Maintain the Nava visual system: pale blue-white background, restrained cobalt-blue gradients, dark-charcoal typography, rounded controls and generous spacing.
+CONTEXT
 
-HERO ILLUSTRATION
+Display the application dashboard behind the modal. Apply a dark translucent overlay over the complete background so the dashboard remains recognizable but visually inactive.
 
-Show five diverse adult barber professionals and clients of different ages, genders, skin tones and hairstyles as one cohesive group portrait arranged in a gentle upward arc.
+BOTTOM SHEET
 
-Place a subtle cobalt-blue circular success badge with a white check mark behind the central figure.
+Present a white panel anchored to the bottom edge of the screen. Use large rounded top corners of approximately 32 px and enough height to contain the message and actions comfortably.
 
-Use premium polished 2D digital rendering, crisp expressive black outlines, refined anatomy, controlled cel shading, graphite-black clothing, metallic-gray details, warm skin tones and cobalt-blue accents.
+Add a small horizontal gray drag indicator centered near the upper edge.
 
-Create original characters and a new composition. Do not use a photographic collage, portrait tiles, cards, frames or reproduce reference people and poses.
+TITLE
 
-CONTENT
+“Activar notificaciones”
 
-Headline:
+Use bold dark-charcoal typography with strong visual hierarchy.
 
-“¡Felicitaciones!”
+DESCRIPTION
 
-First paragraph:
+“Activa el permiso para recibir notificaciones importantes de tus reservas y novedades sobre tu negocio.”
 
-“Has completado tus primeros pasos para empezar a utilizar tu nueva herramienta, diseñada para potenciar tus ventas y reservas.”
+Use medium-gray text, comfortable line spacing and a readable width.
 
-Second paragraph:
+ACTIONS
 
-“Aquí tienes tu enlace de reservas para compartirlo en tus redes sociales.”
+Place two equal-width buttons horizontally:
 
-HELP
+- “Ahora no”: white background, dark outline, dark text.
+- “Aceptar”: solid cobalt-blue background, white text.
 
-Create a help row labeled:
+Use approximately 24–28 px rounded corners and a minimum touch height of 56 px.
 
-“¿Cómo configurar el enlace en Instagram?”
+INTERACTION
 
-Add a simple directional arrow.
+The bottom sheet enters with a smooth upward slide while the background overlay fades in.
 
-BOOKING LINK
+- “Aceptar” requests the operating system notification permission.
+- “Ahora no” closes the modal without requesting permission.
+- Prevent interaction with the dashboard while the modal is visible.
+- Keep the device safe area and bottom home indicator unobstructed.
 
-Create a rounded pale-blue link container containing:
+STYLE
 
-- A small link icon.
-- “https://book.weibook.co/figarosfb63f9”
-- Action: “Abrir”
+Follow the established Nava design system:
 
-BOTTOM ACTIONS
+- Cobalt blue #3478F6.
+- White and pale blue surfaces.
+- Dark-charcoal typography.
+- Generous spacing.
+- Minimal shadows.
+- Premium, clean and professional mobile UI.
+- Accessible contrast and large touch targets.
 
-- “Compartir enlace”: pale-blue secondary style with cobalt text.
-- “Ir al inicio”: solid cobalt-blue primary style with white text.
+Do not include illustrations, decorative effects, logos, gradients inside the modal or excessive shadows.
 
-“Compartir enlace” should open the system share sheet when available and copy the URL as a fallback. “Abrir” launches the booking URL.
+OUTPUT
 
-Use minimal shadows and accessible contrast. Do not add confetti, photo cards, decorative clutter, logos or watermarks.
-
-Output at 640 × 1408 px or an equivalent mobile aspect ratio. Keep all Spanish text exact and correctly accented.
+Vertical mobile interface at 640 × 1408 px or equivalent. Keep all Spanish text exact, correctly accented and fully legible.

@@ -313,16 +313,36 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Cliente Prisma regenerado y typecheck de API y móvil aprobados tras el cambio.
 - [ ] Aplicar `20260726110000_onboarding_services` en PostgreSQL de desarrollo, pruebas y despliegue mediante `prisma migrate deploy`; la migración fue creada pero no se aplicó durante este cambio.
 
-## Siguiente tarea recomendada
+## Funcionalidad reciente
 ### Configuracion final de cuenta y cierre de onboarding
 
 - [x] Paso 3 movil: formulario final de cuenta con portada, nombre, telefono, correo de solo lectura, campos opcionales y selector mundial dependiente de pais y ciudad.
 - [x] GET y PATCH en /v1/onboarding/account-details leen y actualizan el usuario autenticado y su user_registration_profiles en una transaccion.
 - [x] Migracion 20260726130000_onboarding_account_details creada y aplicada en PostgreSQL local; agrega portada, direccion, descripcion y enlaces sociales al perfil.
-- [x] Pantalla movil de felicitaciones creada con Felicidadez.png, enlace de reservas, apertura de URL, compartir y copia de respaldo mediante expo-clipboard.
+- [x] Pantalla movil de felicitaciones creada con Felicidadez.png, enlace de reservas, panel interno de acciones, compartir y copia mediante expo-clipboard.
 - [x] El boton Siguiente de servicios lleva a la configuracion final y, despues de guardar, a /congratulations.
 - [x] Typecheck de API y movil aprobados; API Vitest: 6 pruebas aprobadas y 10 de integracion omitidas sin TEST_DATABASE_URL; export web de Expo aprobado con la ruta y recurso de felicitaciones.
 
+
+
+### Dashboard inicial
+
+- [x] Ruta protegida /dashboard creada al finalizar el onboarding para no depender todavia de una organizacion activa.
+- [x] UI movil del dashboard: saludo y negocio desde el perfil, resumen visual de ventas, acciones rapidas, tarjeta de reservas, comunidad y navegacion inferior fija.
+- [x] Boton Ir al inicio de felicitaciones dirigido al dashboard.
+- [x] `Ir al inicio` confirma el cierre en `onboarding_completed_at`; el estado queda en PostgreSQL y el usuario vuelve a `/dashboard` tras iniciar de nuevo, recargar o restaurar sesión.
+- [x] Las rutas de configuración redirigen a usuarios finalizados al dashboard, evitando que vuelvan a completar pasos ya guardados.
+- [x] La consulta de finalización usa una clave de caché por usuario, fuerza revalidación al montar y la migración `20260726235500_backfill_completed_onboarding_profiles` recupera perfiles que completaron el flujo antes de existir el marcador.
+- [x] Las migraciones `20260726150000_onboarding_completion_state` y `20260726235500_backfill_completed_onboarding_profiles` fueron aplicadas y verificadas en PostgreSQL local.
+- [x] `Abrir` muestra un panel interno compatible con Expo Web con QR, copia de enlace y website; no abre el enlace provisional de reservas. QR y website quedan visibles como próximas integraciones hasta contar con reservas públicas.
+- [ ] Estadisticas de ventas, notificaciones, agenda, caja, equipo y ajustes del dashboard siguen como UI de referencia hasta implementar sus APIs y permisos.
+
+## Siguiente tarea recomendada
+
+- [ ] Aplicar y verificar las migraciones 20260726110000_onboarding_services y 20260726130000_onboarding_account_details en PostgreSQL de pruebas y despliegue.
+- [ ] Implementar reservas publicas reales: slug publico unico, pagina web de reservas, disponibilidad publica, creacion idempotente y rate limiting.
+- [ ] Servir el enlace de reservas desde la API con dominio configurado y HTTPS; no construirlo en el cliente.
+- [ ] Conectar las opciones QR y ver mi website del panel existente al enlace público real, y permitir descargar o compartir el QR.
 
 
 - [ ] Aplicar y verificar la migración de servicios de onboarding en PostgreSQL, incluyendo pruebas de CRUD y aislamiento por usuario. Luego verificar el flujo móvil completo y continuar con la Fase 4 — Reservas públicas.

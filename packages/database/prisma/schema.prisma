@@ -142,6 +142,7 @@ model UserRegistrationProfile {
   openingTime     String                  @map("opening_time") @db.Char(5)
   closingTime     String                  @map("closing_time") @db.Char(5)
   phoneKey        String                  @unique @map("phone_key") @db.VarChar(24)
+  onboardingCompletedAt DateTime?         @map("onboarding_completed_at") @db.Timestamptz(3)
   createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
   user            User                    @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -1,13 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { OnboardingAccountDetailsResponse } from '@barber-saas/api-client';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { Redirect, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   Alert,
   Image,
-  Linking,
   Pressable,
   ScrollView,
   Share,
@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NavaButton } from '../../src/components/NavaButton';
 import { requireApiClient } from '../../src/lib/api';
+import { BookingLinkSheet } from '../../src/components/BookingLinkSheet';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -26,28 +27,35 @@ const congratulationsImage = require('../../assets/Felicidadez.png') as number;
 
 export default function CongratulationsScreen() {
   const router = useRouter();
-  const { session } = useAuth();
+  const queryClient = useQueryClient();
+  const { session, user } = useAuth();
   const profileQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
       requireApiClient().request<OnboardingAccountDetailsResponse>(
         '/v1/onboarding/account-details',
       ),
-    queryKey: ['onboarding-account-details'],
+    queryKey: ['onboarding-account-details', user?.id],
   });
 
-  if (!session) return <Redirect href="/(auth)/login" />;
 
+  const [isBookingSheetOpen, setIsBookingSheetOpen] = useState(false);
   const bookingUrl = profileQuery.data?.bookingUrl ?? '';
 
-  const openBookingUrl = async () => {
-    if (!bookingUrl) return;
-    try {
-      await Linking.openURL(bookingUrl);
-    } catch {
-      Alert.alert('No fue posible abrir el enlace', bookingUrl);
-    }
-  };
+  const completeOnboardingMutation = useMutation({
+    mutationFn: () =>
+      requireApiClient().request<{ readonly onboardingCompletedAt: string }>(
+        '/v1/onboarding/complete-account-setup',
+        { method: 'POST' },
+      ),
+    onSuccess: (result) => {
+      queryClient.setQueryData<OnboardingAccountDetailsResponse>(
+        ['onboarding-account-details', user?.id],
+        (profile) => profile ? { ...profile, onboardingCompletedAt: result.onboardingCompletedAt } : profile,
+      );
+      router.replace('/dashboard' as never);
+    },
+  });
 
   const shareBookingUrl = async () => {
     if (!bookingUrl) return;
@@ -62,6 +70,7 @@ export default function CongratulationsScreen() {
     }
   };
 
+  if (!session) return <Redirect href="/(auth)/login" />;
   return (
     <SafeAreaView edges={['bottom', 'left', 'right', 'top']} style={styles.screen}>
       <StatusBar style="dark" />
@@ -113,7 +122,7 @@ export default function CongratulationsScreen() {
             accessibilityLabel="Abrir enlace de reservas"
             accessibilityRole="button"
             disabled={!bookingUrl}
-            onPress={() => void openBookingUrl()}
+            onPress={() => setIsBookingSheetOpen(true)}
             style={styles.openButton}
           >
             <Text style={styles.openLabel}>Abrir</Text>
@@ -121,6 +130,11 @@ export default function CongratulationsScreen() {
         </View>
       </ScrollView>
 
+      <BookingLinkSheet
+        onClose={() => setIsBookingSheetOpen(false)}
+        url={bookingUrl}
+        visible={isBookingSheetOpen}
+      />
       <View style={styles.footer}>
         <NavaButton
           disabled={!bookingUrl}
@@ -133,7 +147,16 @@ export default function CongratulationsScreen() {
         <NavaButton
           icon="home-outline"
           label="Ir al inicio"
-          onPress={() => router.replace('/')}
+          disabled={completeOnboardingMutation.isPending}
+          onPress={() =>
+            completeOnboardingMutation.mutate(undefined, {
+              onError: () =>
+                Alert.alert(
+                  'No pudimos finalizar la configuraci\u00f3n',
+                  'Revisa tu conexi\u00f3n e int\u00e9ntalo nuevamente.',
+                ),
+            })
+          }
           style={styles.homeButton}
           variant="primary"
         />

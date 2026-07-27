@@ -1,3 +1,5 @@
+import type { OnboardingAccountDetailsResponse } from '@barber-saas/api-client';
+import { useQuery } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
 import {
   ActivityIndicator,
@@ -9,13 +11,24 @@ import {
 
 import { InlineMessage } from '../src/components/InlineMessage';
 import { NavaWelcomeScreen } from '../src/components/NavaWelcomeScreen';
+import { requireApiClient } from '../src/lib/api';
 import { useCurrentOrganization } from '../src/features/organization/useCurrentOrganization';
 import { useAuth } from '../src/providers/AuthProvider';
 
 export default function EntryScreen() {
   const router = useRouter();
-  const { configurationError, isLoading, session } = useAuth();
+  const { configurationError, isLoading, session, user } = useAuth();
   const organizationQuery = useCurrentOrganization();
+  const onboardingQuery = useQuery({
+    enabled: Boolean(session && !organizationQuery.data),
+    queryFn: () =>
+      requireApiClient().request<OnboardingAccountDetailsResponse>(
+        '/v1/onboarding/account-details',
+      ),
+    queryKey: ['onboarding-account-details', user?.id],
+    refetchOnMount: 'always',
+    staleTime: 0,
+  });
 
   if (configurationError) {
     return (
@@ -24,7 +37,7 @@ export default function EntryScreen() {
       </View>
     );
   }
-  if (isLoading || (session && organizationQuery.isLoading)) {
+  if (isLoading || (session && (organizationQuery.isLoading || onboardingQuery.isLoading))) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator color="#101c2d" size="large" />
@@ -47,6 +60,7 @@ export default function EntryScreen() {
     );
   }
   if (session && organizationQuery.data) return <Redirect href="/(app)" />;
+  if (session && onboardingQuery.data?.onboardingCompletedAt) return <Redirect href={'/dashboard' as never} />;
   if (session) return <Redirect href="/(onboarding)/account-setup" />;
   return (
     <NavaWelcomeScreen

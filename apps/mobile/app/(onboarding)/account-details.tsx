@@ -98,7 +98,7 @@ function Field({
 export default function AccountDetailsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const [coverUri, setCoverUri] = useState<string | null>(null);
   const [countryCode, setCountryCode] = useState('EC');
   const [optionalOpen, setOptionalOpen] = useState(false);
@@ -111,7 +111,7 @@ export default function AccountDetailsScreen() {
       requireApiClient().request<OnboardingAccountDetailsResponse>(
         '/v1/onboarding/account-details',
       ),
-    queryKey: ['onboarding-account-details'],
+    queryKey: ['onboarding-account-details', user?.id],
   });
 
   useEffect(() => {
@@ -167,7 +167,7 @@ export default function AccountDetailsScreen() {
         },
       );
       await queryClient.invalidateQueries({
-        queryKey: ['onboarding-account-details'],
+        queryKey: ['onboarding-account-details', user?.id],
       });
       router.replace('/congratulations');
     } catch (error) {
