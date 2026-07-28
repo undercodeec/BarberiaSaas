@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { NavaPreloader } from '../src/components/NavaPreloader';
 import { AppProviders } from '../src/providers/AppProviders';
+import { SessionLock } from '../src/components/SessionLock';
 
 export default function RootLayout() {
   const [showPreloader, setShowPreloader] = useState(true);
@@ -15,8 +16,10 @@ export default function RootLayout() {
   return (
     <View style={styles.root}>
       <AppProviders>
-        <StatusBar style={showPreloader ? 'dark' : 'light'} />
-        <Stack screenOptions={{ headerShown: false }} />
+        <SessionLock>
+          <StatusBar style={showPreloader ? 'dark' : 'light'} />
+          <Stack screenOptions={{ headerShown: false }} />
+        </SessionLock>
       </AppProviders>
       {showPreloader ? <NavaPreloader onFinish={finishPreloader} /> : null}
     </View>

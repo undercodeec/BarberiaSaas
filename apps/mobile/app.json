@@ -6,7 +6,15 @@
     "orientation": "portrait",
     "scheme": "barbersaas",
     "userInterfaceStyle": "dark",
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Permite que Nava importe tus contactos para crear reservas m?s r?pido."
+        }
+      ]
+    ],
     "experiments": { "typedRoutes": true },
     "web": { "bundler": "metro" },
     "android": { "package": "com.barbersaas.mobile" },

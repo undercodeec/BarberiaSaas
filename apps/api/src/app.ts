@@ -28,6 +28,7 @@ import { z, ZodError } from 'zod';
 import type { ApiConfig } from './config';
 import { ApiError, isUniqueConstraintError } from './errors';
 import { registerAgendaRoutes } from './agenda';
+import { registerClientRoutes } from './clients';
 import { registerOperationsRoutes } from './operations';
 import type {
   InvitationMailer,
@@ -42,7 +43,8 @@ import {
   verifyPassword,
 } from './security';
 
-const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
+const SESSION_IDLE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+const SESSION_MAX_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const RESET_DURATION_MS = 30 * 60 * 1000;
 const VERIFICATION_DURATION_MS = 10 * 60 * 1000;
 const VERIFICATION_LOCK_DURATION_MS = 15 * 60 * 1000;
@@ -292,9 +294,10 @@ function assertVerificationNotLocked(lockedUntil: Date | null): void {
 
 async function createSession(database: DatabaseClient, userId: string) {
   const token = createOpaqueToken();
-  const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + SESSION_MAX_DURATION_MS);
   await database.session.create({
-    data: { expiresAt, tokenHash: hashOpaqueToken(token), userId },
+    data: { expiresAt, lastActiveAt: now, tokenHash: hashOpaqueToken(token), userId },
   });
   return { expiresAt: expiresAt.toISOString(), token };
 }
@@ -372,10 +375,14 @@ function getBearerToken(request: FastifyRequest): string {
 
 async function authenticate(database: DatabaseClient, request: FastifyRequest) {
   const token = getBearerToken(request);
+  const now = new Date();
   const session = await database.session.findFirst({
     include: { user: true },
     where: {
-      expiresAt: { gt: new Date() },
+      expiresAt: { gt: now },
+      lastActiveAt: {
+        gt: new Date(now.getTime() - SESSION_IDLE_DURATION_MS),
+      },
       revokedAt: null,
       tokenHash: hashOpaqueToken(token),
     },
@@ -387,6 +394,10 @@ async function authenticate(database: DatabaseClient, request: FastifyRequest) {
       'Tu sesión venció. Inicia sesión nuevamente.',
     );
   }
+  await database.session.update({
+    data: { lastActiveAt: now },
+    where: { id: session.id },
+  });
   return { session, token, user: session.user };
 }
 
@@ -1144,6 +1155,7 @@ export async function buildApi({
     config,
   );
   registerAgendaRoutes(app, database, authenticate);
+  registerClientRoutes(app, database, authenticate);
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof ZodError) {

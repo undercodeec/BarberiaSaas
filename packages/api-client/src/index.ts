@@ -164,6 +164,56 @@ export interface ServicesResponse {
   readonly services: readonly ServiceRecord[];
 }
 
+export interface ClientLabelRecord {
+  readonly color: string;
+  readonly id: string;
+  readonly name: string;
+}
+
+export interface ClientLabelsResponse {
+  readonly labels: readonly ClientLabelRecord[];
+}
+export interface ClientRecord {
+  readonly addressLine: string | null;
+  readonly birthDate: string | null;
+  readonly documentNumber: string | null;
+  readonly email: string | null;
+  readonly fullName: string;
+  readonly id: string;
+  readonly labels: readonly ClientLabelRecord[];
+  readonly lastName: string | null;
+  readonly notes: string | null;
+  readonly phone: string | null;
+}
+
+export interface ClientsResponse {
+  readonly clients: readonly ClientRecord[];
+}
+
+export interface ClientDetailResponse {
+  readonly client: ClientRecord;
+  readonly history: ReadonlyArray<{
+    readonly collaboratorName: string;
+    readonly endsAt: string;
+    readonly id: string;
+    readonly serviceName: string;
+    readonly startsAt: string;
+    readonly status:
+      | 'cancelled'
+      | 'checked_in'
+      | 'completed'
+      | 'confirmed'
+      | 'in_progress'
+      | 'no_show'
+      | 'scheduled';
+  }>;
+  readonly metrics: {
+    readonly accumulatedCents: number;
+    readonly appointmentsCount: number;
+    readonly lastVisitAt: string | null;
+  };
+}
+
 export interface SchedulesResponse {
   readonly blocks: ReadonlyArray<{
     readonly endsAt: string;

@@ -1,0 +1,2 @@
+ALTER TABLE "clients"
+  ALTER COLUMN "organization_id" DROP NOT NULL;

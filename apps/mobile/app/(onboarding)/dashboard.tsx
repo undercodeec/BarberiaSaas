@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect, useRef, useState } from 'react';
-import { Redirect } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
   Alert,
@@ -36,6 +36,7 @@ const communityImage = require('../../assets/Felicidadez.png') as number;
 const MONTH_PROGRESS = 84;
 const WELCOME_SURVEY_RESPONSE_KEY = 'barber-saas.welcome-survey-response';
 const LOCATION_BANNER_KEY = 'barber-saas.location-banner';
+let notificationPromptSessionKey: string | null = null;
 const WELCOME_SURVEY_OPTIONS = [
   'Publicidad',
   'Redes sociales de Nava (Facebook o Instagram)',
@@ -122,6 +123,30 @@ function QuickAction({
   readonly label: string;
   readonly onPress: () => void;
 }) {
+  const shimmerTranslateX = useRef(new Animated.Value(-82)).current;
+
+  useEffect(() => {
+    const shimmerAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmerTranslateX, {
+          duration: 860,
+          easing: Easing.out(Easing.cubic),
+          toValue: 82,
+          useNativeDriver: true,
+        }),
+        Animated.delay(1650),
+        Animated.timing(shimmerTranslateX, {
+          duration: 0,
+          toValue: -82,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    shimmerAnimation.start();
+    return () => shimmerAnimation.stop();
+  }, [shimmerTranslateX]);
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -130,6 +155,18 @@ function QuickAction({
     >
       <View style={styles.quickIcon}>
         <Ionicons color="#101c2d" name={icon} size={27} />
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.quickIconShimmer,
+            {
+              transform: [
+                { translateX: shimmerTranslateX },
+                { rotate: '22deg' },
+              ],
+            },
+          ]}
+        />
       </View>
       <Text style={styles.quickLabel}>{label}</Text>
     </Pressable>
@@ -653,6 +690,9 @@ function LocationBannerSheet({
 
 export default function DashboardScreen() {
   const { session, user } = useAuth();
+  const router = useRouter();
+  const currentNotificationSessionKey =
+    session && user ? `${user.id}:${session.expiresAt}` : null;
   const accountQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -693,7 +733,14 @@ export default function DashboardScreen() {
         const { status } = await Notifications.getPermissionsAsync();
         if (isMounted) {
           const shouldRequestPermission =
-            status !== Notifications.PermissionStatus.GRANTED;
+            status !== Notifications.PermissionStatus.GRANTED &&
+            currentNotificationSessionKey !== null &&
+            notificationPromptSessionKey !== currentNotificationSessionKey;
+
+          if (shouldRequestPermission) {
+            notificationPromptSessionKey = currentNotificationSessionKey;
+          }
+
           setIsNotificationSheetOpen(shouldRequestPermission);
           setNotificationFlowState(
             shouldRequestPermission ? 'visible' : 'completed',
@@ -710,7 +757,7 @@ export default function DashboardScreen() {
     return () => {
       isMounted = false;
     };
-  }, [session, user?.id]);
+  }, [currentNotificationSessionKey, session]);
 
   useEffect(() => {
     let isMounted = true;
@@ -787,7 +834,7 @@ export default function DashboardScreen() {
     try {
       await Notifications.requestPermissionsAsync();
     } catch {
-      // The banner will be shown again on the next sign-in while permission is off.
+      // The permission prompt is only shown once during each app session.
     } finally {
       completeNotificationFlow();
     }
@@ -989,7 +1036,7 @@ export default function DashboardScreen() {
         <Pressable
           accessibilityLabel="Agenda"
           accessibilityRole="button"
-          onPress={() => unavailable('Agenda')}
+          onPress={() => router.push('/agenda')}
           style={styles.navItem}
         >
           <Ionicons color="#101c2d" name="calendar-outline" size={25} />
@@ -1005,7 +1052,7 @@ export default function DashboardScreen() {
         <Pressable
           accessibilityLabel="Equipo"
           accessibilityRole="button"
-          onPress={() => unavailable('Equipo')}
+          onPress={() => router.push('/equipo')}
           style={styles.navItem}
         >
           <Ionicons color="#101c2d" name="people-outline" size={25} />
@@ -1030,7 +1077,7 @@ export default function DashboardScreen() {
         visible={isNotificationSheetOpen}
       />
       <WelcomeSurveySheet
-        key={user?.id ?? 'anonymous'}
+        key={`welcome-survey-${user?.id ?? 'anonymous'}`}
         onComplete={() => setIsWelcomeSurveyOpen(false)}
         onDismiss={dismissWelcomeSurvey}
         onSubmit={saveWelcomeSurveyResponse}
@@ -1038,7 +1085,7 @@ export default function DashboardScreen() {
       />
       <LocationBannerSheet
         initialAddress={accountQuery.data?.addressLine ?? ''}
-        key={user?.id ?? 'anonymous'}
+        key={`location-banner-${user?.id ?? 'anonymous'}`}
         onComplete={() => setIsLocationBannerOpen(false)}
         onDismiss={dismissLocationBanner}
         onSubmit={saveLocation}
@@ -1427,7 +1474,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 60,
     justifyContent: 'center',
+    overflow: 'hidden',
     width: 60,
+  },
+  quickIconShimmer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    bottom: -20,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    borderWidth: 1,
+    left: 21,
+    position: 'absolute',
+    shadowColor: '#ffffff',
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    top: -20,
+    width: 13,
   },
   quickLabel: {
     color: '#101c2d',
@@ -1481,7 +1542,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 1,
   },
-  screen: { backgroundColor: '#f4f4f3', flex: 1 },
+  screen: { backgroundColor: '#ffffff', flex: 1 },
   summaryButton: {
     alignItems: 'center',
     backgroundColor: '#e1e2e4',

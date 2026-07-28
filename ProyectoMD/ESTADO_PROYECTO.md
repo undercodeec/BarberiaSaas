@@ -2,7 +2,7 @@
 
 Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión posterior documentada en `docs/adr/0003-postgresql-prisma-y-api-en-vps.md`. Se marca `[x]` solo cuando la tarea está implementada y cuenta con la verificación indicada; `[ ]` significa pendiente o aún no demostrada.
 
-Última actualización: 2026-07-27
+Última actualización: 2026-07-28
 
 ## Decisión de infraestructura vigente
 
@@ -21,7 +21,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Fase 2 — Equipo, servicios y horarios
 - [ ] Fase 3 — Motor de agenda _(implementada y verificada contra PostgreSQL; flujo manual móvil pendiente)_
 - [ ] Fase 4 — Reservas públicas
-- [ ] Fase 5 — Clientes e historial
+- [ ] Fase 5 — Clientes e historial _(directorio, creación e importación implementados; historial, edición y eliminación lógica pendientes)_
 - [ ] Fase 6 — Caja y POS básico
 - [ ] Fase 7 — Comisiones
 - [ ] Fase 8 — Inventario básico
@@ -225,7 +225,9 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 
 ### Fase 5 — Clientes e historial
 
-- [ ] Clientes, búsqueda, historial, notas, fotografías privadas y eliminación lógica.
+- [x] Directorio autenticado, búsqueda, creación e importación de contactos.
+- [x] Aislamiento por organización activa o, en su ausencia, por usuario propietario.
+- [ ] Historial, edición, notas operativas, fotografías privadas y eliminación lógica.
 
 ### Fase 6 — Caja y POS básico
 
@@ -374,3 +376,122 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 
 - [ ] Crear una tabla y endpoint autenticado para almacenar las opciones de `WelcomeSurveySheet` de forma única por usuario en PostgreSQL.
 - [ ] Cambiar el comportamiento de cierre de Welcome para que, si se cierra sin enviar opciones, vuelva a mostrarse hasta completar el envío; actualmente el cierre local también la considera atendida.
+
+## Actualizacion 2026-07-27 - Sesiones, bloqueo y agenda
+
+### Seguridad de sesiones
+
+- [x] Corregida la advertencia React por claves duplicadas entre los paneles de encuesta y ubicacion del dashboard.
+- [x] El aviso de permisos de notificaciones se muestra una sola vez por sesion de aplicacion y por inicio de sesion, aunque la persona navegue fuera y vuelva al dashboard.
+- [x] Las sesiones mantienen un limite absoluto de 30 dias y ahora vencen tras 7 dias sin actividad autenticada en la API.
+- [x] Se agrego `sessions.last_active_at`, su indice y la migracion `20260727133000_add_session_idle_timeout`; se aplico y verifico en PostgreSQL local el 2026-07-27.
+- [x] El error HTTP 500 en `POST /v1/auth/login`, causado por la migracion pendiente de `last_active_at`, fue resuelto al ejecutar `prisma migrate deploy` localmente.
+- [x] La aplicacion movil se bloquea despues de cinco minutos en segundo plano; solicita autenticacion local y valida la sesion con la API antes de volver a mostrar contenido.
+- [x] Se incorporo `expo-local-authentication` compatible con Expo SDK 57. Si no hay autenticacion local disponible, la aplicacion cierra la sesion como medida segura.
+
+### Agenda semanal movil
+
+- [x] Ruta protegida `/agenda` creada en el grupo de onboarding terminado.
+- [x] El boton Agenda de la navegacion inferior del dashboard redirige a la nueva ruta.
+- [x] Pantalla visual semanal implementada con encabezado, selector de siete dias, resumen de disponibilidad, linea temporal, tarjetas de citas de referencia, indicador de hora actual, boton flotante y navegacion inferior con Agenda activa.
+- [x] La pagina adopta la estetica del dashboard: superficies claras, tipografia fuerte, bordes redondeados, sombras ligeras y navegacion inferior fija; el azul `#3478F6` se usa como acento de agenda.
+- [ ] Conectar la agenda a las citas reales, disponibilidad, profesionales, filtros y creacion de reservas mediante la API del motor de agenda.
+
+### Verificacion reciente
+
+- [x] `pnpm --filter @barber-saas/api typecheck`, `pnpm --filter @barber-saas/mobile typecheck` y `pnpm --filter @barber-saas/database typecheck` aprobados.
+- [x] Vitest de API aprobado: 6 pruebas aprobadas y 10 de integracion omitidas sin `TEST_DATABASE_URL`.
+- [x] Formato de las rutas moviles modificadas y `git diff --check` aprobados.
+
+## Actualizacion 2026-07-27 - Agenda interactiva, clientes y equipo
+
+### Agenda movil
+
+- [x] La ruta protegida `/agenda` consulta la zona horaria de la sucursal u organizacion activa y usa como respaldo la zona horaria del dispositivo.
+- [x] El selector semanal mantiene sincronizados el dia elegido, el mes visible y el calendario completo.
+- [x] El boton central del selector abre un calendario mensual completo, con navegacion entre meses y seleccion directa de fecha.
+- [x] Los controles anterior y siguiente cambian un dia por vez.
+- [x] El area de horarios admite deslizamiento horizontal hacia izquierda o derecha para avanzar o retroceder un dia, con transicion suave de desplazamiento y opacidad.
+- [x] La animacion se limita al contenido de horarios; el resumen y la navegacion permanecen fijos.
+- [x] La franja semanal refleja inmediatamente el cambio de fecha producido por botones, calendario o gesto.
+- [x] `Horario del dia` utiliza primero los horarios semanales configurados para el dia seleccionado y, si no existen, usa la apertura y cierre guardados en `user_registration_profiles`.
+- [x] La fecha actual se calcula con la zona horaria disponible y no depende exclusivamente del reloj UTC.
+- [x] El boton flotante `Nueva cita` consulta `/v1/clients`; si no existen clientes redirige a `/equipo`.
+- [ ] La creacion completa de una cita cuando ya existen clientes continua pendiente; actualmente muestra un aviso de funcionalidad futura.
+- [ ] Las tarjetas de citas y estadisticas de la agenda todavia no consumen el motor real de reservas.
+
+### Pantalla Equipo / Clientes
+
+- [x] Nueva pantalla protegida `/clients` con el lenguaje visual del dashboard y la referencia de `nava-new-booking-client.png`.
+- [x] La ruta `/equipo` funciona como alias y redirige al directorio de clientes.
+- [x] El boton Equipo de la navegacion inferior abre la pantalla creada.
+- [x] Directorio con busqueda local por nombre o telefono, estado vacio y listado de clientes persistidos.
+- [x] Boton flotante para abrir el formulario de nuevo cliente, ubicado en la esquina inferior derecha.
+- [x] El formulario se presenta como panel inferior y puede cerrarse tocando fuera, usando el boton de cierre del sistema o arrastrando su cabecera hacia abajo.
+- [x] El cierre por gesto tiene animacion vertical suave.
+- [x] Campos obligatorios: nombre y telefono.
+- [x] Campo opcional visible: apellido.
+- [x] Campos adicionales desplegables: fecha de nacimiento, direccion, documento y correo electronico.
+- [x] Al guardar correctamente se limpian los campos, se cierra el panel y se invalida la consulta para refrescar el listado.
+- [x] La accion del estado vacio se renombro a `Importar contactos`.
+- [x] Integracion con `expo-contacts` para solicitar permiso y leer nombre, telefono y correo de los contactos en Android o iOS.
+- [x] La importacion descarta contactos sin nombre o telefono y evita volver a importar telefonos ya existentes en el directorio cargado.
+- [x] En Expo Web se informa que la sincronizacion de contactos requiere un telefono.
+- [x] `expo-contacts` fue agregado a la configuracion de Expo con el mensaje de permiso correspondiente.
+
+### Persistencia, API y aislamiento
+
+- [x] Modelo Prisma `Client` agregado con nombre, apellido, telefono, correo, fecha de nacimiento, direccion, documento, notas y marcas de auditoria.
+- [x] Cada cliente conserva `created_by_user_id` y `updated_by_user_id`, relacionados con el usuario autenticado.
+- [x] `organization_id` es opcional para permitir clientes personales mientras la cuenta aun no pertenece a una organizacion activa.
+- [x] Endpoint autenticado `GET /v1/clients` para listar y buscar clientes.
+- [x] Endpoint autenticado `POST /v1/clients` para crear clientes; nombre y telefono se validan como obligatorios.
+- [x] El cliente movil tipado incluye las respuestas y campos del directorio.
+- [x] Si el usuario tiene una membresia activa, los clientes se consultan dentro de su organizacion.
+- [x] Si no tiene una membresia activa, la API limita los clientes por `created_by_user_id`, evitando mezclar datos personales entre usuarios.
+- [x] La API nunca acepta el propietario ni la organizacion desde el formulario; deriva el usuario desde la sesion y la organizacion desde una membresia activa.
+- [x] Migracion `20260727170000_add_clients`: tabla inicial de clientes.
+- [x] Migracion `20260727174500_add_client_details`: apellido y campos adicionales.
+- [x] Migracion `20260727183000_audit_client_owners`: propietarios de creacion/actualizacion, telefono obligatorio y auditoria.
+- [x] Migracion `20260727190000_allow_personal_clients`: organizacion opcional para cuentas individuales.
+- [x] Las 20 migraciones disponibles estan aplicadas en PostgreSQL local y `prisma migrate status` confirma el esquema actualizado.
+
+### Organizacion y cuenta actual
+
+- [x] Se verifico que la base local contiene un solo usuario registrado.
+- [x] El usuario actual no posee filas en `memberships`; por tanto no tiene una organizacion activa.
+- [x] Una organizacion representa el negocio o espacio de trabajo compartido. `Membership` enlaza un usuario con ese negocio y define su rol y estado.
+- [x] La ausencia de organizacion no bloquea la creacion de clientes: se guardan como clientes personales con `organization_id = NULL` y el usuario autenticado como propietario.
+- [ ] Como mejora estructural, al completar el onboarding debe crearse automaticamente la organizacion del negocio y una membresia `OWNER` para el usuario principal.
+- [ ] Cuando se implemente esa creacion automatica, definir la migracion o adopcion de clientes personales existentes hacia la nueva organizacion.
+
+### Correccion del error al guardar clientes
+
+- [x] `logs.md` mostro `POST /v1/clients 500 Internal Server Error`; no correspondia a un rechazo de permisos.
+- [x] Se reprodujo el fallo directamente: el Prisma Client generado conservaba el modelo anterior y todavia exigia la relacion `organization`.
+- [x] Se regenero Prisma Client 7.8.0 después de aplicar el esquema donde la organizacion es opcional.
+- [x] El proceso `tsx watch` de la API detecto el cambio y se recargo.
+- [x] Se ejecuto una insercion real sin organizacion dentro de una transaccion de prueba; la insercion fue aceptada y luego revertida para no dejar datos ficticios.
+- [x] Se agrego `predev` en `apps/api/package.json` para ejecutar `db:generate` antes de iniciar la API y evitar clientes Prisma obsoletos.
+- [x] Typecheck de la API aprobado despues de regenerar Prisma.
+- [x] Suite API final aprobada: 3 archivos, 6 pruebas aprobadas y 10 pruebas de integracion omitidas por no proporcionar `TEST_DATABASE_URL`.
+
+### Pendientes funcionales de clientes
+
+- [ ] Edicion y eliminacion logica de clientes.
+- [ ] Historial de citas por cliente.
+- [ ] Notas operativas y fotografias privadas.
+- [ ] Importacion masiva con pantalla previa de seleccion, confirmacion y reporte individual de conflictos.
+- [ ] Vincular un cliente persistido con la creacion real de una nueva reserva.
+
+## Actualizacion 2026-07-28 - Etiquetas de clientes y correcciones
+
+- [x] Las fichas de cliente muestran etiquetas y permiten crear una con nombre y color desde un panel inferior.
+- [x] La etiqueta creada se persiste y se asigna al cliente actual; repetir un nombre existente la reutiliza dentro del mismo alcance.
+- [x] El directorio muestra las etiquetas y permite filtrar clientes por ellas.
+- [x] Se agregaron los modelos Prisma `ClientLabel` y `ClientLabelAssignment`, junto con los endpoints autenticados `GET` y `POST /v1/clients/labels`.
+- [x] Migracion `20260728123000_create_client_label_tables` aplicada en PostgreSQL local; crea las tablas de etiquetas y sus asignaciones sin modificar migraciones ya aplicadas.
+- [x] El cliente existente se verifico en PostgreSQL y no fue eliminado durante la correccion.
+- [x] Resuelto el HTTP 500 de clientes (`P2021`): faltaba `client_label_assignments` porque una migracion ya aplicada no se vuelve a ejecutar al cambiar su archivo.
+- [x] Resuelta la advertencia de Expo Web `Unexpected text node`: se elimino el nodo de texto invalido entre dos modales de `client-detail.tsx`.
+- [x] Verificado: Prisma validate, migraciones, typecheck de API y movil; insercion de cliente probada dentro de una transaccion revertida.
