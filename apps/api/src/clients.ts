@@ -35,6 +35,14 @@ const createClientLabelSchema = z.object({
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/u),
   name: z.string().trim().min(1).max(60),
 });
+const createClientNoteSchema = z.object({
+  description: z.string().trim().min(1).max(500),
+  photoData: z
+    .string()
+    .regex(/^data:image\/(jpeg|png|webp);base64,/u)
+    .max(2_000_000)
+    .optional(),
+});
 
 async function currentOrganizationId(database: DatabaseClient, userId: string) {
   const membership = await database.membership.findFirst({
@@ -49,6 +57,19 @@ function clientScope(organizationId: string | null, userId: string) {
 
 function publicLabel(label: { color: string; id: string; name: string }) {
   return label;
+}
+function publicClientNote(note: {
+  createdAt: Date;
+  description: string;
+  id: string;
+  photoData: string | null;
+}) {
+  return {
+    createdAt: note.createdAt.toISOString(),
+    description: note.description,
+    id: note.id,
+    photoData: note.photoData,
+  };
 }
 
 function publicClient(client: {
@@ -138,6 +159,45 @@ export function registerClientRoutes(
     });
   });
 
+  app.get('/v1/clients/:clientId/notes', async (request) => {
+    const { user } = await authenticate(database, request);
+    const organizationId = await currentOrganizationId(database, user.id);
+    const { clientId } = request.params as { clientId: string };
+    const client = await database.client.findFirst({
+      where: { id: clientId, ...clientScope(organizationId, user.id) },
+    });
+    if (!client) {
+      throw new ApiError(404, 'CLIENT_NOT_FOUND', 'El cliente no existe.');
+    }
+    const notes = await database.clientNote.findMany({
+      orderBy: { createdAt: 'desc' },
+      where: { clientId: client.id },
+    });
+    return { notes: notes.map(publicClientNote) };
+  });
+
+  app.post('/v1/clients/:clientId/notes', async (request, reply) => {
+    const { user } = await authenticate(database, request);
+    const organizationId = await currentOrganizationId(database, user.id);
+    const { clientId } = request.params as { clientId: string };
+    const input = createClientNoteSchema.parse(request.body);
+    const client = await database.client.findFirst({
+      where: { id: clientId, ...clientScope(organizationId, user.id) },
+    });
+    if (!client) {
+      throw new ApiError(404, 'CLIENT_NOT_FOUND', 'El cliente no existe.');
+    }
+    const note = await database.clientNote.create({
+      data: {
+        clientId: client.id,
+        createdByUserId: user.id,
+        description: input.description,
+        organizationId,
+        photoData: input.photoData ?? null,
+      },
+    });
+    return reply.code(201).send({ note: publicClientNote(note) });
+  });
   app.get('/v1/clients', async (request) => {
     const { user } = await authenticate(database, request);
     const organizationId = await currentOrganizationId(database, user.id);
@@ -223,6 +283,7 @@ export function registerClientRoutes(
         collaboratorName: appointment.professional.user.fullName,
         endsAt: appointment.endsAt.toISOString(),
         id: appointment.id,
+        paymentStatus: appointment.paymentStatus.toLowerCase(),
         serviceName:
           appointment.services
             .map((service) => service.serviceName)

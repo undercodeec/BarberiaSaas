@@ -36,12 +36,22 @@ enum InvitationStatus {
 
 enum AppointmentStatus {
   SCHEDULED
+  WAITING
   CONFIRMED
   CHECKED_IN
   IN_PROGRESS
   COMPLETED
   CANCELLED
   NO_SHOW
+}
+enum AppointmentPaymentStatus {
+  PENDING
+  PAID
+}
+
+enum CashRegisterStatus {
+  OPEN
+  CLOSED
 }
 
 enum AppointmentEventType {
@@ -86,6 +96,7 @@ model User {
   onboardingServices      OnboardingService[]
   clientsCreated          Client[]                 @relation("ClientCreator")
   clientsUpdated          Client[]                 @relation("ClientUpdater")
+  clientNotesCreated      ClientNote[]             @relation("ClientNoteCreator")
   clientLabelsCreated     ClientLabel[]            @relation("ClientLabelCreator")
   clientLabelsUpdated     ClientLabel[]            @relation("ClientLabelUpdater")
 
@@ -251,6 +262,7 @@ model Organization {
   appointmentEvents AppointmentEvent[]
   clients           Client[]
   clientLabels      ClientLabel[]
+  clientNotes       ClientNote[]
 
   @@map("organizations")
 }
@@ -274,12 +286,30 @@ model Client {
   createdBy      User         @relation("ClientCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
   updatedBy      User         @relation("ClientUpdater", fields: [updatedByUserId], references: [id], onDelete: Restrict)
   labels         ClientLabelAssignment[]
+  noteEntries    ClientNote[]
 
   @@index([organizationId, fullName])
   @@index([createdByUserId])
   @@map("clients")
 }
 
+model ClientNote {
+  id              String        @id @default(uuid()) @db.Uuid
+  clientId        String        @map("client_id") @db.Uuid
+  organizationId  String?       @map("organization_id") @db.Uuid
+  createdByUserId String        @map("created_by_user_id") @db.Uuid
+  description     String        @db.VarChar(500)
+  photoData       String?       @map("photo_data") @db.Text
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  client          Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  createdBy       User          @relation("ClientNoteCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([clientId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([createdByUserId, createdAt])
+  @@map("client_notes")
+}
 model ClientLabel {
   id              String                  @id @default(uuid()) @db.Uuid
   organizationId  String?                 @map("organization_id") @db.Uuid
@@ -485,6 +515,24 @@ model ScheduleBlock {
   @@map("schedule_blocks")
 }
 
+model CashRegisterSession {
+  id                      String             @id @default(uuid()) @db.Uuid
+  organizationId          String?            @map("organization_id") @db.Uuid
+  ownerUserId             String             @map("owner_user_id") @db.Uuid
+  locationId              String?            @map("location_id") @db.Uuid
+  responsibleMembershipId String?            @map("responsible_membership_id") @db.Uuid
+  responsibleName         String             @map("responsible_name") @db.VarChar(120)
+  openingAmountCents      Int                @map("opening_amount_cents")
+  status                  CashRegisterStatus @default(OPEN)
+  openedAt                DateTime           @default(now()) @map("opened_at") @db.Timestamptz(3)
+  closedAt                DateTime?          @map("closed_at") @db.Timestamptz(3)
+  createdAt               DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([organizationId, status])
+  @@index([ownerUserId, status])
+  @@map("cash_register_sessions")
+}
 model Appointment {
   id                       String               @id @default(uuid()) @db.Uuid
   organizationId           String               @map("organization_id") @db.Uuid
@@ -496,6 +544,7 @@ model Appointment {
   startsAt                 DateTime             @map("starts_at") @db.Timestamptz(3)
   endsAt                   DateTime             @map("ends_at") @db.Timestamptz(3)
   status                   AppointmentStatus    @default(SCHEDULED)
+  paymentStatus            AppointmentPaymentStatus @default(PENDING) @map("payment_status")
   reservesSlot             Boolean              @default(true) @map("reserves_slot")
   notes                    String?              @db.VarChar(500)
   cancellationReason       String?              @map("cancellation_reason") @db.VarChar(240)

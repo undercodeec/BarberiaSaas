@@ -1,12 +1,19 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { ClientDetailResponse } from '@barber-saas/api-client';
+import type {
+  ClientDetailResponse,
+  ClientNotesResponse,
+} from '@barber-saas/api-client';
+import * as ImagePicker from 'expo-image-picker';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
+  Image,
   Linking,
   Modal,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,7 +26,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
-type Tab = 'information' | 'history' | 'notes';
+type Tab = 'comments' | 'history' | 'information' | 'notes';
+type HistoryOrder = 'newest' | 'oldest';
+type HistoryStatusFilter =
+  'all' | 'active' | 'paid' | 'cancelled' | 'completed';
 
 const emptyValue = (value: string | null | undefined) =>
   value || 'Sin registrar';
@@ -52,6 +62,7 @@ function statusLabel(
     in_progress: 'En curso',
     no_show: 'No asistió',
     scheduled: 'Agendada',
+    waiting: 'En espera',
   } as const;
   return labels[status];
 }
@@ -62,9 +73,16 @@ export default function ClientDetailScreen() {
   const queryClient = useQueryClient();
   const { clientId } = useLocalSearchParams<{ clientId: string }>();
   const [activeTab, setActiveTab] = useState<Tab>('information');
+  const [historyOrder, setHistoryOrder] = useState<HistoryOrder>('newest');
+  const [historyStatus, setHistoryStatus] =
+    useState<HistoryStatusFilter>('all');
   const [isEditing, setIsEditing] = useState(false);
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const [isLabelOpen, setIsLabelOpen] = useState(false);
+  const [isNoteOpen, setIsNoteOpen] = useState(false);
+  const [noteDescription, setNoteDescription] = useState('');
+  const [notePhotoData, setNotePhotoData] = useState<string | null>(null);
+  const noteSheetTranslateY = useRef(new Animated.Value(0)).current;
   const [labelName, setLabelName] = useState('');
   const [labelColor, setLabelColor] = useState('#101C2D');
   const [showAdditionalFields, setShowAdditionalFields] = useState(false);
@@ -85,6 +103,33 @@ export default function ClientDetailScreen() {
     queryKey: ['client-detail', clientId],
   });
   const client = detailQuery.data?.client;
+  const visibleHistory = useMemo(() => {
+    const history = detailQuery.data?.history ?? [];
+    return history
+      .filter((item) => {
+        if (historyStatus === 'all') return true;
+        if (historyStatus === 'paid') return item.paymentStatus === 'paid';
+        if (historyStatus === 'cancelled') return item.status === 'cancelled';
+        if (historyStatus === 'completed') return item.status === 'completed';
+        return ['scheduled', 'confirmed', 'checked_in', 'in_progress'].includes(
+          item.status,
+        );
+      })
+      .toSorted((left, right) => {
+        const difference =
+          new Date(left.startsAt).getTime() -
+          new Date(right.startsAt).getTime();
+        return historyOrder === 'newest' ? -difference : difference;
+      });
+  }, [detailQuery.data?.history, historyOrder, historyStatus]);
+  const notesQuery = useQuery({
+    enabled: Boolean(session && clientId),
+    queryFn: () =>
+      requireApiClient().request<ClientNotesResponse>(
+        `/v1/clients/${clientId}/notes`,
+      ),
+    queryKey: ['client-notes', clientId],
+  });
 
   useEffect(() => {
     if (!client) return;
@@ -133,6 +178,98 @@ export default function ClientDetailScreen() {
     },
   });
 
+  const closeNoteSheet = () => {
+    Animated.timing(noteSheetTranslateY, {
+      duration: 180,
+      toValue: 600,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsNoteOpen(false);
+      noteSheetTranslateY.setValue(0);
+    });
+  };
+
+  const noteSheetPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_event, gesture) => gesture.dy > 8,
+      onPanResponderMove: (_event, gesture) => {
+        noteSheetTranslateY.setValue(Math.max(0, gesture.dy));
+      },
+      onPanResponderRelease: (_event, gesture) => {
+        if (gesture.dy > 90) closeNoteSheet();
+        else {
+          Animated.spring(noteSheetTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    }),
+  ).current;
+
+  const chooseNotePhoto = async (source: 'camera' | 'library') => {
+    const permission =
+      source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        'Permiso necesario',
+        'Autoriza el acceso para agregar una foto.',
+      );
+      return;
+    }
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ base64: true, quality: 0.7 })
+        : await ImagePicker.launchImageLibraryAsync({
+            base64: true,
+            quality: 0.7,
+          });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (!asset?.base64) {
+      Alert.alert('No pudimos leer la foto', 'Inténtalo con otra imagen.');
+      return;
+    }
+    const bytes = asset.fileSize ?? Math.ceil((asset.base64.length * 3) / 4);
+    if (bytes > 1_500_000 || asset.width > 1_600 || asset.height > 1_600) {
+      Alert.alert(
+        'Imagen demasiado grande',
+        'Usa una foto de hasta 1.5 MB y 1600 × 1600 píxeles.',
+      );
+      return;
+    }
+    const mimeType =
+      asset.mimeType === 'image/png' || asset.mimeType === 'image/webp'
+        ? asset.mimeType
+        : 'image/jpeg';
+    setNotePhotoData(`data:${mimeType};base64,${asset.base64}`);
+  };
+
+  const createNote = useMutation({
+    mutationFn: () => {
+      if (!noteDescription.trim()) throw new Error('Ingresa una descripción.');
+      return requireApiClient().request(`/v1/clients/${clientId}/notes`, {
+        body: {
+          description: noteDescription.trim(),
+          photoData: notePhotoData ?? undefined,
+        },
+        method: 'POST',
+      });
+    },
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos guardar la nota',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      setNoteDescription('');
+      setNotePhotoData(null);
+      closeNoteSheet();
+      await notesQuery.refetch();
+    },
+  });
   const createLabel = useMutation({
     mutationFn: () => {
       if (!labelName.trim())
@@ -311,7 +448,6 @@ export default function ClientDetailScreen() {
             </View>
           </View>
         </View>
-
         <View style={styles.metrics}>
           <View style={styles.metric}>
             <Text style={styles.metricValue}>{metrics.appointmentsCount}</Text>
@@ -332,7 +468,6 @@ export default function ClientDetailScreen() {
             <Text style={styles.metricLabel}>Última visita</Text>
           </View>
         </View>
-
         <Text style={styles.sectionTitle}>Acciones rápidas</Text>
         <View style={styles.quickActions}>
           <Pressable
@@ -371,13 +506,13 @@ export default function ClientDetailScreen() {
             <Text style={styles.quickLabel}>Notificar</Text>
           </View>
         </View>
-
         <View style={styles.tabs}>
           {(
             [
               ['information', 'Información'],
               ['notes', 'Notas'],
               ['history', 'Historial'],
+              ['comments', 'Comentarios'],
             ] as const
           ).map(([tab, label]) => (
             <Pressable
@@ -397,7 +532,6 @@ export default function ClientDetailScreen() {
             </Pressable>
           ))}
         </View>
-
         {activeTab === 'information' ? (
           <View style={styles.detailsCard}>
             <InfoRow
@@ -453,61 +587,180 @@ export default function ClientDetailScreen() {
           </View>
         ) : null}
         {activeTab === 'notes' ? (
-          <View style={styles.notesCard}>
-            <Ionicons color="#101c2d" name="document-text-outline" size={22} />
-            <Text style={[styles.notesText, !client.notes && styles.secondary]}>
-              {emptyValue(client.notes)}
-            </Text>
+          <View>
+            <View style={styles.notesHeader}>
+              <Text style={styles.sectionTitle}>Notas</Text>
+              <Pressable
+                accessibilityLabel="Agregar nota"
+                accessibilityRole="button"
+                onPress={() => setIsNoteOpen(true)}
+                style={styles.addLabelButton}
+              >
+                <Ionicons color="#101c2d" name="add" size={22} />
+              </Pressable>
+            </View>
+            {client.notes ? (
+              <View style={styles.notesCard}>
+                <Ionicons
+                  color="#101c2d"
+                  name="document-text-outline"
+                  size={22}
+                />
+                <Text style={styles.notesText}>{client.notes}</Text>
+              </View>
+            ) : null}
+            {notesQuery.data?.notes.length ? (
+              <View style={styles.noteList}>
+                {notesQuery.data.notes.map((note) => (
+                  <View key={note.id} style={styles.notesCard}>
+                    <Ionicons
+                      color="#101c2d"
+                      name="document-text-outline"
+                      size={22}
+                    />
+                    <View style={styles.noteCopy}>
+                      <Text style={styles.notesText}>{note.description}</Text>
+                      {note.photoData ? (
+                        <Image
+                          source={{ uri: note.photoData }}
+                          style={styles.notePhoto}
+                        />
+                      ) : null}
+                      <Text style={styles.noteDate}>
+                        {formatDate(note.createdAt)}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : !client.notes ? (
+              <Text style={styles.secondary}>
+                Aún no hay notas registradas.
+              </Text>
+            ) : null}
           </View>
         ) : null}
         {activeTab === 'history' ? (
-          detail.history.length ? (
-            <View style={styles.historyList}>
-              {detail.history.map((item) => (
-                <View key={item.id} style={styles.historyCard}>
-                  <View style={styles.historyDate}>
-                    <Text style={styles.historyDay}>
-                      {new Intl.DateTimeFormat('es-EC', {
-                        day: '2-digit',
-                      }).format(new Date(item.startsAt))}
-                    </Text>
-                    <Text style={styles.historyMonth}>
-                      {new Intl.DateTimeFormat('es-EC', { month: 'short' })
-                        .format(new Date(item.startsAt))
-                        .replace('.', '')}
-                    </Text>
-                  </View>
-                  <View style={styles.historyCopy}>
-                    <Text style={styles.historyService}>
-                      {item.serviceName}
-                    </Text>
-                    <Text style={styles.historyMeta}>
-                      {item.collaboratorName} ·{' '}
-                      {new Intl.DateTimeFormat('es-EC', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      }).format(new Date(item.startsAt))}
-                    </Text>
-                  </View>
-                  <Text
+          <View>
+            <View style={styles.historyFilters}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterList}
+              >
+                {(
+                  [
+                    ['all', 'Todos'],
+                    ['active', 'Actividad'],
+                    ['paid', 'Pagado'],
+                    ['cancelled', 'Cancelado'],
+                    ['completed', 'Finalizado'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <Pressable
+                    key={value}
+                    onPress={() => setHistoryStatus(value)}
                     style={[
-                      styles.status,
-                      item.status === 'completed' && styles.statusCompleted,
+                      styles.filterChip,
+                      historyStatus === value && styles.filterChipActive,
                     ]}
                   >
-                    {statusLabel(item.status)}
-                  </Text>
-                </View>
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        historyStatus === value && styles.filterChipTextActive,
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <Pressable
+                onPress={() =>
+                  setHistoryOrder(
+                    historyOrder === 'newest' ? 'oldest' : 'newest',
+                  )
+                }
+                style={styles.orderButton}
+              >
+                <Ionicons color="#101c2d" name="swap-vertical" size={18} />
+                <Text style={styles.orderLabel}>
+                  {historyOrder === 'newest' ? 'Más reciente' : 'Más antigua'}
+                </Text>
+              </Pressable>
+            </View>
+            {visibleHistory.length ? (
+              <View style={styles.historyList}>
+                {visibleHistory.map((item) => (
+                  <View key={item.id} style={styles.historyCard}>
+                    <View style={styles.historyDate}>
+                      <Text style={styles.historyDay}>
+                        {new Intl.DateTimeFormat('es-EC', {
+                          day: '2-digit',
+                        }).format(new Date(item.startsAt))}
+                      </Text>
+                      <Text style={styles.historyMonth}>
+                        {new Intl.DateTimeFormat('es-EC', { month: 'short' })
+                          .format(new Date(item.startsAt))
+                          .replace('.', '')}
+                      </Text>
+                    </View>
+                    <View style={styles.historyCopy}>
+                      <Text style={styles.historyService}>
+                        {item.serviceName}
+                      </Text>
+                      <Text style={styles.historyMeta}>
+                        {item.collaboratorName} ·{' '}
+                        {new Intl.DateTimeFormat('es-EC', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        }).format(new Date(item.startsAt))}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text
+                        style={[
+                          styles.status,
+                          item.status === 'completed' && styles.statusCompleted,
+                        ]}
+                      >
+                        {statusLabel(item.status)}
+                      </Text>
+                      {item.paymentStatus === 'paid' ? (
+                        <Text style={styles.paidLabel}>Pagado</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyHistory}>
+                <Ionicons color="#8B96A5" name="calendar-outline" size={28} />
+                <Text style={styles.secondary}>
+                  No hay reservas con este filtro.
+                </Text>
+              </View>
+            )}
+          </View>
+        ) : null}
+        {activeTab === 'comments' ? (
+          <View style={styles.commentsEmpty}>
+            <View style={styles.commentStars}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Ionicons
+                  color="#D0A84A"
+                  key={star}
+                  name="star-outline"
+                  size={25}
+                />
               ))}
             </View>
-          ) : (
-            <View style={styles.emptyHistory}>
-              <Ionicons color="#8B96A5" name="calendar-outline" size={28} />
-              <Text style={styles.secondary}>
-                Aún no hay reservas registradas.
-              </Text>
-            </View>
-          )
+            <Text style={styles.commentsTitle}>Reseñas del cliente</Text>
+            <Text style={styles.secondary}>
+              Las reseñas aparecerán aquí cuando se integre su recopilación.
+            </Text>
+          </View>
         ) : null}
       </ScrollView>
       <Modal
@@ -580,6 +833,76 @@ export default function ClientDetailScreen() {
               <Text style={styles.deleteOptionLabel}>Eliminar cliente</Text>
             </Pressable>
           </View>
+        </View>
+      </Modal>
+      <Modal
+        animationType="slide"
+        onRequestClose={closeNoteSheet}
+        transparent
+        visible={isNoteOpen}
+      >
+        <View style={styles.overlay}>
+          <Pressable onPress={closeNoteSheet} style={styles.backdrop} />
+          <Animated.View
+            style={[
+              styles.noteSheet,
+              { transform: [{ translateY: noteSheetTranslateY }] },
+            ]}
+          >
+            <View
+              {...noteSheetPanResponder.panHandlers}
+              style={styles.noteDragArea}
+            >
+              <View style={styles.handle} />
+            </View>
+            <Text style={styles.sheetTitle}>Nueva nota</Text>
+            <TextInput
+              accessibilityLabel="Descripción de la nota"
+              maxLength={500}
+              multiline
+              onChangeText={setNoteDescription}
+              placeholder="Descripción"
+              placeholderTextColor="#8B96A5"
+              style={[styles.field, styles.notesField]}
+              textAlignVertical="top"
+              value={noteDescription}
+            />
+            {notePhotoData ? (
+              <Image
+                source={{ uri: notePhotoData }}
+                style={styles.notePreview}
+              />
+            ) : null}
+            <View style={styles.notePhotoActions}>
+              <Pressable
+                onPress={() => void chooseNotePhoto('library')}
+                style={styles.photoAction}
+              >
+                <Ionicons color="#101c2d" name="images-outline" size={20} />
+                <Text style={styles.photoActionLabel}>Cargar foto</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void chooseNotePhoto('camera')}
+                style={styles.photoAction}
+              >
+                <Ionicons color="#101c2d" name="camera-outline" size={20} />
+                <Text style={styles.photoActionLabel}>Tomar foto</Text>
+              </Pressable>
+            </View>
+            <Pressable
+              disabled={createNote.isPending || !noteDescription.trim()}
+              onPress={() => createNote.mutate()}
+              style={[
+                styles.noteSaveButton,
+                (createNote.isPending || !noteDescription.trim()) &&
+                  styles.disabled,
+              ]}
+            >
+              <Text style={styles.saveLabel}>
+                {createNote.isPending ? 'Guardando...' : 'Guardar nota'}
+              </Text>
+            </Pressable>
+          </Animated.View>
         </View>
       </Modal>
       <Modal
@@ -1045,6 +1368,47 @@ const styles = StyleSheet.create({
     width: 46,
   },
   headerTitle: { color: '#111827', fontSize: 17, fontWeight: '900' },
+  commentStars: { flexDirection: 'row', gap: 5 },
+  commentsEmpty: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E4E8EF',
+    borderRadius: 22,
+    borderWidth: 1,
+    gap: 12,
+    padding: 32,
+  },
+  commentsTitle: { color: '#111827', fontSize: 17, fontWeight: '900' },
+  filterChip: {
+    borderColor: '#CBD2DA',
+    borderRadius: 15,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  filterChipActive: { backgroundColor: '#101c2d', borderColor: '#101c2d' },
+  filterChipText: { color: '#101c2d', fontSize: 12, fontWeight: '800' },
+  filterChipTextActive: { color: '#FFFFFF' },
+  filterList: { gap: 7, paddingRight: 12 },
+  historyFilters: { gap: 10, marginBottom: 14 },
+  orderButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#E1E2E4',
+    borderRadius: 13,
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+  },
+  orderLabel: { color: '#101c2d', fontSize: 12, fontWeight: '900' },
+  paidLabel: {
+    color: '#167644',
+    fontSize: 11,
+    fontWeight: '900',
+    marginTop: 4,
+    textAlign: 'right',
+  },
   historyCard: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
@@ -1136,6 +1500,45 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: -0.3,
   },
+  noteCopy: { flex: 1 },
+  noteDate: { color: '#6E7785', fontSize: 12, marginTop: 9 },
+  noteDragArea: { paddingBottom: 10, paddingTop: 4 },
+  noteList: { gap: 10, marginTop: 10 },
+  notePhoto: { borderRadius: 14, height: 150, marginTop: 12, width: '100%' },
+  notePhotoActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  notePreview: { borderRadius: 16, height: 180, marginTop: 14, width: '100%' },
+  noteSaveButton: {
+    alignItems: 'center',
+    backgroundColor: '#101c2d',
+    borderRadius: 16,
+    marginTop: 20,
+    minHeight: 54,
+    justifyContent: 'center',
+  },
+  noteSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingBottom: 34,
+    paddingHorizontal: 22,
+    paddingTop: 10,
+  },
+  notesHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  photoAction: {
+    alignItems: 'center',
+    backgroundColor: '#E1E2E4',
+    borderRadius: 15,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 50,
+  },
+  photoActionLabel: { color: '#101c2d', fontSize: 13, fontWeight: '900' },
   notesCard: {
     alignItems: 'flex-start',
     backgroundColor: '#FFFFFF',

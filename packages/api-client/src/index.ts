@@ -79,6 +79,17 @@ export interface OnboardingAccountDetailsResponse {
   readonly phone: string | null;
 }
 
+export interface CashRegisterSession {
+  readonly id: string;
+  readonly openedAt: string;
+  readonly openingAmountCents: number;
+  readonly responsibleName: string;
+  readonly status: 'open' | 'closed';
+}
+
+export interface CurrentCashRegisterResponse {
+  readonly session: CashRegisterSession | null;
+}
 export interface ApiMessageResponse {
   readonly message: string;
   // Reserved for future shared message fields.
@@ -173,6 +184,16 @@ export interface ClientLabelRecord {
 export interface ClientLabelsResponse {
   readonly labels: readonly ClientLabelRecord[];
 }
+export interface ClientNoteRecord {
+  readonly createdAt: string;
+  readonly description: string;
+  readonly id: string;
+  readonly photoData: string | null;
+}
+
+export interface ClientNotesResponse {
+  readonly notes: readonly ClientNoteRecord[];
+}
 export interface ClientRecord {
   readonly addressLine: string | null;
   readonly birthDate: string | null;
@@ -196,6 +217,7 @@ export interface ClientDetailResponse {
     readonly collaboratorName: string;
     readonly endsAt: string;
     readonly id: string;
+    readonly paymentStatus: 'paid' | 'pending';
     readonly serviceName: string;
     readonly startsAt: string;
     readonly status:
@@ -205,7 +227,8 @@ export interface ClientDetailResponse {
       | 'confirmed'
       | 'in_progress'
       | 'no_show'
-      | 'scheduled';
+      | 'scheduled'
+      | 'waiting';
   }>;
   readonly metrics: {
     readonly accumulatedCents: number;
@@ -240,6 +263,7 @@ export interface AppointmentRecord {
   readonly locationId: string;
   readonly notes: string | null;
   readonly professionalMembershipId: string;
+  readonly paymentStatus: 'paid' | 'pending';
   readonly services: ReadonlyArray<{
     readonly durationMinutes: number;
     readonly id: string;
@@ -255,7 +279,8 @@ export interface AppointmentRecord {
     | 'confirmed'
     | 'in_progress'
     | 'no_show'
-    | 'scheduled';
+    | 'scheduled'
+    | 'waiting';
 }
 
 export interface AppointmentsResponse {

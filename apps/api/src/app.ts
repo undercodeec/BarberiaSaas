@@ -28,6 +28,7 @@ import { z, ZodError } from 'zod';
 import type { ApiConfig } from './config';
 import { ApiError, isUniqueConstraintError } from './errors';
 import { registerAgendaRoutes } from './agenda';
+import { registerCashRegisterRoutes } from './cash-register';
 import { registerClientRoutes } from './clients';
 import { registerOperationsRoutes } from './operations';
 import type {
@@ -169,7 +170,10 @@ function publicOnboardingCollaborator(collaborator: {
 
 function onboardingServiceData(input: {
   readonly agendaColor: string;
-  readonly category: { readonly description: string; readonly name: string } | null;
+  readonly category: {
+    readonly description: string;
+    readonly name: string;
+  } | null;
   readonly description?: string | null | undefined;
   readonly downPaymentPercentage: number;
   readonly durationMinutes: number;
@@ -179,7 +183,12 @@ function onboardingServiceData(input: {
   readonly price: number;
   readonly priceType: 'fixed' | 'from' | 'free' | 'hidden';
   readonly showServiceTime: boolean;
-  readonly tax: { readonly addAtCheckout: boolean; readonly addAtPurchaseEnd: boolean; readonly name: string; readonly percentage: number } | null;
+  readonly tax: {
+    readonly addAtCheckout: boolean;
+    readonly addAtPurchaseEnd: boolean;
+    readonly name: string;
+    readonly percentage: number;
+  } | null;
 }) {
   return {
     agendaColor: input.agendaColor.toUpperCase(),
@@ -202,15 +211,32 @@ function onboardingServiceData(input: {
 }
 
 function publicOnboardingService(service: {
-  readonly agendaColor: string; readonly categoryDescription: string | null; readonly categoryName: string | null;
-  readonly description: string | null; readonly downPaymentPercentage: number; readonly durationMinutes: number;
-  readonly id: string; readonly imageUri: string | null; readonly name: string; readonly onlineBooking: boolean;
-  readonly priceCents: number; readonly priceType: string; readonly showServiceTime: boolean;
-  readonly taxAddAtCheckout: boolean; readonly taxAddAtPurchaseEnd: boolean; readonly taxName: string | null; readonly taxPercentage: number | null;
+  readonly agendaColor: string;
+  readonly categoryDescription: string | null;
+  readonly categoryName: string | null;
+  readonly description: string | null;
+  readonly downPaymentPercentage: number;
+  readonly durationMinutes: number;
+  readonly id: string;
+  readonly imageUri: string | null;
+  readonly name: string;
+  readonly onlineBooking: boolean;
+  readonly priceCents: number;
+  readonly priceType: string;
+  readonly showServiceTime: boolean;
+  readonly taxAddAtCheckout: boolean;
+  readonly taxAddAtPurchaseEnd: boolean;
+  readonly taxName: string | null;
+  readonly taxPercentage: number | null;
 }) {
   return {
     agendaColor: service.agendaColor,
-    category: service.categoryName ? { description: service.categoryDescription ?? '', name: service.categoryName } : null,
+    category: service.categoryName
+      ? {
+          description: service.categoryDescription ?? '',
+          name: service.categoryName,
+        }
+      : null,
     description: service.description,
     downPaymentPercentage: service.downPaymentPercentage,
     durationMinutes: service.durationMinutes,
@@ -221,7 +247,15 @@ function publicOnboardingService(service: {
     price: service.priceCents / 100,
     priceType: service.priceType as 'fixed' | 'from' | 'free' | 'hidden',
     showServiceTime: service.showServiceTime,
-    tax: service.taxName && service.taxPercentage !== null ? { addAtCheckout: service.taxAddAtCheckout, addAtPurchaseEnd: service.taxAddAtPurchaseEnd, name: service.taxName, percentage: service.taxPercentage } : null,
+    tax:
+      service.taxName && service.taxPercentage !== null
+        ? {
+            addAtCheckout: service.taxAddAtCheckout,
+            addAtPurchaseEnd: service.taxAddAtPurchaseEnd,
+            name: service.taxName,
+            percentage: service.taxPercentage,
+          }
+        : null,
   };
 }
 
@@ -297,7 +331,12 @@ async function createSession(database: DatabaseClient, userId: string) {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + SESSION_MAX_DURATION_MS);
   await database.session.create({
-    data: { expiresAt, lastActiveAt: now, tokenHash: hashOpaqueToken(token), userId },
+    data: {
+      expiresAt,
+      lastActiveAt: now,
+      tokenHash: hashOpaqueToken(token),
+      userId,
+    },
   });
   return { expiresAt: expiresAt.toISOString(), token };
 }
@@ -844,7 +883,9 @@ export async function buildApi({
       where: { userId: user.id },
     });
     return {
-      accountType: profile ? (profile.accountType.toLowerCase() as 'business' | 'professional') : null,
+      accountType: profile
+        ? (profile.accountType.toLowerCase() as 'business' | 'professional')
+        : null,
       addressLine: profile?.addressLine ?? null,
       businessName: profile?.businessName ?? null,
       bookingUrl: profile
@@ -861,7 +902,8 @@ export async function buildApi({
       openingTime: profile?.openingTime ?? null,
       phone: user.phone,
       instagramUrl: profile?.instagramUrl ?? null,
-      onboardingCompletedAt: profile?.onboardingCompletedAt?.toISOString() ?? null,
+      onboardingCompletedAt:
+        profile?.onboardingCompletedAt?.toISOString() ?? null,
     };
   });
 
@@ -903,8 +945,7 @@ export async function buildApi({
       ]);
       return {
         accountType: updatedProfile.accountType.toLowerCase() as
-          | 'business'
-          | 'professional',
+          'business' | 'professional',
         addressLine: updatedProfile.addressLine,
         businessName: updatedProfile.businessName,
         bookingUrl: 'https://book.weibook.co/' + updatedProfile.businessNameKey,
@@ -917,7 +958,8 @@ export async function buildApi({
         facebookUrl: updatedProfile.facebookUrl,
         fullName: updatedUser.fullName,
         instagramUrl: updatedProfile.instagramUrl,
-        onboardingCompletedAt: updatedProfile.onboardingCompletedAt?.toISOString() ?? null,
+        onboardingCompletedAt:
+          updatedProfile.onboardingCompletedAt?.toISOString() ?? null,
         openingTime: updatedProfile.openingTime,
         phone: updatedUser.phone,
       };
@@ -932,7 +974,6 @@ export async function buildApi({
       throw error;
     }
   });
-
 
   app.post('/v1/onboarding/complete-account-setup', async (request) => {
     const { user } = await authenticate(database, request);
@@ -950,7 +991,10 @@ export async function buildApi({
       data: { onboardingCompletedAt: new Date() },
       where: { userId: user.id },
     });
-    return { onboardingCompletedAt: completedProfile.onboardingCompletedAt!.toISOString() };
+    return {
+      onboardingCompletedAt:
+        completedProfile.onboardingCompletedAt!.toISOString(),
+    };
   });
   app.get('/v1/onboarding/collaborators', async (request) => {
     const { user } = await authenticate(database, request);
@@ -1017,14 +1061,19 @@ export async function buildApi({
 
   app.get('/v1/onboarding/services', async (request) => {
     const { user } = await authenticate(database, request);
-    const services = await database.onboardingService.findMany({ orderBy: { createdAt: 'asc' }, where: { ownerUserId: user.id } });
+    const services = await database.onboardingService.findMany({
+      orderBy: { createdAt: 'asc' },
+      where: { ownerUserId: user.id },
+    });
     return { services: services.map(publicOnboardingService) };
   });
 
   app.post('/v1/onboarding/services', async (request, reply) => {
     const { user } = await authenticate(database, request);
     const input = createOnboardingServiceSchema.parse(request.body);
-    const service = await database.onboardingService.create({ data: { ...onboardingServiceData(input), ownerUserId: user.id } });
+    const service = await database.onboardingService.create({
+      data: { ...onboardingServiceData(input), ownerUserId: user.id },
+    });
     return reply.code(201).send({ service: publicOnboardingService(service) });
   });
 
@@ -1032,17 +1081,34 @@ export async function buildApi({
     const { user } = await authenticate(database, request);
     const { id } = onboardingServiceParamsSchema.parse(request.params);
     const input = updateOnboardingServiceSchema.parse(request.body);
-    const existing = await database.onboardingService.findFirst({ where: { id, ownerUserId: user.id } });
-    if (!existing) throw new ApiError(404, 'ONBOARDING_SERVICE_NOT_FOUND', 'El servicio no existe.');
-    const service = await database.onboardingService.update({ data: onboardingServiceData(input), where: { id: existing.id } });
+    const existing = await database.onboardingService.findFirst({
+      where: { id, ownerUserId: user.id },
+    });
+    if (!existing)
+      throw new ApiError(
+        404,
+        'ONBOARDING_SERVICE_NOT_FOUND',
+        'El servicio no existe.',
+      );
+    const service = await database.onboardingService.update({
+      data: onboardingServiceData(input),
+      where: { id: existing.id },
+    });
     return { service: publicOnboardingService(service) };
   });
 
   app.delete('/v1/onboarding/services/:id', async (request, reply) => {
     const { user } = await authenticate(database, request);
     const { id } = onboardingServiceParamsSchema.parse(request.params);
-    const existing = await database.onboardingService.findFirst({ where: { id, ownerUserId: user.id } });
-    if (!existing) throw new ApiError(404, 'ONBOARDING_SERVICE_NOT_FOUND', 'El servicio no existe.');
+    const existing = await database.onboardingService.findFirst({
+      where: { id, ownerUserId: user.id },
+    });
+    if (!existing)
+      throw new ApiError(
+        404,
+        'ONBOARDING_SERVICE_NOT_FOUND',
+        'El servicio no existe.',
+      );
     await database.onboardingService.delete({ where: { id: existing.id } });
     return reply.code(204).send();
   });
@@ -1156,6 +1222,7 @@ export async function buildApi({
   );
   registerAgendaRoutes(app, database, authenticate);
   registerClientRoutes(app, database, authenticate);
+  registerCashRegisterRoutes(app, database, authenticate);
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof ZodError) {

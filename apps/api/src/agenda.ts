@@ -1,5 +1,6 @@
 import {
   AppointmentEventType,
+  AppointmentPaymentStatus,
   AppointmentStatus,
   MembershipRole,
   MembershipStatus,
@@ -347,6 +348,7 @@ function publicAppointment(appointment: {
   locationId: string;
   notes: string | null;
   professionalMembershipId: string;
+  paymentStatus: AppointmentPaymentStatus;
   startsAt: Date;
   status: AppointmentStatus;
   services?: ReadonlyArray<{
@@ -361,6 +363,7 @@ function publicAppointment(appointment: {
     ...appointment,
     endsAt: appointment.endsAt.toISOString(),
     startsAt: appointment.startsAt.toISOString(),
+    paymentStatus: appointment.paymentStatus.toLowerCase(),
     status: appointment.status.toLowerCase(),
   };
 }

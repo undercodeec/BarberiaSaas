@@ -226,7 +226,15 @@ export default function ClientsScreen() {
         <Text accessibilityRole="header" style={styles.headerTitle}>
           Clientes
         </Text>
-        <View style={styles.headerSpacer} />
+        <Pressable
+          accessibilityLabel="Sincronizar contactos del teléfono"
+          accessibilityRole="button"
+          disabled={isImporting}
+          onPress={() => void importContacts()}
+          style={[styles.iconButton, isImporting && { opacity: 0.55 }]}
+        >
+          <Ionicons color="#101c2d" name="sync-outline" size={23} />
+        </Pressable>
       </View>
 
       <ScrollView

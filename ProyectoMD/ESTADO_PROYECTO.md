@@ -495,3 +495,55 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Resuelto el HTTP 500 de clientes (`P2021`): faltaba `client_label_assignments` porque una migracion ya aplicada no se vuelve a ejecutar al cambiar su archivo.
 - [x] Resuelta la advertencia de Expo Web `Unexpected text node`: se elimino el nodo de texto invalido entre dos modales de `client-detail.tsx`.
 - [x] Verificado: Prisma validate, migraciones, typecheck de API y movil; insercion de cliente probada dentro de una transaccion revertida.
+
+## Actualizacion 2026-07-28 - Notas, historial y nueva reserva
+
+- [x] Notas de cliente persistentes con descripcion y foto opcional: el selector permite tomar foto o cargarla desde el dispositivo.
+- [x] Las fotos se validan antes de enviarse: maximo 1.5 MB y 1600 × 1600 pixeles; la API limita el contenido codificado a 2 MB.
+- [x] La nota se relaciona con el cliente y el usuario autenticado; la API deriva el alcance desde la sesion y no recibe propietarios desde el movil.
+- [x] El panel de nueva nota se cierra tocando fuera o al deslizar su cabecera hacia abajo.
+- [x] Migracion `20260728140000_add_client_notes` aplicada en PostgreSQL local.
+- [x] Historial de reservas con orden real por fecha y filtros para actividad, pagado, cancelado y finalizado.
+- [x] Se agrego `appointments.payment_status` y la migracion `20260728150000_add_appointment_payment_status`, aplicada localmente; el filtro Pagado usa ese dato persistido.
+- [x] Nueva pestaña Comentarios con UI de estrellas, preparada para integrar la captura de reseñas posteriormente.
+- [x] Nueva ruta movil `/new-booking`: Paso 1 de 4 para elegir cliente, buscar por nombre/telefono/correo, continuar sin cliente y acceder al alta de clientes.
+- [x] Desde Nueva reserva, `Añadir cliente` abre el panel en la misma pantalla; incluye los campos adicionales y guarda el cliente asociado al usuario autenticado.
+- [x] Corregido el nodo de texto invalido en Nueva reserva que producia `Unexpected text node` en Expo Web.
+- [x] El boton Nueva cita de Agenda redirige a `/new-booking` cuando existen clientes; si no, conserva el redireccionamiento al directorio.
+- [x] La nueva reserva usa la variante visual negra solicitada, sin el azul de la referencia.
+- [x] Se agrego el acceso de sincronizacion de contactos junto al titulo Clientes, reutilizando la importacion existente.
+- [x] Verificado: typecheck movil, API, Prisma validate, migraciones y `git diff --check`.
+
+## Actualizacion 2026-07-28 - Agenda y lista de espera
+
+- [x] El antiguo boton `Filtrar agenda` fue reemplazado por `Lista espera`, con icono de lista y acceso a la ruta movil `/waitlist`.
+- [x] Se agrego, junto a Lista espera, el boton `Ajustes agenda` con icono de configuracion y mensaje temporal hasta implementar sus opciones.
+- [x] Nueva pantalla movil de Lista de espera con buscador y pestañas `Pendientes`, `Aceptados` y `Rechazados`.
+- [x] Las pestañas cambian visualmente entre sus estados y muestran sus estados vacios; no consumen ni persisten solicitudes porque la logica de reservas aun no existe.
+- [x] El alta de cliente dentro de Nueva reserva incluye Nombre, telefono y el desplegable `Agregar campos adicionales`: apellidos, fecha de nacimiento, direccion, documento y correo.
+- [x] Los campos adicionales de Nueva reserva se envian al endpoint de clientes, se limpian tras guardar y el cliente creado queda seleccionado.
+- [x] Corregido el error de Expo Web `Unexpected text node` registrado en `logs.log`: provenia de un nodo de espacio invalido junto al modal de Nueva reserva.
+- [x] Verificado: `pnpm --filter @barber-saas/mobile typecheck` y `git diff --check` sin errores funcionales.
+
+## Actualizacion 2026-07-28 - Ajustes reales de agenda
+
+- [x] El boton `Ajustes agenda` abre un panel inferior con filtros aplicables de inmediato.
+- [x] El panel permite mostrar las 24 horas o mantener el horario configurado, e incluir o excluir citas canceladas.
+- [x] Las vistas Dia, Semana y Completo consultan citas reales de la fecha, semana o mes respectivo.
+- [x] Los filtros de reservas usan datos persistidos: activa (confirmada, check-in o en proceso), no asistio, pendiente de confirmacion, pagado, en espera, confirmado, en proceso y finalizado.
+- [x] Los miembros se obtienen de `/v1/team`; seleccionar uno filtra por su `professionalMembershipId`.
+- [x] Se creo el estado Prisma `WAITING` para citas en espera y la migracion `20260728160000_add_appointment_waiting_status`, aplicada localmente.
+- [x] La API ahora expone `paymentStatus` en cada cita para que el filtro Pagado use la BD.
+- [x] Los selectores de vista, estado y miembro se presentan como filas horizontales desplazables, con icono y texto.
+- [x] Los filtros se aplican inmediatamente al seleccionar una opcion; se retiro el boton de aplicar.
+- [x] El panel de ajustes se cierra con una animacion suave al tocar fuera o al deslizar la cabecera hacia abajo.
+- [x] Verificado: migracion aplicada, Prisma Client regenerado, typecheck de API y movil, y `git diff --check`.
+
+## Actualizacion 2026-07-28 - Caja
+
+- [x] Nueva ruta movil `/cash-register`, accesible desde el boton Caja de Agenda.
+- [x] Estado inicial de caja cerrada y formulario para abrirla con responsable y dinero base.
+- [x] La caja abierta se persiste; no es informacion temporal, para conservar trazabilidad de ventas, gastos y cierres diarios.
+- [x] Migracion `20260728170000_add_cash_register_sessions` aplicada localmente; conserva responsable, base, fechas y estado de la sesion.
+- [x] Endpoints autenticados para consultar la caja abierta actual y abrir una nueva; se evita abrir dos cajas dentro del mismo alcance.
+- [x] Verificado: typecheck de API y movil, migraciones locales aplicadas y `git diff --check`.

@@ -1,9 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
+  AppointmentsResponse,
   ClientsResponse,
   CurrentOrganizationResponse,
   OnboardingAccountDetailsResponse,
   SchedulesResponse,
+  TeamResponse,
 } from '@barber-saas/api-client';
 import { useQuery } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
@@ -91,6 +93,26 @@ function minuteForTime(value: string | null | undefined): number | null {
     : hours * 60 + minutes;
 }
 
+type AgendaView = 'day' | 'month' | 'week';
+type AgendaStatusFilter =
+  | 'active'
+  | 'all'
+  | 'completed'
+  | 'confirmed'
+  | 'in_progress'
+  | 'no_show'
+  | 'paid'
+  | 'scheduled'
+  | 'waiting';
+
+function localDateValue(date: Date): string {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 
 function timelineMinutes(
@@ -134,6 +156,11 @@ export default function AgendaScreen() {
     queryFn: () => requireApiClient().request<ClientsResponse>('/v1/clients'),
     queryKey: ['clients'],
   });
+  const teamQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () => requireApiClient().request<TeamResponse>('/v1/team'),
+    queryKey: ['team'],
+  });
   const accountQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -154,10 +181,51 @@ export default function AgendaScreen() {
     return Array.from({ length: 7 }, (_, index) => addDays(monday, index));
   }, [selectedDay]);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isAgendaSettingsOpen, setIsAgendaSettingsOpen] = useState(false);
+  const [calendarView, setCalendarView] = useState<AgendaView>('day');
+  const [showAllHours, setShowAllHours] = useState(false);
+  const [showCancelled, setShowCancelled] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<AgendaStatusFilter>('all');
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(today);
   const dayContentOpacity = useRef(new Animated.Value(1)).current;
   const schedulePageSlide = useRef(new Animated.Value(0)).current;
+  const settingsSheetTranslateY = useRef(new Animated.Value(0)).current;
   const isDayTransitioning = useRef(false);
+  const dismissAgendaSettings = useCallback(() => {
+    Animated.timing(settingsSheetTranslateY, {
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      toValue: 520,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsAgendaSettingsOpen(false);
+      settingsSheetTranslateY.setValue(0);
+    });
+  }, [settingsSheetTranslateY]);
+  const settingsSheetPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          gesture.dy > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onPanResponderMove: (_, gesture) => {
+          settingsSheetTranslateY.setValue(Math.max(0, gesture.dy));
+        },
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dy > 80) {
+            dismissAgendaSettings();
+            return;
+          }
+          Animated.spring(settingsSheetTranslateY, {
+            bounciness: 0,
+            speed: 18,
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        },
+      }),
+    [dismissAgendaSettings, settingsSheetTranslateY],
+  );
   const moveSelectedDay = useCallback(
     (offset: number) => {
       if (isDayTransitioning.current) return;
@@ -240,6 +308,34 @@ export default function AgendaScreen() {
       }),
     [dayContentOpacity, moveSelectedDay, schedulePageSlide],
   );
+  const visibleDates = useMemo(() => {
+    if (calendarView === 'day') return [selectedDay];
+    if (calendarView === 'week') {
+      const monday = mondayOfWeek(selectedDay);
+      return Array.from({ length: 7 }, (_, index) => addDays(monday, index));
+    }
+    return daysInMonth(selectedDay);
+  }, [calendarView, selectedDay]);
+  const locationId = organizationQuery.data?.location?.id;
+  const appointmentsQuery = useQuery({
+    enabled: Boolean(session && locationId),
+    queryFn: async () => {
+      const results = await Promise.all(
+        visibleDates.map((date) =>
+          requireApiClient().request<AppointmentsResponse>(
+            `/v1/appointments?date=${localDateValue(date)}&locationId=${locationId}`,
+          ),
+        ),
+      );
+      return results.flatMap((result) => result.appointments);
+    },
+    queryKey: [
+      'agenda-appointments',
+      calendarView,
+      locationId,
+      localDateValue(selectedDay),
+    ],
+  });
   const monthDays = useMemo(() => calendarGrid(calendarMonth), [calendarMonth]);
   const selectedDaySchedules = useMemo(
     () =>
@@ -268,6 +364,27 @@ export default function AgendaScreen() {
     [businessHoursTimeline, selectedDaySchedules],
   );
 
+  const filteredAppointments = useMemo(() => {
+    return (appointmentsQuery.data ?? []).filter((appointment) => {
+      if (!showCancelled && appointment.status === 'cancelled') return false;
+      if (
+        selectedMemberId &&
+        appointment.professionalMembershipId !== selectedMemberId
+      )
+        return false;
+      if (statusFilter === 'all') return true;
+      if (statusFilter === 'active')
+        return ['confirmed', 'checked_in', 'in_progress'].includes(
+          appointment.status,
+        );
+      if (statusFilter === 'paid') return appointment.paymentStatus === 'paid';
+      return appointment.status === statusFilter;
+    });
+  }, [appointmentsQuery.data, selectedMemberId, showCancelled, statusFilter]);
+  const displayedTimeline = showAllHours
+    ? Array.from({ length: 25 }, (_, index) => index * 60)
+    : configuredTimeline;
+
   useEffect(() => {
     setSelectedDay(today);
     setCalendarMonth(today);
@@ -291,19 +408,27 @@ export default function AgendaScreen() {
           </Text>
           <Text style={styles.date}>{selectedLabel}</Text>
         </View>
-        <Pressable
-          accessibilityLabel="Filtrar agenda"
-          accessibilityRole="button"
-          onPress={() =>
-            Alert.alert(
-              'Filtros',
-              'Los filtros estaran disponibles proximamente.',
-            )
-          }
-          style={styles.filterButton}
-        >
-          <Ionicons color="#111318" name="options-outline" size={22} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            accessibilityLabel="Lista espera"
+            accessibilityRole="button"
+            onPress={() => router.push('/waitlist')}
+            style={styles.filterButton}
+          >
+            <Ionicons color="#111318" name="list-outline" size={23} />
+          </Pressable>
+          <Pressable
+            accessibilityLabel="Ajustes agenda"
+            accessibilityRole="button"
+            onPress={() => {
+              settingsSheetTranslateY.setValue(0);
+              setIsAgendaSettingsOpen(true);
+            }}
+            style={styles.filterButton}
+          >
+            <Ionicons color="#111318" name="settings-outline" size={22} />
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.viewControls}>
@@ -383,8 +508,10 @@ export default function AgendaScreen() {
 
       <View style={styles.summary}>
         <View>
-          <Text style={styles.summaryValue}>Sin citas</Text>
-          <Text style={styles.summaryLabel}>para este dia</Text>
+          <Text style={styles.summaryValue}>
+            {filteredAppointments.length} citas
+          </Text>
+          <Text style={styles.summaryLabel}>en la vista seleccionada</Text>
         </View>
         <View style={styles.availability}>
           <View style={styles.availabilityRing}>
@@ -393,7 +520,11 @@ export default function AgendaScreen() {
           <View>
             <Text style={styles.availabilityLabel}>Agenda disponible</Text>
             <Text style={styles.availabilityCopy}>
-              Sin reservas registradas
+              {appointmentsQuery.isLoading
+                ? 'Cargando reservas'
+                : filteredAppointments.length
+                  ? 'Filtros aplicados'
+                  : 'Sin reservas registradas'}
             </Text>
           </View>
         </View>
@@ -412,11 +543,33 @@ export default function AgendaScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.timelineHeader}>
-            <Text style={styles.timelineTitle}>Horario del dia</Text>
+            <Text style={styles.timelineTitle}>Citas y horario</Text>
           </View>
           <View style={styles.timeline}>
-            {configuredTimeline.length ? (
-              configuredTimeline.map((minute) => (
+            {filteredAppointments.map((appointment) => (
+              <View key={appointment.id} style={styles.appointmentCard}>
+                <Text style={styles.appointmentTime}>
+                  {new Date(appointment.startsAt).toLocaleTimeString('es-EC', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </Text>
+                <View style={styles.appointmentCopy}>
+                  <Text style={styles.appointmentClient}>
+                    {appointment.clientName}
+                  </Text>
+                  <Text style={styles.appointmentMeta}>
+                    {appointment.services
+                      .map((service) => service.serviceName)
+                      .join(', ') || 'Sin servicio'}
+                    {' - '}
+                    {appointment.status.replace(/_/gu, ' ')}
+                  </Text>
+                </View>
+              </View>
+            ))}
+            {displayedTimeline.length ? (
+              displayedTimeline.map((minute) => (
                 <View key={minute} style={styles.hourRow}>
                   <Text style={styles.hour}>{formatMinute(minute)}</Text>
                   <View style={styles.hourContent}>
@@ -543,6 +696,222 @@ export default function AgendaScreen() {
         </View>
       </Modal>
 
+      <Modal
+        animationType="fade"
+        onRequestClose={dismissAgendaSettings}
+        transparent
+        visible={isAgendaSettingsOpen}
+      >
+        <View style={styles.settingsOverlay}>
+          <Pressable
+            onPress={dismissAgendaSettings}
+            style={styles.settingsBackdrop}
+          />
+          <Animated.View
+            style={{ transform: [{ translateY: settingsSheetTranslateY }] }}
+          >
+            <ScrollView contentContainerStyle={styles.settingsSheet}>
+              <View
+                {...settingsSheetPanResponder.panHandlers}
+                style={styles.settingsDragArea}
+              >
+                <View style={styles.settingsHandle} />
+              </View>
+              <Text style={styles.settingsTitle}>Ajustes de agenda</Text>
+              {[
+                [
+                  'Ver todas las horas del calendario',
+                  showAllHours,
+                  setShowAllHours,
+                ],
+                ['Mostrar citas canceladas', showCancelled, setShowCancelled],
+              ].map(([label, selected, onChange]) => (
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: Boolean(selected) }}
+                  key={String(label)}
+                  onPress={() =>
+                    (onChange as (value: boolean) => void)(!Boolean(selected))
+                  }
+                  style={styles.checkboxRow}
+                >
+                  <Ionicons
+                    color="#111318"
+                    name={Boolean(selected) ? 'checkbox' : 'square-outline'}
+                    size={23}
+                  />
+                  <Text style={styles.checkboxLabel}>{String(label)}</Text>
+                </Pressable>
+              ))}
+              <Text style={styles.settingsSection}>Vista de calendario</Text>
+              <ScrollView
+                contentContainerStyle={styles.horizontalOptions}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+              >
+                {[
+                  ['Dia', 'day'],
+                  ['Semana', 'week'],
+                  ['Completo', 'month'],
+                ].map(([label, value]) => {
+                  const selected = calendarView === value;
+                  return (
+                    <Pressable
+                      key={value}
+                      onPress={() => setCalendarView(value as AgendaView)}
+                      style={[
+                        styles.optionTile,
+                        selected && styles.optionTileSelected,
+                      ]}
+                    >
+                      <Ionicons
+                        color={selected ? '#FFFFFF' : '#111318'}
+                        name={
+                          value === 'day'
+                            ? 'today-outline'
+                            : value === 'week'
+                              ? 'calendar-outline'
+                              : 'calendar-number-outline'
+                        }
+                        size={23}
+                      />
+                      <Text
+                        style={[
+                          styles.optionTileLabel,
+                          selected && styles.optionTileLabelSelected,
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+              <Text style={styles.settingsSection}>Estado de las reservas</Text>
+              <ScrollView
+                contentContainerStyle={styles.horizontalOptions}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+              >
+                {[
+                  ['Todos', 'all'],
+                  ['Activa', 'active'],
+                  ['No asistio', 'no_show'],
+                  ['Pendiente de confirmacion', 'scheduled'],
+                  ['Pagado', 'paid'],
+                  ['En espera', 'waiting'],
+                  ['Confirmado', 'confirmed'],
+                  ['En proceso', 'in_progress'],
+                  ['Finalizado', 'completed'],
+                ].map(([label, value]) => {
+                  const selected = statusFilter === value;
+                  const icon =
+                    value === 'active'
+                      ? 'pulse-outline'
+                      : value === 'no_show'
+                        ? 'person-remove-outline'
+                        : value === 'scheduled'
+                          ? 'time-outline'
+                          : value === 'paid'
+                            ? 'cash-outline'
+                            : value === 'waiting'
+                              ? 'hourglass-outline'
+                              : value === 'confirmed'
+                                ? 'checkmark-circle-outline'
+                                : value === 'in_progress'
+                                  ? 'sync-outline'
+                                  : value === 'completed'
+                                    ? 'checkmark-done-outline'
+                                    : 'options-outline';
+                  return (
+                    <Pressable
+                      key={value}
+                      onPress={() =>
+                        setStatusFilter(value as AgendaStatusFilter)
+                      }
+                      style={[
+                        styles.optionTile,
+                        selected && styles.optionTileSelected,
+                      ]}
+                    >
+                      <Ionicons
+                        color={selected ? '#FFFFFF' : '#111318'}
+                        name={icon}
+                        size={23}
+                      />
+                      <Text
+                        style={[
+                          styles.optionTileLabel,
+                          selected && styles.optionTileLabelSelected,
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+              <Text style={styles.settingsSection}>Miembros del equipo</Text>
+              <ScrollView
+                contentContainerStyle={styles.horizontalOptions}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+              >
+                <Pressable
+                  onPress={() => setSelectedMemberId(null)}
+                  style={[
+                    styles.optionTile,
+                    !selectedMemberId && styles.optionTileSelected,
+                  ]}
+                >
+                  <Ionicons
+                    color={!selectedMemberId ? '#FFFFFF' : '#111318'}
+                    name="people-outline"
+                    size={23}
+                  />
+                  <Text
+                    style={[
+                      styles.optionTileLabel,
+                      !selectedMemberId && styles.optionTileLabelSelected,
+                    ]}
+                  >
+                    Todos
+                  </Text>
+                </Pressable>
+                {(teamQuery.data?.members ?? []).map((member) => {
+                  const selected = selectedMemberId === member.id;
+                  return (
+                    <Pressable
+                      key={member.id}
+                      onPress={() => setSelectedMemberId(member.id)}
+                      style={[
+                        styles.optionTile,
+                        selected && styles.optionTileSelected,
+                      ]}
+                    >
+                      <Ionicons
+                        color={selected ? '#FFFFFF' : '#111318'}
+                        name="person-outline"
+                        size={23}
+                      />
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.optionTileLabel,
+                          selected && styles.optionTileLabelSelected,
+                        ]}
+                      >
+                        {member.user.fullName}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </ScrollView>
+          </Animated.View>
+        </View>
+      </Modal>
+
       <Pressable
         accessibilityLabel="Crear cita"
         accessibilityRole="button"
@@ -555,10 +924,7 @@ export default function AgendaScreen() {
             router.push('/equipo');
             return;
           }
-          Alert.alert(
-            'Nueva cita',
-            'La creacion de reservas se conectara en el siguiente paso.',
-          );
+          router.push('/new-booking');
         }}
         style={styles.floatingButton}
       >
@@ -586,6 +952,7 @@ export default function AgendaScreen() {
         <Pressable
           accessibilityLabel="Caja"
           accessibilityRole="button"
+          onPress={() => router.push('/cash-register')}
           style={styles.navItem}
         >
           <Ionicons color="#111318" name="receipt-outline" size={24} />
@@ -611,6 +978,83 @@ export default function AgendaScreen() {
 }
 
 const styles = StyleSheet.create({
+  appointmentCard: {
+    backgroundColor: '#EEF0F2',
+    borderLeftColor: '#111318',
+    borderLeftWidth: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 10,
+    padding: 12,
+  },
+  appointmentClient: { color: '#111318', fontSize: 15, fontWeight: '900' },
+  appointmentCopy: { flex: 1 },
+  appointmentMeta: { color: '#666666', fontSize: 12, marginTop: 3 },
+  appointmentTime: { color: '#111318', fontSize: 13, fontWeight: '900' },
+  checkboxLabel: { color: '#111318', flex: 1, fontSize: 15, fontWeight: '700' },
+  checkboxRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 11,
+    marginTop: 16,
+  },
+  optionTile: {
+    alignItems: 'center',
+    backgroundColor: '#F2F3F4',
+    borderColor: '#DDE0E3',
+    borderRadius: 13,
+    borderWidth: 1,
+    justifyContent: 'center',
+    marginTop: 9,
+    height: 82,
+    paddingHorizontal: 10,
+    width: 104,
+  },
+  optionTileLabel: { color: '#111318', fontSize: 14, fontWeight: '800' },
+  optionTileLabelSelected: { color: '#FFFFFF' },
+  optionTileSelected: { backgroundColor: '#111318', borderColor: '#111318' },
+  settingsBackdrop: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  horizontalOptions: { gap: 10, paddingRight: 22, paddingTop: 11 },
+  settingsDragArea: { paddingBottom: 8 },
+  settingsHandle: {
+    alignSelf: 'center',
+    backgroundColor: '#C7CBD0',
+    borderRadius: 3,
+    height: 5,
+    width: 46,
+  },
+  settingsOverlay: {
+    backgroundColor: 'rgba(17, 19, 24, 0.42)',
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  settingsSection: {
+    color: '#111318',
+    fontSize: 16,
+    fontWeight: '900',
+    marginTop: 27,
+  },
+  settingsSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingBottom: 42,
+    paddingHorizontal: 22,
+    paddingTop: 15,
+  },
+  settingsTitle: {
+    color: '#111318',
+    fontSize: 22,
+    fontWeight: '900',
+    marginTop: 17,
+  },
   availability: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   availabilityCopy: { color: '#666666', fontSize: 12, marginTop: 2 },
   availabilityLabel: { color: '#111318', fontSize: 13, fontWeight: '800' },
@@ -670,6 +1114,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 48,
   },
+  headerActions: { flexDirection: 'row', gap: 9 },
   floatingButton: {
     alignItems: 'center',
     backgroundColor: '#111318',

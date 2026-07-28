@@ -104,7 +104,12 @@ export const resendVerificationSchema = z.object({ email: emailSchema });
 
 export const recoverAccessSchema = z.object({ email: emailSchema });
 const optionalProfileText = (maximum: number) =>
-  z.string().trim().max(maximum).nullable().transform((value) => value || null);
+  z
+    .string()
+    .trim()
+    .max(maximum)
+    .nullable()
+    .transform((value) => value || null);
 
 const optionalProfileUrl = z
   .union([z.literal(''), z.string().trim().url().max(2048), z.null()])
@@ -114,14 +119,15 @@ export const updateOnboardingAccountDetailsSchema = z.object({
   addressLine: optionalProfileText(240),
   businessName: businessNameSchema,
   city: z.string().trim().min(2).max(120),
-  countryCode: z.string().regex(/^[A-Z]{2}$/u, 'El c\u00f3digo de pa\u00eds no es v\u00e1lido.'),
+  countryCode: z
+    .string()
+    .regex(/^[A-Z]{2}$/u, 'El c\u00f3digo de pa\u00eds no es v\u00e1lido.'),
   coverImageUri: optionalProfileText(2048),
   description: optionalProfileText(500),
   facebookUrl: optionalProfileUrl,
   instagramUrl: optionalProfileUrl,
   phone: phoneSchema,
 });
-
 
 export const resetPasswordSchema = z.object({
   password: passwordSchema,
@@ -348,6 +354,7 @@ export const cancelAppointmentSchema = z.object({
 
 export const updateAppointmentStatusSchema = z.object({
   status: z.enum([
+    'waiting',
     'confirmed',
     'checked_in',
     'in_progress',
