@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BottomNavigation } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -27,6 +28,7 @@ export default function CashRegisterScreen() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [responsibleId, setResponsibleId] = useState<string | null>(null);
   const [openingAmount, setOpeningAmount] = useState('0');
+  const [isBaseInfoVisible, setIsBaseInfoVisible] = useState(false);
   const cashQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -75,7 +77,7 @@ export default function CashRegisterScreen() {
       <View style={styles.header}>
         <Pressable
           accessibilityLabel="Volver"
-          onPress={() => router.back()}
+          onPress={() => router.replace('/agenda')}
           style={styles.back}
         >
           <Ionicons color="#111827" name="chevron-back" size={24} />
@@ -164,20 +166,26 @@ export default function CashRegisterScreen() {
             <View style={styles.moneyLabel}>
               <Text style={styles.label}>Dinero base</Text>
               <Pressable
-                onPress={() =>
-                  Alert.alert(
-                    'Dinero base',
-                    'Es el efectivo con el que inicia la caja y sirve para calcular el cierre diario.',
-                  )
-                }
+                accessibilityLabel="Informacion sobre dinero base"
+                onPress={() => setIsBaseInfoVisible((visible) => !visible)}
+                style={styles.infoButton}
               >
-                <Ionicons
-                  color="#111827"
-                  name="information-circle-outline"
-                  size={21}
-                />
+                <Text style={styles.infoButtonLabel}>!</Text>
               </Pressable>
             </View>
+            {isBaseInfoVisible ? (
+              <View style={styles.baseInfoBox}>
+                <Ionicons
+                  color="#5D6672"
+                  name="information-circle-outline"
+                  size={18}
+                />
+                <Text style={styles.baseInfo}>
+                  Ingresa el efectivo fisico disponible al iniciar la caja. No
+                  incluyas ventas ni gastos del dia.
+                </Text>
+              </View>
+            ) : null}
             <TextInput
               accessibilityLabel="Dinero base"
               keyboardType="decimal-pad"
@@ -207,11 +215,22 @@ export default function CashRegisterScreen() {
           </View>
         </View>
       </Modal>
+      <BottomNavigation active="cash" />
     </SafeAreaView>
   );
 }
 const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 10, marginTop: 24 },
+  baseInfo: { color: '#5D6672', flex: 1, fontSize: 13, lineHeight: 19 },
+  baseInfoBox: {
+    alignItems: 'flex-start',
+    backgroundColor: '#F1F3F5',
+    borderRadius: 12,
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 9,
+    padding: 11,
+  },
   back: {
     alignItems: 'center',
     height: 44,
@@ -265,6 +284,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 18,
   },
+  infoButton: {
+    alignItems: 'center',
+    backgroundColor: '#111827',
+    borderRadius: 10,
+    height: 20,
+    justifyContent: 'center',
+    width: 20,
+  },
+  infoButtonLabel: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
   icon: {
     alignItems: 'center',
     backgroundColor: '#E5E7EB',

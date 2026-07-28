@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BottomNavigation } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -373,43 +374,7 @@ export default function ClientsScreen() {
         <Ionicons color="#ffffff" name="add" size={29} />
       </Pressable>
 
-      <View style={styles.navigation}>
-        <Pressable
-          accessibilityLabel="Inicio"
-          accessibilityRole="button"
-          onPress={() => router.replace('/dashboard')}
-          style={styles.navItem}
-        >
-          <Ionicons color="#101c2d" name="home-outline" size={24} />
-        </Pressable>
-        <Pressable
-          accessibilityLabel="Agenda"
-          accessibilityRole="button"
-          onPress={() => router.push('/agenda')}
-          style={styles.navItem}
-        >
-          <Ionicons color="#101c2d" name="calendar-outline" size={24} />
-        </Pressable>
-        <Pressable
-          accessibilityLabel="Caja"
-          accessibilityRole="button"
-          style={styles.navItem}
-        >
-          <Ionicons color="#101c2d" name="receipt-outline" size={24} />
-        </Pressable>
-        <View style={[styles.navItem, styles.navActive]}>
-          <Ionicons color="#ffffff" name="people-outline" size={23} />
-          <Text style={styles.navActiveLabel}>Equipo</Text>
-        </View>
-        <Pressable
-          accessibilityLabel="Ajustes"
-          accessibilityRole="button"
-          style={styles.navItem}
-        >
-          <Ionicons color="#101c2d" name="settings-outline" size={24} />
-        </Pressable>
-      </View>
-
+      <BottomNavigation active="team" />
       <Modal
         animationType="none"
         onRequestClose={dismissCreateSheet}

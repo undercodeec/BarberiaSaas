@@ -27,6 +27,7 @@ import {
 } from 'react-native-safe-area-context';
 
 import { DashboardProgress } from '../../src/components/DashboardProgress';
+import { BottomNavigation } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { BookingLinkSheet } from '../../src/components/BookingLinkSheet';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -1025,47 +1026,7 @@ export default function DashboardScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.navigation}>
-        <Pressable
-          accessibilityRole="button"
-          style={[styles.navItem, styles.navActive]}
-        >
-          <Ionicons color="#ffffff" name="home-outline" size={25} />
-          <Text style={styles.navActiveLabel}>Inicio</Text>
-        </Pressable>
-        <Pressable
-          accessibilityLabel="Agenda"
-          accessibilityRole="button"
-          onPress={() => router.push('/agenda')}
-          style={styles.navItem}
-        >
-          <Ionicons color="#101c2d" name="calendar-outline" size={25} />
-        </Pressable>
-        <Pressable
-          accessibilityLabel="Caja"
-          accessibilityRole="button"
-          onPress={() => unavailable('Caja')}
-          style={styles.navItem}
-        >
-          <Ionicons color="#101c2d" name="receipt-outline" size={25} />
-        </Pressable>
-        <Pressable
-          accessibilityLabel="Equipo"
-          accessibilityRole="button"
-          onPress={() => router.push('/equipo')}
-          style={styles.navItem}
-        >
-          <Ionicons color="#101c2d" name="people-outline" size={25} />
-        </Pressable>
-        <Pressable
-          accessibilityLabel="Ajustes"
-          accessibilityRole="button"
-          onPress={() => unavailable('Ajustes')}
-          style={styles.navItem}
-        >
-          <Ionicons color="#101c2d" name="settings-outline" size={25} />
-        </Pressable>
-      </View>
+      <BottomNavigation active="dashboard" />
       <BookingLinkSheet
         onClose={() => setIsBookingSheetOpen(false)}
         url={bookingUrl}

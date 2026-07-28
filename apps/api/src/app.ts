@@ -31,6 +31,7 @@ import { registerAgendaRoutes } from './agenda';
 import { registerCashRegisterRoutes } from './cash-register';
 import { registerClientRoutes } from './clients';
 import { registerOperationsRoutes } from './operations';
+import { registerProfileRoutes } from './profile';
 import type {
   InvitationMailer,
   RecoveryMailer,
@@ -1223,6 +1224,7 @@ export async function buildApi({
   registerAgendaRoutes(app, database, authenticate);
   registerClientRoutes(app, database, authenticate);
   registerCashRegisterRoutes(app, database, authenticate);
+  registerProfileRoutes(app, database, authenticate);
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof ZodError) {

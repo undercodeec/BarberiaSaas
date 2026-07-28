@@ -78,6 +78,8 @@ model User {
   passwordHash           String?                  @map("password_hash") @db.Text
   fullName               String                   @map("full_name") @db.VarChar(120)
   phone                  String?                  @db.VarChar(24)
+  profilePhotoData       String?                  @map("profile_photo_data") @db.Text
+  profileBio             String?                  @map("profile_bio") @db.VarChar(500)
   emailVerifiedAt        DateTime?                @map("email_verified_at") @db.Timestamptz(3)
   locale                 String                   @default("es") @db.VarChar(10)
   createdAt              DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -99,10 +101,22 @@ model User {
   clientNotesCreated      ClientNote[]             @relation("ClientNoteCreator")
   clientLabelsCreated     ClientLabel[]            @relation("ClientLabelCreator")
   clientLabelsUpdated     ClientLabel[]            @relation("ClientLabelUpdater")
+  portfolioItems          UserPortfolioItem[]
 
   @@map("users")
 }
 
+model UserPortfolioItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  photoData String   @map("photo_data") @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("user_portfolio_items")
+}
 model EmailVerificationCode {
   id        String    @id @default(uuid()) @db.Uuid
   userId    String    @map("user_id") @db.Uuid

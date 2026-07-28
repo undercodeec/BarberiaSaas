@@ -547,3 +547,41 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Migracion `20260728170000_add_cash_register_sessions` aplicada localmente; conserva responsable, base, fechas y estado de la sesion.
 - [x] Endpoints autenticados para consultar la caja abierta actual y abrir una nueva; se evita abrir dos cajas dentro del mismo alcance.
 - [x] Verificado: typecheck de API y movil, migraciones locales aplicadas y `git diff --check`.
+
+## Actualizacion 2026-07-28 - Navegacion, Ajustes y perfil de usuario
+
+### Navegacion inferior compartida
+
+- [x] Se creo el componente reutilizable `BottomNavigation` para evitar menus inferiores duplicados.
+- [x] Dashboard, Agenda, Clientes/Equipo, Caja, Ajustes y Edicion de perfil usan el mismo menu flotante.
+- [x] Los accesos Inicio, Agenda, Caja, Equipo y Ajustes navegan a rutas reales y muestran la opcion activa.
+- [x] Se agregaron `elevation` y `zIndex` al menu para impedir que quede oculto por el contenido desplazable en web o Android.
+
+### Correcciones de Caja
+
+- [x] La pagina Caja incluye el menu flotante compartido.
+- [x] El boton de regreso usa la ruta estable `/agenda` y evita la advertencia `GO_BACK` cuando no existe historial de navegacion.
+- [x] El signo de informacion de Dinero base muestra una descripcion dentro del formulario: corresponde al efectivo fisico disponible al abrir la caja, sin incluir ventas ni gastos del dia.
+
+### Pagina de Ajustes
+
+- [x] Se creo la ruta protegida `/settings` con el lenguaje visual negro, blanco y gris del Dashboard.
+- [x] La pantalla muestra perfil del negocio, accesos de aprendizaje y soporte, Mi negocio, promociones, SuperLink, cierre de sesion, borrado de cuenta y version instalada.
+- [x] El bloque `Estadisticas e informes` se ubica inmediatamente debajo de `Mi negocio`; actualmente es una entrada de UI para funcionalidades futuras.
+- [x] `ProyectoMD/prompt/prompt.md` conserva la especificacion detallada de la futura pantalla de estadisticas, historiales e informes; esas rutas y reportes aun no estan implementados.
+- [x] El texto de actualizacion y version se presenta centrado.
+- [x] El menu flotante inferior compartido se renderiza con Ajustes como opcion activa.
+- [x] El lapiz del avatar navega a la nueva ruta `/profile-edit`.
+
+### Edicion de perfil y portafolio
+
+- [x] Se creo la pagina `/profile-edit`, fiel a la paleta visual del Dashboard.
+- [x] Permite editar foto de perfil, nombre, telefono y descripcion `Sobre mi`; el correo se muestra como dato de solo lectura.
+- [x] El portafolio muestra las fotos persistidas y ofrece un boton `+` para tomar una foto o cargarla desde el dispositivo.
+- [x] El movil limita cada imagen a 1.5 MB y 1600 x 1600 pixeles; la API acepta JPEG, PNG o WebP y limita el contenido Base64 a 2 MB.
+- [x] Se agregaron los endpoints autenticados `GET /v1/profile`, `PATCH /v1/profile` y `POST /v1/profile/portfolio`.
+- [x] Los campos `profile_photo_data` y `profile_bio` se almacenan en `users`.
+- [x] El modelo `UserPortfolioItem` relaciona cada foto del portafolio con su usuario mediante `user_id` y eliminacion en cascada.
+- [x] La migracion `20260728180000_add_user_profile_portfolio` fue creada y aplicada en PostgreSQL local.
+- [x] Prisma Client fue regenerado y `prisma migrate status` confirma 25 migraciones aplicadas.
+- [x] Verificado: schema Prisma valido, typecheck de API y movil, `git diff --check` y export web de Expo completado.

@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BottomNavigation } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -932,47 +933,7 @@ export default function AgendaScreen() {
         <Text style={styles.floatingLabel}>Nueva cita</Text>
       </Pressable>
 
-      <View style={styles.navigation}>
-        <Pressable
-          accessibilityLabel="Inicio"
-          accessibilityRole="button"
-          onPress={() => router.replace('/dashboard')}
-          style={styles.navItem}
-        >
-          <Ionicons color="#111318" name="home-outline" size={24} />
-        </Pressable>
-        <Pressable
-          accessibilityLabel="Agenda"
-          accessibilityRole="button"
-          style={[styles.navItem, styles.navActive]}
-        >
-          <Ionicons color="#ffffff" name="calendar-outline" size={23} />
-          <Text style={styles.navActiveLabel}>Agenda</Text>
-        </Pressable>
-        <Pressable
-          accessibilityLabel="Caja"
-          accessibilityRole="button"
-          onPress={() => router.push('/cash-register')}
-          style={styles.navItem}
-        >
-          <Ionicons color="#111318" name="receipt-outline" size={24} />
-        </Pressable>
-        <Pressable
-          accessibilityLabel="Equipo"
-          accessibilityRole="button"
-          onPress={() => router.push('/equipo')}
-          style={styles.navItem}
-        >
-          <Ionicons color="#111318" name="people-outline" size={24} />
-        </Pressable>
-        <Pressable
-          accessibilityLabel="Ajustes"
-          accessibilityRole="button"
-          style={styles.navItem}
-        >
-          <Ionicons color="#111318" name="settings-outline" size={24} />
-        </Pressable>
-      </View>
+      <BottomNavigation active="agenda" />
     </SafeAreaView>
   );
 }

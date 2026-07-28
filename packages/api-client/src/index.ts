@@ -79,6 +79,22 @@ export interface OnboardingAccountDetailsResponse {
   readonly phone: string | null;
 }
 
+export interface UserPortfolioItem {
+  readonly createdAt: string;
+  readonly id: string;
+  readonly photoData: string;
+}
+
+export interface UserProfileResponse {
+  readonly profile: {
+    readonly bio: string | null;
+    readonly email: string;
+    readonly fullName: string;
+    readonly phone: string | null;
+    readonly photoData: string | null;
+    readonly portfolio: readonly UserPortfolioItem[];
+  };
+}
 export interface CashRegisterSession {
   readonly id: string;
   readonly openedAt: string;
