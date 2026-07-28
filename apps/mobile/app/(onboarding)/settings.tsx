@@ -117,23 +117,13 @@ export default function SettingsScreen() {
         <SettingsCard
           description="Gestiona y administra tu negocio"
           icon="storefront-outline"
-          onPress={() =>
-            Alert.alert(
-              'Mi negocio',
-              'La configuracion avanzada estara disponible aqui.',
-            )
-          }
+          onPress={() => router.push('/(onboarding)/business-settings')}
           title="Mi negocio"
         />
         <SettingsCard
           description="Gestiona movimientos, reportes y otros informes que estarán disponibles próximamente."
           icon="bar-chart-outline"
-          onPress={() =>
-            Alert.alert(
-              'Estadísticas e informes',
-              'Los movimientos y reportes estarán disponibles próximamente.',
-            )
-          }
+          onPress={() => router.push('/(onboarding)/reports')}
           title="Estadísticas e informes"
         />
         <View style={styles.welcome}>

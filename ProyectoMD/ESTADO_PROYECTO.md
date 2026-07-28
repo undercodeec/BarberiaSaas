@@ -585,3 +585,12 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] La migracion `20260728180000_add_user_profile_portfolio` fue creada y aplicada en PostgreSQL local.
 - [x] Prisma Client fue regenerado y `prisma migrate status` confirma 25 migraciones aplicadas.
 - [x] Verificado: schema Prisma valido, typecheck de API y movil, `git diff --check` y export web de Expo completado.
+
+## Actualizacion 2026-07-28 - Ajustes del negocio e informes
+
+- [x] Nueva ruta movil `/business-settings`, accesible desde la tarjeta `Mi negocio` de Ajustes.
+- [x] La pantalla secundaria incluye opciones recientes, ajustes del negocio, encabezado fijo, scroll seguro, tarjetas accesibles y los acordeones Nava Flex y Mas opciones.
+- [x] Equipo, edicion de perfil y servicios abren sus modulos existentes; los demas accesos responden con un aviso temporal sin romper la navegacion.
+- [x] Nueva ruta movil `/reports`, accesible desde `Estadisticas e informes`, con las secciones de resumen, caja, ventas y otros reportes solicitadas.
+- [x] Las pantallas nuevas reutilizan la paleta negro, blanco y gris del Dashboard, sin acentos azules.
+- [x] Verificado: typecheck movil y `git diff --check`.
