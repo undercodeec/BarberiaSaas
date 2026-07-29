@@ -39,9 +39,7 @@ export default function SettingsScreen() {
   const account = accountQuery.data;
   const businessName = account?.businessName || 'Tu negocio';
   const bookingUrl = account?.bookingUrl ?? '';
-  const communityUrl = String(
-    Constants.expoConfig?.extra?.communityWhatsappUrl ?? '',
-  );
+
   const version = Constants.expoConfig?.version ?? 'No disponible';
 
   const openExternal = async (url: string, title: string) => {
@@ -75,16 +73,6 @@ export default function SettingsScreen() {
             </Text>
           </View>
           <View style={styles.headerActions}>
-            <IconButton
-              icon="school-outline"
-              label="Centro de aprendizaje"
-              onPress={() =>
-                Alert.alert(
-                  'Centro de aprendizaje',
-                  'Este contenido estara disponible proximamente.',
-                )
-              }
-            />
             <IconButton
               icon="headset-outline"
               label="Soporte"
@@ -125,20 +113,6 @@ export default function SettingsScreen() {
           icon="bar-chart-outline"
           onPress={() => router.push('/(onboarding)/reports')}
           title="Estadísticas e informes"
-        />
-        <View style={styles.welcome}>
-          <Text style={styles.welcomeTitle}>¡Bienvenido a Nava!</Text>
-          <Text style={styles.welcomeCopy}>
-            Descubre todo lo que podemos hacer juntos
-          </Text>
-        </View>
-        <PromoCard
-          description="Unete a nuestra comunidad de WhatsApp y mantente al dia con las ultimas novedades."
-          icon="logo-whatsapp"
-          onPress={() =>
-            void openExternal(communityUrl, 'Comunidad de WhatsApp')
-          }
-          title="¡Unete a nuestra comunidad!"
         />
         <PromoCard
           description="Comparte el enlace de reservas de tu negocio en tus redes sociales y aumenta tus citas."
@@ -468,7 +442,4 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textAlign: 'center',
   },
-  welcome: { alignItems: 'center', marginVertical: 30 },
-  welcomeCopy: { color: '#697483', fontSize: 14, marginTop: 7 },
-  welcomeTitle: { color: '#111827', fontSize: 21, fontWeight: '900' },
 });

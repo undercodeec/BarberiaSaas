@@ -566,7 +566,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 ### Pagina de Ajustes
 
 - [x] Se creo la ruta protegida `/settings` con el lenguaje visual negro, blanco y gris del Dashboard.
-- [x] La pantalla muestra perfil del negocio, accesos de aprendizaje y soporte, Mi negocio, promociones, SuperLink, cierre de sesion, borrado de cuenta y version instalada.
+- [x] La pantalla muestra perfil del negocio, soporte, Mi negocio, promociones, SuperLink, cierre de sesion, borrado de cuenta y version instalada.
 - [x] El bloque `Estadisticas e informes` se ubica inmediatamente debajo de `Mi negocio`; actualmente es una entrada de UI para funcionalidades futuras.
 - [x] `ProyectoMD/prompt/prompt.md` conserva la especificacion detallada de la futura pantalla de estadisticas, historiales e informes; esas rutas y reportes aun no estan implementados.
 - [x] El texto de actualizacion y version se presenta centrado.
@@ -594,3 +594,9 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Nueva ruta movil `/reports`, accesible desde `Estadisticas e informes`, con las secciones de resumen, caja, ventas y otros reportes solicitadas.
 - [x] Las pantallas nuevas reutilizan la paleta negro, blanco y gris del Dashboard, sin acentos azules.
 - [x] Verificado: typecheck movil y `git diff --check`.
+
+## Actualizacion 2026-07-28 - Simplificacion de Ajustes
+
+- [x] Se retiraron de la aplicacion los accesos y mensajes promocionales que no aportan a la operacion del MVP.
+- [x] La bienvenida permanece unicamente en Dashboard mientras la configuracion de cuenta sigue pendiente; explica que desaparecera al completarla y se oculta al registrarse `onboardingCompletedAt`.
+- [x] Verificado: formateo de las pantallas modificadas, typecheck movil y `git diff --check`.

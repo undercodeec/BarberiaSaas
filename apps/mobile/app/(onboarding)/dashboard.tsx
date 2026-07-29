@@ -10,7 +10,6 @@ import {
   Alert,
   Animated,
   Easing,
-  Image,
   Modal,
   PanResponder,
   Platform,
@@ -32,8 +31,6 @@ import { requireApiClient } from '../../src/lib/api';
 import { BookingLinkSheet } from '../../src/components/BookingLinkSheet';
 import { useAuth } from '../../src/providers/AuthProvider';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const communityImage = require('../../assets/Felicidadez.png') as number;
 const MONTH_PROGRESS = 84;
 const WELCOME_SURVEY_RESPONSE_KEY = 'barber-saas.welcome-survey-response';
 const LOCATION_BANNER_KEY = 'barber-saas.location-banner';
@@ -42,7 +39,7 @@ const WELCOME_SURVEY_OPTIONS = [
   'Publicidad',
   'Redes sociales de Nava (Facebook o Instagram)',
   'Buscador',
-  'Recomendaci\u00f3n de una comunidad, academia, clase u otro negocio',
+  'Recomendaci\u00f3n de una academia, clase u otro negocio',
   'Evento o feria',
 ] as const;
 
@@ -718,6 +715,8 @@ export default function DashboardScreen() {
   >(null);
   const [isLocationBannerOpen, setIsLocationBannerOpen] = useState(false);
   const bookingUrl = accountQuery.data?.bookingUrl ?? '';
+  const shouldShowWelcome =
+    accountQuery.isSuccess && !accountQuery.data?.onboardingCompletedAt;
   const unavailable = (title: string) =>
     Alert.alert(
       title,
@@ -971,12 +970,18 @@ export default function DashboardScreen() {
           />
         </View>
 
-        <View style={styles.welcome}>
-          <Text style={styles.welcomeTitle}>{'\u00a1Bienvenido a Nava!'}</Text>
-          <Text style={styles.welcomeCopy}>
-            Descubre todo lo que podemos hacer juntos
-          </Text>
-        </View>
+        {shouldShowWelcome ? (
+          <View style={styles.welcome}>
+            <Text style={styles.welcomeTitle}>
+              {'\u00a1Bienvenido a Nava!'}
+            </Text>
+            <Text style={styles.welcomeCopy}>
+              {
+                'Termina de configurar tu cuenta para comenzar a administrar tu negocio. Este mensaje desaparecer\u00e1 al finalizar la configuraci\u00f3n.'
+              }
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.reservationCard}>
           <View style={styles.cardHeading}>
@@ -1004,25 +1009,6 @@ export default function DashboardScreen() {
               <Text style={styles.openLabel}>Abrir</Text>
             </Pressable>
           </View>
-        </View>
-
-        <View style={styles.communityCard}>
-          <View style={styles.communityCopy}>
-            <Text style={styles.cardTitle}>
-              {'\u00a1\u00danete a nuestra comunidad!'}
-            </Text>
-            <Text style={styles.cardCopy}>
-              {
-                'Consejos, novedades e inspiraci\u00f3n para hacer crecer tu negocio.'
-              }
-            </Text>
-          </View>
-          <Image
-            accessibilityLabel="Comunidad Nava"
-            resizeMode="contain"
-            source={communityImage}
-            style={styles.communityImage}
-          />
         </View>
       </ScrollView>
 
@@ -1076,24 +1062,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: -0.4,
   },
-  communityCard: {
-    backgroundColor: '#eeeff1',
-    borderColor: '#d2d4d8',
-    borderRadius: 30,
-    borderWidth: 1,
-    height: 236,
-    marginTop: 20,
-    overflow: 'hidden',
-    padding: 24,
-  },
-  communityCopy: { maxWidth: '61%', zIndex: 1 },
-  communityImage: {
-    bottom: -72,
-    height: 245,
-    position: 'absolute',
-    right: -30,
-    width: 275,
-  },
+
   content: { paddingBottom: 128, paddingHorizontal: 24, paddingTop: 20 },
   greeting: { color: '#555a63', fontSize: 20, lineHeight: 28 },
   linkBox: {
