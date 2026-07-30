@@ -268,20 +268,20 @@ export function BookingExperience({
   };
 
   return (
-    <main className="min-h-screen bg-[#f4f3ef] text-[#161616] [color-scheme:light]">
+    <main className="min-h-screen overflow-x-hidden bg-[#f4f3ef] text-[#161616] [color-scheme:light]">
       <header className="border-b border-black/8 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
-          <div>
+        <div className="mx-auto flex max-w-6xl min-w-0 items-center justify-between gap-3 px-4 py-4 sm:px-5">
+          <div className="min-w-0">
             <p className="text-xs font-black tracking-[0.2em] uppercase">
               Nava
             </p>
-            <p className="mt-1 text-sm text-black/55">
+            <p className="mt-1 truncate text-sm text-black/55">
               Reservas de {catalog.organization.name}
             </p>
           </div>
           <button
             aria-label={`Volver al inicio de reservas de ${catalog.location.name}`}
-            className="rounded-full bg-black px-4 py-2 text-xs font-bold text-white transition hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+            className="max-w-32 shrink-0 truncate rounded-full bg-black px-3 py-2 text-xs font-bold text-white transition hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black sm:max-w-none sm:px-4"
             onClick={() => setStep('landing')}
             type="button"
           >
@@ -293,8 +293,8 @@ export function BookingExperience({
       {step === 'landing' ? (
         <Landing catalog={catalog} onBook={() => setStep('professional')} />
       ) : (
-        <section className="mx-auto grid max-w-6xl gap-8 px-5 py-8 lg:grid-cols-[1fr_330px]">
-          <div className="rounded-[2rem] bg-white p-5 shadow-[0_24px_80px_rgba(0,0,0,.08)] sm:p-8">
+        <section className="mx-auto grid w-full max-w-6xl min-w-0 gap-6 px-4 py-6 sm:px-5 sm:py-8 lg:grid-cols-[minmax(0,1fr)_330px] lg:gap-8">
+          <div className="min-w-0 rounded-[2rem] bg-white p-4 shadow-[0_24px_80px_rgba(0,0,0,.08)] sm:p-8">
             <Progress step={step} />
             {step === 'professional' ? (
               <>
@@ -305,7 +305,7 @@ export function BookingExperience({
                 <div className="grid gap-3 sm:grid-cols-2">
                   {catalog.professionals.map((item) => (
                     <button
-                      className={`flex items-center gap-4 rounded-2xl border p-4 text-left transition ${
+                      className={`flex min-w-0 items-center gap-4 rounded-2xl border p-4 text-left transition ${
                         professionalId === item.id
                           ? 'border-black bg-black text-white'
                           : 'border-black/10 hover:border-black/30'
@@ -317,10 +317,12 @@ export function BookingExperience({
                       <span className="grid h-12 w-12 place-items-center rounded-full bg-[#ecebe6] font-black text-black">
                         {item.name.slice(0, 1)}
                       </span>
-                      <span>
-                        <span className="block font-black">{item.name}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate font-black">
+                          {item.name}
+                        </span>
                         <span
-                          className={`mt-1 block text-sm ${
+                          className={`mt-1 block truncate text-sm ${
                             professionalId === item.id
                               ? 'text-white/65'
                               : 'text-black/50'
@@ -352,7 +354,7 @@ export function BookingExperience({
                     const selected = serviceIds.includes(service.id);
                     return (
                       <button
-                        className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left ${
+                        className={`flex w-full min-w-0 items-center justify-between gap-3 rounded-2xl border p-4 text-left ${
                           selected
                             ? 'border-black bg-[#f0efe9]'
                             : 'border-black/10'
@@ -361,18 +363,18 @@ export function BookingExperience({
                         onClick={() => toggleService(service.id)}
                         type="button"
                       >
-                        <span>
-                          <span className="block font-black">
+                        <span className="min-w-0">
+                          <span className="block truncate font-black">
                             {service.name}
                           </span>
-                          <span className="mt-1 block text-sm text-black/50">
+                          <span className="mt-1 block truncate text-sm text-black/50">
                             {service.durationMinutes} min
                             {service.description
                               ? ` · ${service.description}`
                               : ''}
                           </span>
                         </span>
-                        <span className="font-black">
+                        <span className="shrink-0 font-black">
                           {money(
                             service.priceCents,
                             catalog.location.currencyCode,
@@ -405,7 +407,7 @@ export function BookingExperience({
                     const selected = dateKey(item) === dateKey(date);
                     return (
                       <button
-                        className={`min-w-16 rounded-2xl border px-3 py-3 ${
+                        className={`min-w-16 shrink-0 rounded-2xl border px-3 py-3 ${
                           selected
                             ? 'border-black bg-black text-white'
                             : 'border-black/10'
@@ -431,7 +433,7 @@ export function BookingExperience({
                 </div>
                 <div
                   aria-label="Filtrar horarios"
-                  className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
+                  className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-4"
                   role="group"
                 >
                   {TIME_OF_DAY_OPTIONS.map((option) => {
@@ -461,7 +463,7 @@ export function BookingExperience({
                     Consultando disponibilidad...
                   </p>
                 ) : (
-                  <div className="mt-4 grid grid-cols-2 gap-2 min-[420px]:grid-cols-3 sm:grid-cols-4 lg:grid-cols-5">
+                  <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                     {visibleSlots.map((slot) => (
                       <button
                         className={`w-full min-w-0 rounded-xl border px-2 py-3 text-sm font-black whitespace-nowrap ${
@@ -774,11 +776,13 @@ function BookingSummary({
   totalMinutes: number;
 }) {
   return (
-    <aside className="h-fit rounded-[2rem] bg-black p-6 text-white lg:sticky lg:top-6">
+    <aside className="h-fit min-w-0 rounded-[2rem] bg-black p-5 text-white sm:p-6 lg:sticky lg:top-6">
       <p className="text-xs font-bold tracking-[0.18em] text-white/45 uppercase">
         Tu cita
       </p>
-      <h2 className="mt-2 text-2xl font-black">{catalog.organization.name}</h2>
+      <h2 className="mt-2 text-2xl font-black break-words">
+        {catalog.organization.name}
+      </h2>
       <dl className="mt-6 space-y-4 text-sm">
         <SummaryItem
           label="Profesional"
@@ -820,9 +824,11 @@ function BookingSummary({
 
 function SummaryItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex gap-4">
-      <dt className="w-20 text-white/45">{label}</dt>
-      <dd className="flex-1 text-right font-bold">{value}</dd>
+    <div className="flex min-w-0 gap-4">
+      <dt className="w-20 shrink-0 text-white/45">{label}</dt>
+      <dd className="min-w-0 flex-1 text-right font-bold break-words">
+        {value}
+      </dd>
     </div>
   );
 }
