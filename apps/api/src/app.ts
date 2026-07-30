@@ -58,7 +58,6 @@ const RESET_DURATION_MS = 30 * 60 * 1000;
 const VERIFICATION_DURATION_MS = 10 * 60 * 1000;
 const VERIFICATION_LOCK_DURATION_MS = 15 * 60 * 1000;
 const MAX_VERIFICATION_ATTEMPTS = 5;
-const BOOKING_BASE_URL = 'https://book.nava.app';
 
 function minuteForRegistrationTime(
   value: string | null | undefined,
@@ -72,8 +71,8 @@ function minuteForRegistrationTime(
   return hours * 60 + minutes;
 }
 
-function publicBookingUrl(slug: string) {
-  return `${BOOKING_BASE_URL}/${slug}`;
+function publicBookingUrl(baseUrl: string, slug: string) {
+  return `${baseUrl.replace(/\/$/u, '')}/${slug}`;
 }
 
 const onboardingCollaboratorParamsSchema = z.object({
@@ -924,6 +923,7 @@ export async function buildApi({
       businessName: profile?.businessName ?? null,
       bookingUrl: profile
         ? publicBookingUrl(
+            config.PUBLIC_WEB_URL,
             membership?.organization.slug ??
               createSlug(profile.businessName).slice(0, 80),
           )
@@ -1017,6 +1017,7 @@ export async function buildApi({
         addressLine: updatedProfile.addressLine,
         businessName: updatedProfile.businessName,
         bookingUrl: publicBookingUrl(
+          config.PUBLIC_WEB_URL,
           activeMembership?.organization.slug ??
             createSlug(updatedProfile.businessName).slice(0, 80),
         ),
@@ -1077,7 +1078,10 @@ export async function buildApi({
             where: { userId: user.id },
           });
         return {
-          bookingUrl: publicBookingUrl(existingMembership.organization.slug),
+          bookingUrl: publicBookingUrl(
+            config.PUBLIC_WEB_URL,
+            existingMembership.organization.slug,
+          ),
           locationId: existingMembership.memberLocations[0]?.locationId ?? null,
           onboardingCompletedAt:
             completedProfile.onboardingCompletedAt!.toISOString(),
@@ -1247,7 +1251,7 @@ export async function buildApi({
         },
       });
       return {
-        bookingUrl: publicBookingUrl(organization.slug),
+        bookingUrl: publicBookingUrl(config.PUBLIC_WEB_URL, organization.slug),
         locationId: location.id,
         onboardingCompletedAt:
           completedProfile.onboardingCompletedAt!.toISOString(),
