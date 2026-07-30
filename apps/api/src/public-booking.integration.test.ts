@@ -238,6 +238,22 @@ integrationDescribe('reservas públicas', () => {
     expect(catalog.json().professionals).toHaveLength(1);
     expect(catalog.json().services).toHaveLength(1);
 
+    const availability = await app.inject({
+      method: 'GET',
+      url: `/v1/public/${organizationSlug}/principal/availability?date=${futureSlot(3, 9).slice(0, 10)}&membershipId=${membershipId}&serviceIds=${serviceId}`,
+    });
+    expect(availability.statusCode).toBe(200);
+    const availabilityBody = availability.json<{
+      durationMinutes: number;
+      slots: ReadonlyArray<{ startsAt: string }>;
+    }>();
+    const slotStartTimes = availabilityBody.slots
+      .slice(0, 3)
+      .map((slot) => Date.parse(slot.startsAt));
+    expect(availabilityBody.durationMinutes).toBe(30);
+    expect(slotStartTimes[1]! - slotStartTimes[0]!).toBe(30 * 60_000);
+    expect(slotStartTimes[2]! - slotStartTimes[1]!).toBe(30 * 60_000);
+
     const startsAt = futureSlot(3, 10);
     const management = await createAndVerifyBooking(
       `public-booking-${randomUUID()}`,

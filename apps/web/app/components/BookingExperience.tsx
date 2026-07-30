@@ -17,6 +17,23 @@ type Step =
   | 'verify'
   | 'confirmed';
 
+type TimeOfDay = 'afternoon' | 'all' | 'evening' | 'morning';
+
+const TIME_OF_DAY_OPTIONS: ReadonlyArray<{
+  id: TimeOfDay;
+  label: string;
+  matches: (hour: number) => boolean;
+}> = [
+  { id: 'all', label: 'Todo el día', matches: () => true },
+  { id: 'morning', label: 'Mañana', matches: (hour) => hour < 12 },
+  {
+    id: 'afternoon',
+    label: 'Tarde',
+    matches: (hour) => hour >= 12 && hour < 18,
+  },
+  { id: 'evening', label: 'Noche', matches: (hour) => hour >= 18 },
+];
+
 function dateKey(date: Date) {
   return [
     date.getFullYear(),
@@ -42,6 +59,16 @@ function money(cents: number, currency: string) {
   }).format(cents / 100);
 }
 
+function hourAtLocation(isoDate: string, timezone: string) {
+  return Number(
+    new Intl.DateTimeFormat('en-US', {
+      hour: '2-digit',
+      hourCycle: 'h23',
+      timeZone: timezone,
+    }).format(new Date(isoDate)),
+  );
+}
+
 async function readError(response: Response) {
   const body = (await response.json().catch(() => null)) as {
     message?: string;
@@ -63,6 +90,7 @@ export function BookingExperience({
     ReadonlyArray<{ endsAt: string; startsAt: string }>
   >([]);
   const [startsAt, setStartsAt] = useState<string | null>(null);
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const countries = useMemo(
@@ -110,6 +138,14 @@ export function BookingExperience({
     (country) => country.isoCode === countryCode,
   );
   const normalizedPhone = `+${selectedCountry?.phonecode.replace(/\D/gu, '') ?? ''}${phone.replace(/\D/gu, '')}`;
+  const visibleSlots = slots.filter((slot) => {
+    const option = TIME_OF_DAY_OPTIONS.find((item) => item.id === timeOfDay);
+    return (
+      option?.matches(
+        hourAtLocation(slot.startsAt, catalog.location.timezone),
+      ) ?? false
+    );
+  });
 
   const chooseProfessional = (id: string) => {
     setProfessionalId(id);
@@ -243,9 +279,14 @@ export function BookingExperience({
               Reservas de {catalog.organization.name}
             </p>
           </div>
-          <div className="rounded-full bg-black px-4 py-2 text-xs font-bold text-white">
+          <button
+            aria-label={`Volver al inicio de reservas de ${catalog.location.name}`}
+            className="rounded-full bg-black px-4 py-2 text-xs font-bold text-white transition hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+            onClick={() => setStep('landing')}
+            type="button"
+          >
             {catalog.location.name}
-          </div>
+          </button>
         </div>
       </header>
 
@@ -388,15 +429,42 @@ export function BookingExperience({
                     );
                   })}
                 </div>
+                <div
+                  aria-label="Filtrar horarios"
+                  className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
+                  role="group"
+                >
+                  {TIME_OF_DAY_OPTIONS.map((option) => {
+                    const selected = timeOfDay === option.id;
+                    return (
+                      <button
+                        aria-pressed={selected}
+                        className={`min-w-0 rounded-xl border px-2 py-2.5 text-xs font-black transition sm:text-sm ${
+                          selected
+                            ? 'border-black bg-black text-white'
+                            : 'border-black/10 bg-white text-black hover:border-black/30'
+                        }`}
+                        key={option.id}
+                        onClick={() => {
+                          setTimeOfDay(option.id);
+                          setStartsAt(null);
+                        }}
+                        type="button"
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
                 {loading ? (
                   <p className="py-8 text-center text-black/50">
                     Consultando disponibilidad...
                   </p>
                 ) : (
-                  <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-5">
-                    {slots.map((slot) => (
+                  <div className="mt-4 grid grid-cols-2 gap-2 min-[420px]:grid-cols-3 sm:grid-cols-4 lg:grid-cols-5">
+                    {visibleSlots.map((slot) => (
                       <button
-                        className={`rounded-xl border px-3 py-3 text-sm font-black ${
+                        className={`w-full min-w-0 rounded-xl border px-2 py-3 text-sm font-black whitespace-nowrap ${
                           startsAt === slot.startsAt
                             ? 'border-black bg-black text-white'
                             : 'border-black/10'
@@ -408,14 +476,19 @@ export function BookingExperience({
                         {new Date(slot.startsAt).toLocaleTimeString('es-EC', {
                           hour: '2-digit',
                           minute: '2-digit',
+                          timeZone: catalog.location.timezone,
                         })}
                       </button>
                     ))}
                   </div>
                 )}
-                {!loading && !slots.length ? (
+                {!loading && !visibleSlots.length ? (
                   <p className="rounded-2xl bg-[#f4f3ef] p-5 text-center text-sm text-black/55">
-                    No hay espacios disponibles en esta fecha.
+                    No hay horarios disponibles durante la{' '}
+                    {TIME_OF_DAY_OPTIONS.find(
+                      (item) => item.id === timeOfDay,
+                    )?.label.toLowerCase()}
+                    .
                   </p>
                 ) : null}
                 <NextButton

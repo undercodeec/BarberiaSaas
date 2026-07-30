@@ -387,7 +387,7 @@ async function calculatePublicAvailability(
     for (
       let minute = startMinute;
       minute + durationMinutes <= endMinute;
-      minute += 5
+      minute += durationMinutes
     ) {
       const startsAt = zonedDateTimeToUtc(
         input.date,
