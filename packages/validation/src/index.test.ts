@@ -2,14 +2,18 @@ import { describe, expect, it } from 'vitest';
 
 import {
   appEnvironmentSchema,
+  businessScheduleDaySchema,
   createOnboardingCollaboratorSchema,
+  createPublicBookingSchema,
   createTeamInvitationSchema,
   createServiceSchema,
   createAppointmentSchema,
   createSlug,
   locationOnboardingSchema,
   publicApiConfigSchema,
+  replaceBusinessScheduleSchema,
   signUpSchema,
+  updateBookingSettingsSchema,
   verifyEmailSchema,
   weeklyScheduleIntervalSchema,
 } from './index';
@@ -21,6 +25,43 @@ describe('esquemas de entorno', () => {
 
   it('rechaza una URL pública inválida', () => {
     expect(() => publicApiConfigSchema.parse({ url: 'incorrecta' })).toThrow();
+  });
+});
+
+describe('reglas de reservas públicas', () => {
+  const settings = {
+    cancellationLeadMinutes: 120,
+    confirmationDeadlineMinutes: 360,
+    confirmationEnabled: true,
+    policyText: 'Acepto asistir puntualmente y respetar las reglas informadas.',
+    reminderMinutes: 1440,
+    rescheduleLeadMinutes: 120,
+    unconfirmedAction: 'keep',
+  } as const;
+
+  it('exige que el plazo de respuesta ocurra después del recordatorio', () => {
+    expect(updateBookingSettingsSchema.safeParse(settings).success).toBe(true);
+    expect(
+      updateBookingSettingsSchema.safeParse({
+        ...settings,
+        confirmationDeadlineMinutes: settings.reminderMinutes,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rechaza un servicio repetido dentro de la misma cita', () => {
+    const serviceId = 'c7b4e705-a4a8-4337-a2a7-a8147b44be07';
+    expect(
+      createPublicBookingSchema.safeParse({
+        email: 'cliente@example.com',
+        fullName: 'Cliente Público',
+        membershipId: 'ac2c28df-8da1-4716-af55-f38ac99d57af',
+        phone: '+593999999999',
+        policyAccepted: true,
+        serviceIds: [serviceId, serviceId],
+        startsAt: '2026-08-10T15:00:00.000Z',
+      }).success,
+    ).toBe(false);
   });
 });
 
@@ -49,6 +90,38 @@ describe('servicios y horarios', () => {
     expect(
       weeklyScheduleIntervalSchema.safeParse({
         endMinute: 480,
+        startMinute: 600,
+        weekday: 1,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('valida una semana completa del negocio', () => {
+    const days = Array.from({ length: 7 }, (_, weekday) => ({
+      endMinute: 1080,
+      isOpen: weekday !== 0,
+      startMinute: 540,
+      weekday,
+    }));
+    expect(
+      replaceBusinessScheduleSchema.safeParse({
+        days,
+        locationId: '00000000-0000-4000-8000-000000000001',
+      }).success,
+    ).toBe(true);
+    expect(
+      replaceBusinessScheduleSchema.safeParse({
+        days: days.map((day) => ({ ...day, weekday: 1 })),
+        locationId: '00000000-0000-4000-8000-000000000001',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rechaza un horario general con cierre anterior a la apertura', () => {
+    expect(
+      businessScheduleDaySchema.safeParse({
+        endMinute: 480,
+        isOpen: true,
         startMinute: 600,
         weekday: 1,
       }).success,
@@ -156,6 +229,24 @@ describe('autenticación y onboarding', () => {
         phone: '+593999999999',
       }).success,
     ).toBe(true);
+  });
+
+  it('rechaza un horario de registro que cierre antes de abrir', () => {
+    expect(
+      signUpSchema.safeParse({
+        accountType: 'professional',
+        businessName: 'Estudio nocturno',
+        city: 'Quito',
+        closingTime: '09:00',
+        confirmPassword: 'clave-segura',
+        countryCode: 'EC',
+        email: 'nocturno@example.com',
+        fullName: 'Ana Due\u00f1a',
+        openingTime: '18:00',
+        password: 'clave-segura',
+        phone: '+593988888888',
+      }).success,
+    ).toBe(false);
   });
 
   it('solo acepta códigos de verificación de seis dígitos', () => {

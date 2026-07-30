@@ -1,9 +1,10 @@
 import {
   AppointmentEventType,
-  AppointmentPaymentStatus,
+  AppointmentSource,
   AppointmentStatus,
   MembershipRole,
   MembershipStatus,
+  type AppointmentPaymentStatus,
   type DatabaseClient,
 } from '@barber-saas/database';
 import {
@@ -159,7 +160,7 @@ function overlaps(
   return startsAt < blockedEndsAt && endsAt > blockedStartsAt;
 }
 
-async function loadBookingContext(
+export async function loadBookingContext(
   database: DatabaseClient,
   organizationId: string,
   locationId: string,
@@ -174,7 +175,6 @@ async function loadBookingContext(
       where: {
         id: professionalMembershipId,
         organizationId,
-        role: MembershipRole.BARBER,
         status: { in: [MembershipStatus.ACTIVE, MembershipStatus.INVITED] },
       },
     }),
@@ -244,7 +244,7 @@ async function loadBookingContext(
   return { location, professional, snapshots };
 }
 
-async function assertBookable(
+export async function assertBookable(
   database: DatabaseClient,
   input: {
     endsAt: Date;
@@ -266,13 +266,47 @@ async function assertBookable(
       'La cita debe comenzar y terminar dentro de la misma jornada.',
     );
   }
-  const schedules = await database.weeklySchedule.findMany({
-    where: {
-      locationId: input.locationId,
-      membershipId: input.professionalMembershipId,
-      weekday: weekdayFor(localDate),
-    },
-  });
+  const weekday = weekdayFor(localDate);
+  const [schedules, businessSchedule] = await Promise.all([
+    database.weeklySchedule.findMany({
+      where: {
+        locationId: input.locationId,
+        membershipId: input.professionalMembershipId,
+        weekday,
+      },
+    }),
+    database.businessWeeklySchedule.findUnique({
+      where: {
+        locationId_weekday: {
+          locationId: input.locationId,
+          weekday,
+        },
+      },
+    }),
+  ]);
+  const businessStart = businessSchedule
+    ? zonedDateTimeToUtc(
+        localDate,
+        businessSchedule.startMinute,
+        input.timeZone,
+      )
+    : null;
+  const businessEnd = businessSchedule
+    ? zonedDateTimeToUtc(localDate, businessSchedule.endMinute, input.timeZone)
+    : null;
+  if (
+    !businessSchedule?.isOpen ||
+    !businessStart ||
+    !businessEnd ||
+    input.startsAt < businessStart ||
+    input.endsAt > businessEnd
+  ) {
+    throw new ApiError(
+      400,
+      'OUTSIDE_BUSINESS_HOURS',
+      'El horario seleccionado está fuera del horario del negocio.',
+    );
+  }
   const insideWorkingHours = schedules.some((schedule) => {
     const scheduleStart = zonedDateTimeToUtc(
       localDate,
@@ -330,16 +364,42 @@ async function assertBookable(
   }
 }
 
-function isAppointmentConflict(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
+function errorDetails(
+  error: unknown,
+  seen = new Set<object>(),
+  depth = 0,
+): string {
+  if (error === null || error === undefined) return '';
+  if (typeof error !== 'object') return String(error);
+  if (seen.has(error) || depth > 4) return '';
+  seen.add(error);
+  const values = Object.getOwnPropertyNames(error).map((property) => {
+    try {
+      return errorDetails(
+        (error as Record<string, unknown>)[property],
+        seen,
+        depth + 1,
+      );
+    } catch {
+      return '';
+    }
+  });
+  return [String(error), ...values].join(' ');
+}
+
+export function isAppointmentConflict(error: unknown): boolean {
+  const details = errorDetails(error).toLowerCase();
   return (
-    error.message.includes('appointments_no_professional_overlap') ||
-    error.message.includes('23P01') ||
-    error.message.toLowerCase().includes('exclusion constraint')
+    details.includes('appointments_no_professional_overlap') ||
+    details.includes('23p01') ||
+    details.includes('exclusion constraint') ||
+    details.includes('write conflict') ||
+    details.includes('p2034')
   );
 }
 
-function publicAppointment(appointment: {
+export function publicAppointment(appointment: {
+  clientId?: string | null;
   clientEmail: string | null;
   clientName: string;
   clientPhone: string | null;
@@ -351,6 +411,7 @@ function publicAppointment(appointment: {
   paymentStatus: AppointmentPaymentStatus;
   startsAt: Date;
   status: AppointmentStatus;
+  source?: AppointmentSource;
   services?: ReadonlyArray<{
     durationMinutes: number;
     id: string;
@@ -360,10 +421,19 @@ function publicAppointment(appointment: {
   }>;
 }) {
   return {
-    ...appointment,
+    clientEmail: appointment.clientEmail,
+    clientId: appointment.clientId ?? null,
+    clientName: appointment.clientName,
+    clientPhone: appointment.clientPhone,
     endsAt: appointment.endsAt.toISOString(),
+    id: appointment.id,
+    locationId: appointment.locationId,
+    notes: appointment.notes,
     startsAt: appointment.startsAt.toISOString(),
     paymentStatus: appointment.paymentStatus.toLowerCase(),
+    professionalMembershipId: appointment.professionalMembershipId,
+    services: appointment.services ?? [],
+    source: appointment.source?.toLowerCase() ?? 'manual',
     status: appointment.status.toLowerCase(),
   };
 }
@@ -404,31 +474,43 @@ export function registerAgendaRoutes(
       context.location.timezone,
     );
     const weekday = weekdayFor(input.date);
-    const [schedules, blocks, appointments] = await Promise.all([
-      database.weeklySchedule.findMany({
-        orderBy: { startMinute: 'asc' },
-        where: {
-          locationId: input.locationId,
-          membershipId: input.membershipId,
-          weekday,
-        },
-      }),
-      database.scheduleBlock.findMany({
-        where: {
-          endsAt: { gt: dayStart },
-          membershipId: input.membershipId,
-          startsAt: { lt: dayEnd },
-        },
-      }),
-      database.appointment.findMany({
-        where: {
-          endsAt: { gt: dayStart },
-          professionalMembershipId: input.membershipId,
-          reservesSlot: true,
-          startsAt: { lt: dayEnd },
-        },
-      }),
-    ]);
+    const [schedules, businessSchedule, blocks, appointments] =
+      await Promise.all([
+        database.weeklySchedule.findMany({
+          orderBy: { startMinute: 'asc' },
+          where: {
+            locationId: input.locationId,
+            membershipId: input.membershipId,
+            weekday,
+          },
+        }),
+        database.businessWeeklySchedule.findUnique({
+          where: {
+            locationId_weekday: {
+              locationId: input.locationId,
+              weekday,
+            },
+          },
+        }),
+        database.scheduleBlock.findMany({
+          where: {
+            endsAt: { gt: dayStart },
+            membershipId: input.membershipId,
+            startsAt: { lt: dayEnd },
+          },
+        }),
+        database.appointment.findMany({
+          where: {
+            endsAt: { gt: dayStart },
+            professionalMembershipId: input.membershipId,
+            reservesSlot: true,
+            startsAt: { lt: dayEnd },
+          },
+        }),
+      ]);
+    if (!businessSchedule?.isOpen) {
+      return { durationMinutes, slots: [] };
+    }
     const occupied = [
       ...blocks.map((block) => ({
         endsAt: block.endsAt,
@@ -441,14 +523,22 @@ export function registerAgendaRoutes(
     ];
     const slots: { endsAt: string; startsAt: string }[] = [];
     for (const schedule of schedules) {
+      const effectiveStartMinute = Math.max(
+        schedule.startMinute,
+        businessSchedule.startMinute,
+      );
+      const effectiveEndMinute = Math.min(
+        schedule.endMinute,
+        businessSchedule.endMinute,
+      );
       const scheduleEnd = zonedDateTimeToUtc(
         input.date,
-        schedule.endMinute,
+        effectiveEndMinute,
         context.location.timezone,
       );
       for (
-        let minute = schedule.startMinute;
-        minute + durationMinutes <= schedule.endMinute;
+        let minute = effectiveStartMinute;
+        minute + durationMinutes <= effectiveEndMinute;
         minute += 5
       ) {
         const startsAt = zonedDateTimeToUtc(
@@ -501,6 +591,12 @@ export function registerAgendaRoutes(
       where: {
         locationId: input.locationId,
         organizationId: current.organizationId,
+        status: {
+          notIn: [
+            AppointmentStatus.PENDING_VERIFICATION,
+            AppointmentStatus.EXPIRED,
+          ],
+        },
         startsAt: { gte: dayStart, lt: dayEnd },
         ...(targetMembershipId
           ? { professionalMembershipId: targetMembershipId }
@@ -519,6 +615,29 @@ export function registerAgendaRoutes(
     );
     const input = createAppointmentSchema.parse(request.body);
     assertProfessionalScope(current, input.professionalMembershipId);
+    const selectedClient = input.clientId
+      ? await database.client.findFirst({
+          where: {
+            deletedAt: null,
+            id: input.clientId,
+            organizationId: current.organizationId,
+          },
+        })
+      : null;
+    if (input.clientId && !selectedClient) {
+      throw new ApiError(
+        404,
+        'CLIENT_NOT_FOUND',
+        'El cliente seleccionado no existe.',
+      );
+    }
+    const clientName = selectedClient
+      ? [selectedClient.fullName, selectedClient.lastName]
+          .filter(Boolean)
+          .join(' ')
+      : input.clientName!;
+    const clientEmail = selectedClient?.email ?? input.clientEmail ?? null;
+    const clientPhone = selectedClient?.phone ?? input.clientPhone ?? null;
     const context = await loadBookingContext(
       database,
       current.organizationId,
@@ -543,15 +662,19 @@ export function registerAgendaRoutes(
       const appointment = await database.$transaction(async (transaction) => {
         const created = await transaction.appointment.create({
           data: {
-            clientEmail: input.clientEmail || null,
-            clientName: input.clientName,
-            clientPhone: input.clientPhone ?? null,
+            clientEmail,
+            clientId: selectedClient?.id ?? null,
+            clientName,
+            clientPhone,
             createdByUserId: user.id,
             endsAt,
             locationId: input.locationId,
             notes: input.notes ?? null,
             organizationId: current.organizationId,
             professionalMembershipId: input.professionalMembershipId,
+            source: selectedClient
+              ? AppointmentSource.MANUAL
+              : AppointmentSource.WALK_IN,
             services: {
               create: context.snapshots.map((service) => ({
                 durationMinutes: service.durationMinutes,

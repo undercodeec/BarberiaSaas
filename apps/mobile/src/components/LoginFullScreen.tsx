@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { type SignInInput, signInSchema } from '@barber-saas/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Controller, useForm } from 'react-hook-form';
 import { Image, ImageBackground, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
@@ -16,7 +16,7 @@ const loginBackground = require('../../assets/loginbanner.png') as number;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const logoImage = require('../../assets/nava-logo.png') as number;
 
-export function LoginFullScreen({ invitationToken }: { readonly invitationToken?: string | undefined }) {
+export function LoginFullScreen() {
   const router = useRouter();
   const { signIn } = useAuth();
   const { height, width } = useWindowDimensions();
@@ -26,7 +26,7 @@ export function LoginFullScreen({ invitationToken }: { readonly invitationToken?
   const { control, handleSubmit, formState } = useForm<SignInInput>({ defaultValues: { email: '', password: '' }, resolver: zodResolver(signInSchema) });
   const submit = handleSubmit(async (input) => {
     setFormError(null);
-    try { await signIn(input); router.replace(invitationToken ? { params: { token: invitationToken }, pathname: '/(onboarding)/accept-invitation' } : '/'); }
+    try { await signIn(input); router.replace('/'); }
     catch (error) { setFormError(error instanceof Error ? error.message : 'No fue posible iniciar sesión.'); }
   });
   return <ImageBackground imageStyle={styles.backgroundImage} resizeMode="cover" source={loginBackground} style={[styles.background, { minHeight: height, width }]}>
@@ -35,14 +35,13 @@ export function LoginFullScreen({ invitationToken }: { readonly invitationToken?
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboard}>
         <ScrollView contentContainerStyle={[styles.content, { minHeight: height }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <Pressable accessibilityRole="button" onPress={() => router.replace('/')} style={styles.backButton}><Ionicons color="#ffffff" name="arrow-back" size={23} /><Text style={styles.backLabel}>Regresar al inicio</Text></Pressable>
-          <View style={[styles.brand, compact ? styles.brandCompact : null]}><Image accessibilityLabel="Nava" resizeMode="contain" source={logoImage} style={styles.brandName} /><Text style={styles.brandMessage}>Bienvenido de nuevo</Text></View>
+          <View style={[styles.brand, compact ? styles.brandCompact : null]}><Image accessibilityLabel="Nava" resizeMode="contain" source={logoImage} style={[styles.brandName, { tintColor: '#ffffff' }]} /><Text style={styles.brandMessage}>Bienvenido de nuevo</Text></View>
           <View style={styles.formCard}>
             <Text accessibilityRole="header" style={styles.title}>Iniciar sesión</Text>
             <Text style={styles.subtitle}>Ingresa tus datos para continuar.</Text>
             {formError ? <Text accessibilityRole="alert" style={styles.formError}>{formError}</Text> : null}
             <Controller control={control} name="email" render={({ field, fieldState }) => <View style={styles.field}><Text style={styles.label}>Correo electrónico</Text><View style={[styles.inputShell, fieldState.error ? styles.inputError : null]}><Ionicons color="#667080" name="mail-outline" size={21} /><TextInput autoCapitalize="none" autoComplete="email" keyboardType="email-address" onBlur={field.onBlur} onChangeText={field.onChange} placeholder="correo@ejemplo.com" placeholderTextColor="#98a0ab" style={styles.input} value={field.value} /></View>{fieldState.error ? <Text accessibilityRole="alert" style={styles.fieldError}>{fieldState.error.message}</Text> : null}</View>} />
             <Controller control={control} name="password" render={({ field, fieldState }) => <View style={styles.field}><Text style={styles.label}>Contraseña</Text><View style={[styles.inputShell, fieldState.error ? styles.inputError : null]}><Ionicons color="#667080" name="lock-closed-outline" size={21} /><TextInput autoComplete="current-password" onBlur={field.onBlur} onChangeText={field.onChange} placeholder="Ingresa tu contraseña" placeholderTextColor="#98a0ab" secureTextEntry={!showPassword} style={styles.input} value={field.value} /><Pressable accessibilityLabel={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'} onPress={() => setShowPassword((current) => !current)}><Ionicons color="#667080" name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={22} /></Pressable></View>{fieldState.error ? <Text accessibilityRole="alert" style={styles.fieldError}>{fieldState.error.message}</Text> : null}</View>} />
-            <Link href="/(auth)/recover" style={[styles.forgot, { color: '#101c2d' }]}>¿Olvidaste tu contraseña?</Link>
             <NavaButton disabled={formState.isSubmitting} icon="log-in-outline" label="Iniciar sesión" loading={formState.isSubmitting} onPress={() => void submit()} style={styles.loginButton} variant="primary" />
             <Pressable accessibilityRole="button" onPress={() => router.replace('/')} style={styles.homeButton}><Ionicons color="#101c2d" name="home-outline" size={20} /><Text style={styles.homeLabel}>Regresar al inicio</Text></Pressable>
           </View>

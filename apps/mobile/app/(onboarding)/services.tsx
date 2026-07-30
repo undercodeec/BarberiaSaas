@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import type { OnboardingAccountDetailsResponse } from '@barber-saas/api-client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -26,34 +27,67 @@ import { requireApiClient } from '../../src/lib/api';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const servicesImage = require('../../assets/imagenServicios.png') as number;
 
-interface StoredService extends ServiceDraft { readonly id: string }
+interface StoredService extends ServiceDraft {
+  readonly id: string;
+}
 
 export default function ServicesOnboardingScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const { height, width } = useWindowDimensions();
-  const compact = height < 740;
+  const compact = height < 850;
   const [serviceSheetOpen, setServiceSheetOpen] = useState(false);
-  const [editingService, setEditingService] = useState<StoredService | null>(null);
+  const [editingService, setEditingService] = useState<StoredService | null>(
+    null,
+  );
   const [requestError, setRequestError] = useState<string | null>(null);
-  const servicesQuery = useQuery({ enabled: Boolean(session), queryFn: () => requireApiClient().request<{ readonly services: readonly StoredService[] }>('/v1/onboarding/services'), queryKey: ['onboarding-services'] });
+  const servicesQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<{
+        readonly services: readonly StoredService[];
+      }>('/v1/onboarding/services'),
+    queryKey: ['onboarding-services'],
+  });
+  const accountQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<OnboardingAccountDetailsResponse>(
+        '/v1/onboarding/account-details',
+      ),
+    queryKey: ['onboarding-account-details', user?.id],
+  });
   const services = servicesQuery.data?.services ?? [];
+  const isSolo = accountQuery.data?.accountType === 'professional';
 
   if (!session) return <Redirect href="/(auth)/login" />;
 
   const saveService = async (service: ServiceDraft) => {
     setRequestError(null);
-    if (editingService) await requireApiClient().request(`/v1/onboarding/services/${editingService.id}`, { body: service, method: 'PATCH' });
-    else await requireApiClient().request('/v1/onboarding/services', { body: service, method: 'POST' });
+    if (editingService)
+      await requireApiClient().request(
+        `/v1/onboarding/services/${editingService.id}`,
+        { body: service, method: 'PATCH' },
+      );
+    else
+      await requireApiClient().request('/v1/onboarding/services', {
+        body: service,
+        method: 'POST',
+      });
     await queryClient.invalidateQueries({ queryKey: ['onboarding-services'] });
-    setEditingService(null); setServiceSheetOpen(false);
+    setEditingService(null);
+    setServiceSheetOpen(false);
   };
   const deleteService = async (service: StoredService) => {
     setRequestError(null);
-    await requireApiClient().request<void>(`/v1/onboarding/services/${service.id}`, { method: 'DELETE' });
+    await requireApiClient().request<void>(
+      `/v1/onboarding/services/${service.id}`,
+      { method: 'DELETE' },
+    );
     await queryClient.invalidateQueries({ queryKey: ['onboarding-services'] });
-    setEditingService(null); setServiceSheetOpen(false);
+    setEditingService(null);
+    setServiceSheetOpen(false);
   };
 
   return (
@@ -89,11 +123,10 @@ export default function ServicesOnboardingScreen() {
           <Text style={styles.eyebrow}>Configura tu cuenta</Text>
 
           <View
-            accessibilityLabel="Paso 2 de 4"
+            accessibilityLabel="Paso 1 de 3"
             accessibilityRole="progressbar"
             style={styles.progress}
           >
-            <View style={styles.completedStep} />
             <View style={styles.activeStep} />
             <View style={styles.step} />
             <View style={styles.step} />
@@ -114,11 +147,14 @@ export default function ServicesOnboardingScreen() {
 
           <View style={styles.copy}>
             <Text accessibilityRole="header" style={styles.title}>
-              Crea los servicios de tu negocio
+              {isSolo
+                ? 'Crea tus servicios'
+                : 'Crea los servicios de tu negocio'}
             </Text>
             <Text style={styles.description}>
-              Configura los servicios que ofrecerá tu equipo, indicando su
-              duración y precio para que tus clientes puedan reservarlos.
+              {isSolo
+                ? 'Configura lo que ofrecerás, indicando duración y precio para que tus clientes puedan reservar.'
+                : 'Configura los servicios que ofrecerá tu equipo, indicando duración y precio para que tus clientes puedan reservarlos.'}
             </Text>
           </View>
 
@@ -128,13 +164,75 @@ export default function ServicesOnboardingScreen() {
             label={
               services.length > 0 ? 'Añadir otro servicio' : 'Añadir servicio'
             }
-            onPress={() => { setEditingService(null); setServiceSheetOpen(true); }}
+            onPress={() => {
+              setEditingService(null);
+              setServiceSheetOpen(true);
+            }}
             style={styles.actionButton}
             variant="outline"
           />
-          {requestError || servicesQuery.error ? <Text accessibilityRole="alert" style={styles.requestError}>{requestError ?? (servicesQuery.error instanceof Error ? servicesQuery.error.message : 'No fue posible cargar los servicios.')}</Text> : null}
-          {servicesQuery.isPending ? <Text style={styles.savedLabel}>Cargando servicios…</Text> : null}
-          {services.map((service) => <View key={service.id} style={styles.serviceRow}><View style={[styles.serviceColor, { backgroundColor: service.agendaColor }]} /><View style={styles.serviceCopy}><Text numberOfLines={1} style={styles.serviceName}>{service.name}</Text><Text numberOfLines={1} style={styles.serviceMeta}>{service.durationMinutes} min · {service.priceType === 'free' ? 'Gratis' : `$${service.price.toFixed(2)}`}</Text></View><Pressable accessibilityLabel={`Editar ${service.name}`} onPress={() => { setEditingService(service); setServiceSheetOpen(true); }} style={styles.editButton}><Ionicons color="#101c2d" name="pencil-outline" size={20} /></Pressable><Pressable accessibilityLabel={`Eliminar ${service.name}`} onPress={() => Alert.alert('Eliminar servicio', `¿Quieres eliminar ${service.name}? Esta acción no se puede deshacer.`, [{ style: 'cancel', text: 'Cancelar' }, { onPress: () => void deleteService(service), style: 'destructive', text: 'Eliminar' }])} style={styles.deleteIconButton}><Ionicons color="#bd2d2d" name="trash-outline" size={20} /></Pressable></View>)}
+          {requestError || servicesQuery.error ? (
+            <Text accessibilityRole="alert" style={styles.requestError}>
+              {requestError ??
+                (servicesQuery.error instanceof Error
+                  ? servicesQuery.error.message
+                  : 'No fue posible cargar los servicios.')}
+            </Text>
+          ) : null}
+          {servicesQuery.isPending ? (
+            <Text style={styles.savedLabel}>Cargando servicios…</Text>
+          ) : null}
+          {services.map((service) => (
+            <View key={service.id} style={styles.serviceRow}>
+              <View
+                style={[
+                  styles.serviceColor,
+                  { backgroundColor: service.agendaColor },
+                ]}
+              />
+              <View style={styles.serviceCopy}>
+                <Text numberOfLines={1} style={styles.serviceName}>
+                  {service.name}
+                </Text>
+                <Text numberOfLines={1} style={styles.serviceMeta}>
+                  {service.durationMinutes} min ·{' '}
+                  {service.priceType === 'free'
+                    ? 'Gratis'
+                    : `$${service.price.toFixed(2)}`}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityLabel={`Editar ${service.name}`}
+                onPress={() => {
+                  setEditingService(service);
+                  setServiceSheetOpen(true);
+                }}
+                style={styles.editButton}
+              >
+                <Ionicons color="#101c2d" name="pencil-outline" size={20} />
+              </Pressable>
+              <Pressable
+                accessibilityLabel={`Eliminar ${service.name}`}
+                onPress={() =>
+                  Alert.alert(
+                    'Eliminar servicio',
+                    `¿Quieres eliminar ${service.name}? Esta acción no se puede deshacer.`,
+                    [
+                      { style: 'cancel', text: 'Cancelar' },
+                      {
+                        onPress: () => void deleteService(service),
+                        style: 'destructive',
+                        text: 'Eliminar',
+                      },
+                    ],
+                  )
+                }
+                style={styles.deleteIconButton}
+              >
+                <Ionicons color="#bd2d2d" name="trash-outline" size={20} />
+              </Pressable>
+            </View>
+          ))}
           {services.length > 0 ? (
             <Text style={styles.savedLabel}>
               {services.length}{' '}
@@ -144,21 +242,24 @@ export default function ServicesOnboardingScreen() {
             </Text>
           ) : null}
         </View>
-
-        <View style={styles.footer}>
-          <NavaButton
-            disabled={services.length === 0}
-            icon="arrow-forward-outline"
-            label="Siguiente"
-            onPress={() => router.push('/(onboarding)/account-details')}
-            style={styles.nextButton}
-            variant="primary"
-          />
-        </View>
       </ScrollView>
 
+      <View style={styles.footer}>
+        <NavaButton
+          disabled={services.length === 0}
+          icon="arrow-forward-outline"
+          label="Siguiente"
+          onPress={() => router.push('/(onboarding)/account-details')}
+          style={styles.nextButton}
+          variant="primary"
+        />
+      </View>
+
       <ServiceFormSheet
-        key={editingService?.id ?? (serviceSheetOpen ? 'new-service' : 'closed-service')}
+        key={
+          editingService?.id ??
+          (serviceSheetOpen ? 'new-service' : 'closed-service')
+        }
         initialValue={editingService}
         onClose={() => setServiceSheetOpen(false)}
         onSave={saveService}
@@ -178,8 +279,8 @@ const styles = StyleSheet.create({
   actionButton: {
     flexBasis: 'auto',
     flexGrow: 0,
-    height: 66,
-    marginTop: 25,
+    height: 56,
+    marginTop: 14,
     width: '100%',
   },
   backButton: {
@@ -219,7 +320,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     flexGrow: 1,
     maxWidth: 640,
-    paddingBottom: 18,
+    paddingBottom: 10,
     paddingHorizontal: 24,
     paddingTop: 18,
     width: '100%',
@@ -230,13 +331,13 @@ const styles = StyleSheet.create({
   },
   copy: {
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 4,
   },
   description: {
     color: '#667080',
-    fontSize: 16,
-    lineHeight: 24,
-    marginTop: 12,
+    fontSize: 15,
+    lineHeight: 21,
+    marginTop: 7,
     maxWidth: 490,
     textAlign: 'center',
   },
@@ -247,8 +348,12 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   footer: {
-    marginTop: 28,
-    width: '100%',
+    backgroundColor: 'rgba(249,251,255,0.98)',
+    borderTopColor: '#e1e8f4',
+    borderTopWidth: 1,
+    paddingBottom: 12,
+    paddingHorizontal: 24,
+    paddingTop: 10,
   },
   header: {
     alignItems: 'center',
@@ -257,22 +362,21 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   illustration: {
-    aspectRatio: 1.5,
+    height: 190,
     width: '108%',
   },
   illustrationCompact: {
-    maxHeight: 220,
+    height: 145,
   },
   main: {
     alignItems: 'center',
-    flexGrow: 1,
     justifyContent: 'center',
-    paddingTop: 22,
+    paddingTop: 10,
   },
   nextButton: {
     flexBasis: 'auto',
     flexGrow: 0,
-    height: 66,
+    height: 56,
     width: '100%',
   },
   progress: {
@@ -286,14 +390,45 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 10,
   },
-  deleteIconButton: { alignItems: 'center', backgroundColor: '#fff0ee', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
-  editButton: { alignItems: 'center', backgroundColor: '#f1f3f5', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
-  requestError: { color: '#bd283c', fontSize: 13, fontWeight: '600', marginTop: 10 },
+  deleteIconButton: {
+    alignItems: 'center',
+    backgroundColor: '#fff0ee',
+    borderRadius: 12,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  editButton: {
+    alignItems: 'center',
+    backgroundColor: '#f1f3f5',
+    borderRadius: 12,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  requestError: {
+    color: '#bd283c',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 10,
+  },
   serviceColor: { borderRadius: 999, height: 14, width: 14 },
   serviceCopy: { flex: 1, gap: 2 },
   serviceMeta: { color: '#667080', fontSize: 13, fontWeight: '600' },
   serviceName: { color: '#101c2d', fontSize: 15, fontWeight: '800' },
-  serviceRow: { alignItems: 'center', backgroundColor: '#fff', borderColor: '#dce7fb', borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 10, marginTop: 10, minHeight: 72, paddingHorizontal: 14, paddingVertical: 10 },
+  serviceRow: {
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderColor: '#dce7fb',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+    minHeight: 72,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
   screen: {
     backgroundColor: '#f9fbff',
     flex: 1,
@@ -306,10 +441,10 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#101c2d',
-    fontSize: 30,
+    fontSize: 27,
     fontWeight: '900',
     letterSpacing: -0.9,
-    lineHeight: 36,
+    lineHeight: 32,
     maxWidth: 470,
     textAlign: 'center',
   },

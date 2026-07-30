@@ -2,7 +2,7 @@
 
 Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión posterior documentada en `docs/adr/0003-postgresql-prisma-y-api-en-vps.md`. Se marca `[x]` solo cuando la tarea está implementada y cuenta con la verificación indicada; `[ ]` significa pendiente o aún no demostrada.
 
-Última actualización: 2026-07-28
+Última actualización: 2026-07-30
 
 ## Decisión de infraestructura vigente
 
@@ -17,11 +17,11 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 ## Resumen por fases
 
 - [x] Fase 0 — Inicialización del repositorio
-- [ ] Fase 1 — Autenticación, organización y onboarding _(implementada y verificada localmente; autenticación SMTP aprobada, entrega a bandeja externa pendiente)_
+- [ ] Fase 1 — Autenticación, organización y onboarding _(implementada y verificada localmente; autenticación SMTP y entrega a bandeja externa aprobadas)_
 - [x] Fase 2 — Equipo, servicios y horarios
-- [ ] Fase 3 — Motor de agenda _(implementada y verificada contra PostgreSQL; flujo manual móvil pendiente)_
-- [ ] Fase 4 — Reservas públicas
-- [ ] Fase 5 — Clientes e historial _(directorio, creación e importación implementados; historial, edición y eliminación lógica pendientes)_
+- [ ] Fase 3 — Motor de agenda _(implementada y verificada contra PostgreSQL; aceptación manual móvil pendiente)_
+- [ ] Fase 4 — Reservas públicas _(implementada y verificada contra PostgreSQL; entrega SMTP externa aprobada, aceptación manual pendiente)_
+- [ ] Fase 5 — Clientes e historial _(directorio, creación, importación, historial vinculado y eliminación lógica implementados; edición, notas y fotografías privadas pendientes)_
 - [ ] Fase 6 — Caja y POS básico
 - [ ] Fase 7 — Comisiones
 - [ ] Fase 8 — Inventario básico
@@ -137,7 +137,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Máximo de cinco intentos OTP fallidos por correo, bloqueo de 15 minutos y HTTP `429`; generar o reenviar otro código no restablece el límite.
 - [x] Plantilla SMTP `Verifica tu cuenta de Nava` implementada.
 - [x] Migraciones OTP y solicitudes pendientes aplicadas a PostgreSQL local (`5434`) y a la base aislada de pruebas (`5433`).
-- [ ] Entrega del OTP pendiente de comprobar con el proveedor SMTP real.
+- [x] Entrega del OTP comprobada con el proveedor SMTP real en una bandeja externa.
 - [x] Los datos ampliados del registro (tipo de cuenta, negocio, teléfono, país, ciudad y horario) se conservan temporalmente en `pending_registrations` y, tras verificar el correo, se trasladan a `users` y `user_registration_profiles`, relacionados mediante el `user_id` único.
 - [ ] Añadir limitación general de frecuencia por IP para registro y reenvío antes de producción; la limitación de intentos OTP por correo ya está implementada.
 
@@ -221,13 +221,23 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 
 ### Fase 4 — Reservas públicas
 
-- [ ] Reserva web pública, idempotencia, tokens de gestión y rate limiting.
+- [x] Página pública con servicios, equipo, reseñas visibles y profesional obligatorio.
+- [x] Selección de varios servicios y disponibilidad calculada en tiempo real.
+- [x] Datos obligatorios del cliente, precio permanente, aceptación de política y verificación por correo.
+- [x] Idempotencia, tokens de gestión, rate limiting y retención temporal de bloqueos sin verificar.
+- [x] Confirmación de asistencia configurable por negocio, recordatorio por correo y política para conservar o cancelar citas no confirmadas.
+- [x] Cancelación y reprogramación pública con anticipación configurable.
+- [x] Cancelación y reprogramación manual desde la aplicación por parte del negocio o profesional autorizado.
+- [x] Reseñas automáticas después de completar una cita y capacidad de ocultarlas.
+- [ ] Entrega SMTP a una bandeja externa comprobada; aceptación visual/manual completa pendiente.
 
 ### Fase 5 — Clientes e historial
 
 - [x] Directorio autenticado, búsqueda, creación e importación de contactos.
 - [x] Aislamiento por organización activa o, en su ausencia, por usuario propietario.
-- [ ] Historial, edición, notas operativas, fotografías privadas y eliminación lógica.
+- [x] Historial de citas vinculado por `clientId`, conservando compatibilidad con snapshots anteriores.
+- [x] Eliminación lógica de clientes sin perder el historial de citas.
+- [ ] Edición, notas operativas y fotografías privadas.
 
 ### Fase 6 — Caja y POS básico
 
@@ -316,6 +326,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [ ] Aplicar `20260726110000_onboarding_services` en PostgreSQL de desarrollo, pruebas y despliegue mediante `prisma migrate deploy`; la migración fue creada pero no se aplicó durante este cambio.
 
 ## Funcionalidad reciente
+
 ### Configuracion final de cuenta y cierre de onboarding
 
 - [x] Paso 3 movil: formulario final de cuenta con portada, nombre, telefono, correo de solo lectura, campos opcionales y selector mundial dependiente de pais y ciudad.
@@ -324,8 +335,6 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Pantalla movil de felicitaciones creada con Felicidadez.png, enlace de reservas, panel interno de acciones, compartir y copia mediante expo-clipboard.
 - [x] El boton Siguiente de servicios lleva a la configuracion final y, despues de guardar, a /congratulations.
 - [x] Typecheck de API y movil aprobados; API Vitest: 6 pruebas aprobadas y 10 de integracion omitidas sin TEST_DATABASE_URL; export web de Expo aprobado con la ruta y recurso de felicitaciones.
-
-
 
 ### Dashboard inicial
 
@@ -345,7 +354,6 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [ ] Implementar reservas publicas reales: slug publico unico, pagina web de reservas, disponibilidad publica, creacion idempotente y rate limiting.
 - [ ] Servir el enlace de reservas desde la API con dominio configurado y HTTPS; no construirlo en el cliente.
 - [ ] Conectar las opciones QR y ver mi website del panel existente al enlace público real, y permitir descargar o compartir el QR.
-
 
 - [ ] Aplicar y verificar la migración de servicios de onboarding en PostgreSQL, incluyendo pruebas de CRUD y aislamiento por usuario. Luego verificar el flujo móvil completo y continuar con la Fase 4 — Reservas públicas.
 
@@ -600,3 +608,1976 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Se retiraron de la aplicacion los accesos y mensajes promocionales que no aportan a la operacion del MVP.
 - [x] La bienvenida permanece unicamente en Dashboard mientras la configuracion de cuenta sigue pendiente; explica que desaparecera al completarla y se oculta al registrarse `onboardingCompletedAt`.
 - [x] Verificado: formateo de las pantallas modificadas, typecheck movil y `git diff --check`.
+
+## Actualizacion 2026-07-29 - Banner de opinion
+
+- [x] El banner local de opinion se muestra al ingresar por primera vez al Dashboard.
+- [x] Al enviar la encuesta o cerrarla, se registra localmente la fecha de interaccion por usuario y dispositivo.
+- [x] El banner vuelve a estar disponible despues de siete dias desde la ultima interaccion.
+- [x] La frecuencia se conserva en `SecureStore` en dispositivos moviles y en `localStorage` para Expo Web; no requiere cambios en API ni base de datos y no se sincroniza entre dispositivos o reinstalaciones.
+- [x] Se conservan los datos locales existentes: un registro invalido o sin fecha permite volver a mostrar el banner.
+- [x] Verificado: `pnpm --filter @barber-saas/mobile typecheck` aprobado.
+
+## Planificacion 2026-07-29 - Desarrollo funcional de Ajustes del negocio
+
+> Estado de esta seccion: especificacion funcional, tecnica y comercial aprobada
+> para desarrollo posterior. Los elementos marcados con `[ ]` no estan
+> implementados todavia. Esta seccion no registra codigo terminado.
+
+### Objetivo y contexto
+
+La ruta movil `apps/mobile/app/(onboarding)/business-settings.tsx` funciona como
+menu secundario de configuracion del negocio. En la revision realizada se
+identificaron siete tarjetas y dos acordeones:
+
+| Opcion                   | Estado al iniciar esta planificacion | Decision                                       |
+| ------------------------ | ------------------------------------ | ---------------------------------------------- |
+| Gestion de colaboradores | Redirige a `/equipo`                 | Conservar la ruta; no recrear la pantalla      |
+| Horario del negocio      | Sin ruta; muestra aviso temporal     | Crear una pantalla y persistencia nuevas       |
+| Editar informacion       | Redirige a `/profile-edit`           | Conservar la ruta; no recrear la pantalla      |
+| Configuracion avanzada   | Sin ruta; muestra aviso temporal     | Crear pantalla y modulos funcionales graduales |
+| Nava Wallet              | Sin ruta; muestra aviso temporal     | Crear un centro de pagos y anticipos por fases |
+| Gestion de servicios     | Redirige a `/services`               | Conservar la ruta; no recrear la pantalla      |
+| Suscripcion              | Sin ruta; muestra aviso temporal     | Crear pantalla con suscripcion simulada        |
+
+Los acordeones `Nava Flex` y `Mas opciones` ya se expanden y contraen dentro de
+la misma pantalla. No deben navegar a una ruta independiente durante este
+desarrollo, salvo que una especificacion futura lo solicite expresamente.
+
+### Principios transversales aprobados
+
+- [ ] Mantener la identidad visual actual de Nava: negro, blanco, grises,
+      tipografia, radios, bordes, espaciado e iconos existentes.
+- [ ] Reutilizar componentes actuales antes de crear variantes nuevas.
+- [ ] Los paneles inferiores deben cerrarse tocando fuera, mediante el boton de
+      cancelar o deslizando el panel hacia abajo.
+- [ ] Toda funcionalidad editable debe persistir realmente; no se mostraran
+      interruptores o botones que simulen guardar informacion.
+- [ ] Las secciones todavia no funcionales mostraran una insignia discreta
+      `Proximamente` y una explicacion, sin enviar datos al servidor.
+- [ ] Las decisiones de autorizacion se validaran nuevamente en la API. Ocultar
+      un control en el movil no se considera una medida de seguridad.
+- [ ] Todas las operaciones multi-tenant derivaran la organizacion, sucursal y
+      membresia desde la sesion autenticada.
+- [ ] Los cambios sensibles se registraran en `AuditLog`.
+- [ ] Las nuevas rutas conservaran proteccion de sesion, estados de carga,
+      error, reintento, vacio y falta de permisos.
+- [ ] El trabajo se entregara por cortes verticales: migracion, validacion,
+      API, tipos compartidos, UI, navegacion y pruebas del mismo modulo.
+- [ ] No modificar ni recrear las tres pantallas que ya tienen redireccion
+      funcional desde `business-settings.tsx`.
+
+## Modulo planificado 1 - Horario general del negocio
+
+### Alcance funcional aprobado
+
+- [x] Crear la ruta movil `/business-schedule`.
+- [x] Administrar el horario general del negocio de lunes a domingo.
+- [x] Cada dia tendra un checkbox para indicar `Abierto` o `Cerrado`.
+- [x] Debajo del checkbox se mostrara un icono de configuracion.
+- [x] Cada dia admitira un unico intervalo continuo de apertura y cierre.
+- [x] Al tocar el icono se abrira un panel inferior para editar ambas horas.
+- [x] El selector de hora reutilizara el estilo y comportamiento del registro
+      inicial, actualmente implementado mediante `TimeField` y
+      `TimeWheelModal` en `RegistrationSelectors.tsx`.
+- [x] El panel inferior se podra cerrar deslizando hacia abajo, tocando fuera o
+      presionando `Cancelar`.
+- [x] El panel tendra una accion explicita para confirmar el intervalo del dia.
+- [x] La pantalla tendra un boton general `Guardar cambios`.
+- [x] Un dia desmarcado se mostrara como `Cerrado`.
+- [x] El icono de configuracion de un dia cerrado quedara visualmente
+      deshabilitado.
+- [x] Al cerrar un dia se conservara internamente su ultimo intervalo; si el
+      usuario lo activa nuevamente, se restauraran esas horas.
+- [x] Se validara que la hora de apertura sea anterior a la hora de cierre.
+- [x] Se impediran intervalos vacios, iguales o fuera de `00:00-24:00`.
+
+### Compatibilidad con cuentas existentes
+
+El registro actual solo conserva `openingTime` y `closingTime`; no permite
+seleccionar dias. Por ello, la primera inicializacion del nuevo horario semanal
+usara esta regla aprobada:
+
+- [x] Activar inicialmente los siete dias.
+- [x] Copiar a cada dia la apertura y cierre configurados durante el registro.
+- [x] Ejecutar la inicializacion de forma idempotente para no sobrescribir una
+      configuracion semanal ya editada.
+- [x] Conservar temporalmente los campos generales existentes mientras las
+      pantallas que aun los consumen migran al nuevo horario.
+- [ ] Eliminar o deprecar esos campos solamente en una migracion posterior y
+      despues de comprobar que no existen consumidores activos.
+
+### Efecto sobre agenda y reservas
+
+El proyecto ya posee horarios semanales por profesional mediante
+`WeeklySchedule` y `/v1/schedules`. El nuevo horario no los reemplaza. Se
+aplicara una interseccion:
+
+```text
+Disponibilidad efectiva
+= horario general del negocio
+∩ horario del profesional
+- bloqueos
+- citas que reservan espacio
+```
+
+- [x] No ofrecer horas fuera del horario general, aunque el profesional tenga
+      un horario mas amplio.
+- [x] No ofrecer horas fuera del horario profesional, aunque el negocio este
+      abierto.
+- [x] Rechazar tambien en el servidor la creacion o reprogramacion de una cita
+      fuera de la disponibilidad efectiva.
+- [ ] Aplicar la misma regla a disponibilidad interna y futura reserva publica.
+- [x] Ajustar la linea temporal de Agenda para que use el horario semanal del
+      dia seleccionado, no solamente el par historico de apertura y cierre.
+- [x] Mantener el control de concurrencia y exclusion de citas existente.
+
+### Modelo y API propuestos
+
+Crear una entidad semanal asociada a la sucursal, aunque el MVP empiece con una
+sola ubicacion:
+
+```text
+BusinessWeeklySchedule
+- id
+- organizationId
+- locationId
+- weekday (0-6)
+- isOpen
+- openingMinute
+- closingMinute
+- createdAt
+- updatedAt
+```
+
+- [x] Indice unico por `locationId + weekday`.
+- [x] Restriccion de dia entre 0 y 6.
+- [x] Horas nulas unicamente cuando el dia esta cerrado, o una regla equivalente
+      claramente validada.
+- [x] `GET /v1/business-schedule` para consultar los siete dias.
+- [x] `PUT /v1/business-schedule` para reemplazar la semana completa dentro de
+      una transaccion.
+- [x] Permisos separados de lectura y administracion o reutilizacion consciente
+      de `schedule.read` y `schedule.manage`.
+- [x] Registro de auditoria con estado anterior y posterior.
+
+### Criterios de aceptacion
+
+- [x] Los siete dias se muestran sin scroll horizontal obligatorio en telefonos
+      pequenos; el layout puede adaptarse en filas o tarjetas.
+- [ ] El panel de horas funciona en Android, iOS y Expo Web.
+- [x] Cerrar el panel sin confirmar no modifica el valor guardado.
+- [x] Guardar actualiza la consulta, informa exito y conserva la pantalla.
+- [x] Un fallo de red no elimina los datos que el usuario estaba editando.
+- [x] Disponibilidad, creacion y reprogramacion rechazan horas fuera del negocio.
+- [x] Existen pruebas de inicializacion, validacion, interseccion y aislamiento
+      entre organizaciones.
+
+## Modulo planificado 2 - Configuracion avanzada
+
+### Estructura general
+
+- [ ] Crear la ruta movil `/advanced-settings`.
+- [ ] Mantener el orden de la referencia:
+  1. Tipo de cuenta.
+  2. Permisos a colaboradores.
+  3. Modificar enlace de reserva.
+  4. Configuracion general.
+  5. Reservas anticipadas.
+  6. Informacion adicional.
+- [ ] Mostrar un boton inferior `Guardar cambios` solo para los cambios de tipo
+      de cuenta y enlace de reserva.
+- [ ] Mantener el boton deshabilitado cuando no existan cambios.
+- [ ] Los permisos se guardaran dentro de su propio flujo, no con el boton
+      general de la pantalla.
+
+### Tipo de cuenta y personalizacion de experiencia
+
+Las opciones aprobadas son:
+
+```text
+Solo yo
+Tengo un negocio
+```
+
+La seleccion representa un modo de experiencia y producto. No reemplaza roles,
+permisos ni controles de autorizacion.
+
+#### Experiencia `Solo yo`
+
+- [ ] Ocultar Gestion de colaboradores y Permisos a colaboradores.
+- [ ] Evitar selectores de profesionales cuando el unico profesional es el
+      propietario.
+- [ ] Enfocar Agenda directamente en el propietario.
+- [ ] Adaptar textos a lenguaje singular, por ejemplo `Mi horario` y
+      `Mis servicios`, cuando corresponda.
+- [ ] Mantener disponibles clientes, servicios, reservas, caja, Wallet,
+      reportes y suscripcion del plan vigente.
+
+#### Experiencia `Tengo un negocio`
+
+- [ ] Mostrar equipo, invitaciones, roles y permisos.
+- [ ] Permitir agendas y filtros por colaborador.
+- [ ] Mostrar administracion de horarios individuales y del horario general.
+- [ ] Mantener la experiencia administrativa completa.
+
+#### Cambio entre tipos
+
+- [ ] Permitir `Solo yo -> Tengo un negocio` de forma inmediata.
+- [ ] Permitir `Tengo un negocio -> Solo yo` unicamente cuando no existan otros
+      colaboradores ni invitaciones pendientes.
+- [ ] Si existen colaboradores o invitaciones, bloquear el cambio con una
+      explicacion y una accion hacia `/equipo`.
+- [ ] Nunca borrar colaboradores, invitaciones, citas ni configuracion como
+      efecto secundario de cambiar el tipo de cuenta.
+- [ ] Centralizar las diferencias de experiencia en un hook, contexto o politica
+      de capacidades; evitar condicionales dispersos por toda la aplicacion.
+- [ ] Extender la API de perfil/configuracion para persistir el tipo de cuenta
+      despues del registro.
+
+### Permisos hibridos por rol y por colaborador
+
+Se aprobo un modelo hibrido:
+
+```text
+Permisos efectivos
+= plantilla del rol
++ permisos concedidos individualmente
+- permisos retirados individualmente
+```
+
+Si un colaborador no tiene personalizaciones, recibe exactamente la plantilla
+de su rol. Las excepciones se aplican por membresia.
+
+#### Flujo de UI
+
+- [ ] Abrir una pantalla secundaria o flujo dedicado desde
+      `Permisos a colaboradores`.
+- [ ] Mostrar lista de colaboradores y permitir seleccionar uno.
+- [ ] Mostrar su rol base: administrador, recepcionista o barbero.
+- [ ] Ofrecer `Usar permisos del rol` y `Personalizar permisos`.
+- [ ] Agrupar las acciones en acordeones:
+  - Negocio.
+  - Sucursales.
+  - Colaboradores.
+  - Servicios.
+  - Horarios.
+  - Agenda y reservas.
+  - Pagos y Wallet.
+- [ ] Distinguir visualmente `Heredado del rol` de `Personalizado`.
+- [ ] Incluir la accion `Restaurar permisos del rol`.
+- [ ] Confirmar antes de retirar permisos sensibles.
+
+#### Capacidades base
+
+Las capacidades existentes que deben conservarse y exponerse de forma
+comprensible son:
+
+- `organization.read`
+- `organization.update`
+- `location.read`
+- `location.update`
+- `membership.read`
+- `membership.manage`
+- `service.read`
+- `service.manage`
+- `schedule.read`
+- `schedule.manage`
+- `appointment.read`
+- `appointment.manage`
+
+Wallet requerira agregar capacidades especificas, evitando concentrar todas las
+acciones financieras en un unico permiso:
+
+- [ ] Ver historial de pagos.
+- [ ] Registrar pagos en efectivo.
+- [ ] Ver comprobantes de transferencia.
+- [ ] Aprobar o rechazar transferencias.
+- [ ] Ejecutar reversos o reembolsos.
+- [ ] Administrar metodos y configuracion de pago.
+
+#### Reglas de seguridad aprobadas
+
+- [ ] El propietario conserva acceso completo y sus permisos no se pueden
+      retirar desde esta UI.
+- [ ] Solo el propietario puede personalizar permisos.
+- [ ] Un usuario no puede conceder una capacidad superior a la que posee.
+- [ ] `Administrar` activa o exige automaticamente `Ver`.
+- [ ] Cambiar el rol debe preguntar si se conservan o eliminan excepciones.
+- [ ] El rol y el permiso determinan la accion; el alcance de datos determina si
+      se opera sobre datos propios, de una sucursal o de toda la organizacion.
+- [ ] Un barbero solo consulta el estado financiero de sus propias citas, salvo
+      una politica futura expresamente mas amplia.
+- [ ] Credenciales PayPhone y reembolsos permanecen bajo control exclusivo del
+      propietario.
+- [ ] Todo cambio genera auditoria con actor, membresia afectada, estado anterior
+      y estado posterior.
+
+#### Persistencia propuesta
+
+Crear una tabla de excepciones por membresia, por ejemplo:
+
+```text
+MembershipPermissionOverride
+- membershipId
+- permission
+- effect (grant | deny)
+- createdByUserId
+- createdAt
+- updatedAt
+```
+
+- [ ] Indice unico por `membershipId + permission`.
+- [ ] Calcular permisos efectivos en un unico paquete compartido y aplicar la
+      misma funcion en todos los endpoints.
+- [ ] No confiar en una lista de permisos calculada por el cliente movil.
+- [ ] Agregar pruebas para escalamiento de privilegios, dependencias y
+      aislamiento multi-tenant.
+
+### Modificar enlace de reserva
+
+Formato aprobado:
+
+```text
+https://book.nava.app/{identificador}
+```
+
+- [ ] Obtener el dominio base desde configuracion del entorno.
+- [ ] Mostrar el dominio como prefijo no editable.
+- [ ] Permitir editar solamente el identificador.
+- [ ] Normalizar a minusculas y guiones.
+- [ ] Permitir letras minusculas, numeros y guiones con longitud validada.
+- [ ] Comprobar disponibilidad sin esperar al guardado final.
+- [ ] Proteger tambien en base de datos contra cambios concurrentes.
+- [ ] Permitir copiar y compartir el enlace actual.
+- [ ] Confirmar el impacto antes de cambiarlo.
+- [ ] Limitar el cambio a una vez cada 30 dias.
+- [ ] Reservar permanentemente los identificadores historicos para impedir
+      suplantacion.
+- [ ] Redirigir un enlace historico al identificador vigente.
+- [ ] Guardar el identificador canonico en la organizacion; dejar de construir
+      el enlace publico desde `businessNameKey`.
+- [ ] Preparar la ruta de una sola sucursal para que en Multi pueda aparecer un
+      selector de ubicacion sin romper enlaces existentes.
+
+Persistencia adicional propuesta:
+
+```text
+BookingSlugAlias
+- id
+- organizationId
+- slug
+- replacedAt
+- createdAt
+```
+
+La pagina publica de reservas sigue siendo una dependencia pendiente. Editar,
+copiar y conservar el enlace puede implementarse antes, pero no se debe afirmar
+que acepta reservas reales hasta completar esa fase.
+
+### Secciones solo visuales
+
+- [ ] `Configuracion general`: acordeon funcional con contenido
+      `Proximamente`; no incluir controles editables.
+- [ ] `Reservas anticipadas`: acordeon con vista previa de futuras reglas de
+      anticipacion minima, horizonte maximo y cancelacion; queda `Proximamente`
+      hasta integrarlo con reservas publicas.
+- [ ] `Informacion adicional`: acordeon `Proximamente` hasta definir campos y
+      efecto de negocio.
+- [ ] Estas secciones no habilitan el boton `Guardar cambios`.
+
+## Modulo planificado 3 - Nava Wallet
+
+### Cambio de alcance y definicion del producto
+
+El documento original del MVP dejaba wallet y pasarela de pagos fuera de
+alcance. La decision comercial tomada en esta planificacion amplia ese alcance.
+Debe implementarse de forma gradual y no habilitar dinero real en produccion
+sin completar pruebas, autorizaciones del proveedor y revision operativa.
+
+Nava Wallet no custodiara fondos. Funcionara como centro de configuracion,
+anticipos, conciliacion e historial:
+
+- PayPhone acredita el dinero en la cuenta PayPhone Business del negocio.
+- Una transferencia se acredita directamente en la cuenta bancaria del negocio.
+- El efectivo entra en la caja fisica del local.
+- Nava registra el movimiento, su relacion con la cita y su estado.
+
+### Navegacion y UI
+
+- [ ] Crear la ruta movil `/wallet`.
+- [ ] Organizarla en tres pestañas:
+  - `Resumen`.
+  - `Historial`.
+  - `Configuracion`.
+- [ ] Mostrar estado de conexion PayPhone.
+- [ ] Reutilizar tarjetas, filtros, paneles inferiores y estados visuales de
+      Nava.
+
+#### Resumen
+
+- [ ] Total cobrado online durante el periodo seleccionado.
+- [ ] Transferencias aprobadas.
+- [ ] Transferencias pendientes de verificacion.
+- [ ] Saldo pendiente de las citas.
+- [ ] Pagos rechazados, reversados o reembolsados.
+- [ ] Acceso a PayPhone Business para consultar el saldo real del proveedor.
+- [ ] No etiquetar como `Saldo disponible PayPhone` una suma calculada
+      internamente, porque comisiones, retenciones y reversos pueden producir una
+      diferencia con el saldo retirable.
+
+#### Historial
+
+- [ ] Mostrar cliente, cita, metodo, monto, estado y fecha.
+- [ ] Mostrar saldo restante de la cita.
+- [ ] Mostrar referencia bancaria o identificadores PayPhone cuando existan.
+- [ ] Permitir abrir el comprobante de transferencia con permisos adecuados.
+- [ ] Filtrar por fecha, metodo y estado.
+- [ ] Permitir consultar el detalle y la auditoria del movimiento.
+
+#### Configuracion
+
+- [ ] Activar o desactivar efectivo.
+- [ ] Activar o desactivar transferencia bancaria.
+- [ ] Activar o desactivar PayPhone.
+- [ ] Configurar politica de anticipo.
+- [ ] Configurar cuenta bancaria.
+- [ ] Conectar, probar, rotar o desconectar PayPhone.
+- [ ] Permitir que el cliente pague solamente el minimo o el total completo.
+
+### Politica de anticipos
+
+Estados configurables:
+
+```text
+Sin anticipo
+Anticipo opcional
+Anticipo obligatorio
+```
+
+Calculo configurable:
+
+```text
+Porcentaje del total
+Valor fijo en la moneda del negocio
+```
+
+- [ ] La Wallet define la regla general del negocio.
+- [ ] Cada servicio puede heredarla o establecer una excepcion.
+- [ ] Migrar el porcentaje de abono que ya existe en servicios de onboarding al
+      modelo operativo `Service`, que actualmente no conserva ese campo.
+- [ ] En citas con varios servicios, calcular el anticipo de cada servicio y
+      sumar los resultados.
+- [ ] Un valor fijo nunca puede superar el total de la cita.
+- [ ] Trabajar siempre en unidades monetarias menores, por ejemplo centavos.
+- [ ] Conservar monto total, monto pagado y saldo restante.
+- [ ] Ofrecer al cliente `Pagar anticipo minimo` o `Pagar total`, cuando la
+      politica lo permita.
+
+### Efectivo
+
+- [ ] Interpretar efectivo como `Pagar en el local`, no como anticipo online.
+- [ ] Crear la cita con pago pendiente cuando la politica permita pagar despues.
+- [ ] Registrar el cobro al atender o finalizar la cita.
+- [ ] Integrar el efectivo con la sesion de caja abierta y su futuro movimiento
+      transaccional.
+- [ ] No aumentar caja por transferencias ni pagos PayPhone.
+- [ ] Cuando el anticipo sea obligatorio, ocultar efectivo en la reserva
+      publica.
+- [ ] Permitir una excepcion manual solo a un usuario autorizado y dejarla
+      auditada.
+
+### Transferencia bancaria
+
+Para el MVP ampliado se aprobo una sola cuenta bancaria activa por negocio:
+
+- Banco.
+- Tipo de cuenta.
+- Numero de cuenta.
+- Titular.
+- RUC o identificacion.
+- Correo opcional.
+- Instrucciones adicionales.
+- Codigo QR opcional como imagen.
+
+Flujo aprobado:
+
+1. El cliente selecciona transferencia.
+2. Nava reserva temporalmente el horario.
+3. El cliente dispone de 30 minutos para adjuntar el comprobante.
+4. Si no adjunta el comprobante, la solicitud vence y libera el horario.
+5. Si lo adjunta, la cita queda `Pendiente de verificacion` y conserva el
+   horario.
+6. El negocio recibe una alerta interna.
+7. Un usuario autorizado aprueba o rechaza.
+8. Aprobado: se confirma la cita y se registra el anticipo.
+9. Rechazado: se informa dentro del canal disponible y se libera el horario.
+
+- [ ] Subir comprobantes a almacenamiento privado, no a una URL publica.
+- [ ] Autorizar cada descarga mediante la sesion y permisos efectivos.
+- [ ] No aprobar automaticamente una transferencia por recibir una imagen.
+- [ ] Definir antes de produccion el plazo maximo que el negocio tendra para
+      revisar un comprobante ya enviado.
+- [ ] Implementar un trabajo de expiracion idempotente para liberar
+      reservaciones sin comprobante.
+- [ ] Evitar que dos clientes adquieran el mismo horario mientras la reserva
+      temporal sigue vigente.
+
+### PayPhone
+
+Las credenciales correctas son:
+
+```text
+Token
+StoreID
+```
+
+No deben llamarse `API key` e `ID de negocio` dentro de la implementacion.
+
+#### Configuracion inicial
+
+- [ ] Mostrar una ventana informativa que explique la necesidad de una cuenta
+      PayPhone Business.
+- [ ] Enlazar al registro y documentacion oficial del proveedor.
+- [ ] Solicitar Token y StoreID.
+- [ ] Permitir seleccionar ambiente `Pruebas` o `Produccion`.
+- [ ] Incluir `Probar conexion`.
+- [ ] Mostrar estados `No configurado`, `Conectado`, `Error` y
+      `Requiere atencion`.
+- [ ] Ocultar el token despues de guardarlo y mostrar solamente una referencia
+      parcial no sensible.
+- [ ] Permitir rotacion y desconexion.
+
+#### Seguridad y arquitectura
+
+- [ ] Enviar credenciales directamente a la API de Nava sobre HTTPS.
+- [ ] Cifrar el Token en el servidor con una clave externa a la base de datos.
+- [ ] No guardar el Token en SecureStore, AsyncStorage, logs, auditorias,
+      analytics ni respuestas del API.
+- [ ] El StoreID puede mostrarse parcialmente, pero debe tratarse como dato de
+      configuracion sensible.
+- [ ] Crear un adaptador de proveedor para no acoplar citas directamente a
+      PayPhone.
+- [ ] Usar identificadores internos idempotentes por intento de pago.
+- [ ] Confirmar cada pago en el servidor mediante consulta al proveedor,
+      respuesta firmada o webhook autorizado; no confiar en el resultado mostrado
+      por el navegador o telefono del cliente.
+- [ ] Verificar que monto, moneda, StoreID, cita e identificador interno
+      coincidan antes de aprobar el pago.
+- [ ] Procesar notificaciones repetidas sin duplicar pagos.
+- [ ] Ejecutar primero el flujo completo en ambiente de pruebas.
+
+#### Estrategia comercial de integracion
+
+Para una primera prueba puede permitirse que el propietario ingrese su Token y
+StoreID. Antes de escalar a muchos negocios se debe evaluar con PayPhone el
+modelo `Comercio aliado: token de tercero`, diseñado para plataformas SaaS:
+
+- Nava configura una aplicacion base como partner.
+- Cada barberia queda asociada como comercio aliado.
+- Cada comercio recibe credenciales separadas.
+- Los fondos se acreditan directamente en la wallet del comercio aliado.
+
+Este modelo requiere autorizacion previa, validacion comercial y aceptacion de
+las condiciones vigentes del proveedor. No se debe activar en produccion
+basandose solamente en la documentacion tecnica.
+
+Referencias oficiales revisadas durante la definicion:
+
+- Credenciales y ambientes:
+  `https://docs.payphone.app/configuracion-de-ambiente-y-credenciales`.
+- Token de terceros para plataformas:
+  `https://docs.payphone.app/token-de-terceros`.
+- Notificacion externa:
+  `https://docs.payphone.app/notificacion-externa`.
+- API Link:
+  `https://docs.payphone.app/api-link`.
+- API Sale y consulta de transacciones:
+  `https://docs.payphone.app/api-sale`.
+
+### Estados de pagos
+
+El modelo debe distinguir, como minimo:
+
+```text
+pending
+processing
+proof_submitted
+approved
+rejected
+cancelled
+expired
+reversed
+refunded
+```
+
+El estado simplificado actual `AppointmentPaymentStatus.PENDING/PAID` no es
+suficiente para el nuevo flujo. Puede conservarse como resumen derivado durante
+la migracion, pero la fuente de verdad debe ser un registro de pagos.
+
+### Persistencia propuesta
+
+Separar responsabilidades en modelos equivalentes a:
+
+```text
+PaymentSettings
+- organizationId
+- cashEnabled
+- bankTransferEnabled
+- payPhoneEnabled
+- depositRequirement
+- depositCalculation
+- depositValue
+- allowFullPayment
+
+BankAccount
+- organizationId
+- datos de la unica cuenta activa
+- qrPrivateAsset
+- isActive
+
+PaymentProviderConnection
+- organizationId
+- provider
+- environment
+- storeId
+- encryptedToken
+- status
+- verifiedAt
+
+AppointmentPayment
+- appointmentId
+- method
+- amountCents
+- currencyCode
+- status
+- providerTransactionId
+- clientTransactionId
+- createdByUserId
+- reviewedByUserId
+- timestamps
+
+TransferProof
+- appointmentPaymentId
+- privateAsset
+- submittedAt
+- reviewedAt
+- reviewReason
+
+BookingPaymentHold
+- appointment o solicitud publica
+- startsAt
+- expiresAt
+- status
+```
+
+- [ ] Usar restricciones unicas para idempotencia de proveedor.
+- [ ] Relacionar reversos y reembolsos con el pago original.
+- [ ] Nunca editar destructivamente un movimiento aprobado; registrar la
+      operacion compensatoria.
+- [ ] Conservar monto, moneda y datos historicos aunque cambie el servicio.
+
+### Permisos de Wallet aprobados
+
+- Propietario: acceso completo.
+- Administrador autorizado: historial, registro y verificacion segun excepciones.
+- Recepcionista autorizado: efectivo y verificacion de transferencias.
+- Barbero: solamente estado de pago de sus propias citas.
+- Token, StoreID, configuracion del proveedor y reembolsos: propietario.
+
+### Dependencias y riesgos
+
+- [ ] Completar la reserva publica antes de prometer anticipos al cliente final.
+- [ ] Definir almacenamiento privado para comprobantes.
+- [ ] Acordar con PayPhone webhook, dominio, ambiente de produccion y modalidad
+      comercial.
+- [ ] Definir politica operativa de disputas, devoluciones y comprobantes
+      fraudulentos.
+- [ ] Revisar requisitos legales, privacidad y conservacion de datos financieros.
+- [ ] No habilitar produccion hasta superar pruebas de idempotencia, concurrencia,
+      reversion, expiracion y recuperacion ante fallos.
+
+## Modulo planificado 4 - Suscripcion
+
+### Planes comerciales aprobados
+
+Solo existiran dos nombres de plan:
+
+```text
+Esencial
+Multi
+```
+
+Los precios quedan expresamente `Por definir`. No se escribiran precios
+provisionales en la aplicacion ni en constantes del cliente. El backend debera
+permitir precios nulos o no publicados.
+
+### Plan Esencial
+
+Dirigido tanto a `Solo yo` como a `Tengo un negocio` cuando opera una sola
+sucursal:
+
+- Una sucursal.
+- Colaboradores ilimitados.
+- Clientes, servicios y reservas sin limite comercial por usuario.
+- Agenda individual y de equipo.
+- Pagina publica y enlace personalizado de reservas.
+- Horario general y horarios por colaborador.
+- Roles y permisos personalizados.
+- Lista de espera.
+- Gestion de clientes e historial.
+- Caja basica.
+- Nava Wallet.
+- PayPhone, transferencia y efectivo cuando Wallet este habilitada.
+- Anticipos y reglas por servicio.
+- Reportes esenciales.
+- Inventario de una sucursal cuando se implemente.
+- Soporte estandar.
+- Sin cobro adicional por cada barbero.
+
+La diferencia entre profesional individual y negocio se resuelve mediante el
+tipo de cuenta y la experiencia visual, no mediante un tercer plan.
+
+### Plan Multi
+
+Incluye Esencial y agrega operacion de hasta cinco sucursales:
+
+- Colaboradores ilimitados.
+- Colaboradores asignables a varias sucursales.
+- Agenda consolidada y filtro por sucursal.
+- Clientes compartidos entre sucursales.
+- Reportes consolidados y comparativos.
+- Caja independiente por sucursal.
+- Inventario por sucursal y transferencias.
+- Servicios generales con excepciones de precio/duracion por sucursal.
+- Horarios distintos por local.
+- Permisos con alcance por sucursal.
+- Cuenta bancaria y PayPhone configurables por sucursal.
+- Enlace general con selector de sucursal.
+- Enlaces individuales por local.
+- Auditoria consolidada.
+- Exportacion de reportes.
+- Soporte prioritario.
+
+Multi permanecera visible como `Proximamente` hasta que esas capacidades sean
+reales. No debe venderse ni activarse un plan basado en funciones simuladas.
+
+### Matriz comercial resumida
+
+| Capacidad                      | Esencial               | Multi                       |
+| ------------------------------ | ---------------------- | --------------------------- |
+| Sucursales                     | 1                      | Hasta 5                     |
+| Colaboradores                  | Ilimitados             | Ilimitados                  |
+| Reservas, clientes y servicios | Incluidos              | Incluidos                   |
+| Wallet                         | Una sucursal           | Configuracion por sucursal  |
+| Permisos                       | Por colaborador        | Por colaborador y sucursal  |
+| Reportes                       | Esenciales del negocio | Consolidados y comparativos |
+| Enlaces de reserva             | Uno                    | General y por sucursal      |
+| Soporte                        | Estandar               | Prioritario                 |
+
+### Flujo de suscripcion para el MVP
+
+- [ ] Crear la ruta movil `/subscription`.
+- [ ] Mostrar plan actual y estado.
+- [ ] Estados previstos: `trial`, `active`, `past_due`, `suspended`,
+      `cancelled`.
+- [ ] Mostrar funciones y consumo frente a limites aplicables.
+- [ ] Mostrar Esencial como plan disponible.
+- [ ] Mostrar Multi como `Proximamente`.
+- [ ] Prueba de 14 dias sin tarjeta.
+- [ ] Periodo de gracia de siete dias.
+- [ ] Despues de la gracia, pasar a modo lectura sin eliminar informacion.
+- [ ] Explicar con precision que accion esta bloqueada y como reactivar.
+- [ ] No bloquear acceso a exportacion/consulta de informacion propia por un
+      cambio de plan sin una politica comercial y legal revisada.
+- [ ] Durante el MVP la suscripcion sera simulada; no se integrara cobro real.
+- [ ] El metodo de pago de la suscripcion se mostrara `Proximamente` o se
+      omitira mientras no exista facturacion del SaaS.
+- [ ] Las definiciones de planes y limites viviran en backend.
+
+### Fuera de alcance comercial
+
+- [ ] No incluir notificaciones de WhatsApp en Esencial, Multi, Wallet ni la
+      comparacion de planes.
+- [ ] No mostrar cuotas de WhatsApp ni prometer integracion futura en esta fase.
+- [ ] No cobrar por colaborador/barbero.
+- [ ] No definir todavia precio mensual o anual.
+- [ ] No reutilizar las credenciales PayPhone del negocio para cobrar la
+      suscripcion de Nava.
+
+## Flujo comercial consolidado
+
+```text
+El usuario elige experiencia:
+  Solo yo
+  o Tengo un negocio
+
+Ambas experiencias pueden usar:
+  Plan Esencial
+
+Si el negocio necesita varias sucursales:
+  Plan Multi
+
+Los cobros de citas:
+  pertenecen al negocio y pasan por sus metodos de pago
+
+El cobro futuro de la suscripcion Nava:
+  sera un flujo separado y aun no esta definido
+```
+
+- El tipo de cuenta personaliza UX/UI; no otorga permisos.
+- El rol y sus excepciones determinan autorizacion.
+- El plan determina limites comerciales y capacidades disponibles.
+- La sucursal determina el alcance operativo de horarios, caja, pagos y
+  reportes.
+- PayPhone procesa pagos de clientes hacia el negocio; Nava no debe mezclar esos
+  fondos con su propia facturacion.
+
+## Rutas previstas y conexion con el menu
+
+Actualizar `business-settings.tsx` solamente cuando cada destino exista:
+
+```text
+Horario del negocio      -> /business-schedule
+Configuracion avanzada   -> /advanced-settings
+Nava Wallet              -> /wallet
+Suscripcion              -> /subscription
+```
+
+- [ ] Extender el tipo `SettingsMenuItem.route` con rutas reales.
+- [ ] Mantener el aviso temporal hasta que el corte vertical correspondiente
+      este listo.
+- [ ] No apuntar una tarjeta a una pantalla incompleta que pueda perder datos.
+- [ ] Conservar navegacion de regreso estable hacia `/business-settings` o
+      `/settings`.
+
+## Estrategia y orden de implementacion
+
+### Fase A - Horario general del negocio
+
+1. Diseñar migracion y compatibilidad con apertura/cierre actuales.
+2. Crear validacion y tipos compartidos.
+3. Implementar API y reglas de permisos.
+4. Integrar horario general con disponibilidad y citas.
+5. Crear UI semanal y panel de horas.
+6. Conectar la tarjeta.
+7. Ejecutar pruebas y documentar resultado.
+
+Esta debe ser la primera fase porque modifica una regla central de
+disponibilidad y establece el patron de panel inferior reutilizable.
+
+### Fase B - Configuracion avanzada
+
+Dividirla en cortes independientes:
+
+1. Contenedor visual y secciones `Proximamente`.
+2. Tipo de cuenta y politica centralizada de experiencia.
+3. Permisos hibridos y auditoria.
+4. Enlace canonico, disponibilidad, alias y redireccion.
+
+No mezclar los cuatro cortes en una unica migracion.
+
+### Fase C - Suscripcion simulada
+
+1. Crear `Plan` y `Subscription` con precios no publicados.
+2. Sembrar Esencial y Multi.
+3. Implementar estados, prueba, gracia y modo lectura.
+4. Aplicar limites de sucursal en backend.
+5. Crear comparador y pantalla movil.
+6. Mantener Multi deshabilitado hasta soporte multisucursal.
+
+Esta fase puede completarse antes de Wallet porque no mueve dinero real.
+
+### Fase D - Nava Wallet
+
+Dividir en puertas de seguridad:
+
+1. Modelos de pagos y configuracion sin proveedor externo.
+2. Efectivo y relacion con caja.
+3. Transferencia, comprobantes privados y aprobacion.
+4. Retenciones temporales de horarios.
+5. PayPhone en sandbox.
+6. Webhook/confirmacion, idempotencia y reversos.
+7. Revision comercial y autorizacion PayPhone.
+8. Produccion controlada.
+
+No saltar directamente a credenciales de produccion.
+
+## Verificacion obligatoria por fase
+
+- [ ] `prisma validate`.
+- [ ] Migraciones aplicadas en una base de desarrollo limpia y en una base con
+      datos existentes.
+- [ ] Prisma Client regenerado.
+- [ ] Typecheck de API, movil y paquetes modificados.
+- [ ] Pruebas unitarias de validacion y calculos.
+- [ ] Pruebas de integracion con PostgreSQL.
+- [ ] Pruebas de aislamiento multi-tenant.
+- [ ] Pruebas de permisos efectivos y escalamiento de privilegios.
+- [ ] Pruebas de concurrencia para slugs y horarios.
+- [ ] Pruebas de disponibilidad dentro/fuera del horario general.
+- [ ] Pruebas de idempotencia y repeticion de webhooks para Wallet.
+- [ ] Verificacion visual en Android, iOS y Expo Web.
+- [ ] `git diff --check`.
+- [ ] Actualizar esta seccion cambiando a `[x]` solamente lo que haya sido
+      implementado y verificado.
+
+## Decisiones pendientes antes de produccion
+
+- [ ] Precio de Esencial.
+- [ ] Precio de Multi.
+- [ ] Periodicidad comercial y eventual descuento anual.
+- [ ] Acuerdo PayPhone para produccion y modalidad partner/comercio aliado.
+- [ ] Comisiones, retenciones y comunicacion comercial de PayPhone.
+- [ ] Endpoint o mecanismo oficial para consultar saldo retirable; mientras no
+      exista, Nava mostrara cobros registrados, no saldo real.
+- [ ] Tiempo maximo de revision de un comprobante ya enviado.
+- [ ] Politica de devoluciones fuera de la ventana de reverso del proveedor.
+- [ ] Almacenamiento privado y periodo de conservacion de comprobantes.
+- [ ] Contenido funcional de Configuracion general.
+- [ ] Contenido funcional de Informacion adicional.
+- [ ] Reglas definitivas de reservas anticipadas publicas.
+- [ ] Desarrollo completo de reservas publicas.
+- [ ] Desarrollo real multisucursal antes de activar Multi.
+
+## Proxima accion de desarrollo
+
+El siguiente bloque de desarrollo, ya sea como continuacion de esta sesion o
+desde una sesion futura, debe comenzar exclusivamente con
+`Horario general del negocio`. Antes de modificar codigo se debe:
+
+1. Revisar esta planificacion completa.
+2. Inspeccionar el estado de las migraciones y consumidores de
+   `openingTime/closingTime`.
+3. Confirmar que los cambios locales existentes no se sobrescriban.
+4. Crear un plan de implementacion limitado a la Fase A.
+5. Implementar y verificar el corte vertical.
+6. Actualizar este documento con archivos, migracion, endpoints, pruebas y
+   pendientes reales.
+
+Configuracion avanzada, Suscripcion y Wallet no deben iniciarse en paralelo con
+Horario del negocio salvo una autorizacion posterior explicita.
+
+## Implementacion 2026-07-29 - Fase A completada
+
+### Resultado funcional
+
+Se completo el primer corte vertical de esta planificacion:
+`Horario general del negocio`. La tarjeta ya no muestra el aviso temporal;
+navega a `/business-schedule` y permite administrar la semana completa.
+
+La pantalla implementada:
+
+- muestra lunes a domingo como tarjetas verticales;
+- conserva el orden solicitado de checkbox y engranaje debajo;
+- distingue visualmente dias abiertos y cerrados;
+- conserva las horas al cerrar temporalmente un dia;
+- deshabilita la configuracion mientras el dia esta cerrado;
+- permite un solo intervalo diario;
+- reutiliza `TimeField` y el selector de rueda del registro inicial;
+- abre la edicion en una hoja inferior;
+- permite cerrar la hoja al tocar fuera, cancelar o deslizar el tirador hacia
+  abajo;
+- valida apertura anterior al cierre;
+- mantiene el borrador cuando una solicitud falla;
+- advierte antes de salir con cambios sin guardar;
+- muestra carga, error, reintento, guardado en curso y confirmacion de exito.
+
+### Persistencia y compatibilidad
+
+Se agrego `BusinessWeeklySchedule`, asociado tanto a organizacion como a
+sucursal. La implementacion usa `startMinute` y `endMinute`; ambos valores se
+conservan incluso cuando `isOpen=false`. Esta es la regla equivalente elegida
+para restaurar el ultimo intervalo al volver a activar un dia.
+
+La migracion
+`20260729120000_add_business_weekly_schedules`:
+
+- crea la tabla, claves foraneas e indices;
+- restringe `weekday` a `0..6`;
+- restringe los minutos a un intervalo valido;
+- exige una sola fila por `locationId + weekday`;
+- inicializa las cuentas existentes con siete dias activos;
+- toma `opening_time` y `closing_time` del perfil de registro del propietario;
+- usa `09:00-18:00` solamente como respaldo para datos historicos incompletos;
+- no reemplaza filas ya existentes.
+
+El onboarding crea desde ahora las siete filas dentro de su misma transaccion.
+Los campos historicos `openingTime` y `closingTime` se mantienen porque aun son
+parte del perfil de registro y no corresponde eliminarlos en este corte.
+
+### API, autorizacion y auditoria
+
+Se agregaron:
+
+- `GET /v1/business-schedule`, protegido por `schedule.read`;
+- `PUT /v1/business-schedule`, protegido por `schedule.manage`;
+- validacion de semana completa, siete dias unicos e intervalos validos;
+- comprobacion de que la sucursal pertenece a la organizacion autenticada;
+- reemplazo transaccional mediante `upsert`;
+- auditoria `business_weekly_schedule.replaced` con estado anterior y posterior;
+- inicializacion diferida e idempotente si una cuenta historica no tiene las
+  siete filas.
+
+Un colaborador sin `schedule.manage` puede consultar el horario si su rol tiene
+lectura, pero no puede modificarlo. El propietario mantiene administracion.
+
+### Integracion con Agenda
+
+La disponibilidad efectiva ahora se calcula como la interseccion entre el
+horario del negocio y el horario del profesional. Un dia cerrado devuelve cero
+espacios. La creacion y reprogramacion reutilizan la misma comprobacion en el
+servidor y responden `OUTSIDE_BUSINESS_HOURS` cuando corresponde.
+
+La linea temporal de la Agenda movil consulta el horario semanal y:
+
+- muestra el intervalo correspondiente al dia seleccionado;
+- queda vacia si el negocio esta cerrado;
+- recorta horarios profesionales que excedan la apertura o cierre del negocio.
+
+Tambien se fortalecio el reconocimiento de conflictos concurrentes de
+PostgreSQL/Prisma para conservar la respuesta `409 APPOINTMENT_CONFLICT` ante
+dos intentos simultaneos sobre el mismo espacio.
+
+### Archivos del corte
+
+- `packages/database/prisma/schema.prisma`
+- `packages/database/prisma/migrations/20260729120000_add_business_weekly_schedules/migration.sql`
+- `packages/validation/src/index.ts`
+- `packages/validation/src/index.test.ts`
+- `packages/api-client/src/index.ts`
+- `apps/api/src/business-schedule.ts`
+- `apps/api/src/app.ts`
+- `apps/api/src/agenda.ts`
+- `apps/api/src/app.integration.test.ts`
+- `apps/mobile/app/(onboarding)/business-schedule.tsx`
+- `apps/mobile/app/(onboarding)/business-settings.tsx`
+- `apps/mobile/app/(onboarding)/agenda.tsx`
+
+### Verificacion ejecutada
+
+- [x] `prisma validate`.
+- [x] Prisma Client regenerado.
+- [x] Migracion aplicada correctamente en PostgreSQL local.
+- [x] 16 pruebas unitarias de validacion aprobadas.
+- [x] 17 pruebas de API aprobadas, incluidas las pruebas con PostgreSQL.
+- [x] Prueba especifica de horario, permisos, auditoria, disponibilidad y
+      rechazo de citas fuera del horario.
+- [x] Prueba de doble reserva concurrente aprobada.
+- [x] Typecheck de API aprobado.
+- [x] Typecheck de la aplicacion movil aprobado.
+- [x] Exportacion Expo Web completada: 1114 modulos empaquetados.
+- [x] `git diff --check` sin errores de espacios.
+
+La inspeccion visual automatizada no pudo ejecutarse porque la sesion de
+desarrollo no tenia un navegador conectado. La exportacion web si fue exitosa,
+pero continua pendiente revisar gestos y dimensiones en un dispositivo Android,
+un dispositivo iOS y un navegador real antes de declarar verificacion visual
+multiplataforma.
+
+### Estado al cerrar esta fase
+
+Fase A queda implementada. No se inicio Configuracion avanzada, Suscripcion ni
+Wallet en codigo, por lo que sus casillas y decisiones siguen pendientes. El
+siguiente corte recomendado es `Configuracion avanzada`, comenzando por su
+contenedor visual y los bloques marcados `Proximamente`, y despues separando
+tipo de cuenta, permisos hibridos y enlace de reserva en entregas verificables.
+
+## Corrección de coherencia entre registro y configuración — 29 de julio de 2026
+
+### Problema detectado
+
+El registro moderno recopilaba correctamente el tipo de cuenta, los datos del negocio,
+los servicios y el horario inicial, pero al finalizar sólo marcaba
+`onboardingCompletedAt`. No creaba las entidades operativas que utiliza el resto de la
+aplicación:
+
+- organización;
+- sede principal;
+- membresía `OWNER`;
+- acceso del propietario a la sede;
+- horario general del negocio;
+- horario profesional del propietario;
+- servicios reales y su asignación al propietario.
+
+Por esta razón una cuenta recién creada podía llegar al dashboard, pero las páginas de
+configuración y agenda no encontraban una organización activa. Además:
+
+- `accountType` se guardaba, pero no personalizaba la experiencia;
+- una cuenta profesional era obligada a pasar por una captura de colaboradores;
+- los colaboradores capturados eran borradores sin correo y no podían convertirse de
+  forma segura en usuarios o invitaciones;
+- la opción Equipo redirigía erróneamente a Clientes;
+- Editar información del negocio abría la edición del perfil personal;
+- el enlace público continuaba usando el dominio anterior;
+- las pruebas de integración no impedían usar accidentalmente la base local principal.
+
+### Decisión funcional
+
+`accountType` describe la experiencia del producto, no los permisos:
+
+- `PROFESSIONAL` se presenta como **Solo yo**.
+- `BUSINESS` se presenta como **Tengo un negocio**.
+- En ambos casos el usuario que crea la cuenta obtiene el rol de autorización `OWNER`.
+
+Para el MVP, ambas modalidades pueden operar inmediatamente:
+
+- El propietario queda habilitado como profesional.
+- Sus servicios iniciales se asignan a su membresía.
+- Su horario profesional inicial coincide con el horario general configurado durante el
+  registro.
+- **Solo yo** oculta las opciones de colaboradores.
+- **Tengo un negocio** muestra la gestión de equipo e invitaciones después de finalizar
+  el registro.
+
+No se crearán colaboradores ficticios a partir de nombre y cargo. El paso antiguo de
+captura de colaboradores deja de formar parte del recorrido obligatorio. Los
+colaboradores reales se incorporarán desde Gestión de equipo, donde se dispone de un
+correo y del flujo formal de invitación.
+
+### Flujo corregido
+
+1. El usuario elige Solo yo o Tengo un negocio.
+2. Completa los datos básicos y el horario inicial.
+3. Registra al menos un servicio.
+4. Revisa o completa la información de la cuenta.
+5. Al confirmar, `POST /v1/onboarding/complete-account-setup` ejecuta una transacción
+   idempotente que:
+   - crea la organización y un `slug` único;
+   - crea la sede Principal;
+   - crea la membresía `OWNER` y su acceso a la sede;
+   - crea los siete días del horario general;
+   - crea los siete días del horario profesional del propietario;
+   - transforma los borradores de servicios en categorías y servicios reales;
+   - asigna los servicios al propietario;
+   - elimina los borradores ya materializados;
+   - marca el onboarding como completado.
+6. Una repetición de la petición no duplica datos y devuelve la organización ya creada.
+
+### Ajustes de interfaz y navegación
+
+- El onboarding ya no exige agregar colaboradores.
+- Configuración muestra textos y opciones según Solo yo o Tengo un negocio.
+- Equipo abre la gestión real de operaciones/invitaciones.
+- Información del negocio usa los datos del onboarding y, tras completarse, sincroniza
+  los cambios con la organización y la sede.
+- El enlace de reserva se genera a partir del `slug` real de la organización bajo
+  `https://book.nava.app`.
+
+### Protección de datos de pruebas
+
+Las pruebas de integración sólo podrán ejecutarse con una URL identificada
+explícitamente como base de pruebas y el puerto del servicio `postgres-test` (`5433`).
+Una URL de la base local principal será rechazada antes de cualquier limpieza.
+
+### Criterios de aceptación
+
+- Una cuenta nueva puede abrir horario, servicios, agenda y configuración sin
+  `ORGANIZATION_REQUIRED`.
+- Existen exactamente una organización, una sede y una membresía propietaria después
+  de completar el registro.
+- Los siete días y los servicios iniciales conservan la configuración capturada.
+- Repetir la finalización no crea duplicados.
+- Solo yo no muestra gestión de colaboradores; Tengo un negocio sí.
+- Ninguna prueba automatizada puede truncar la base local de desarrollo.
+
+### Estado de implementación y verificación
+
+Implementado y verificado en esta sesión:
+
+- finalización transaccional e idempotente del onboarding moderno;
+- materialización de organización, sede, propietario, accesos, horarios,
+  categorías, servicios y asignaciones;
+- sincronización posterior de información con organización y sede;
+- enlace público bajo `book.nava.app`;
+- recorrido inicial sin colaboradores ficticios;
+- personalización visual y de opciones para Solo yo y Tengo un negocio;
+- rutas corregidas para información del negocio y gestión de equipo;
+- validación de cierre posterior a la apertura;
+- bloqueo preventivo de pruebas contra una base que no sea
+  `barber_saas_test:5433`.
+
+Verificaciones completadas:
+
+- typecheck de API, validaciones y aplicación móvil;
+- 18 pruebas de API aprobadas, incluida la nueva cobertura del onboarding
+  moderno y su reintento;
+- 17 pruebas de validación aprobadas;
+- 6 pruebas de componentes móviles aprobadas;
+- ESLint aprobado en todos los archivos intervenidos.
+
+### Qué sigue después de esta corrección
+
+Antes de ampliar el producto se realizará una aceptación manual del recorrido
+completo con la base local limpia:
+
+1. Registrar una cuenta **Solo yo**.
+2. Confirmar que se crean el negocio, la sede, el horario y los servicios.
+3. Verificar que no aparece Gestión de colaboradores.
+4. Registrar una cuenta **Tengo un negocio** con datos diferentes.
+5. Confirmar que Gestión de colaboradores abre Operaciones y permite iniciar
+   el flujo real de invitación.
+6. Editar la información y el horario desde Ajustes, cerrar sesión y comprobar
+   que los cambios persisten al volver a ingresar.
+
+Superada esa aceptación, el siguiente corte de desarrollo recomendado es
+**Configuración avanzada**, porque ya dispone de `accountType`, organización,
+membresía propietaria y `slug` reales.
+
+#### Alcance propuesto para Configuración avanzada
+
+- Crear la pantalla y conectarla desde
+  `business-settings.tsx`.
+- **Tipo de cuenta**:
+  - mostrar Solo yo o Tengo un negocio;
+  - permitir pasar de Solo yo a Tengo un negocio;
+  - al intentar pasar de Tengo un negocio a Solo yo, no borrar colaboradores
+    ni información: mostrar confirmación y bloquear el cambio si existen
+    membresías o invitaciones activas.
+- **Permisos a colaboradores**:
+  - visible únicamente para Tengo un negocio;
+  - usar el modelo híbrido ya acordado: permisos base por rol y excepciones
+    individuales por colaborador;
+  - el rol sirve como plantilla y el ajuste individual sólo sobrescribe las
+    capacidades seleccionadas.
+- **Modificar enlace de reserva**:
+  - mostrar, copiar, compartir y abrir el enlace actual;
+  - permitir editar el `slug`;
+  - validar disponibilidad antes de guardar;
+  - conservar la restricción única en el servidor.
+- **Configuración general**:
+  - construir únicamente el contenedor visual;
+  - mostrar sus opciones como Próximamente hasta definir reglas funcionales.
+- **Reservas anticipadas** e **Información adicional**:
+  - mantener como secciones visuales Próximamente durante el MVP.
+- Guardar cambios con estados de carga, errores del servidor y confirmación
+  visible.
+
+#### Orden de implementación del siguiente corte
+
+1. Aceptación manual de Solo yo y Tengo un negocio.
+2. Contenedor y navegación de Configuración avanzada.
+3. Edición segura del tipo de cuenta.
+4. Edición y disponibilidad del enlace de reserva.
+5. Permisos por rol con excepciones individuales.
+6. Pruebas de API, permisos, persistencia y UI.
+
+Wallet y Suscripción permanecen fuera de este siguiente corte. Se desarrollarán
+después de Configuración avanzada para evitar que pagos y límites comerciales
+dependan de una estructura de cuenta todavía incompleta.
+
+## Corrección de navegación y altura del onboarding — 29 de julio de 2026
+
+### Problemas reproducidos
+
+- Configuración avanzada no tenía una ruta y sólo mostraba el aviso genérico.
+- Gestión de servicios apuntaba a `/services`, que corresponde al alta inicial.
+  El guardián del onboarding detectaba una cuenta completada y la devolvía al
+  dashboard.
+- Colaboradores utilizaba una redirección sin grupo explícito y podía rebotar al
+  inicio cuando la consulta de organización todavía conservaba el valor vacío
+  anterior a finalizar el registro.
+- El botón principal de las primeras pantallas estaba al final del contenido
+  desplazable. La ilustración, los espacios flexibles y el alto del botón
+  provocaban un recorrido vertical innecesario en pantallas móviles.
+
+### Correcciones aplicadas
+
+- Se creó `advanced-settings.tsx` y Configuración avanzada ahora abre esa
+  pantalla.
+- La pantalla avanzada muestra:
+  - el tipo de cuenta actual;
+  - acceso a colaboradores únicamente para Tengo un negocio;
+  - enlace de reservas con acciones Copiar, Compartir y Abrir;
+  - Configuración general, Reservas anticipadas e Información adicional como
+    Próximamente.
+- Gestión de servicios abre explícitamente
+  `/(app)/operations?section=services`.
+- Gestión de colaboradores abre explícitamente
+  `/(app)/operations?section=team`.
+- La barra inferior oculta Equipo para Solo yo y lo conserva para Tengo un
+  negocio.
+- Operaciones interpreta el parámetro `section` y muestra solamente la sección
+  solicitada, con un título coherente, en lugar de presentar todo el formulario
+  operativo.
+- Al finalizar el onboarding se invalida `current-organization` antes de abrir
+  el dashboard, evitando redirecciones causadas por datos en caché.
+- El botón Comenzar configuración quedó fijo debajo del contenido.
+- El botón Siguiente de Servicios quedó fijo y visible aunque existan servicios
+  guardados en la lista.
+- Se redujeron ilustraciones, márgenes, títulos y botones para alturas menores a
+  850 px.
+- El contenido de bienvenida y servicios cambia entre Solo yo y Tengo un
+  negocio.
+- El indicador del recorrido se actualizó a tres pasos.
+
+### Verificación
+
+- [x] Typecheck móvil.
+- [x] ESLint de los archivos intervenidos.
+- [x] 6 pruebas de componentes móviles.
+- [x] Exportación Expo Web con 1115 módulos y reconocimiento de la nueva ruta.
+- [ ] Inspección visual en navegador/dispositivo: el entorno no expuso una
+      sesión de navegador conectada. Se mantiene como prueba manual inmediata.
+
+## Aislamiento de la interfaz móvil heredada — 29 de julio de 2026
+
+### Hallazgo
+
+La aplicación mantenía dos sistemas visuales en paralelo:
+
+- la interfaz vigente, con fondo blanco y componentes similares a
+  `dashboard.tsx`;
+- la interfaz heredada, construida con `Screen`, `PrimaryButton`, `TextField`,
+  `SelectionList` y `theme.ts`.
+
+El tema heredado usa fondo `#101816`, superficie `#18231f` y acento verde
+`#d9ff70`. Gestión de servicios y colaboradores todavía enviaban a
+`(app)/operations.tsx`, por lo que ambas modalidades de cuenta podían abandonar
+la experiencia blanca.
+
+### Corrección de navegación
+
+- Se creó `service-management.tsx` con la interfaz blanca:
+  - consulta de servicios y categorías reales;
+  - creación de categorías;
+  - creación de servicios;
+  - asignación automática del servicio nuevo al propietario y sede actuales;
+  - resumen y catálogo activo.
+- Se creó `team-management.tsx` con la interfaz blanca:
+  - listado del equipo real;
+  - invitaciones pendientes;
+  - creación e invitación por correo;
+  - elección inicial de rol;
+  - bloqueo de acceso para cuentas Solo yo.
+- Business Settings, Configuración avanzada, Equipo y la barra inferior ahora
+  apuntan a estas páginas nuevas.
+- La ruta de compatibilidad `equipo.tsx` redirige a `team-management`.
+- `app/index.tsx`, `account-setup.tsx`, aceptación de invitaciones y el resumen
+  heredado regresan al dashboard blanco, no a `/(app)`.
+- Si Agenda no encuentra clientes, abre Clientes en lugar de enviar a Equipo.
+- Los archivos heredados `(app)/index.tsx`, `(app)/agenda.tsx` y
+  `(app)/operations.tsx` quedaron convertidos en redirecciones de
+  compatibilidad. Incluso un enlace guardado ya no presenta la UI verde.
+- No quedan referencias desde la navegación vigente hacia `/(app)` ni
+  `/operations`.
+
+### Inventario de diseños móviles heredados que permanecen
+
+Pantallas todavía construidas con la base visual antigua:
+
+1. `apps/mobile/app/(auth)/recover.tsx`
+   - recuperación de acceso;
+   - usa `Screen`.
+2. `apps/mobile/app/(auth)/reset-password.tsx`
+   - cambio de contraseña;
+   - usa `Screen`.
+3. `apps/mobile/app/(onboarding)/accept-invitation.tsx`
+   - aceptación de una invitación al equipo;
+   - usa `Screen`.
+4. `apps/mobile/app/(onboarding)/location.tsx`
+   - paso de ubicación del onboarding anterior;
+   - ya no forma parte del recorrido actual.
+5. `apps/mobile/app/(onboarding)/summary.tsx`
+   - resumen del onboarding anterior;
+   - ya no forma parte del recorrido actual.
+
+Infraestructura visual heredada:
+
+- `apps/mobile/src/components/Screen.tsx`;
+- `apps/mobile/src/components/PrimaryButton.tsx`;
+- `apps/mobile/src/components/TextField.tsx`;
+- `apps/mobile/src/components/SelectionList.tsx`;
+- `apps/mobile/src/theme.ts`.
+
+Las pantallas `location.tsx` y `summary.tsx` se consideran candidatas a
+eliminación después de confirmar que no existen enlaces externos antiguos. Las
+pantallas de recuperación, restablecimiento e invitaciones siguen siendo
+funcionales y deberán migrarse al estilo blanco en un corte posterior.
+
+### Verificación
+
+- [x] Typecheck móvil.
+- [x] 6 pruebas de componentes móviles.
+- [x] ESLint aprobado en las páginas nuevas y archivos de navegación
+      intervenidos.
+- [x] Exportación Expo Web aprobada con 1117 módulos.
+- [x] Búsqueda estática sin referencias desde la navegación vigente a
+      `/(app)` o `/operations`.
+- [ ] `agenda.tsx` conserva deuda previa de reglas React Hooks/refs al ejecutar
+      ESLint directamente sobre todo el archivo; no fue introducida por esta
+      corrección de ruta.
+
+## Revisión previa a eliminar diseños móviles heredados — 29 de julio de 2026
+
+### Decisión de seguridad
+
+No se eliminó ninguna pantalla en este corte. La petición combina la intención
+de retirar el código antiguo con la necesidad de verlo antes de decidir. Para
+evitar una pérdida equivocada, se habilitó un catálogo temporal y aislado que
+no aparece en la navegación normal.
+
+Ruta del catálogo:
+
+- `/legacy-designs`
+
+Las pantallas del catálogo se abren con `preview=1`. En ese modo se bloquean
+las acciones que podrían modificar datos:
+
+- envío de enlaces de recuperación;
+- cambio de contraseña;
+- aceptación de invitaciones;
+- guardado de la primera sucursal;
+- creación de la organización desde el resumen anterior.
+
+### Resultado del análisis de dependencias
+
+1. `recover.tsx`
+   - está enlazada desde `LoginFullScreen.tsx`;
+   - inicia el flujo real de recuperación;
+   - no debe eliminarse sin crear antes su reemplazo visual.
+2. `reset-password.tsx`
+   - es el destino del token generado por `recover.tsx`;
+   - completa el cambio real de contraseña;
+   - no debe eliminarse sin reemplazo.
+3. `accept-invitation.tsx`
+   - recibe usuarios desde `LoginFullScreen.tsx` y `RegistrationFlow.tsx`;
+   - acepta la pertenencia real a un equipo;
+   - no debe eliminarse sin reemplazo.
+4. `location.tsx`
+   - sólo enlaza con `summary.tsx`;
+   - el flujo vigente de `organization.tsx` avanza a `services.tsx`;
+   - no tiene enlaces entrantes desde la navegación actual;
+   - es candidata segura a eliminación, junto con sus dependencias exclusivas.
+5. `summary.tsx`
+   - depende únicamente de los datos del onboarding anterior;
+   - sólo recibe navegación desde `location.tsx`;
+   - no tiene enlaces entrantes desde el flujo vigente;
+   - es candidata segura a eliminación junto con `location.tsx`.
+
+### Direcciones de vista previa
+
+Tomando como base Expo Web `http://localhost:8081`:
+
+- catálogo: `http://localhost:8081/legacy-designs`;
+- recuperar acceso:
+  `http://localhost:8081/recover?preview=1`;
+- nueva contraseña:
+  `http://localhost:8081/reset-password?preview=1&token=token-de-vista-previa`;
+- aceptar invitación:
+  `http://localhost:8081/accept-invitation?preview=1&token=00000000000000000000000000000000`;
+- primera sucursal:
+  `http://localhost:8081/location?preview=1`;
+- resumen anterior:
+  `http://localhost:8081/summary?preview=1`.
+
+En un túnel o dominio distinto se conserva la ruta y sólo se sustituye
+`http://localhost:8081` por el origen activo.
+
+### Estrategia recomendada para la siguiente decisión
+
+- Eliminar `location.tsx` y `summary.tsx` si la revisión visual confirma que no
+  contienen elementos que se quieran rescatar.
+- Mantener temporalmente recuperación, nueva contraseña y aceptación de
+  invitaciones por su lógica activa.
+- Rediseñar esas tres pantallas funcionales con el sistema blanco vigente.
+- Después de migrarlas, comprobar si `Screen`, `PrimaryButton`, `TextField`,
+  `SelectionList` y `theme.ts` quedaron sin consumidores; sólo entonces
+  retirar la infraestructura heredada.
+- Eliminar `legacy-designs.tsx` y el modo `preview` al cerrar la revisión.
+
+### Verificación
+
+- [x] Typecheck móvil.
+- [x] ESLint de las seis pantallas intervenidas.
+- [x] Exportación Expo Web aprobada con 1117 módulos.
+- [x] Expo Router generó la ruta `/legacy-designs`.
+- [x] Las acciones principales están deshabilitadas en modo de vista previa.
+- [ ] Revisión visual y decisión explícita del usuario sobre cada pantalla.
+
+## Eliminación definitiva de la interfaz móvil heredada — 29 de julio de 2026
+
+### Decisión
+
+El usuario revisó el inventario y decidió retirar todas las pantallas
+heredadas. Recuperación de contraseña y aceptación de invitaciones se
+rediseñarán completamente en el futuro. Por tanto, el catálogo temporal y sus
+modos de vista previa también dejaron de ser necesarios.
+
+### Rutas eliminadas
+
+- `apps/mobile/app/(auth)/recover.tsx`;
+- `apps/mobile/app/(auth)/reset-password.tsx`;
+- `apps/mobile/app/(onboarding)/accept-invitation.tsx`;
+- `apps/mobile/app/(onboarding)/location.tsx`;
+- `apps/mobile/app/(onboarding)/summary.tsx`;
+- `apps/mobile/app/(onboarding)/legacy-designs.tsx`.
+
+Estas direcciones ya no forman parte del bundle móvil:
+
+- `/recover`;
+- `/reset-password`;
+- `/accept-invitation`;
+- `/location`;
+- `/summary`;
+- `/legacy-designs`.
+
+### Infraestructura heredada retirada
+
+Después de eliminar las pantallas se comprobó que los siguientes archivos
+quedaron sin consumidores y también fueron retirados:
+
+- `PrimaryButton.tsx` y su prueba;
+- `Screen.tsx`;
+- `SelectionList.tsx`;
+- `TextField.tsx`;
+- `features/onboarding/store.ts`;
+- `features/onboarding/completeOnboarding.ts`;
+- `theme.ts`.
+
+La dependencia `zustand` sólo sostenía el store del onboarding anterior, por
+lo que se eliminó de `apps/mobile/package.json` y de `pnpm-lock.yaml`.
+
+`InlineMessage.tsx` sí continúa siendo utilizado por pantallas vigentes. Se
+conservó, pero se desacopló del tema verde eliminado y ahora utiliza
+contenedores claros para éxito y error.
+
+### Prevención de rutas y acciones rotas
+
+- Inicio de sesión ya no muestra el enlace hacia recuperación.
+- Inicio de sesión y registro ya no intentan redirigir a aceptación de
+  invitaciones mediante `invitationToken`.
+- El registro verificado continúa directamente a `/account-setup`.
+- Gestión de colaboradores conserva el resumen y listado del equipo.
+- La creación y envío de nuevas invitaciones quedó deshabilitada y visible como
+  `Próximamente`, porque sin una pantalla de aceptación funcional se generarían
+  invitaciones que el destinatario no podría completar.
+- Los endpoints del backend para recuperación, cambio de contraseña e
+  invitaciones no se eliminaron. Quedan disponibles para el rediseño futuro y
+  para no afectar otros consumidores.
+
+### Verificación
+
+- [x] Búsqueda estática sin imports ni navegación hacia las rutas eliminadas.
+- [x] Typecheck móvil.
+- [x] ESLint de los archivos adaptados.
+- [x] 3 suites y 5 pruebas móviles aprobadas.
+- [x] Exportación Expo Web aprobada con 1102 módulos.
+- [x] El bundle exportado no contiene ninguna de las seis rutas retiradas.
+
+## Corte consolidado para revisión manual — 29 de julio de 2026
+
+### Estado general del corte
+
+El desarrollo realizado hasta este punto queda técnicamente compilado y con
+pruebas automatizadas aprobadas. El estado funcional del corte es:
+
+> **PENDIENTE DE REVISIÓN MANUAL EN NAVEGADOR Y DISPOSITIVO MÓVIL.**
+
+La revisión manual es necesaria para validar experiencia de uso, dimensiones,
+gestos, persistencia entre sesiones y navegación real con datos creados por el
+usuario. Las verificaciones automatizadas no sustituyen esta aceptación.
+
+### Funcionalidades implementadas que forman parte de la revisión
+
+#### 1. Registro, tipo de cuenta y finalización del onboarding
+
+- Selección entre `Solo yo` y `Tengo un negocio`.
+- Captura de datos personales, datos de actividad o negocio, país, ciudad,
+  teléfono, horario inicial, credenciales y servicios.
+- Verificación del correo antes de continuar.
+- Recorrido inicial sin creación de colaboradores ficticios.
+- Finalización transaccional e idempotente del onboarding.
+- Creación de:
+  - organización;
+  - sede Principal;
+  - membresía propietaria;
+  - acceso del propietario a la sede;
+  - horario general de siete días;
+  - horario profesional del propietario;
+  - categorías y servicios reales;
+  - asignación de servicios al propietario.
+- Personalización de textos y opciones visibles según el tipo de cuenta.
+- Pantallas iniciales compactadas para reducir desplazamiento vertical
+  innecesario.
+
+#### 2. Navegación principal y Ajustes
+
+- Cuenta finalizada abre el dashboard blanco vigente.
+- Inicio, Agenda, Clientes, Caja y Ajustes utilizan navegación compartida.
+- Ajustes muestra la identidad del negocio o actividad actual.
+- `Mi actividad` se utiliza para `Solo yo`.
+- `Mi negocio` se utiliza para `Tengo un negocio`.
+- Ajustes del negocio abre rutas blancas independientes para:
+  - Horario del negocio;
+  - Configuración avanzada;
+  - Gestión de servicios;
+  - Gestión de colaboradores, sólo para `Tengo un negocio`.
+- Los enlaces históricos de `(app)` funcionan únicamente como compatibilidad y
+  redirigen a las páginas blancas actuales.
+- No quedan enlaces de la navegación vigente hacia la antigua pantalla verde de
+  Operaciones.
+
+#### 3. Horario general del negocio
+
+- Consulta y persistencia real mediante:
+  - `GET /v1/business-schedule`;
+  - `PUT /v1/business-schedule`.
+- Semana completa de lunes a domingo.
+- Activación y desactivación individual por checkbox.
+- Engranaje de configuración debajo de cada día.
+- Un solo intervalo de apertura y cierre por día.
+- Hoja inferior con el mismo selector de hora utilizado en el registro.
+- Cierre de la hoja mediante:
+  - botón cerrar;
+  - cancelar;
+  - toque fuera de la hoja;
+  - deslizamiento hacia abajo desde el tirador.
+- Validación de apertura anterior al cierre.
+- Conservación del último intervalo al desactivar y reactivar un día.
+- Aviso al intentar salir con cambios sin guardar.
+- Estados de carga, error, reintento, guardado y confirmación.
+- Inicialización compatible con cuentas ya existentes.
+- Auditoría del reemplazo de horario.
+- Integración con disponibilidad y Agenda:
+  - día cerrado sin espacios;
+  - intersección del horario del negocio con el horario profesional;
+  - rechazo de creación o reprogramación fuera del horario mediante
+    `OUTSIDE_BUSINESS_HOURS`.
+
+#### 4. Gestión de servicios
+
+- Pantalla blanca `/service-management`.
+- Consulta de categorías y servicios reales.
+- Creación de categorías.
+- Creación de servicios con:
+  - nombre;
+  - categoría;
+  - duración;
+  - precio.
+- Asignación automática del servicio creado al propietario y sede actuales.
+- Resumen de totales.
+- Catálogo de servicios persistidos.
+- Ruta separada del alta inicial `/services`, evitando que una cuenta
+  finalizada regrese al onboarding.
+
+#### 5. Configuración avanzada: alcance actual
+
+La pantalla `/advanced-settings` está conectada y actualmente permite:
+
+- mostrar el tipo de cuenta persistido;
+- ocultar colaboradores para `Solo yo`;
+- mostrar acceso a colaboradores para `Tengo un negocio`;
+- mostrar el enlace de reservas generado desde el `slug` real;
+- copiar el enlace;
+- compartir el enlace;
+- abrir el enlace.
+
+Se muestran como `Próximamente` y no deben evaluarse como funcionales:
+
+- Configuración general;
+- Reservas anticipadas;
+- Información adicional.
+
+La edición del tipo de cuenta, la personalización detallada de permisos y la
+edición del `slug` todavía no están implementadas. En este corte sólo se muestra
+el tipo actual y se ofrecen las acciones existentes sobre el enlace.
+
+#### 6. Gestión de colaboradores: alcance temporal
+
+- `/team-management` está disponible únicamente para `Tengo un negocio`.
+- Muestra integrantes actuales.
+- Muestra invitaciones pendientes existentes.
+- Una cuenta `Solo yo` es devuelta a Ajustes del negocio si intenta abrir la
+  ruta directamente.
+- Crear y enviar nuevas invitaciones está deshabilitado y marcado como
+  `Próximamente`.
+
+Esta desactivación es intencional: la pantalla antigua de aceptación de
+invitaciones fue eliminada y el flujo será rediseñado completamente. Los
+endpoints del backend se conservaron para la implementación futura.
+
+#### 7. Eliminación de la interfaz heredada
+
+Se eliminaron definitivamente las rutas móviles:
+
+- `/recover`;
+- `/reset-password`;
+- `/accept-invitation`;
+- `/location`;
+- `/summary`;
+- `/legacy-designs`.
+
+También se retiraron los componentes, tema verde, store y dependencia
+exclusivos de esas pantallas. Recuperación de contraseña y aceptación de
+invitaciones quedan fuera del alcance funcional actual hasta su rediseño.
+
+### Funcionalidades definidas pero todavía no desarrolladas
+
+Las siguientes decisiones están documentadas como estrategia de producto, pero
+no deben considerarse disponibles durante la prueba manual:
+
+- permisos híbridos por rol con excepciones individuales;
+- cambio entre `Solo yo` y `Tengo un negocio`;
+- edición y validación de disponibilidad del enlace público;
+- Nava Wallet;
+- resumen e historial de pagos;
+- efectivo y transferencia dentro de Wallet;
+- integración PayPhone mediante API key e identificador de negocio;
+- anticipos mínimos por porcentaje o valor fijo;
+- planes Esencial y Multi;
+- precios de suscripción;
+- aplicación real de límites por plan.
+
+WhatsApp permanece fuera del alcance aprobado. Los precios continúan por
+definir.
+
+## Guía de aceptación manual
+
+### Preparación del entorno
+
+1. Confirmar que PostgreSQL, API y aplicación móvil estén ejecutándose.
+2. Aplicar las migraciones pendientes, incluida
+   `20260729120000_add_business_weekly_schedules`.
+3. Usar la base local de desarrollo configurada en `.env`.
+4. No ejecutar pruebas de integración contra la base de desarrollo; las
+   pruebas usan exclusivamente `barber_saas_test` en el servicio y puerto
+   definidos para pruebas.
+5. Abrir Expo Web y, si es posible, repetir las pruebas críticas en Android o
+   iOS.
+6. Utilizar dos correos diferentes:
+   - uno para una cuenta `Solo yo`;
+   - otro para una cuenta `Tengo un negocio`.
+7. Registrar cualquier error con:
+   - cuenta utilizada;
+   - ruta o pantalla;
+   - acción realizada;
+   - resultado esperado;
+   - resultado obtenido;
+   - captura de pantalla;
+   - mensaje de API o consola, si existe.
+
+### Prueba A — Cuenta `Solo yo`
+
+- [ ] Abrir Registro y seleccionar `Solo yo`.
+- [ ] Completar todos los pasos con datos válidos.
+- [ ] Confirmar que apertura y cierre no permitan un intervalo invertido.
+- [ ] Crear al menos un servicio durante el onboarding.
+- [ ] Verificar el correo y continuar.
+- [ ] Confirmar que las pantallas iniciales permitan avanzar sin un
+      desplazamiento vertical excesivo.
+- [ ] Finalizar el onboarding.
+- [ ] Confirmar que abre el dashboard blanco.
+- [ ] Cerrar y volver a abrir la aplicación; no debe regresar al onboarding.
+- [ ] Abrir Ajustes y confirmar que aparece `Mi actividad`.
+- [ ] Abrir Ajustes del negocio.
+- [ ] Confirmar que no aparece la opción Gestión de colaboradores.
+- [ ] Abrir directamente `/team-management` y confirmar que regresa a Ajustes
+      del negocio.
+- [ ] Abrir Configuración avanzada y confirmar:
+  - [ ] tipo de cuenta `Solo yo`;
+  - [ ] ausencia de Permisos a colaboradores;
+  - [ ] enlace de reserva visible;
+  - [ ] Copiar funciona;
+  - [ ] Compartir abre el diálogo del sistema;
+  - [ ] Abrir intenta abrir la dirección correcta;
+  - [ ] las tres secciones pendientes muestran `Próximamente`.
+
+### Prueba B — Cuenta `Tengo un negocio`
+
+- [ ] Cerrar sesión de la cuenta anterior.
+- [ ] Registrar una cuenta nueva con `Tengo un negocio`.
+- [ ] Completar negocio, ubicación, horario, credenciales y servicios.
+- [ ] Confirmar que el onboarding no obliga a crear colaboradores.
+- [ ] Verificar el correo y finalizar.
+- [ ] Confirmar que abre el dashboard blanco.
+- [ ] Abrir Ajustes y confirmar que aparece `Mi negocio`.
+- [ ] Abrir Ajustes del negocio.
+- [ ] Confirmar que Gestión de colaboradores sí aparece.
+- [ ] Abrir Gestión de colaboradores y comprobar:
+  - [ ] total de integrantes;
+  - [ ] propietario en Equipo actual;
+  - [ ] invitaciones pendientes, si existen;
+  - [ ] bloque Añadir colaborador marcado `Próximamente`;
+  - [ ] ausencia de un botón activo para enviar invitaciones.
+- [ ] Abrir Configuración avanzada y confirmar:
+  - [ ] tipo de cuenta `Tengo un negocio`;
+  - [ ] acceso a colaboradores;
+  - [ ] enlace de reserva real;
+  - [ ] acciones Copiar, Compartir y Abrir.
+
+### Prueba C — Horario del negocio
+
+Ejecutar primero con una cuenta y repetir al menos persistencia con la otra:
+
+- [ ] Abrir Horario del negocio desde Ajustes.
+- [ ] Confirmar que aparecen exactamente siete días, de lunes a domingo.
+- [ ] Confirmar que el estado inicial coincide con el horario registrado.
+- [ ] Desactivar un día.
+- [ ] Confirmar que su engranaje queda deshabilitado.
+- [ ] Reactivar el día y comprobar que recupera sus horas anteriores.
+- [ ] Abrir el engranaje de un día activo.
+- [ ] Cambiar apertura y cierre.
+- [ ] Intentar guardar cierre anterior o igual a apertura; debe bloquearse.
+- [ ] Cerrar la hoja tocando fuera.
+- [ ] Cerrar la hoja con el botón.
+- [ ] Cerrar la hoja deslizando el tirador hacia abajo.
+- [ ] Guardar una semana válida.
+- [ ] Salir y volver a entrar; los cambios deben persistir.
+- [ ] Cerrar sesión e iniciar sesión; los cambios deben persistir.
+- [ ] Modificar un valor, intentar volver sin guardar y confirmar que aparece
+      la advertencia.
+- [ ] Si se puede simular desconexión, guardar sin API y confirmar que el
+      borrador permanece y se muestra un error recuperable.
+
+### Prueba D — Efecto del horario sobre Agenda
+
+- [ ] Seleccionar en Agenda un día marcado como cerrado.
+- [ ] Confirmar que no se muestran espacios disponibles.
+- [ ] Abrir un día con un intervalo corto.
+- [ ] Confirmar que la línea temporal respeta apertura y cierre.
+- [ ] Confirmar que no aparecen espacios del profesional fuera del horario del
+      negocio.
+- [ ] Intentar crear una cita fuera del intervalo; la API debe rechazarla.
+- [ ] Intentar reprogramar una cita fuera del intervalo; la API debe
+      rechazarla.
+- [ ] Confirmar que una cita válida dentro del intervalo sí puede crearse.
+- [ ] Confirmar que dos reservas sobre el mismo espacio no se aceptan
+      simultáneamente.
+
+### Prueba E — Gestión de servicios
+
+- [ ] Abrir Gestión de servicios desde Ajustes del negocio.
+- [ ] Confirmar que no redirige al alta inicial ni a Operaciones verde.
+- [ ] Confirmar que se muestran categorías y servicios existentes.
+- [ ] Crear una categoría nueva.
+- [ ] Crear un servicio con nombre, categoría, duración y precio.
+- [ ] Confirmar mensaje de éxito.
+- [ ] Confirmar que el servicio aparece en el catálogo.
+- [ ] Salir y volver a entrar; debe persistir.
+- [ ] Comprobar que el servicio queda asociado a la sede y propietario.
+- [ ] Comprobar que el nuevo servicio puede utilizarse al crear una cita.
+- [ ] Probar campos vacíos o valores inválidos y confirmar que no se envía el
+      formulario.
+
+### Prueba F — Navegación y ausencia del diseño antiguo
+
+- [ ] Desde Ajustes, abrir Horario, Configuración avanzada, Servicios y, en
+      cuenta negocio, Colaboradores.
+- [ ] Confirmar que todas usan fondo blanco y el sistema visual vigente.
+- [ ] Confirmar que Servicios abre `/service-management`.
+- [ ] Confirmar que Colaboradores abre `/team-management`.
+- [ ] Confirmar que los botones Atrás regresan a la pantalla esperada.
+- [ ] Confirmar que la barra inferior no envía a `(app)/operations`.
+- [ ] Abrir enlaces históricos de dashboard, agenda u operations si existen en
+      favoritos y comprobar que redirigen al diseño vigente.
+- [ ] Confirmar que `/recover`, `/reset-password`, `/accept-invitation`,
+      `/location`, `/summary` y `/legacy-designs` ya no muestran una pantalla
+      funcional.
+- [ ] Confirmar que Login no muestra `¿Olvidaste tu contraseña?`.
+
+### Prueba G — UI, gestos y adaptación
+
+Repetir las pantallas críticas en una altura pequeña y una grande:
+
+- [ ] No hay espacios verticales excesivos en el onboarding.
+- [ ] Los botones principales están visibles o requieren sólo el
+      desplazamiento natural del contenido.
+- [ ] No hay textos cortados, botones superpuestos ni contenido fuera de la
+      pantalla.
+- [ ] El teclado no cubre los campos ni la acción principal.
+- [ ] Las hojas inferiores respetan el área segura del dispositivo.
+- [ ] El gesto vertical para cerrar el horario no interfiere con los selectores
+      de hora.
+- [ ] Android, iOS y Web mantienen una jerarquía visual equivalente.
+- [ ] Copiar, Compartir y Abrir se comportan correctamente según la plataforma.
+
+### Criterio para aprobar el corte
+
+El corte puede marcarse como aceptado cuando:
+
+- las pruebas A a G estén completadas;
+- no existan bloqueos de registro, onboarding, inicio de sesión o navegación;
+- horario y servicios persistan después de volver a iniciar sesión;
+- Agenda respete el horario general;
+- ambos tipos de cuenta muestren las opciones correctas;
+- no aparezca ninguna interfaz verde heredada;
+- las diferencias visuales menores queden registradas como tareas concretas;
+- cualquier error funcional tenga pasos de reproducción antes de iniciar el
+  siguiente módulo.
+
+Hasta completar esta guía, el estado oficial permanece:
+
+> **IMPLEMENTADO TÉCNICAMENTE — ACEPTACIÓN MANUAL PENDIENTE.**
+
+## Actualización 2026-07-30 — Agenda operativa y reservas públicas
+
+### Flujo interno
+
+- [x] `Nueva cita` continúa a un formulario real y conserva el cliente seleccionado.
+- [x] El usuario elige un profesional concreto, uno o varios servicios y un horario calculado desde la disponibilidad efectiva.
+- [x] La API vuelve a validar horario general, jornada profesional, bloqueos y citas existentes antes de crear o reprogramar.
+- [x] La cita se vincula al cliente mediante `clientId`; nombre, correo, teléfono, precio y duración también se guardan como snapshot histórico.
+- [x] El negocio o profesional autorizado puede cancelar o reprogramar manualmente desde Agenda.
+- [x] La cancelación libera el horario; la reprogramación no puede crear solapamientos.
+
+### Flujo público del cliente
+
+1. La página pública muestra servicios, equipo y reseñas visibles.
+2. El cliente selecciona obligatoriamente un profesional; no existe la opción `cualquier profesional`.
+3. Selecciona uno o varios servicios asignados y habilitados para reserva online.
+4. Selecciona una fecha y uno de los horarios calculados para la duración total.
+5. Registra nombre completo, correo, país y teléfono en formato E.164, y acepta la política versionada del negocio.
+6. La API crea un bloqueo temporal de diez minutos y envía un código de verificación por correo.
+7. Al validar el código, la cita pasa a confirmada, se crea o reutiliza el cliente y se entrega un enlace privado de gestión.
+8. La página final muestra profesional, servicios, precio, fecha, hora y sede; desde el mismo enlace se puede cancelar o reprogramar dentro de los límites configurados.
+9. Si la cita se completa, el enlace permite publicar una reseña visible automáticamente. El propietario, administrador o profesional correspondiente puede ocultarla.
+
+### Confirmación de asistencia sin WhatsApp
+
+- [x] El negocio configura si desea una segunda confirmación de asistencia.
+- [x] Configura cuántos minutos antes se envía el recordatorio y hasta cuándo se espera la respuesta.
+- [x] El recordatorio se envía por correo con un enlace de confirmación que no requiere cuenta ni aplicación móvil.
+- [x] El negocio decide si una cita no confirmada se conserva para gestión manual o se cancela automáticamente al vencer el plazo.
+- [x] Las reservas realizadas dentro de la ventana del recordatorio no reciben una segunda confirmación redundante.
+- [x] El negocio configura por separado la anticipación mínima para cancelar y reprogramar.
+
+WhatsApp no forma parte de este corte. Puede añadirse después como un canal adicional sin cambiar el modelo de citas ni el enlace web de gestión.
+
+### Política de almacenamiento
+
+- Los días y horas disponibles no se guardan como filas. Se calculan al consultar usando horarios del negocio, horarios del profesional, bloqueos, duración acumulada y citas que reservan espacio.
+- Un intento público sin verificar sí crea un bloqueo temporal para impedir que dos clientes tomen el mismo horario. Si no se verifica en diez minutos, pasa a `EXPIRED` y deja de reservar espacio.
+- Los códigos se almacenan únicamente como hash; el código legible no permanece en la base.
+- Las citas confirmadas, canceladas, completadas y ausencias se conservan. No son datos basura: forman el historial del cliente, permiten reseñas, métricas de asistencia, auditoría, comisiones y reportes futuros.
+- La eliminación de un cliente es lógica. Su ficha desaparece del directorio activo, pero sus citas históricas no se pierden.
+
+### Configuración y permisos
+
+- [x] Pantalla móvil de reglas de reserva accesible desde Configuración avanzada.
+- [x] Sólo propietario y administrador pueden modificar política, tiempos y comportamiento de no confirmados.
+- [x] Pantalla móvil para mostrar u ocultar reseñas.
+- [x] Un profesional puede administrar únicamente las reseñas asociadas a sus propias citas; recepción no puede ocultarlas.
+
+### Migración y verificación
+
+- [x] Migración `20260730120000_public_bookings_clients_and_reviews` aplicada en PostgreSQL de desarrollo y pruebas.
+- [x] Prisma validado, formateado y cliente regenerado.
+- [x] Typecheck de API, móvil y web.
+- [x] ESLint de todos los archivos modificados por este flujo.
+- [x] Suite API: 21/21 pruebas aprobadas, incluidas 3 integrales del flujo público.
+- [x] Validación: 19/19 pruebas aprobadas.
+- [x] Móvil: 5/5 pruebas aprobadas.
+- [x] Builds de producción de API, web y exportación Expo Web aprobados.
+
+### Pendiente para aceptación
+
+- [x] Entrega real de correos comprobada en una bandeja externa con el SMTP del entorno.
+- [ ] Recorrer visualmente el flujo público en tamaños móvil y escritorio.
+- [ ] Confirmar textos legales definitivos y valores iniciales de cancelación, reprogramación y no confirmación.
+- [ ] Configurar el dominio público definitivo usado por los enlaces incluidos en correos.
+- [ ] Sustituir el rate limiting en memoria si la API se despliega en más de una instancia.
+
+Estado de este corte:
+
+> **IMPLEMENTADO Y VERIFICADO AUTOMÁTICAMENTE — ACEPTACIÓN MANUAL Y CONFIGURACIÓN EXTERNA PENDIENTES.**

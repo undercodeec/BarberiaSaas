@@ -37,7 +37,10 @@ export default function EntryScreen() {
       </View>
     );
   }
-  if (isLoading || (session && (organizationQuery.isLoading || onboardingQuery.isLoading))) {
+  if (
+    isLoading ||
+    (session && (organizationQuery.isLoading || onboardingQuery.isLoading))
+  ) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator color="#101c2d" size="large" />
@@ -59,8 +62,9 @@ export default function EntryScreen() {
       </View>
     );
   }
-  if (session && organizationQuery.data) return <Redirect href="/(app)" />;
-  if (session && onboardingQuery.data?.onboardingCompletedAt) return <Redirect href={'/dashboard' as never} />;
+  if (session && organizationQuery.data) return <Redirect href="/dashboard" />;
+  if (session && onboardingQuery.data?.onboardingCompletedAt)
+    return <Redirect href={'/dashboard' as never} />;
   if (session) return <Redirect href="/(onboarding)/account-setup" />;
   return (
     <NavaWelcomeScreen

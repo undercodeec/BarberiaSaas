@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@barber-saas/api-client": "workspace:*",
     "@barber-saas/design-tokens": "workspace:*",
+    "country-state-city": "^3.2.1",
     "next": "16.2.10",
     "react": "19.2.7",
     "react-dom": "19.2.7"

@@ -1,4 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import type { OnboardingAccountDetailsResponse } from '@barber-saas/api-client';
+import { useQuery } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
@@ -13,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -20,7 +23,7 @@ type SettingsMenuItem = {
   readonly description: string;
   readonly icon: IconName;
   readonly id: string;
-  readonly route?: '/equipo' | '/profile-edit' | '/services';
+  readonly route?: string;
   readonly title: string;
 };
 type SettingsSection = {
@@ -48,7 +51,7 @@ const settingsSections: readonly SettingsSection[] = [
           'Gestiona tus colaboradores: crea, edita y administra su informaci\u00f3n.',
         icon: 'people-outline',
         id: 'collaborators',
-        route: '/equipo',
+        route: '/team-management',
         title: 'Gesti\u00f3n de colaboradores',
       },
       {
@@ -56,6 +59,7 @@ const settingsSections: readonly SettingsSection[] = [
           'Gestiona el horario del negocio y los d\u00edas de atenci\u00f3n.',
         icon: 'calendar-outline',
         id: 'business-schedule',
+        route: '/business-schedule',
         title: 'Horario del negocio',
       },
     ],
@@ -68,7 +72,7 @@ const settingsSections: readonly SettingsSection[] = [
         description: 'Edita la informaci\u00f3n de tu negocio.',
         icon: 'information-circle-outline',
         id: 'edit-business',
-        route: '/profile-edit',
+        route: '/account-details',
         title: 'Editar informaci\u00f3n',
       },
       {
@@ -76,6 +80,7 @@ const settingsSections: readonly SettingsSection[] = [
           'Configuraci\u00f3n adicional para hacer funcionar tu negocio.',
         icon: 'settings-outline',
         id: 'advanced-settings',
+        route: '/advanced-settings',
         title: 'Configuraci\u00f3n avanzada',
       },
       {
@@ -85,11 +90,10 @@ const settingsSections: readonly SettingsSection[] = [
         title: 'Nava Wallet',
       },
       {
-        description:
-          'Gestiona tus servicios: crea, edita y organiza tu cat\u00e1logo.',
+        description: 'Consulta, crea y organiza tu cat\u00e1logo de servicios.',
         icon: 'briefcase-outline',
         id: 'services-management',
-        route: '/services',
+        route: '/service-management',
         title: 'Gesti\u00f3n de servicios',
       },
       {
@@ -103,11 +107,27 @@ const settingsSections: readonly SettingsSection[] = [
 ];
 
 export default function BusinessSettingsScreen() {
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const router = useRouter();
   const [isFlexExpanded, setIsFlexExpanded] = useState(true);
   const [isMoreExpanded, setIsMoreExpanded] = useState(false);
   const isOpening = useRef(false);
+  const accountQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<OnboardingAccountDetailsResponse>(
+        '/v1/onboarding/account-details',
+      ),
+    queryKey: ['onboarding-account-details', user?.id],
+  });
+  const isSolo = accountQuery.data?.accountType === 'professional';
+  const isBusiness = accountQuery.data?.accountType === 'business';
+  const visibleSections = settingsSections.map((section) => ({
+    ...section,
+    items: section.items.filter(
+      (item) => item.id !== 'collaborators' || isBusiness,
+    ),
+  }));
 
   const unavailable = useCallback((title: string) => {
     if (isOpening.current) return;
@@ -129,7 +149,7 @@ export default function BusinessSettingsScreen() {
   const openItem = useCallback(
     (item: SettingsMenuItem) => {
       if (item.route) {
-        router.push(item.route);
+        router.push(item.route as never);
         return;
       }
       unavailable(item.title);
@@ -175,7 +195,7 @@ export default function BusinessSettingsScreen() {
             <Ionicons color={COLORS.text} name="arrow-back" size={25} />
           </Pressable>
           <Text accessibilityRole="header" style={styles.headerTitle}>
-            Ajustes
+            {isSolo ? 'Mi actividad' : 'Ajustes'}
           </Text>
         </View>
       </View>
@@ -184,7 +204,7 @@ export default function BusinessSettingsScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {settingsSections.map((section) => (
+        {visibleSections.map((section) => (
           <View key={section.id} style={styles.section}>
             <Text accessibilityRole="header" style={styles.sectionTitle}>
               {section.title}

@@ -1,18 +1,19 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
+  AppointmentRecord,
   AppointmentsResponse,
+  BusinessScheduleResponse,
   ClientsResponse,
   CurrentOrganizationResponse,
-  OnboardingAccountDetailsResponse,
   SchedulesResponse,
   TeamResponse,
 } from '@barber-saas/api-client';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
-  Alert,
   Animated,
+  Alert,
   Easing,
   Modal,
   PanResponder,
@@ -86,14 +87,6 @@ function formatMinute(minute: number): string {
   );
 }
 
-function minuteForTime(value: string | null | undefined): number | null {
-  if (!value || !/^([01]\d|2[0-3]):[0-5]\d$/u.test(value)) return null;
-  const [hours, minutes] = value.split(':').map(Number);
-  return hours === undefined || minutes === undefined
-    ? null
-    : hours * 60 + minutes;
-}
-
 type AgendaView = 'day' | 'month' | 'week';
 type AgendaStatusFilter =
   | 'active'
@@ -138,6 +131,7 @@ function timelineMinutes(
 export default function AgendaScreen() {
   const { session } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const organizationQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -152,6 +146,14 @@ export default function AgendaScreen() {
       requireApiClient().request<SchedulesResponse>('/v1/schedules'),
     queryKey: ['schedules'],
   });
+  const businessScheduleQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<BusinessScheduleResponse>(
+        '/v1/business-schedule',
+      ),
+    queryKey: ['business-schedule'],
+  });
   const clientsQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<ClientsResponse>('/v1/clients'),
@@ -162,14 +164,65 @@ export default function AgendaScreen() {
     queryFn: () => requireApiClient().request<TeamResponse>('/v1/team'),
     queryKey: ['team'],
   });
-  const accountQuery = useQuery({
-    enabled: Boolean(session),
-    queryFn: () =>
-      requireApiClient().request<OnboardingAccountDetailsResponse>(
-        '/v1/onboarding/account-details',
+  const cancelAppointment = useMutation({
+    mutationFn: (appointmentId: string) =>
+      requireApiClient().request<{ appointment: AppointmentRecord }>(
+        `/v1/appointments/${appointmentId}/cancel`,
+        {
+          body: { reason: 'Cancelada manualmente desde Agenda.' },
+          method: 'POST',
+        },
       ),
-    queryKey: ['onboarding-account-details'],
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos cancelar la cita',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['agenda-appointments'],
+      });
+    },
   });
+  const manageAppointment = (appointment: AppointmentRecord) => {
+    if (
+      appointment.status === 'cancelled' ||
+      appointment.status === 'completed' ||
+      appointment.status === 'no_show'
+    ) {
+      Alert.alert(
+        appointment.clientName,
+        'Esta cita ya no ocupa un horario y conserva su historial.',
+      );
+      return;
+    }
+    Alert.alert(
+      appointment.clientName,
+      'Reprograma o cancela la cita por una circunstancia del negocio o profesional.',
+      [
+        { style: 'cancel', text: 'Cerrar' },
+        {
+          onPress: () =>
+            router.push({
+              pathname: '/reschedule-booking' as never,
+              params: {
+                appointmentId: appointment.id,
+                membershipId: appointment.professionalMembershipId,
+                serviceIds: appointment.services
+                  .map((service) => service.serviceId)
+                  .join(','),
+              },
+            }),
+          text: 'Reprogramar',
+        },
+        {
+          onPress: () => cancelAppointment.mutate(appointment.id),
+          style: 'destructive',
+          text: 'Cancelar cita',
+        },
+      ],
+    );
+  };
   const timeZone =
     organizationQuery.data?.location?.timezone ??
     organizationQuery.data?.organization?.defaultTimezone ??
@@ -189,10 +242,10 @@ export default function AgendaScreen() {
   const [statusFilter, setStatusFilter] = useState<AgendaStatusFilter>('all');
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(today);
-  const dayContentOpacity = useRef(new Animated.Value(1)).current;
-  const schedulePageSlide = useRef(new Animated.Value(0)).current;
-  const settingsSheetTranslateY = useRef(new Animated.Value(0)).current;
-  const isDayTransitioning = useRef(false);
+  const [dayContentOpacity] = useState(() => new Animated.Value(1));
+  const [schedulePageSlide] = useState(() => new Animated.Value(0));
+  const [settingsSheetTranslateY] = useState(() => new Animated.Value(0));
+  const [isDayTransitioning, setIsDayTransitioning] = useState(false);
   const dismissAgendaSettings = useCallback(() => {
     Animated.timing(settingsSheetTranslateY, {
       duration: 220,
@@ -229,8 +282,8 @@ export default function AgendaScreen() {
   );
   const moveSelectedDay = useCallback(
     (offset: number) => {
-      if (isDayTransitioning.current) return;
-      isDayTransitioning.current = true;
+      if (isDayTransitioning) return;
+      setIsDayTransitioning(true);
       const direction = offset > 0 ? 1 : -1;
       const nextDay = addDays(selectedDay, offset);
       schedulePageSlide.setValue(direction * 42);
@@ -251,10 +304,10 @@ export default function AgendaScreen() {
           useNativeDriver: true,
         }),
       ]).start(() => {
-        isDayTransitioning.current = false;
+        setIsDayTransitioning(false);
       });
     },
-    [dayContentOpacity, schedulePageSlide, selectedDay],
+    [dayContentOpacity, isDayTransitioning, schedulePageSlide, selectedDay],
   );
   const dayPanResponder = useMemo(
     () =>
@@ -276,7 +329,7 @@ export default function AgendaScreen() {
           Math.abs(gesture.dx) > 12 &&
           Math.abs(gesture.dx) > Math.abs(gesture.dy),
         onPanResponderMove: (_, gesture) => {
-          if (!isDayTransitioning.current) {
+          if (!isDayTransitioning) {
             schedulePageSlide.setValue(gesture.dx);
             dayContentOpacity.setValue(
               Math.max(0.55, 1 - Math.abs(gesture.dx) / 420),
@@ -307,7 +360,7 @@ export default function AgendaScreen() {
           ]).start();
         },
       }),
-    [dayContentOpacity, moveSelectedDay, schedulePageSlide],
+    [dayContentOpacity, isDayTransitioning, moveSelectedDay, schedulePageSlide],
   );
   const visibleDates = useMemo(() => {
     if (calendarView === 'day') return [selectedDay];
@@ -346,24 +399,34 @@ export default function AgendaScreen() {
     [schedulesQuery.data?.schedules, selectedDay],
   );
   const businessHoursTimeline = useMemo(() => {
-    const startMinute = minuteForTime(accountQuery.data?.openingTime);
-    const endMinute = minuteForTime(accountQuery.data?.closingTime);
-    if (
-      startMinute === null ||
-      endMinute === null ||
-      startMinute >= endMinute
-    ) {
-      return [];
-    }
-    return timelineMinutes([{ endMinute, startMinute }]);
-  }, [accountQuery.data?.closingTime, accountQuery.data?.openingTime]);
-  const configuredTimeline = useMemo(
-    () =>
-      selectedDaySchedules.length
-        ? timelineMinutes(selectedDaySchedules)
-        : businessHoursTimeline,
-    [businessHoursTimeline, selectedDaySchedules],
-  );
+    const day = businessScheduleQuery.data?.days.find(
+      (schedule) => schedule.weekday === selectedDay.getDay(),
+    );
+    if (!day?.isOpen) return [];
+    return timelineMinutes([
+      { endMinute: day.endMinute, startMinute: day.startMinute },
+    ]);
+  }, [businessScheduleQuery.data?.days, selectedDay]);
+  const configuredTimeline = useMemo(() => {
+    const businessDay = businessScheduleQuery.data?.days.find(
+      (schedule) => schedule.weekday === selectedDay.getDay(),
+    );
+    if (!businessDay?.isOpen) return [];
+    if (!selectedDaySchedules.length) return businessHoursTimeline;
+    return timelineMinutes(
+      selectedDaySchedules
+        .map((schedule) => ({
+          endMinute: Math.min(schedule.endMinute, businessDay.endMinute),
+          startMinute: Math.max(schedule.startMinute, businessDay.startMinute),
+        }))
+        .filter((schedule) => schedule.startMinute < schedule.endMinute),
+    );
+  }, [
+    businessHoursTimeline,
+    businessScheduleQuery.data?.days,
+    selectedDay,
+    selectedDaySchedules,
+  ]);
 
   const filteredAppointments = useMemo(() => {
     return (appointmentsQuery.data ?? []).filter((appointment) => {
@@ -385,11 +448,6 @@ export default function AgendaScreen() {
   const displayedTimeline = showAllHours
     ? Array.from({ length: 25 }, (_, index) => index * 60)
     : configuredTimeline;
-
-  useEffect(() => {
-    setSelectedDay(today);
-    setCalendarMonth(today);
-  }, [today]);
 
   if (!session) return <Redirect href="/(auth)/login" />;
 
@@ -548,7 +606,11 @@ export default function AgendaScreen() {
           </View>
           <View style={styles.timeline}>
             {filteredAppointments.map((appointment) => (
-              <View key={appointment.id} style={styles.appointmentCard}>
+              <Pressable
+                key={appointment.id}
+                onPress={() => manageAppointment(appointment)}
+                style={styles.appointmentCard}
+              >
                 <Text style={styles.appointmentTime}>
                   {new Date(appointment.startsAt).toLocaleTimeString('es-EC', {
                     hour: '2-digit',
@@ -567,7 +629,8 @@ export default function AgendaScreen() {
                     {appointment.status.replace(/_/gu, ' ')}
                   </Text>
                 </View>
-              </View>
+                <Ionicons color="#687282" name="ellipsis-vertical" size={18} />
+              </Pressable>
             ))}
             {displayedTimeline.length ? (
               displayedTimeline.map((minute) => (
@@ -720,28 +783,30 @@ export default function AgendaScreen() {
               </View>
               <Text style={styles.settingsTitle}>Ajustes de agenda</Text>
               {[
-                [
-                  'Ver todas las horas del calendario',
-                  showAllHours,
-                  setShowAllHours,
-                ],
-                ['Mostrar citas canceladas', showCancelled, setShowCancelled],
-              ].map(([label, selected, onChange]) => (
+                {
+                  label: 'Ver todas las horas del calendario',
+                  onChange: setShowAllHours,
+                  selected: showAllHours,
+                },
+                {
+                  label: 'Mostrar citas canceladas',
+                  onChange: setShowCancelled,
+                  selected: showCancelled,
+                },
+              ].map(({ label, selected, onChange }) => (
                 <Pressable
                   accessibilityRole="checkbox"
-                  accessibilityState={{ checked: Boolean(selected) }}
-                  key={String(label)}
-                  onPress={() =>
-                    (onChange as (value: boolean) => void)(!Boolean(selected))
-                  }
+                  accessibilityState={{ checked: selected }}
+                  key={label}
+                  onPress={() => onChange(!selected)}
                   style={styles.checkboxRow}
                 >
                   <Ionicons
                     color="#111318"
-                    name={Boolean(selected) ? 'checkbox' : 'square-outline'}
+                    name={selected ? 'checkbox' : 'square-outline'}
                     size={23}
                   />
-                  <Text style={styles.checkboxLabel}>{String(label)}</Text>
+                  <Text style={styles.checkboxLabel}>{label}</Text>
                 </Pressable>
               ))}
               <Text style={styles.settingsSection}>Vista de calendario</Text>
@@ -922,7 +987,7 @@ export default function AgendaScreen() {
             clientsQuery.isError ||
             !clientsQuery.data?.clients.length
           ) {
-            router.push('/equipo');
+            router.push('/clients');
             return;
           }
           router.push('/new-booking');

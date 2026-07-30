@@ -468,6 +468,7 @@ export function registerOperationsRoutes(
         durationMinutes: service.durationMinutes,
         id: service.id,
         name: service.name,
+        onlineBooking: service.onlineBooking,
         priceCents: service.priceCents,
       })),
     };
@@ -522,6 +523,7 @@ export function registerOperationsRoutes(
         description: input.description ?? null,
         durationMinutes: input.durationMinutes,
         name: input.name,
+        onlineBooking: input.onlineBooking,
         organizationId: current.organizationId,
         priceCents: input.priceCents,
       },

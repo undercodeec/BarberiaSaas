@@ -9,6 +9,7 @@ import {
 } from '@barber-saas/database';
 import {
   completeOnboardingSchema,
+  createSlug,
   createOnboardingCollaboratorSchema,
   createOnboardingServiceSchema,
   recoverAccessSchema,
@@ -28,10 +29,16 @@ import { z, ZodError } from 'zod';
 import type { ApiConfig } from './config';
 import { ApiError, isUniqueConstraintError } from './errors';
 import { registerAgendaRoutes } from './agenda';
+import { registerBusinessScheduleRoutes } from './business-schedule';
 import { registerCashRegisterRoutes } from './cash-register';
 import { registerClientRoutes } from './clients';
 import { registerOperationsRoutes } from './operations';
 import { registerProfileRoutes } from './profile';
+import {
+  processPublicBookingLifecycle,
+  registerPublicBookingRoutes,
+  type PublicBookingMailer,
+} from './public-booking';
 import type {
   InvitationMailer,
   RecoveryMailer,
@@ -51,6 +58,24 @@ const RESET_DURATION_MS = 30 * 60 * 1000;
 const VERIFICATION_DURATION_MS = 10 * 60 * 1000;
 const VERIFICATION_LOCK_DURATION_MS = 15 * 60 * 1000;
 const MAX_VERIFICATION_ATTEMPTS = 5;
+const BOOKING_BASE_URL = 'https://book.nava.app';
+
+function minuteForRegistrationTime(
+  value: string | null | undefined,
+  fallback: number,
+) {
+  const match = /^(\d{2}):(\d{2})$/u.exec(value ?? '');
+  if (!match) return fallback;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return fallback;
+  return hours * 60 + minutes;
+}
+
+function publicBookingUrl(slug: string) {
+  return `${BOOKING_BASE_URL}/${slug}`;
+}
+
 const onboardingCollaboratorParamsSchema = z.object({
   id: z.uuid('El identificador no es válido.'),
 });
@@ -62,6 +87,7 @@ interface BuildApiOptions {
   readonly config: ApiConfig;
   readonly database?: DatabaseClient;
   readonly invitationMailer?: InvitationMailer | null;
+  readonly publicBookingMailer?: PublicBookingMailer | null;
   readonly recoveryMailer?: RecoveryMailer | null;
   readonly verificationMailer?: VerificationMailer | null;
 }
@@ -445,6 +471,7 @@ export async function buildApi({
   config,
   database = createDatabaseClient({ connectionString: config.DATABASE_URL }),
   invitationMailer = null,
+  publicBookingMailer = null,
   recoveryMailer = null,
   verificationMailer = null,
 }: BuildApiOptions) {
@@ -880,9 +907,15 @@ export async function buildApi({
 
   app.get('/v1/onboarding/account-details', async (request) => {
     const { user } = await authenticate(database, request);
-    const profile = await database.userRegistrationProfile.findUnique({
-      where: { userId: user.id },
-    });
+    const [profile, membership] = await Promise.all([
+      database.userRegistrationProfile.findUnique({
+        where: { userId: user.id },
+      }),
+      database.membership.findFirst({
+        include: { organization: { select: { slug: true } } },
+        where: { status: MembershipStatus.ACTIVE, userId: user.id },
+      }),
+    ]);
     return {
       accountType: profile
         ? (profile.accountType.toLowerCase() as 'business' | 'professional')
@@ -890,7 +923,10 @@ export async function buildApi({
       addressLine: profile?.addressLine ?? null,
       businessName: profile?.businessName ?? null,
       bookingUrl: profile
-        ? `https://book.weibook.co/${profile.businessNameKey}`
+        ? publicBookingUrl(
+            membership?.organization.slug ??
+              createSlug(profile.businessName).slice(0, 80),
+          )
         : null,
       city: profile?.city ?? null,
       closingTime: profile?.closingTime ?? null,
@@ -923,33 +959,67 @@ export async function buildApi({
     }
 
     try {
-      const [updatedUser, updatedProfile] = await database.$transaction([
-        database.user.update({
-          data: { phone: input.phone },
-          where: { id: user.id },
-        }),
-        database.userRegistrationProfile.update({
-          data: {
-            addressLine: input.addressLine,
-            businessName: input.businessName,
-            businessNameKey: normalizeBusinessName(input.businessName),
-            city: input.city,
-            countryCode: input.countryCode,
-            coverImageUri: input.coverImageUri,
-            description: input.description,
-            facebookUrl: input.facebookUrl,
-            instagramUrl: input.instagramUrl,
-            phoneKey: normalizePhone(input.phone),
-          },
-          where: { userId: user.id },
-        }),
-      ]);
+      const activeMembership = await database.membership.findFirst({
+        include: {
+          memberLocations: { select: { locationId: true }, take: 1 },
+          organization: { select: { slug: true } },
+        },
+        where: { status: MembershipStatus.ACTIVE, userId: user.id },
+      });
+      const [updatedUser, updatedProfile] = await database.$transaction(
+        async (transaction) => {
+          const updatedUserRecord = await transaction.user.update({
+            data: { phone: input.phone },
+            where: { id: user.id },
+          });
+          const updatedProfileRecord =
+            await transaction.userRegistrationProfile.update({
+              data: {
+                addressLine: input.addressLine,
+                businessName: input.businessName,
+                businessNameKey: normalizeBusinessName(input.businessName),
+                city: input.city,
+                countryCode: input.countryCode,
+                coverImageUri: input.coverImageUri,
+                description: input.description,
+                facebookUrl: input.facebookUrl,
+                instagramUrl: input.instagramUrl,
+                phoneKey: normalizePhone(input.phone),
+              },
+              where: { userId: user.id },
+            });
+          if (activeMembership) {
+            await transaction.organization.update({
+              data: { name: input.businessName },
+              where: { id: activeMembership.organizationId },
+            });
+            const locationId =
+              activeMembership.memberLocations[0]?.locationId ?? null;
+            if (locationId) {
+              await transaction.location.update({
+                data: {
+                  addressLine: input.addressLine,
+                  city: input.city,
+                  countryCode: input.countryCode,
+                  phone: input.phone,
+                  whatsappPhone: input.phone,
+                },
+                where: { id: locationId },
+              });
+            }
+          }
+          return [updatedUserRecord, updatedProfileRecord] as const;
+        },
+      );
       return {
         accountType: updatedProfile.accountType.toLowerCase() as
           'business' | 'professional',
         addressLine: updatedProfile.addressLine,
         businessName: updatedProfile.businessName,
-        bookingUrl: 'https://book.weibook.co/' + updatedProfile.businessNameKey,
+        bookingUrl: publicBookingUrl(
+          activeMembership?.organization.slug ??
+            createSlug(updatedProfile.businessName).slice(0, 80),
+        ),
         city: updatedProfile.city,
         closingTime: updatedProfile.closingTime,
         coverImageUri: updatedProfile.coverImageUri,
@@ -978,24 +1048,212 @@ export async function buildApi({
 
   app.post('/v1/onboarding/complete-account-setup', async (request) => {
     const { user } = await authenticate(database, request);
-    const profile = await database.userRegistrationProfile.findUnique({
-      where: { userId: user.id },
-    });
-    if (!profile) {
-      throw new ApiError(
-        404,
-        'ONBOARDING_ACCOUNT_DETAILS_NOT_FOUND',
-        'No encontramos la informaci\u00f3n de tu cuenta.',
+    return database.$transaction(async (transaction) => {
+      const profile = await transaction.userRegistrationProfile.findUnique({
+        where: { userId: user.id },
+      });
+      if (!profile) {
+        throw new ApiError(
+          404,
+          'ONBOARDING_ACCOUNT_DETAILS_NOT_FOUND',
+          'No encontramos la informaci\u00f3n de tu cuenta.',
+        );
+      }
+
+      const existingMembership = await transaction.membership.findFirst({
+        include: {
+          memberLocations: { select: { locationId: true }, take: 1 },
+          organization: { select: { slug: true } },
+        },
+        where: { status: MembershipStatus.ACTIVE, userId: user.id },
+      });
+      if (existingMembership) {
+        const completedProfile =
+          await transaction.userRegistrationProfile.update({
+            data: {
+              onboardingCompletedAt:
+                profile.onboardingCompletedAt ?? new Date(),
+            },
+            where: { userId: user.id },
+          });
+        return {
+          bookingUrl: publicBookingUrl(existingMembership.organization.slug),
+          locationId: existingMembership.memberLocations[0]?.locationId ?? null,
+          onboardingCompletedAt:
+            completedProfile.onboardingCompletedAt!.toISOString(),
+          organizationId: existingMembership.organizationId,
+        };
+      }
+
+      const onboardingServices = await transaction.onboardingService.findMany({
+        orderBy: { createdAt: 'asc' },
+        where: { ownerUserId: user.id },
+      });
+      if (onboardingServices.length === 0) {
+        throw new ApiError(
+          400,
+          'ONBOARDING_SERVICES_REQUIRED',
+          'Agrega al menos un servicio antes de finalizar.',
+        );
+      }
+
+      const baseSlug =
+        createSlug(profile.businessName).slice(0, 72) ||
+        `negocio-${user.id.slice(0, 8)}`;
+      const matchingOrganizations = await transaction.organization.findMany({
+        select: { slug: true },
+        where: { slug: { startsWith: baseSlug } },
+      });
+      const reservedSlugs = new Set(
+        matchingOrganizations.map((organization) => organization.slug),
       );
-    }
-    const completedProfile = await database.userRegistrationProfile.update({
-      data: { onboardingCompletedAt: new Date() },
-      where: { userId: user.id },
+      let organizationSlug = baseSlug;
+      let suffix = 2;
+      while (reservedSlugs.has(organizationSlug)) {
+        organizationSlug = `${baseSlug}-${suffix}`;
+        suffix += 1;
+      }
+
+      const organization = await transaction.organization.create({
+        data: {
+          currencyCode: 'USD',
+          defaultTimezone: 'America/Guayaquil',
+          name: profile.businessName,
+          slug: organizationSlug,
+        },
+      });
+      const location = await transaction.location.create({
+        data: {
+          addressLine: profile.addressLine,
+          city: profile.city,
+          countryCode: profile.countryCode,
+          currencyCode: 'USD',
+          email: user.email,
+          name: 'Principal',
+          organizationId: organization.id,
+          phone: user.phone ?? profile.phoneKey,
+          slug: 'principal',
+          timezone: 'America/Guayaquil',
+          whatsappPhone: user.phone ?? profile.phoneKey,
+        },
+      });
+      const membership = await transaction.membership.create({
+        data: {
+          organizationId: organization.id,
+          role: MembershipRole.OWNER,
+          status: MembershipStatus.ACTIVE,
+          userId: user.id,
+        },
+      });
+      await transaction.memberLocation.create({
+        data: { locationId: location.id, membershipId: membership.id },
+      });
+
+      const startMinute = minuteForRegistrationTime(profile.openingTime, 540);
+      const requestedEndMinute = minuteForRegistrationTime(
+        profile.closingTime,
+        1080,
+      );
+      const endMinute =
+        requestedEndMinute > startMinute
+          ? requestedEndMinute
+          : Math.min(startMinute + 60, 1440);
+      const weeklyDays = Array.from({ length: 7 }, (_, weekday) => ({
+        endMinute,
+        locationId: location.id,
+        startMinute,
+        weekday,
+      }));
+      await transaction.businessWeeklySchedule.createMany({
+        data: weeklyDays.map((day) => ({
+          ...day,
+          isOpen: true,
+          organizationId: organization.id,
+        })),
+      });
+      await transaction.weeklySchedule.createMany({
+        data: weeklyDays.map((day) => ({
+          ...day,
+          membershipId: membership.id,
+        })),
+      });
+
+      const categoryIds = new Map<string, string>();
+      for (const draft of onboardingServices) {
+        const categoryName = draft.categoryName?.trim() || null;
+        let categoryId: string | null = null;
+        if (categoryName) {
+          const knownCategoryId = categoryIds.get(categoryName);
+          if (knownCategoryId) {
+            categoryId = knownCategoryId;
+          } else {
+            const category = await transaction.serviceCategory.create({
+              data: {
+                name: categoryName,
+                organizationId: organization.id,
+                sortOrder: categoryIds.size,
+              },
+            });
+            categoryId = category.id;
+            categoryIds.set(categoryName, category.id);
+          }
+        }
+        const service = await transaction.service.create({
+          data: {
+            categoryId,
+            description: draft.description,
+            durationMinutes: draft.durationMinutes,
+            name: draft.name,
+            onlineBooking: draft.onlineBooking,
+            organizationId: organization.id,
+            priceCents: draft.priceCents,
+          },
+        });
+        await transaction.professionalService.create({
+          data: {
+            locationId: location.id,
+            membershipId: membership.id,
+            serviceId: service.id,
+          },
+        });
+      }
+
+      await transaction.onboardingService.deleteMany({
+        where: { ownerUserId: user.id },
+      });
+      await transaction.onboardingCollaborator.deleteMany({
+        where: { ownerUserId: user.id },
+      });
+      const completedProfile = await transaction.userRegistrationProfile.update(
+        {
+          data: { onboardingCompletedAt: new Date() },
+          where: { userId: user.id },
+        },
+      );
+      await transaction.auditLog.create({
+        data: {
+          action: 'onboarding.account_setup_completed',
+          actorUserId: user.id,
+          afterData: {
+            accountType: profile.accountType,
+            locationId: location.id,
+            organizationId: organization.id,
+            servicesCreated: onboardingServices.length,
+          },
+          entityId: organization.id,
+          entityType: 'organization',
+          locationId: location.id,
+          organizationId: organization.id,
+        },
+      });
+      return {
+        bookingUrl: publicBookingUrl(organization.slug),
+        locationId: location.id,
+        onboardingCompletedAt:
+          completedProfile.onboardingCompletedAt!.toISOString(),
+        organizationId: organization.id,
+      };
     });
-    return {
-      onboardingCompletedAt:
-        completedProfile.onboardingCompletedAt!.toISOString(),
-    };
   });
   app.get('/v1/onboarding/collaborators', async (request) => {
     const { user } = await authenticate(database, request);
@@ -1163,6 +1421,32 @@ export async function buildApi({
         await transaction.memberLocation.create({
           data: { locationId: location.id, membershipId: membership.id },
         });
+        const registrationProfile =
+          await transaction.userRegistrationProfile.findUnique({
+            where: { userId: user.id },
+          });
+        const startMinute = minuteForRegistrationTime(
+          registrationProfile?.openingTime,
+          540,
+        );
+        const endMinuteCandidate = minuteForRegistrationTime(
+          registrationProfile?.closingTime,
+          1080,
+        );
+        const endMinute =
+          endMinuteCandidate > startMinute
+            ? endMinuteCandidate
+            : startMinute + 60;
+        await transaction.businessWeeklySchedule.createMany({
+          data: Array.from({ length: 7 }, (_, weekday) => ({
+            endMinute,
+            isOpen: true,
+            locationId: location.id,
+            organizationId: organization.id,
+            startMinute,
+            weekday,
+          })),
+        });
         await transaction.auditLog.create({
           data: {
             action: 'onboarding.completed',
@@ -1222,9 +1506,30 @@ export async function buildApi({
     config,
   );
   registerAgendaRoutes(app, database, authenticate);
+  registerPublicBookingRoutes(
+    app,
+    database,
+    authenticate,
+    publicBookingMailer,
+    config.APP_ENV,
+    config.PUBLIC_WEB_URL,
+  );
+  registerBusinessScheduleRoutes(app, database, authenticate);
   registerClientRoutes(app, database, authenticate);
   registerCashRegisterRoutes(app, database, authenticate);
   registerProfileRoutes(app, database, authenticate);
+
+  const publicBookingLifecycleTimer = setInterval(() => {
+    void processPublicBookingLifecycle(
+      database,
+      publicBookingMailer,
+      config.PUBLIC_WEB_URL,
+    ).catch((error: unknown) => app.log.error(error));
+  }, 60_000);
+  publicBookingLifecycleTimer.unref();
+  app.addHook('onClose', async () => {
+    clearInterval(publicBookingLifecycleTimer);
+  });
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof ZodError) {

@@ -95,15 +95,11 @@ export default function NewBookingScreen() {
 
   const canContinue = selectedClientId !== null;
   const continueBooking = () => {
-    const selected = clientsQuery.data?.clients.find(
-      (client) => client.id === selectedClientId,
-    );
-    Alert.alert(
-      'Cliente seleccionado',
-      selected
-        ? `${selected.fullName} continuará a los siguientes pasos.`
-        : 'La reserva continuará sin cliente.',
-    );
+    if (!selectedClientId) return;
+    router.push({
+      pathname: '/booking-details' as never,
+      params: { clientId: selectedClientId },
+    });
   };
 
   return (

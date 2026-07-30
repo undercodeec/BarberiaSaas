@@ -9,7 +9,6 @@ const setupRoutes = new Set([
   'account-setup',
   'organization',
   'services',
-  'account-details',
   'congratulations',
 ]);
 

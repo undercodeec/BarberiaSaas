@@ -2,6 +2,7 @@ import { config as loadEnvironment } from 'dotenv';
 
 import { buildApi } from './app';
 import { readConfig } from './config';
+import { createPublicBookingMailer } from './public-booking-mailer';
 import {
   createInvitationMailer,
   createRecoveryMailer,
@@ -15,6 +16,7 @@ async function main(): Promise<void> {
   const app = await buildApi({
     config,
     invitationMailer: createInvitationMailer(config),
+    publicBookingMailer: createPublicBookingMailer(config),
     recoveryMailer: createRecoveryMailer(config),
     verificationMailer: createVerificationMailer(config),
   });

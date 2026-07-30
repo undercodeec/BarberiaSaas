@@ -39,6 +39,7 @@ export default function SettingsScreen() {
   const account = accountQuery.data;
   const businessName = account?.businessName || 'Tu negocio';
   const bookingUrl = account?.bookingUrl ?? '';
+  const isSolo = account?.accountType === 'professional';
 
   const version = Constants.expoConfig?.version ?? 'No disponible';
 
@@ -67,7 +68,9 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.eyebrow}>Cuenta y negocio</Text>
+            <Text style={styles.eyebrow}>
+              {isSolo ? 'Cuenta profesional' : 'Cuenta y negocio'}
+            </Text>
             <Text accessibilityRole="header" style={styles.title}>
               Ajustes
             </Text>
@@ -85,7 +88,11 @@ export default function SettingsScreen() {
 
         <View style={styles.profile}>
           <View style={styles.avatar}>
-            <Ionicons color={PRIMARY} name="storefront-outline" size={48} />
+            <Ionicons
+              color={PRIMARY}
+              name={isSolo ? 'person-outline' : 'storefront-outline'}
+              size={48}
+            />
             <Pressable
               accessibilityLabel="Editar perfil del negocio"
               onPress={() => router.push('/profile-edit')}
@@ -103,10 +110,14 @@ export default function SettingsScreen() {
         </View>
 
         <SettingsCard
-          description="Gestiona y administra tu negocio"
-          icon="storefront-outline"
+          description={
+            isSolo
+              ? 'Gestiona tu actividad profesional'
+              : 'Gestiona y administra tu negocio'
+          }
+          icon={isSolo ? 'person-outline' : 'storefront-outline'}
           onPress={() => router.push('/(onboarding)/business-settings')}
-          title="Mi negocio"
+          title={isSolo ? 'Mi actividad' : 'Mi negocio'}
         />
         <SettingsCard
           description="Gestiona movimientos, reportes y otros informes que estarán disponibles próximamente."

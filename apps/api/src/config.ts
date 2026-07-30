@@ -19,6 +19,7 @@ const environmentSchema = z
       .min(1)
       .default('barbersaas://accept-invitation'),
     MOBILE_RESET_URL: z.string().min(1).default('barbersaas://reset-password'),
+    PUBLIC_WEB_URL: z.url().default('https://book.nava.app'),
     SMTP_FROM: optionalText,
     SMTP_HOST: optionalText,
     SMTP_PASSWORD: optionalText,

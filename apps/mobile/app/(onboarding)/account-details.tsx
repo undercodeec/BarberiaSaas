@@ -116,12 +116,17 @@ export default function AccountDetailsScreen() {
 
   useEffect(() => {
     if (!profileQuery.data) return;
+    // La respuesta remota hidrata el borrador editable una vez que termina la consulta.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCoverUri(profileQuery.data.coverImageUri);
     setCountryCode(profileQuery.data.countryCode ?? 'EC');
     setForm(profileToForm(profileQuery.data));
   }, [profileQuery.data]);
 
   if (!session) return <Redirect href="/(auth)/login" />;
+  const isEditingCompletedAccount = Boolean(
+    profileQuery.data?.onboardingCompletedAt,
+  );
 
   const update = (field: keyof FormValues) => (value: string) =>
     setForm((current) => ({ ...current, [field]: value }));
@@ -169,7 +174,9 @@ export default function AccountDetailsScreen() {
       await queryClient.invalidateQueries({
         queryKey: ['onboarding-account-details', user?.id],
       });
-      router.replace('/congratulations');
+      router.replace(
+        isEditingCompletedAccount ? '/business-settings' : '/congratulations',
+      );
     } catch (error) {
       setRequestError(
         error instanceof Error
@@ -182,7 +189,10 @@ export default function AccountDetailsScreen() {
   };
 
   return (
-    <SafeAreaView edges={['bottom', 'left', 'right', 'top']} style={styles.screen}>
+    <SafeAreaView
+      edges={['bottom', 'left', 'right', 'top']}
+      style={styles.screen}
+    >
       <StatusBar style="dark" />
 
       <View style={styles.header}>
@@ -195,17 +205,22 @@ export default function AccountDetailsScreen() {
           <Ionicons color="#101c2d" name="arrow-back" size={23} />
         </Pressable>
         <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>Configura tu cuenta</Text>
-          <View
-            accessibilityLabel="Paso 3 de 4"
-            accessibilityRole="progressbar"
-            style={styles.progress}
-          >
-            <View style={styles.completedStep} />
-            <View style={styles.completedStep} />
-            <View style={styles.activeStep} />
-            <View style={styles.step} />
-          </View>
+          <Text style={styles.eyebrow}>
+            {isEditingCompletedAccount
+              ? 'Información de tu negocio'
+              : 'Configura tu cuenta'}
+          </Text>
+          {!isEditingCompletedAccount ? (
+            <View
+              accessibilityLabel="Paso 2 de 3"
+              accessibilityRole="progressbar"
+              style={styles.progress}
+            >
+              <View style={styles.completedStep} />
+              <View style={styles.activeStep} />
+              <View style={styles.step} />
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -219,7 +234,9 @@ export default function AccountDetailsScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Text style={styles.introduction}>
-            {'Genial, por \u00faltimo podr\u00e1s revisar o modificar la informaci\u00f3n de tu cuenta.'}
+            {isEditingCompletedAccount
+              ? 'Mantén actualizados los datos que identifican a tu negocio.'
+              : 'Genial, por \u00faltimo podr\u00e1s revisar o modificar la informaci\u00f3n de tu cuenta.'}
           </Text>
 
           <Pressable
@@ -255,7 +272,11 @@ export default function AccountDetailsScreen() {
             </Text>
           ) : null}
 
-          <Field label="Nombre" onChangeText={update('name')} value={form.name} />
+          <Field
+            label="Nombre"
+            onChangeText={update('name')}
+            value={form.name}
+          />
           <Field
             label={'Tel\u00e9fono'}
             onChangeText={update('phone')}
@@ -329,8 +350,12 @@ export default function AccountDetailsScreen() {
         />
         <NavaButton
           disabled={profileQuery.isPending}
-          icon="arrow-forward-outline"
-          label="Siguiente"
+          icon={
+            isEditingCompletedAccount
+              ? 'checkmark-outline'
+              : 'arrow-forward-outline'
+          }
+          label={isEditingCompletedAccount ? 'Guardar cambios' : 'Siguiente'}
           loading={saving}
           onPress={() => void save()}
           style={styles.nextButton}
@@ -470,4 +495,3 @@ const styles = StyleSheet.create({
   screen: { backgroundColor: '#f9fbff', flex: 1 },
   step: { backgroundColor: '#dce7fb', borderRadius: 6, height: 10, width: 10 },
 });
-

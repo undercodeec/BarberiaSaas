@@ -52,7 +52,9 @@ async function currentOrganizationId(database: DatabaseClient, userId: string) {
 }
 
 function clientScope(organizationId: string | null, userId: string) {
-  return organizationId ? { organizationId } : { createdByUserId: userId };
+  return organizationId
+    ? { deletedAt: null, organizationId }
+    : { createdByUserId: userId, deletedAt: null };
 }
 
 function publicLabel(label: { color: string; id: string; name: string }) {
@@ -266,11 +268,17 @@ export function registerClientRoutes(
       },
       orderBy: { startsAt: 'desc' },
       where: {
-        ...scope,
+        ...(organizationId ? { organizationId } : { createdByUserId: user.id }),
         OR: [
-          { clientName: client.fullName },
-          ...(client.phone ? [{ clientPhone: client.phone }] : []),
-          ...(client.email ? [{ clientEmail: client.email }] : []),
+          { clientId: client.id },
+          {
+            clientId: null,
+            OR: [
+              { clientName: client.fullName },
+              ...(client.phone ? [{ clientPhone: client.phone }] : []),
+              ...(client.email ? [{ clientEmail: client.email }] : []),
+            ],
+          },
         ],
       },
     });
@@ -354,7 +362,10 @@ export function registerClientRoutes(
     if (!client) {
       throw new ApiError(404, 'CLIENT_NOT_FOUND', 'El cliente no existe.');
     }
-    await database.client.delete({ where: { id: client.id } });
+    await database.client.update({
+      data: { deletedAt: new Date(), updatedByUserId: user.id },
+      where: { id: client.id },
+    });
     return reply.code(204).send();
   });
 }

@@ -32,8 +32,9 @@ import { BookingLinkSheet } from '../../src/components/BookingLinkSheet';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const MONTH_PROGRESS = 84;
+const NOTIFICATION_BANNER_DELAY_MS = 5000;
+const WELCOME_SURVEY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 const WELCOME_SURVEY_RESPONSE_KEY = 'barber-saas.welcome-survey-response';
-const LOCATION_BANNER_KEY = 'barber-saas.location-banner';
 let notificationPromptSessionKey: string | null = null;
 const WELCOME_SURVEY_OPTIONS = [
   'Publicidad',
@@ -85,24 +86,24 @@ async function markWelcomeSurveyDismissed(userId: string) {
   await SecureStore.setItemAsync(key, value);
 }
 
-function locationBannerStorageKey(userId: string) {
-  return `${LOCATION_BANNER_KEY}.${userId}`;
-}
+function shouldShowWelcomeSurvey(storedResponse: string | null) {
+  if (storedResponse === null) return true;
 
-async function getLocationBannerStatus(userId: string): Promise<string | null> {
-  const key = locationBannerStorageKey(userId);
-  if (Platform.OS === 'web') return globalThis.localStorage.getItem(key);
-  return SecureStore.getItemAsync(key);
-}
+  try {
+    const response = JSON.parse(storedResponse) as {
+      readonly dismissedAt?: unknown;
+      readonly submittedAt?: unknown;
+    };
+    const interactedAt = response.submittedAt ?? response.dismissedAt;
 
-async function markLocationBannerHandled(userId: string) {
-  const key = locationBannerStorageKey(userId);
-  const value = new Date().toISOString();
-  if (Platform.OS === 'web') {
-    globalThis.localStorage.setItem(key, value);
-    return;
+    if (typeof interactedAt !== 'string') return true;
+    const interactedAtMs = Date.parse(interactedAt);
+    if (Number.isNaN(interactedAtMs)) return true;
+
+    return Date.now() - interactedAtMs >= WELCOME_SURVEY_INTERVAL_MS;
+  } catch {
+    return true;
   }
-  await SecureStore.setItemAsync(key, value);
 }
 
 function greeting() {
@@ -187,6 +188,9 @@ function NotificationPermissionSheet({
   useEffect(() => {
     if (!visible) return;
 
+    backdropOpacity.setValue(0);
+    sheetTranslateY.setValue(48);
+
     Animated.parallel([
       Animated.timing(backdropOpacity, {
         duration: 180,
@@ -203,12 +207,60 @@ function NotificationPermissionSheet({
     ]).start();
   }, [backdropOpacity, sheetTranslateY, visible]);
 
+  const dismissWithAnimation = () => {
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        duration: 160,
+        easing: Easing.in(Easing.cubic),
+        toValue: 0,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sheetTranslateY, {
+        duration: 180,
+        easing: Easing.in(Easing.cubic),
+        toValue: 520,
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) onClose();
+    });
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) =>
+        gestureState.dy > 8 &&
+        Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) sheetTranslateY.setValue(gestureState.dy);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 100 || gestureState.vy > 0.75) {
+          dismissWithAnimation();
+          return;
+        }
+        Animated.spring(sheetTranslateY, {
+          bounciness: 0,
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(sheetTranslateY, {
+          bounciness: 0,
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      },
+    }),
+  ).current;
+
   if (!visible) return null;
 
   return (
     <Modal
       animationType="none"
-      onRequestClose={onClose}
+      onRequestClose={dismissWithAnimation}
       statusBarTranslucent
       transparent
       visible
@@ -218,7 +270,14 @@ function NotificationPermissionSheet({
           pointerEvents="none"
           style={[styles.permissionBackdrop, { opacity: backdropOpacity }]}
         />
+        <Pressable
+          accessibilityLabel="Cerrar notificaciones"
+          accessibilityRole="button"
+          onPress={dismissWithAnimation}
+          style={styles.permissionBackdrop}
+        />
         <Animated.View
+          {...panResponder.panHandlers}
           style={[
             styles.permissionSheet,
             {
@@ -241,7 +300,7 @@ function NotificationPermissionSheet({
                 'Ahora no, activar notificaciones m\u00e1s tarde'
               }
               accessibilityRole="button"
-              onPress={onClose}
+              onPress={dismissWithAnimation}
               style={styles.permissionSecondaryButton}
             >
               <Text style={styles.permissionSecondaryLabel}>Ahora no</Text>
@@ -725,6 +784,7 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     let isMounted = true;
+    let notificationPromptTimer: ReturnType<typeof setTimeout> | null = null;
     setNotificationFlowState('checking');
     setIsNotificationSheetOpen(false);
 
@@ -739,12 +799,16 @@ export default function DashboardScreen() {
 
           if (shouldRequestPermission) {
             notificationPromptSessionKey = currentNotificationSessionKey;
+            notificationPromptTimer = setTimeout(() => {
+              if (!isMounted) return;
+              setIsNotificationSheetOpen(true);
+              setNotificationFlowState('visible');
+            }, NOTIFICATION_BANNER_DELAY_MS);
+            return;
           }
 
-          setIsNotificationSheetOpen(shouldRequestPermission);
-          setNotificationFlowState(
-            shouldRequestPermission ? 'visible' : 'completed',
-          );
+          setIsNotificationSheetOpen(false);
+          setNotificationFlowState('completed');
         }
       } catch {
         // Some development environments do not expose native notifications.
@@ -756,6 +820,7 @@ export default function DashboardScreen() {
 
     return () => {
       isMounted = false;
+      if (notificationPromptTimer) clearTimeout(notificationPromptTimer);
     };
   }, [currentNotificationSessionKey, session]);
 
@@ -768,7 +833,7 @@ export default function DashboardScreen() {
       if (!user) return;
       try {
         const response = await getWelcomeSurveyResponse(user.id);
-        if (isMounted) setNeedsWelcomeSurvey(response === null);
+        if (isMounted) setNeedsWelcomeSurvey(shouldShowWelcomeSurvey(response));
       } catch {
         if (isMounted) setNeedsWelcomeSurvey(true);
       }
@@ -788,26 +853,17 @@ export default function DashboardScreen() {
   }, [needsWelcomeSurvey, notificationFlowState]);
 
   useEffect(() => {
-    let isMounted = true;
     setNeedsLocationBanner(null);
     setIsLocationBannerOpen(false);
 
-    const checkLocationBanner = async () => {
-      if (!user) return;
-      try {
-        const status = await getLocationBannerStatus(user.id);
-        if (isMounted) setNeedsLocationBanner(status === null);
-      } catch {
-        if (isMounted) setNeedsLocationBanner(true);
-      }
-    };
-
-    if (session && user) void checkLocationBanner();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [session, user]);
+    if (!session || !user || !accountQuery.isSuccess) return;
+    setNeedsLocationBanner(!accountQuery.data?.addressLine?.trim());
+  }, [
+    accountQuery.data?.addressLine,
+    accountQuery.isSuccess,
+    session,
+    user,
+  ]);
 
   useEffect(() => {
     if (
@@ -857,7 +913,6 @@ export default function DashboardScreen() {
   const dismissLocationBanner = () => {
     setIsLocationBannerOpen(false);
     setNeedsLocationBanner(false);
-    if (user) void markLocationBannerHandled(user.id);
   };
 
   const saveLocation = async (addressLine: string) => {
@@ -893,7 +948,6 @@ export default function DashboardScreen() {
       },
     );
     await accountQuery.refetch();
-    await markLocationBannerHandled(user.id);
     setNeedsLocationBanner(false);
   };
 

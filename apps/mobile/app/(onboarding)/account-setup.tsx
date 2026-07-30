@@ -1,14 +1,25 @@
+import type { OnboardingAccountDetailsResponse } from '@barber-saas/api-client';
+import { useQuery } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { AccountSetupWelcomeScreen } from '../../src/components/AccountSetupWelcomeScreen';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
+import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 export default function AccountSetupScreen() {
   const router = useRouter();
   const { isLoading: isLoadingSession, session, user } = useAuth();
   const organizationQuery = useCurrentOrganization();
+  const accountQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<OnboardingAccountDetailsResponse>(
+        '/v1/onboarding/account-details',
+      ),
+    queryKey: ['onboarding-account-details', user?.id],
+  });
 
   if (isLoadingSession || (session && organizationQuery.isLoading)) {
     return (
@@ -19,13 +30,14 @@ export default function AccountSetupScreen() {
     );
   }
   if (!session || !user) return <Redirect href="/(auth)/login" />;
-  if (organizationQuery.data) return <Redirect href="/(app)" />;
+  if (organizationQuery.data) return <Redirect href="/dashboard" />;
 
   return (
     <AccountSetupWelcomeScreen
+      accountType={accountQuery.data?.accountType ?? 'professional'}
       fullName={user.fullName}
       onBack={() => router.replace('/')}
-      onContinue={() => router.push('/(onboarding)/organization')}
+      onContinue={() => router.push('/(onboarding)/services')}
     />
   );
 }

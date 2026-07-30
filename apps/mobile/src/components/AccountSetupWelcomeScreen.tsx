@@ -19,19 +19,22 @@ const teamIllustration = require('../../assets/onboarding-team.png') as number;
 const logoImage = require('../../assets/nava-logo.png') as number;
 
 interface AccountSetupWelcomeScreenProps {
+  readonly accountType: 'business' | 'professional';
   readonly fullName: string;
   readonly onBack: () => void;
   readonly onContinue: () => void;
 }
 
 export function AccountSetupWelcomeScreen({
+  accountType,
   fullName,
   onBack,
   onContinue,
 }: AccountSetupWelcomeScreenProps) {
   const { height, width } = useWindowDimensions();
-  const compact = height < 720;
+  const compact = height < 850;
   const firstName = fullName.trim().split(/\s+/u)[0] || 'bienvenido';
+  const isSolo = accountType === 'professional';
 
   return (
     <SafeAreaView
@@ -88,7 +91,10 @@ export function AccountSetupWelcomeScreen({
             style={[
               styles.illustration,
               compact ? styles.illustrationCompact : null,
-              { maxWidth: Math.min(width - 36, 520) },
+              {
+                height: Math.min(Math.max(height * 0.2, 135), 190),
+                maxWidth: Math.min(width - 36, 520),
+              },
             ]}
           />
 
@@ -98,8 +104,15 @@ export function AccountSetupWelcomeScreen({
               Configura tu cuenta
             </Text>
             <Text style={styles.description}>
-              Prepara tu espacio de trabajo para empezar a gestionar tu barbería
-              con <Image resizeMode="contain" source={logoImage} style={styles.inlineBrandLogo} />.
+              {isSolo
+                ? 'Prepara tu espacio para gestionar tu actividad profesional con '
+                : 'Prepara tu espacio para empezar a gestionar tu negocio con '}
+              <Image
+                resizeMode="contain"
+                source={logoImage}
+                style={styles.inlineBrandLogo}
+              />
+              .
             </Text>
           </View>
         </View>
@@ -110,14 +123,18 @@ export function AccountSetupWelcomeScreen({
               <View style={styles.iconShell}>
                 <Ionicons color="#000000" name="storefront-outline" size={19} />
               </View>
-              <Text style={styles.benefitLabel}>Tu barbería</Text>
+              <Text style={styles.benefitLabel}>
+                {isSolo ? 'Tu actividad' : 'Tu negocio'}
+              </Text>
             </View>
             <View style={styles.divider} />
             <View style={styles.benefit}>
               <View style={styles.iconShell}>
                 <Ionicons color="#000000" name="location-outline" size={19} />
               </View>
-              <Text style={styles.benefitLabel}>Tu sucursal</Text>
+              <Text style={styles.benefitLabel}>
+                {isSolo ? 'Tus servicios' : 'Tu equipo'}
+              </Text>
             </View>
             <View style={styles.divider} />
             <View style={styles.benefit}>
@@ -127,18 +144,20 @@ export function AccountSetupWelcomeScreen({
               <Text style={styles.benefitLabel}>Todo listo</Text>
             </View>
           </View>
-
-          <NavaButton
-            compact={width < 390}
-            icon="arrow-forward-outline"
-            label="Comenzar configuración"
-            onPress={onContinue}
-            style={styles.continueButton}
-            variant="primary"
-          />
-          <Text style={styles.helper}>Solo te tomará un par de minutos</Text>
         </View>
       </ScrollView>
+
+      <View style={styles.actionFooter}>
+        <NavaButton
+          compact={width < 390}
+          icon="arrow-forward-outline"
+          label="Comenzar configuración"
+          onPress={onContinue}
+          style={styles.continueButton}
+          variant="primary"
+        />
+        <Text style={styles.helper}>Solo te tomará un par de minutos</Text>
+      </View>
     </SafeAreaView>
   );
 }
@@ -207,9 +226,8 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1,
     flexDirection: 'row',
-    marginBottom: 18,
     paddingHorizontal: 14,
-    paddingVertical: 13,
+    paddingVertical: 10,
     width: '100%',
   },
   bottomGlow: {
@@ -241,14 +259,15 @@ const styles = StyleSheet.create({
   continueButton: {
     flexBasis: 'auto',
     flexGrow: 0,
-    minHeight: 68,
+    height: 56,
+    minHeight: 56,
     width: '100%',
   },
   description: {
     color: '#667080',
-    fontSize: 16,
-    lineHeight: 24,
-    marginTop: 12,
+    fontSize: 15,
+    lineHeight: 21,
+    marginTop: 7,
     maxWidth: 440,
     textAlign: 'center',
   },
@@ -259,8 +278,17 @@ const styles = StyleSheet.create({
   },
   footer: {
     alignItems: 'center',
-    marginTop: 22,
+    marginTop: 10,
     width: '100%',
+  },
+  actionFooter: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(252,252,251,0.98)',
+    borderTopColor: '#e6e9ed',
+    borderTopWidth: 1,
+    paddingBottom: 8,
+    paddingHorizontal: 22,
+    paddingTop: 10,
   },
   greeting: {
     color: '#000000',
@@ -277,11 +305,10 @@ const styles = StyleSheet.create({
   helper: {
     color: '#7d8795',
     fontSize: 13,
-    marginTop: 11,
+    marginTop: 6,
   },
   hero: {
     alignItems: 'center',
-    flexGrow: 1,
     justifyContent: 'center',
     width: '100%',
   },
@@ -298,13 +325,12 @@ const styles = StyleSheet.create({
     width: 61,
   },
   illustration: {
-    aspectRatio: 1.437,
-    marginTop: 18,
+    marginTop: 8,
     width: '100%',
   },
   illustrationCompact: {
-    marginTop: 5,
-    maxHeight: 238,
+    marginTop: 2,
+    maxHeight: 165,
   },
   message: {
     alignItems: 'center',
@@ -316,7 +342,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#101c2d',
-    fontSize: 31,
+    fontSize: 28,
     fontWeight: '900',
     letterSpacing: -0.9,
     textAlign: 'center',

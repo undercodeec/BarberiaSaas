@@ -180,6 +180,7 @@ export interface ServiceRecord {
   readonly durationMinutes: number;
   readonly id: string;
   readonly name: string;
+  readonly onlineBooking: boolean;
   readonly priceCents: number;
 }
 
@@ -270,8 +271,21 @@ export interface SchedulesResponse {
   }>;
 }
 
+export interface BusinessScheduleDay {
+  readonly endMinute: number;
+  readonly isOpen: boolean;
+  readonly startMinute: number;
+  readonly weekday: number;
+}
+
+export interface BusinessScheduleResponse {
+  readonly days: readonly BusinessScheduleDay[];
+  readonly locationId: string;
+}
+
 export interface AppointmentRecord {
   readonly clientEmail: string | null;
+  readonly clientId: string | null;
   readonly clientName: string;
   readonly clientPhone: string | null;
   readonly endsAt: string;
@@ -289,14 +303,18 @@ export interface AppointmentRecord {
   }>;
   readonly startsAt: string;
   readonly status:
+    | 'awaiting_confirmation'
     | 'cancelled'
     | 'checked_in'
     | 'completed'
     | 'confirmed'
     | 'in_progress'
     | 'no_show'
+    | 'pending_verification'
     | 'scheduled'
-    | 'waiting';
+    | 'waiting'
+    | 'expired';
+  readonly source: 'manual' | 'public_booking' | 'walk_in';
 }
 
 export interface AppointmentsResponse {
@@ -318,6 +336,76 @@ export interface AppointmentEventsResponse {
     readonly type: 'cancelled' | 'created' | 'rescheduled' | 'status_changed';
   }>;
   readonly latestEventId: string;
+}
+
+export interface BookingSettingsResponse {
+  readonly cancellationLeadMinutes: number;
+  readonly confirmationDeadlineMinutes: number;
+  readonly confirmationEnabled: boolean;
+  readonly policyText: string;
+  readonly policyVersion: number;
+  readonly reminderMinutes: number;
+  readonly rescheduleLeadMinutes: number;
+  readonly unconfirmedAction: 'cancel' | 'keep';
+}
+
+export interface PublicBookingCatalog {
+  readonly location: {
+    readonly addressLine: string | null;
+    readonly city: string | null;
+    readonly countryCode: string;
+    readonly currencyCode: string;
+    readonly email: string | null;
+    readonly id: string;
+    readonly name: string;
+    readonly phone: string;
+    readonly slug: string;
+    readonly timezone: string;
+  };
+  readonly organization: {
+    readonly id: string;
+    readonly name: string;
+    readonly slug: string;
+  };
+  readonly policy: BookingSettingsResponse;
+  readonly professionals: ReadonlyArray<{
+    readonly bio: string | null;
+    readonly id: string;
+    readonly name: string;
+    readonly photoData: string | null;
+    readonly serviceIds: readonly string[];
+  }>;
+  readonly reviews: ReadonlyArray<{
+    readonly clientName: string;
+    readonly comment: string | null;
+    readonly createdAt: string;
+    readonly id: string;
+    readonly professionalName: string;
+    readonly rating: number;
+  }>;
+  readonly services: ReadonlyArray<{
+    readonly category: string | null;
+    readonly description: string | null;
+    readonly durationMinutes: number;
+    readonly id: string;
+    readonly name: string;
+    readonly priceCents: number;
+  }>;
+}
+
+export interface ReviewRecord {
+  readonly clientName: string;
+  readonly comment: string | null;
+  readonly createdAt: string;
+  readonly id: string;
+  readonly isVisible: boolean;
+  readonly professionalName: string;
+  readonly rating: number;
+  readonly updatedAt: string;
+}
+
+export interface ReviewsResponse {
+  readonly reviews: readonly ReviewRecord[];
 }
 
 export class ApiClientError extends Error {

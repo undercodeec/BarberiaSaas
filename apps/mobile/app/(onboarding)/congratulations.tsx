@@ -38,7 +38,6 @@ export default function CongratulationsScreen() {
     queryKey: ['onboarding-account-details', user?.id],
   });
 
-
   const [isBookingSheetOpen, setIsBookingSheetOpen] = useState(false);
   const bookingUrl = profileQuery.data?.bookingUrl ?? '';
 
@@ -48,11 +47,20 @@ export default function CongratulationsScreen() {
         '/v1/onboarding/complete-account-setup',
         { method: 'POST' },
       ),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       queryClient.setQueryData<OnboardingAccountDetailsResponse>(
         ['onboarding-account-details', user?.id],
-        (profile) => profile ? { ...profile, onboardingCompletedAt: result.onboardingCompletedAt } : profile,
+        (profile) =>
+          profile
+            ? {
+                ...profile,
+                onboardingCompletedAt: result.onboardingCompletedAt,
+              }
+            : profile,
       );
+      await queryClient.invalidateQueries({
+        queryKey: ['current-organization'],
+      });
       router.replace('/dashboard' as never);
     },
   });
@@ -66,13 +74,19 @@ export default function CongratulationsScreen() {
       });
     } catch {
       await Clipboard.setStringAsync(bookingUrl);
-      Alert.alert('Enlace copiado', 'Puedes pegarlo y compartirlo donde prefieras.');
+      Alert.alert(
+        'Enlace copiado',
+        'Puedes pegarlo y compartirlo donde prefieras.',
+      );
     }
   };
 
   if (!session) return <Redirect href="/(auth)/login" />;
   return (
-    <SafeAreaView edges={['bottom', 'left', 'right', 'top']} style={styles.screen}>
+    <SafeAreaView
+      edges={['bottom', 'left', 'right', 'top']}
+      style={styles.screen}
+    >
       <StatusBar style="dark" />
       <ScrollView
         contentContainerStyle={styles.content}
@@ -94,7 +108,9 @@ export default function CongratulationsScreen() {
           }
         </Text>
         <Text style={styles.copy}>
-          {'Aqu? tienes tu enlace de reservas para compartirlo en tus redes sociales.'}
+          {
+            'Aqu? tienes tu enlace de reservas para compartirlo en tus redes sociales.'
+          }
         </Text>
 
         <Pressable
@@ -250,4 +266,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-

@@ -35,18 +35,33 @@ enum InvitationStatus {
 }
 
 enum AppointmentStatus {
+  PENDING_VERIFICATION
   SCHEDULED
   WAITING
   CONFIRMED
+  AWAITING_CONFIRMATION
   CHECKED_IN
   IN_PROGRESS
   COMPLETED
   CANCELLED
   NO_SHOW
+  EXPIRED
 }
+
 enum AppointmentPaymentStatus {
   PENDING
   PAID
+}
+
+enum AppointmentSource {
+  MANUAL
+  PUBLIC_BOOKING
+  WALK_IN
+}
+
+enum UnconfirmedBookingAction {
+  KEEP
+  CANCEL
 }
 
 enum CashRegisterStatus {
@@ -73,27 +88,27 @@ enum OnboardingCollaboratorRole {
 }
 
 model User {
-  id                     String                   @id @default(uuid()) @db.Uuid
-  email                  String                   @unique @db.VarChar(254)
-  passwordHash           String?                  @map("password_hash") @db.Text
-  fullName               String                   @map("full_name") @db.VarChar(120)
-  phone                  String?                  @db.VarChar(24)
-  profilePhotoData       String?                  @map("profile_photo_data") @db.Text
-  profileBio             String?                  @map("profile_bio") @db.VarChar(500)
-  emailVerifiedAt        DateTime?                @map("email_verified_at") @db.Timestamptz(3)
-  locale                 String                   @default("es") @db.VarChar(10)
-  createdAt              DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt              DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
-  sessions               Session[]
-  passwordResetTokens    PasswordResetToken[]
-  emailVerificationCodes EmailVerificationCode[]
-  memberships            Membership[]
-  auditLogs              AuditLog[]               @relation("AuditActor")
-  invitationsSent        TeamInvitation[]         @relation("InvitationInviter")
-  appointmentsCreated    Appointment[]            @relation("AppointmentCreator")
-  appointmentsUpdated    Appointment[]            @relation("AppointmentUpdater")
-  appointmentEvents      AppointmentEvent[]
-  registrationProfile    UserRegistrationProfile?
+  id                      String                   @id @default(uuid()) @db.Uuid
+  email                   String                   @unique @db.VarChar(254)
+  passwordHash            String?                  @map("password_hash") @db.Text
+  fullName                String                   @map("full_name") @db.VarChar(120)
+  phone                   String?                  @db.VarChar(24)
+  profilePhotoData        String?                  @map("profile_photo_data") @db.Text
+  profileBio              String?                  @map("profile_bio") @db.VarChar(500)
+  emailVerifiedAt         DateTime?                @map("email_verified_at") @db.Timestamptz(3)
+  locale                  String                   @default("es") @db.VarChar(10)
+  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  sessions                Session[]
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationCodes  EmailVerificationCode[]
+  memberships             Membership[]
+  auditLogs               AuditLog[]               @relation("AuditActor")
+  invitationsSent         TeamInvitation[]         @relation("InvitationInviter")
+  appointmentsCreated     Appointment[]            @relation("AppointmentCreator")
+  appointmentsUpdated     Appointment[]            @relation("AppointmentUpdater")
+  appointmentEvents       AppointmentEvent[]
+  registrationProfile     UserRegistrationProfile?
   onboardingCollaborators OnboardingCollaborator[]
   onboardingServices      OnboardingService[]
   clientsCreated          Client[]                 @relation("ClientCreator")
@@ -101,6 +116,7 @@ model User {
   clientNotesCreated      ClientNote[]             @relation("ClientNoteCreator")
   clientLabelsCreated     ClientLabel[]            @relation("ClientLabelCreator")
   clientLabelsUpdated     ClientLabel[]            @relation("ClientLabelUpdater")
+  reviewsHidden           AppointmentReview[]      @relation("ReviewHiddenBy")
   portfolioItems          UserPortfolioItem[]
 
   @@map("users")
@@ -117,6 +133,7 @@ model UserPortfolioItem {
   @@index([userId, createdAt])
   @@map("user_portfolio_items")
 }
+
 model EmailVerificationCode {
   id        String    @id @default(uuid()) @db.Uuid
   userId    String    @map("user_id") @db.Uuid
@@ -157,24 +174,24 @@ model PendingRegistration {
 }
 
 model UserRegistrationProfile {
-  userId          String                  @id @map("user_id") @db.Uuid
-  accountType     RegistrationAccountType @map("account_type")
-  businessName    String                  @map("business_name") @db.VarChar(120)
-  businessNameKey String                  @unique @map("business_name_key") @db.VarChar(120)
-  countryCode     String                  @map("country_code") @db.Char(2)
-  city            String                  @db.VarChar(120)
-  addressLine     String?                 @map("address_line") @db.VarChar(240)
-  coverImageUri   String?                 @map("cover_image_uri") @db.VarChar(2048)
-  description     String?                 @db.VarChar(500)
-  facebookUrl     String?                 @map("facebook_url") @db.VarChar(2048)
-  instagramUrl    String?                 @map("instagram_url") @db.VarChar(2048)
-  openingTime     String                  @map("opening_time") @db.Char(5)
-  closingTime     String                  @map("closing_time") @db.Char(5)
-  phoneKey        String                  @unique @map("phone_key") @db.VarChar(24)
-  onboardingCompletedAt DateTime?         @map("onboarding_completed_at") @db.Timestamptz(3)
-  createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
-  user            User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                String                  @id @map("user_id") @db.Uuid
+  accountType           RegistrationAccountType @map("account_type")
+  businessName          String                  @map("business_name") @db.VarChar(120)
+  businessNameKey       String                  @unique @map("business_name_key") @db.VarChar(120)
+  countryCode           String                  @map("country_code") @db.Char(2)
+  city                  String                  @db.VarChar(120)
+  addressLine           String?                 @map("address_line") @db.VarChar(240)
+  coverImageUri         String?                 @map("cover_image_uri") @db.VarChar(2048)
+  description           String?                 @db.VarChar(500)
+  facebookUrl           String?                 @map("facebook_url") @db.VarChar(2048)
+  instagramUrl          String?                 @map("instagram_url") @db.VarChar(2048)
+  openingTime           String                  @map("opening_time") @db.Char(5)
+  closingTime           String                  @map("closing_time") @db.Char(5)
+  phoneKey              String                  @unique @map("phone_key") @db.VarChar(24)
+  onboardingCompletedAt DateTime?               @map("onboarding_completed_at") @db.Timestamptz(3)
+  createdAt             DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user                  User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_registration_profiles")
 }
@@ -201,27 +218,27 @@ model OnboardingCollaborator {
 }
 
 model OnboardingService {
-  id                       String   @id @default(uuid()) @db.Uuid
-  ownerUserId              String   @map("owner_user_id") @db.Uuid
-  name                     String   @db.VarChar(120)
-  description              String?  @db.VarChar(500)
-  durationMinutes          Int      @map("duration_minutes")
-  priceCents               Int      @map("price_cents")
-  priceType                String   @map("price_type") @db.VarChar(16)
-  onlineBooking            Boolean  @default(true) @map("online_booking")
-  showServiceTime          Boolean  @default(true) @map("show_service_time")
-  categoryName             String?  @map("category_name") @db.VarChar(80)
-  categoryDescription      String?  @map("category_description") @db.VarChar(500)
-  taxName                  String?  @map("tax_name") @db.VarChar(80)
-  taxPercentage            Int?     @map("tax_percentage")
-  taxAddAtCheckout         Boolean  @default(false) @map("tax_add_at_checkout")
-  taxAddAtPurchaseEnd      Boolean  @default(false) @map("tax_add_at_purchase_end")
-  imageUri                 String?  @map("image_uri") @db.VarChar(2048)
-  agendaColor              String   @map("agenda_color") @db.Char(7)
-  downPaymentPercentage    Int      @default(0) @map("down_payment_percentage")
-  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt                DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-  owner                    User     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  id                    String   @id @default(uuid()) @db.Uuid
+  ownerUserId           String   @map("owner_user_id") @db.Uuid
+  name                  String   @db.VarChar(120)
+  description           String?  @db.VarChar(500)
+  durationMinutes       Int      @map("duration_minutes")
+  priceCents            Int      @map("price_cents")
+  priceType             String   @map("price_type") @db.VarChar(16)
+  onlineBooking         Boolean  @default(true) @map("online_booking")
+  showServiceTime       Boolean  @default(true) @map("show_service_time")
+  categoryName          String?  @map("category_name") @db.VarChar(80)
+  categoryDescription   String?  @map("category_description") @db.VarChar(500)
+  taxName               String?  @map("tax_name") @db.VarChar(80)
+  taxPercentage         Int?     @map("tax_percentage")
+  taxAddAtCheckout      Boolean  @default(false) @map("tax_add_at_checkout")
+  taxAddAtPurchaseEnd   Boolean  @default(false) @map("tax_add_at_purchase_end")
+  imageUri              String?  @map("image_uri") @db.VarChar(2048)
+  agendaColor           String   @map("agenda_color") @db.Char(7)
+  downPaymentPercentage Int      @default(0) @map("down_payment_percentage")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  owner                 User     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
 
   @@index([ownerUserId, createdAt])
   @@map("onboarding_services")
@@ -256,51 +273,64 @@ model PasswordResetToken {
 }
 
 model Organization {
-  id                String             @id @default(uuid()) @db.Uuid
-  name              String             @db.VarChar(120)
-  slug              String             @unique @db.VarChar(80)
-  status            OrganizationStatus @default(TRIAL)
-  currencyCode      String             @default("USD") @map("currency_code") @db.Char(3)
-  defaultTimezone   String             @default("America/Guayaquil") @map("default_timezone") @db.VarChar(64)
-  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt         DateTime?          @map("deleted_at") @db.Timestamptz(3)
-  locations         Location[]
-  memberships       Membership[]
-  auditLogs         AuditLog[]
-  invitations       TeamInvitation[]
-  serviceCategories ServiceCategory[]
-  services          Service[]
-  scheduleBlocks    ScheduleBlock[]
-  appointments      Appointment[]
-  appointmentEvents AppointmentEvent[]
-  clients           Client[]
-  clientLabels      ClientLabel[]
-  clientNotes       ClientNote[]
+  id                                 String                   @id @default(uuid()) @db.Uuid
+  name                               String                   @db.VarChar(120)
+  slug                               String                   @unique @db.VarChar(80)
+  status                             OrganizationStatus       @default(TRIAL)
+  currencyCode                       String                   @default("USD") @map("currency_code") @db.Char(3)
+  defaultTimezone                    String                   @default("America/Guayaquil") @map("default_timezone") @db.VarChar(64)
+  bookingConfirmationEnabled         Boolean                  @default(true) @map("booking_confirmation_enabled")
+  bookingReminderMinutes             Int                      @default(1440) @map("booking_reminder_minutes")
+  bookingConfirmationDeadlineMinutes Int                      @default(360) @map("booking_confirmation_deadline_minutes")
+  bookingUnconfirmedAction           UnconfirmedBookingAction @default(KEEP) @map("booking_unconfirmed_action")
+  bookingCancellationLeadMinutes     Int                      @default(120) @map("booking_cancellation_lead_minutes")
+  bookingRescheduleLeadMinutes       Int                      @default(120) @map("booking_reschedule_lead_minutes")
+  bookingPolicyVersion               Int                      @default(1) @map("booking_policy_version")
+  bookingPolicyText                  String                   @default("Acepto asistir puntualmente y cancelar o reprogramar dentro del plazo informado por el negocio.") @map("booking_policy_text") @db.VarChar(1000)
+  createdAt                          DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                          DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt                          DateTime?                @map("deleted_at") @db.Timestamptz(3)
+  locations                          Location[]
+  memberships                        Membership[]
+  auditLogs                          AuditLog[]
+  invitations                        TeamInvitation[]
+  serviceCategories                  ServiceCategory[]
+  services                           Service[]
+  businessWeeklySchedules            BusinessWeeklySchedule[]
+  scheduleBlocks                     ScheduleBlock[]
+  appointments                       Appointment[]
+  appointmentEvents                  AppointmentEvent[]
+  appointmentReviews                 AppointmentReview[]
+  clients                            Client[]
+  clientLabels                       ClientLabel[]
+  clientNotes                        ClientNote[]
 
   @@map("organizations")
 }
 
 model Client {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId  String?      @map("organization_id") @db.Uuid
-  createdByUserId String       @map("created_by_user_id") @db.Uuid
-  updatedByUserId String       @map("updated_by_user_id") @db.Uuid
-  fullName        String       @map("full_name") @db.VarChar(120)
-  lastName        String?      @map("last_name") @db.VarChar(120)
-  phone           String       @db.VarChar(24)
-  email          String?      @db.VarChar(254)
-  birthDate      String?      @map("birth_date") @db.Char(10)
-  addressLine    String?      @map("address_line") @db.VarChar(240)
-  documentNumber String?      @map("document_number") @db.VarChar(64)
-  notes          String?      @db.VarChar(500)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
-  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  createdBy      User         @relation("ClientCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  updatedBy      User         @relation("ClientUpdater", fields: [updatedByUserId], references: [id], onDelete: Restrict)
-  labels         ClientLabelAssignment[]
-  noteEntries    ClientNote[]
+  id              String                  @id @default(uuid()) @db.Uuid
+  organizationId  String?                 @map("organization_id") @db.Uuid
+  createdByUserId String?                 @map("created_by_user_id") @db.Uuid
+  updatedByUserId String?                 @map("updated_by_user_id") @db.Uuid
+  fullName        String                  @map("full_name") @db.VarChar(120)
+  lastName        String?                 @map("last_name") @db.VarChar(120)
+  phone           String                  @db.VarChar(24)
+  email           String?                 @db.VarChar(254)
+  birthDate       String?                 @map("birth_date") @db.Char(10)
+  addressLine     String?                 @map("address_line") @db.VarChar(240)
+  documentNumber  String?                 @map("document_number") @db.VarChar(64)
+  notes           String?                 @db.VarChar(500)
+  source          AppointmentSource       @default(MANUAL)
+  deletedAt       DateTime?               @map("deleted_at") @db.Timestamptz(3)
+  createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization    Organization?           @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  createdBy       User?                   @relation("ClientCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedBy       User?                   @relation("ClientUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  labels          ClientLabelAssignment[]
+  noteEntries     ClientNote[]
+  appointments    Appointment[]
 
   @@index([organizationId, fullName])
   @@index([createdByUserId])
@@ -324,6 +354,7 @@ model ClientNote {
   @@index([createdByUserId, createdAt])
   @@map("client_notes")
 }
+
 model ClientLabel {
   id              String                  @id @default(uuid()) @db.Uuid
   organizationId  String?                 @map("organization_id") @db.Uuid
@@ -354,31 +385,34 @@ model ClientLabelAssignment {
   @@index([labelId])
   @@map("client_label_assignments")
 }
+
 model Location {
-  id                   String                @id @default(uuid()) @db.Uuid
-  organizationId       String                @map("organization_id") @db.Uuid
-  name                 String                @db.VarChar(120)
-  slug                 String                @db.VarChar(80)
-  addressLine          String?               @map("address_line") @db.VarChar(240)
-  city                 String?               @db.VarChar(120)
-  countryCode          String                @default("EC") @map("country_code") @db.Char(2)
-  currencyCode         String                @default("USD") @map("currency_code") @db.Char(3)
-  timezone             String                @default("America/Guayaquil") @db.VarChar(64)
-  phone                String                @db.VarChar(24)
-  whatsappPhone        String                @map("whatsapp_phone") @db.VarChar(24)
-  email                String?               @db.VarChar(254)
-  isActive             Boolean               @default(true) @map("is_active")
-  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt            DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
-  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  memberLocations      MemberLocation[]
-  auditLogs            AuditLog[]
-  invitations          TeamInvitation[]
-  professionalServices ProfessionalService[]
-  weeklySchedules      WeeklySchedule[]
-  scheduleBlocks       ScheduleBlock[]
-  appointments         Appointment[]
-  appointmentEvents    AppointmentEvent[]
+  id                      String                   @id @default(uuid()) @db.Uuid
+  organizationId          String                   @map("organization_id") @db.Uuid
+  name                    String                   @db.VarChar(120)
+  slug                    String                   @db.VarChar(80)
+  addressLine             String?                  @map("address_line") @db.VarChar(240)
+  city                    String?                  @db.VarChar(120)
+  countryCode             String                   @default("EC") @map("country_code") @db.Char(2)
+  currencyCode            String                   @default("USD") @map("currency_code") @db.Char(3)
+  timezone                String                   @default("America/Guayaquil") @db.VarChar(64)
+  phone                   String                   @db.VarChar(24)
+  whatsappPhone           String                   @map("whatsapp_phone") @db.VarChar(24)
+  email                   String?                  @db.VarChar(254)
+  isActive                Boolean                  @default(true) @map("is_active")
+  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization            Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  memberLocations         MemberLocation[]
+  auditLogs               AuditLog[]
+  invitations             TeamInvitation[]
+  professionalServices    ProfessionalService[]
+  businessWeeklySchedules BusinessWeeklySchedule[]
+  weeklySchedules         WeeklySchedule[]
+  scheduleBlocks          ScheduleBlock[]
+  appointments            Appointment[]
+  appointmentEvents       AppointmentEvent[]
+  appointmentReviews      AppointmentReview[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -400,6 +434,7 @@ model Membership {
   weeklySchedules      WeeklySchedule[]
   scheduleBlocks       ScheduleBlock[]
   appointments         Appointment[]
+  appointmentReviews   AppointmentReview[]
 
   @@unique([organizationId, userId])
   @@index([userId, status])
@@ -464,6 +499,7 @@ model Service {
   description          String?               @db.VarChar(500)
   durationMinutes      Int                   @map("duration_minutes")
   priceCents           Int                   @map("price_cents")
+  onlineBooking        Boolean               @default(true) @map("online_booking")
   isActive             Boolean               @default(true) @map("is_active")
   createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt            DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -492,6 +528,24 @@ model ProfessionalService {
   @@id([membershipId, serviceId, locationId])
   @@index([serviceId, locationId])
   @@map("professional_services")
+}
+
+model BusinessWeeklySchedule {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  locationId     String       @map("location_id") @db.Uuid
+  weekday        Int          @db.SmallInt
+  isOpen         Boolean      @default(true) @map("is_open")
+  startMinute    Int          @map("start_minute") @db.SmallInt
+  endMinute      Int          @map("end_minute") @db.SmallInt
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location       Location     @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, weekday])
+  @@index([organizationId, weekday])
+  @@map("business_weekly_schedules")
 }
 
 model WeeklySchedule {
@@ -547,38 +601,95 @@ model CashRegisterSession {
   @@index([ownerUserId, status])
   @@map("cash_register_sessions")
 }
-model Appointment {
-  id                       String               @id @default(uuid()) @db.Uuid
-  organizationId           String               @map("organization_id") @db.Uuid
-  locationId               String               @map("location_id") @db.Uuid
-  professionalMembershipId String               @map("professional_membership_id") @db.Uuid
-  clientName               String               @map("client_name") @db.VarChar(120)
-  clientPhone              String?              @map("client_phone") @db.VarChar(24)
-  clientEmail              String?              @map("client_email") @db.VarChar(254)
-  startsAt                 DateTime             @map("starts_at") @db.Timestamptz(3)
-  endsAt                   DateTime             @map("ends_at") @db.Timestamptz(3)
-  status                   AppointmentStatus    @default(SCHEDULED)
-  paymentStatus            AppointmentPaymentStatus @default(PENDING) @map("payment_status")
-  reservesSlot             Boolean              @default(true) @map("reserves_slot")
-  notes                    String?              @db.VarChar(500)
-  cancellationReason       String?              @map("cancellation_reason") @db.VarChar(240)
-  cancelledAt              DateTime?            @map("cancelled_at") @db.Timestamptz(3)
-  createdByUserId          String               @map("created_by_user_id") @db.Uuid
-  updatedByUserId          String               @map("updated_by_user_id") @db.Uuid
-  createdAt                DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt                DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
-  organization             Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  location                 Location             @relation(fields: [locationId], references: [id], onDelete: Restrict)
-  professional             Membership           @relation(fields: [professionalMembershipId], references: [id], onDelete: Restrict)
-  createdBy                User                 @relation("AppointmentCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  updatedBy                User                 @relation("AppointmentUpdater", fields: [updatedByUserId], references: [id], onDelete: Restrict)
-  services                 AppointmentService[]
-  events                   AppointmentEvent[]
 
+model Appointment {
+  id                                String                   @id @default(uuid()) @db.Uuid
+  organizationId                    String                   @map("organization_id") @db.Uuid
+  locationId                        String                   @map("location_id") @db.Uuid
+  professionalMembershipId          String                   @map("professional_membership_id") @db.Uuid
+  clientId                          String?                  @map("client_id") @db.Uuid
+  clientName                        String                   @map("client_name") @db.VarChar(120)
+  clientPhone                       String?                  @map("client_phone") @db.VarChar(24)
+  clientEmail                       String?                  @map("client_email") @db.VarChar(254)
+  startsAt                          DateTime                 @map("starts_at") @db.Timestamptz(3)
+  endsAt                            DateTime                 @map("ends_at") @db.Timestamptz(3)
+  status                            AppointmentStatus        @default(SCHEDULED)
+  paymentStatus                     AppointmentPaymentStatus @default(PENDING) @map("payment_status")
+  source                            AppointmentSource        @default(MANUAL)
+  reservesSlot                      Boolean                  @default(true) @map("reserves_slot")
+  notes                             String?                  @db.VarChar(500)
+  cancellationReason                String?                  @map("cancellation_reason") @db.VarChar(240)
+  cancelledAt                       DateTime?                @map("cancelled_at") @db.Timestamptz(3)
+  policyAcceptedAt                  DateTime?                @map("policy_accepted_at") @db.Timestamptz(3)
+  policyVersion                     Int?                     @map("policy_version")
+  attendanceConfirmationRequestedAt DateTime?                @map("attendance_confirmation_requested_at") @db.Timestamptz(3)
+  attendanceConfirmationDeadlineAt  DateTime?                @map("attendance_confirmation_deadline_at") @db.Timestamptz(3)
+  attendanceConfirmedAt             DateTime?                @map("attendance_confirmed_at") @db.Timestamptz(3)
+  verificationExpiresAt             DateTime?                @map("verification_expires_at") @db.Timestamptz(3)
+  publicIdempotencyKeyHash          String?                  @map("public_idempotency_key_hash") @db.Char(64)
+  createdByUserId                   String?                  @map("created_by_user_id") @db.Uuid
+  updatedByUserId                   String?                  @map("updated_by_user_id") @db.Uuid
+  createdAt                         DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                         DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization                      Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location                          Location                 @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  professional                      Membership               @relation(fields: [professionalMembershipId], references: [id], onDelete: Restrict)
+  client                            Client?                  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  createdBy                         User?                    @relation("AppointmentCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedBy                         User?                    @relation("AppointmentUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  services                          AppointmentService[]
+  events                            AppointmentEvent[]
+  publicAccess                      PublicBookingAccess?
+  review                            AppointmentReview?
+
+  @@unique([organizationId, publicIdempotencyKeyHash])
   @@index([organizationId, startsAt])
   @@index([locationId, startsAt])
   @@index([professionalMembershipId, startsAt])
+  @@index([clientId, startsAt])
   @@map("appointments")
+}
+
+model PublicBookingAccess {
+  id                   String      @id @default(uuid()) @db.Uuid
+  appointmentId        String      @unique @map("appointment_id") @db.Uuid
+  verificationCodeHash String      @map("verification_code_hash") @db.Char(64)
+  verificationAttempts Int         @default(0) @map("verification_attempts")
+  managementTokenHash  String?     @unique @map("management_token_hash") @db.Char(64)
+  reminderTokenHash    String?     @unique @map("reminder_token_hash") @db.Char(64)
+  verifiedAt           DateTime?   @map("verified_at") @db.Timestamptz(3)
+  managementExpiresAt  DateTime?   @map("management_expires_at") @db.Timestamptz(3)
+  createdAt            DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  appointment          Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([verifiedAt, managementExpiresAt])
+  @@map("public_booking_access")
+}
+
+model AppointmentReview {
+  id                       String       @id @default(uuid()) @db.Uuid
+  appointmentId            String       @unique @map("appointment_id") @db.Uuid
+  organizationId           String       @map("organization_id") @db.Uuid
+  locationId               String       @map("location_id") @db.Uuid
+  professionalMembershipId String       @map("professional_membership_id") @db.Uuid
+  clientName               String       @map("client_name") @db.VarChar(120)
+  rating                   Int          @db.SmallInt
+  comment                  String?      @db.VarChar(1000)
+  isVisible                Boolean      @default(true) @map("is_visible")
+  hiddenAt                 DateTime?    @map("hidden_at") @db.Timestamptz(3)
+  hiddenByUserId           String?      @map("hidden_by_user_id") @db.Uuid
+  createdAt                DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  appointment              Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  organization             Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location                 Location     @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  professional             Membership   @relation(fields: [professionalMembershipId], references: [id], onDelete: Cascade)
+  hiddenBy                 User?        @relation("ReviewHiddenBy", fields: [hiddenByUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, isVisible, createdAt])
+  @@index([professionalMembershipId, isVisible, createdAt])
+  @@map("appointment_reviews")
 }
 
 model AppointmentService {
@@ -602,14 +713,14 @@ model AppointmentEvent {
   organizationId String               @map("organization_id") @db.Uuid
   locationId     String               @map("location_id") @db.Uuid
   appointmentId  String               @map("appointment_id") @db.Uuid
-  actorUserId    String               @map("actor_user_id") @db.Uuid
+  actorUserId    String?              @map("actor_user_id") @db.Uuid
   type           AppointmentEventType
   payload        Json                 @default("{}")
   createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
   organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   location       Location             @relation(fields: [locationId], references: [id], onDelete: Cascade)
   appointment    Appointment          @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
-  actor          User                 @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  actor          User?                @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, id])
   @@index([locationId, id])

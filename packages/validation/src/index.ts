@@ -39,6 +39,13 @@ const slugSchema = z
     'Usa letras minúsculas, números y guiones.',
   );
 const uuidSchema = z.uuid('El identificador no es válido.');
+const serviceIdsSchema = z
+  .array(uuidSchema)
+  .min(1, 'Selecciona al menos un servicio.')
+  .max(10)
+  .refine((serviceIds) => new Set(serviceIds).size === serviceIds.length, {
+    message: 'No puedes seleccionar el mismo servicio más de una vez.',
+  });
 const agendaColorSchema = z
   .string()
   .regex(/^#[0-9A-Fa-f]{6}$/u, 'El color de agenda no es válido.');
@@ -76,8 +83,8 @@ export const signUpSchema = z
     message: 'Las contraseñas no coinciden.',
     path: ['confirmPassword'],
   })
-  .refine((value) => value.openingTime !== value.closingTime, {
-    message: 'La hora de cierre debe ser distinta a la de apertura.',
+  .refine((value) => value.openingTime < value.closingTime, {
+    message: 'La hora de cierre debe ser posterior a la de apertura.',
     path: ['closingTime'],
   });
 
@@ -260,6 +267,7 @@ export const createServiceSchema = z.object({
   description: z.string().trim().max(500).nullish(),
   durationMinutes: durationMinutesSchema,
   name: z.string().trim().min(2, 'Ingresa el nombre del servicio.').max(120),
+  onlineBooking: z.boolean().default(true),
   priceCents: z.number().int().min(0, 'El precio no puede ser negativo.'),
 });
 
@@ -288,6 +296,36 @@ export const replaceWeeklySchedulesSchema = z.object({
   schedules: z.array(weeklyScheduleIntervalSchema).max(21),
 });
 
+export const businessScheduleDaySchema = z
+  .object({
+    endMinute: z.number().int().min(1).max(1440),
+    isOpen: z.boolean(),
+    startMinute: z.number().int().min(0).max(1439),
+    weekday: z.number().int().min(0).max(6),
+  })
+  .refine((schedule) => schedule.startMinute < schedule.endMinute, {
+    message: 'La hora de apertura debe ser anterior a la hora de cierre.',
+    path: ['endMinute'],
+  });
+
+export const replaceBusinessScheduleSchema = z
+  .object({
+    days: z
+      .array(businessScheduleDaySchema)
+      .length(7, 'Configura los siete días de la semana.'),
+    locationId: uuidSchema,
+  })
+  .superRefine((input, context) => {
+    const weekdays = new Set(input.days.map((day) => day.weekday));
+    if (weekdays.size !== 7) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Cada día de la semana debe aparecer una sola vez.',
+        path: ['days'],
+      });
+    }
+  });
+
 export const createScheduleBlockSchema = z
   .object({
     endsAt: z.iso.datetime(),
@@ -313,7 +351,7 @@ export const availabilityQuerySchema = z.object({
     .string()
     .min(1)
     .transform((value) => value.split(',').filter(Boolean))
-    .pipe(z.array(uuidSchema).min(1).max(10)),
+    .pipe(serviceIdsSchema),
 });
 
 export const dailyAppointmentsQuerySchema = z.object({
@@ -326,23 +364,25 @@ export const appointmentEventsQuerySchema = z.object({
   after: z.string().regex(/^\d+$/u).default('0'),
 });
 
-export const createAppointmentSchema = z.object({
-  clientEmail: z.union([emailSchema, z.literal('')]).nullish(),
-  clientName: z
-    .string()
-    .trim()
-    .min(2, 'Ingresa el nombre del cliente.')
-    .max(120),
-  clientPhone: z.string().trim().min(7).max(24).nullish(),
-  locationId: uuidSchema,
-  notes: z.string().trim().max(500).nullish(),
-  professionalMembershipId: uuidSchema,
-  serviceIds: z
-    .array(uuidSchema)
-    .min(1, 'Selecciona al menos un servicio.')
-    .max(10),
-  startsAt: z.iso.datetime(),
-});
+export const createAppointmentSchema = z
+  .object({
+    clientEmail: z.union([emailSchema, z.literal('')]).nullish(),
+    clientId: uuidSchema.nullish(),
+    clientName: z.string().trim().max(120).nullish(),
+    clientPhone: z.string().trim().min(7).max(24).nullish(),
+    locationId: uuidSchema,
+    notes: z.string().trim().max(500).nullish(),
+    professionalMembershipId: uuidSchema,
+    serviceIds: serviceIdsSchema,
+    startsAt: z.iso.datetime(),
+  })
+  .refine(
+    (input) => Boolean(input.clientId || (input.clientName?.length ?? 0) >= 2),
+    {
+      message: 'Selecciona un cliente o ingresa su nombre.',
+      path: ['clientName'],
+    },
+  );
 
 export const rescheduleAppointmentSchema = z.object({
   startsAt: z.iso.datetime(),
@@ -363,6 +403,58 @@ export const updateAppointmentStatusSchema = z.object({
   ]),
 });
 
+export const updateBookingSettingsSchema = z
+  .object({
+    cancellationLeadMinutes: z.number().int().min(0).max(43_200),
+    confirmationDeadlineMinutes: z.number().int().min(0).max(10_080),
+    confirmationEnabled: z.boolean(),
+    policyText: z.string().trim().min(20).max(1000),
+    reminderMinutes: z.number().int().min(60).max(10_080),
+    rescheduleLeadMinutes: z.number().int().min(0).max(43_200),
+    unconfirmedAction: z.enum(['keep', 'cancel']),
+  })
+  .superRefine((value, context) => {
+    if (
+      value.confirmationEnabled &&
+      value.confirmationDeadlineMinutes >= value.reminderMinutes
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'El plazo para responder debe ser posterior al envío del recordatorio.',
+        path: ['confirmationDeadlineMinutes'],
+      });
+    }
+  });
+
+const e164PhoneSchema = z
+  .string()
+  .trim()
+  .regex(/^\+[1-9]\d{7,14}$/u, 'Ingresa un teléfono internacional válido.');
+
+export const createPublicBookingSchema = z.object({
+  email: emailSchema,
+  fullName: z.string().trim().min(2).max(120),
+  membershipId: uuidSchema,
+  phone: e164PhoneSchema,
+  policyAccepted: z.literal(true),
+  serviceIds: serviceIdsSchema,
+  startsAt: z.iso.datetime(),
+});
+
+export const verifyPublicBookingSchema = z.object({
+  code: z.string().regex(/^\d{6}$/u, 'Ingresa el código de seis dígitos.'),
+});
+
+export const managePublicBookingCancellationSchema = z.object({
+  reason: z.string().trim().max(240).nullish(),
+});
+
+export const createAppointmentReviewSchema = z.object({
+  comment: z.string().trim().max(1000).nullish(),
+  rating: z.number().int().min(1).max(5),
+});
+
 export function createSlug(value: string): string {
   return value
     .normalize('NFD')
@@ -380,6 +472,12 @@ export type AcceptTeamInvitationInput = z.infer<
 export type AvailabilityQuery = z.infer<typeof availabilityQuerySchema>;
 export type CancelAppointmentInput = z.infer<typeof cancelAppointmentSchema>;
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;
+export type CreateAppointmentReviewInput = z.infer<
+  typeof createAppointmentReviewSchema
+>;
+export type CreatePublicBookingInput = z.infer<
+  typeof createPublicBookingSchema
+>;
 export type CreateOnboardingCollaboratorInput = z.infer<
   typeof createOnboardingCollaboratorSchema
 >;
@@ -416,6 +514,9 @@ export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type ReplaceWeeklySchedulesInput = z.infer<
   typeof replaceWeeklySchedulesSchema
 >;
+export type ReplaceBusinessScheduleInput = z.infer<
+  typeof replaceBusinessScheduleSchema
+>;
 export type RescheduleAppointmentInput = z.infer<
   typeof rescheduleAppointmentSchema
 >;
@@ -427,4 +528,10 @@ export type UpdateOnboardingCollaboratorInput = z.infer<
 >;
 export type UpdateOnboardingServiceInput = z.infer<
   typeof updateOnboardingServiceSchema
+>;
+export type UpdateBookingSettingsInput = z.infer<
+  typeof updateBookingSettingsSchema
+>;
+export type VerifyPublicBookingInput = z.infer<
+  typeof verifyPublicBookingSchema
 >;

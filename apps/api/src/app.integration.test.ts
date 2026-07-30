@@ -6,6 +6,18 @@ import { readConfig } from './config';
 import type { InvitationMessage } from './recovery-mailer';
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
+if (testDatabaseUrl) {
+  const parsedTestDatabaseUrl = new URL(testDatabaseUrl);
+  const isLocalTestService =
+    ['127.0.0.1', 'localhost'].includes(parsedTestDatabaseUrl.hostname) &&
+    parsedTestDatabaseUrl.port === '5433' &&
+    parsedTestDatabaseUrl.pathname.toLowerCase().includes('test');
+  if (!isLocalTestService) {
+    throw new Error(
+      'TEST_DATABASE_URL debe apuntar exclusivamente a postgres-test en el puerto 5433 y a una base cuyo nombre incluya "test".',
+    );
+  }
+}
 const describeWithDatabase = testDatabaseUrl ? describe : describe.skip;
 let registrationProfileSequence = 0;
 
@@ -34,7 +46,9 @@ describe('CORS', () => {
       });
 
       expect(response.statusCode).toBe(204);
-      expect(response.headers['access-control-allow-methods']).toContain('PATCH');
+      expect(response.headers['access-control-allow-methods']).toContain(
+        'PATCH',
+      );
     } finally {
       await app.close();
     }
@@ -85,8 +99,14 @@ describeWithDatabase('API con PostgreSQL', () => {
     await database.appointmentEvent.deleteMany();
     await database.appointmentService.deleteMany();
     await database.appointment.deleteMany();
+    await database.clientLabelAssignment.deleteMany();
+    await database.clientNote.deleteMany();
+    await database.clientLabel.deleteMany();
+    await database.client.deleteMany();
+    await database.cashRegisterSession.deleteMany();
     await database.scheduleBlock.deleteMany();
     await database.weeklySchedule.deleteMany();
+    await database.businessWeeklySchedule.deleteMany();
     await database.professionalService.deleteMany();
     await database.service.deleteMany();
     await database.serviceCategory.deleteMany();
@@ -97,8 +117,12 @@ describeWithDatabase('API con PostgreSQL', () => {
     await database.location.deleteMany();
     await database.organization.deleteMany();
     await database.passwordResetToken.deleteMany();
+    await database.emailVerificationCode.deleteMany();
     await database.pendingRegistration.deleteMany();
     await database.session.deleteMany();
+    await database.userPortfolioItem.deleteMany();
+    await database.onboardingService.deleteMany();
+    await database.userRegistrationProfile.deleteMany();
     await database.user.deleteMany();
   });
 
@@ -247,6 +271,102 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(membership?.role).toBe('OWNER');
     expect(membership?.memberLocations).toHaveLength(1);
     expect(await database.auditLog.count()).toBe(1);
+  });
+
+  it('materializa el onboarding moderno una sola vez', async () => {
+    const token = await register('modern-onboarding@example.com');
+    const serviceResponse = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'POST',
+      payload: {
+        agendaColor: '#2464E8',
+        category: {
+          description: 'Servicios principales',
+          name: 'Barber\u00eda',
+        },
+        description: 'Corte cl\u00e1sico',
+        downPaymentPercentage: 0,
+        durationMinutes: 30,
+        imageUri: null,
+        name: 'Corte moderno',
+        onlineBooking: true,
+        price: 15,
+        priceType: 'fixed',
+        showServiceTime: true,
+        tax: null,
+      },
+      url: '/v1/onboarding/services',
+    });
+    expect(serviceResponse.statusCode).toBe(201);
+
+    const firstCompletion = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'POST',
+      url: '/v1/onboarding/complete-account-setup',
+    });
+    expect(firstCompletion.statusCode).toBe(200);
+    const firstResult = firstCompletion.json<{
+      bookingUrl: string;
+      locationId: string;
+      onboardingCompletedAt: string;
+      organizationId: string;
+    }>();
+
+    expect(firstResult.bookingUrl).toMatch(/^https:\/\/book\.nava\.app\//u);
+    expect(
+      await database.organization.count({
+        where: { id: firstResult.organizationId },
+      }),
+    ).toBe(1);
+    expect(
+      await database.location.count({
+        where: { id: firstResult.locationId },
+      }),
+    ).toBe(1);
+    const ownerMembership = await database.membership.findFirst({
+      where: {
+        organizationId: firstResult.organizationId,
+        role: 'OWNER',
+      },
+    });
+    expect(ownerMembership).not.toBeNull();
+    if (!ownerMembership) {
+      throw new Error('No se creó la membresía propietaria.');
+    }
+    expect(
+      await database.businessWeeklySchedule.count({
+        where: { locationId: firstResult.locationId },
+      }),
+    ).toBe(7);
+    expect(
+      await database.weeklySchedule.count({
+        where: {
+          locationId: firstResult.locationId,
+          membershipId: ownerMembership.id,
+        },
+      }),
+    ).toBe(7);
+    expect(
+      await database.professionalService.count({
+        where: {
+          locationId: firstResult.locationId,
+          membershipId: ownerMembership.id,
+        },
+      }),
+    ).toBe(1);
+    expect(await database.onboardingService.count()).toBe(0);
+
+    const repeatedCompletion = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'POST',
+      url: '/v1/onboarding/complete-account-setup',
+    });
+    expect(repeatedCompletion.statusCode).toBe(200);
+    expect(
+      repeatedCompletion.json<{ organizationId: string }>().organizationId,
+    ).toBe(firstResult.organizationId);
+    expect(await database.organization.count()).toBe(1);
+    expect(await database.service.count()).toBe(1);
   });
 
   it('persiste, edita y elimina colaboradores durante el onboarding', async () => {
@@ -793,6 +913,101 @@ describeWithDatabase('API con PostgreSQL', () => {
         'schedule_block.created',
       ]),
     );
+  });
+
+  it('administra el horario general y lo aplica a la disponibilidad', async () => {
+    const agenda = await setupAgenda('horario-negocio');
+    const initialResponse = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'GET',
+      url: '/v1/business-schedule',
+    });
+    expect(initialResponse.statusCode).toBe(200);
+    const initial = initialResponse.json<{
+      days: {
+        endMinute: number;
+        isOpen: boolean;
+        startMinute: number;
+        weekday: number;
+      }[];
+      locationId: string;
+    }>();
+    expect(initial.locationId).toBe(agenda.locationId);
+    expect(initial.days).toHaveLength(7);
+    expect(initial.days).toEqual(
+      expect.arrayContaining([
+        {
+          endMinute: 1080,
+          isOpen: true,
+          startMinute: 540,
+          weekday: 1,
+        },
+      ]),
+    );
+
+    const closedMonday = initial.days.map((day) =>
+      day.weekday === 1 ? { ...day, isOpen: false } : day,
+    );
+    const forbiddenResponse = await app.inject({
+      headers: { authorization: `Bearer ${agenda.barberToken}` },
+      method: 'PUT',
+      payload: { days: closedMonday, locationId: agenda.locationId },
+      url: '/v1/business-schedule',
+    });
+    expect(forbiddenResponse.statusCode).toBe(403);
+
+    const updateResponse = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'PUT',
+      payload: { days: closedMonday, locationId: agenda.locationId },
+      url: '/v1/business-schedule',
+    });
+    expect(updateResponse.statusCode).toBe(200);
+    expect(
+      updateResponse
+        .json<{ days: { isOpen: boolean; weekday: number }[] }>()
+        .days.find(({ weekday }) => weekday === 1)?.isOpen,
+    ).toBe(false);
+
+    const availability = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'GET',
+      query: {
+        date: '2030-01-14',
+        locationId: agenda.locationId,
+        membershipId: agenda.membershipId,
+        serviceIds: agenda.serviceId,
+      },
+      url: '/v1/availability',
+    });
+    expect(availability.statusCode).toBe(200);
+    expect(availability.json<{ slots: unknown[] }>().slots).toHaveLength(0);
+
+    const appointment = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        clientName: 'Cliente fuera de horario',
+        clientPhone: '0999999999',
+        locationId: agenda.locationId,
+        professionalMembershipId: agenda.membershipId,
+        serviceIds: [agenda.serviceId],
+        startsAt: '2030-01-14T15:00:00.000Z',
+      },
+      url: '/v1/appointments',
+    });
+    expect(appointment.statusCode).toBe(400);
+    expect(appointment.json<{ code: string }>().code).toBe(
+      'OUTSIDE_BUSINESS_HOURS',
+    );
+
+    const audit = await database.auditLog.findFirst({
+      where: {
+        action: 'business_weekly_schedule.replaced',
+        locationId: agenda.locationId,
+      },
+    });
+    expect(audit).not.toBeNull();
   });
 
   it('evita doble reserva bajo concurrencia y publica el evento', async () => {
