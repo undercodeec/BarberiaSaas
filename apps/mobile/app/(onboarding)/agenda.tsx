@@ -389,6 +389,8 @@ export default function AgendaScreen() {
       locationId,
       localDateValue(selectedDay),
     ],
+    refetchInterval: 2_000,
+    refetchIntervalInBackground: true,
   });
   const monthDays = useMemo(() => calendarGrid(calendarMonth), [calendarMonth]);
   const selectedDaySchedules = useMemo(
@@ -628,6 +630,11 @@ export default function AgendaScreen() {
                     {' - '}
                     {appointment.status.replace(/_/gu, ' ')}
                   </Text>
+                  {appointment.source === 'public_booking' ? (
+                    <Text style={styles.publicBookingBadge}>
+                      Reserva online
+                    </Text>
+                  ) : null}
                 </View>
                 <Ionicons color="#687282" name="ellipsis-vertical" size={18} />
               </Pressable>
@@ -1017,6 +1024,18 @@ const styles = StyleSheet.create({
   appointmentClient: { color: '#111318', fontSize: 15, fontWeight: '900' },
   appointmentCopy: { flex: 1 },
   appointmentMeta: { color: '#666666', fontSize: 12, marginTop: 3 },
+  publicBookingBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#DDEBFF',
+    borderRadius: 999,
+    color: '#174A8B',
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 7,
+    overflow: 'hidden',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
   appointmentTime: { color: '#111318', fontSize: 13, fontWeight: '900' },
   checkboxLabel: { color: '#111318', flex: 1, fontSize: 15, fontWeight: '700' },
   checkboxRow: {
