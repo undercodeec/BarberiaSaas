@@ -20,7 +20,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [ ] Fase 1 — Autenticación, organización y onboarding _(implementada y verificada localmente; autenticación SMTP y entrega a bandeja externa aprobadas)_
 - [x] Fase 2 — Equipo, servicios y horarios
 - [ ] Fase 3 — Motor de agenda _(implementada y verificada contra PostgreSQL; aceptación manual móvil pendiente)_
-- [ ] Fase 4 — Reservas públicas _(implementada y verificada contra PostgreSQL; entrega SMTP externa aprobada, aceptación manual pendiente)_
+- [ ] Fase 4 — Reservas públicas _(implementada, verificada contra PostgreSQL y recorrida manualmente; quedan ajustes menores de UI/UX y configuración externa)_
 - [ ] Fase 5 — Clientes e historial _(directorio, creación, importación, historial vinculado y eliminación lógica implementados; edición, notas y fotografías privadas pendientes)_
 - [ ] Fase 6 — Caja y POS básico
 - [ ] Fase 7 — Comisiones
@@ -229,7 +229,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Cancelación y reprogramación pública con anticipación configurable.
 - [x] Cancelación y reprogramación manual desde la aplicación por parte del negocio o profesional autorizado.
 - [x] Reseñas automáticas después de completar una cita y capacidad de ocultarlas.
-- [ ] Entrega SMTP a una bandeja externa comprobada; aceptación visual/manual completa pendiente.
+- [x] Entrega SMTP a una bandeja externa comprobada y flujo público recorrido visualmente en móvil y escritorio.
 
 ### Fase 5 — Clientes e historial
 
@@ -2573,11 +2573,12 @@ WhatsApp no forma parte de este corte. Puede añadirse después como un canal ad
 ### Pendiente para aceptación
 
 - [x] Entrega real de correos comprobada en una bandeja externa con el SMTP del entorno.
-- [ ] Recorrer visualmente el flujo público en tamaños móvil y escritorio.
+- [x] Recorrer visualmente el flujo público en tamaños móvil y escritorio.
+- [ ] Afinar detalles menores de UI/UX en la ventana pública del cliente, sin bloqueos funcionales.
 - [ ] Confirmar textos legales definitivos y valores iniciales de cancelación, reprogramación y no confirmación.
 - [ ] Configurar el dominio público definitivo usado por los enlaces incluidos en correos.
 - [ ] Sustituir el rate limiting en memoria si la API se despliega en más de una instancia.
 
 Estado de este corte:
 
-> **IMPLEMENTADO Y VERIFICADO AUTOMÁTICAMENTE — ACEPTACIÓN MANUAL Y CONFIGURACIÓN EXTERNA PENDIENTES.**
+> **IMPLEMENTADO, VERIFICADO AUTOMÁTICAMENTE Y ACEPTADO EN EL FLUJO PÚBLICO — AJUSTES MENORES DE UI/UX Y CONFIGURACIÓN EXTERNA PENDIENTES.**
