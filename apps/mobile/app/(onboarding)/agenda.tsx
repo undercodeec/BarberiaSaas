@@ -87,6 +87,18 @@ function formatMinute(minute: number): string {
   );
 }
 
+function minuteAtTimeZone(value: string, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    hour: '2-digit',
+    hourCycle: 'h23',
+    minute: '2-digit',
+    timeZone,
+  }).formatToParts(new Date(value));
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((item) => item.type === type)?.value ?? 0);
+  return part('hour') * 60 + part('minute');
+}
+
 type AgendaView = 'day' | 'month' | 'week';
 type AgendaStatusFilter =
   | 'active'
@@ -179,6 +191,7 @@ export default function AgendaScreen() {
         error instanceof Error ? error.message : 'Inténtalo nuevamente.',
       ),
     onSuccess: async () => {
+      setSelectedAppointment(null);
       await queryClient.invalidateQueries({
         queryKey: ['agenda-appointments'],
       });
@@ -196,32 +209,7 @@ export default function AgendaScreen() {
       );
       return;
     }
-    Alert.alert(
-      appointment.clientName,
-      'Reprograma o cancela la cita por una circunstancia del negocio o profesional.',
-      [
-        { style: 'cancel', text: 'Cerrar' },
-        {
-          onPress: () =>
-            router.push({
-              pathname: '/reschedule-booking' as never,
-              params: {
-                appointmentId: appointment.id,
-                membershipId: appointment.professionalMembershipId,
-                serviceIds: appointment.services
-                  .map((service) => service.serviceId)
-                  .join(','),
-              },
-            }),
-          text: 'Reprogramar',
-        },
-        {
-          onPress: () => cancelAppointment.mutate(appointment.id),
-          style: 'destructive',
-          text: 'Cancelar cita',
-        },
-      ],
-    );
+    setSelectedAppointment(appointment);
   };
   const timeZone =
     organizationQuery.data?.location?.timezone ??
@@ -241,6 +229,8 @@ export default function AgendaScreen() {
   const [showCancelled, setShowCancelled] = useState(false);
   const [statusFilter, setStatusFilter] = useState<AgendaStatusFilter>('all');
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [selectedAppointment, setSelectedAppointment] =
+    useState<AppointmentRecord | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(today);
   const [dayContentOpacity] = useState(() => new Animated.Value(1));
   const [schedulePageSlide] = useState(() => new Animated.Value(0));
@@ -607,44 +597,66 @@ export default function AgendaScreen() {
             <Text style={styles.timelineTitle}>Citas y horario</Text>
           </View>
           <View style={styles.timeline}>
-            {filteredAppointments.map((appointment) => (
-              <Pressable
-                key={appointment.id}
-                onPress={() => manageAppointment(appointment)}
-                style={styles.appointmentCard}
-              >
-                <Text style={styles.appointmentTime}>
-                  {new Date(appointment.startsAt).toLocaleTimeString('es-EC', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </Text>
-                <View style={styles.appointmentCopy}>
-                  <Text style={styles.appointmentClient}>
-                    {appointment.clientName}
-                  </Text>
-                  <Text style={styles.appointmentMeta}>
-                    {appointment.services
-                      .map((service) => service.serviceName)
-                      .join(', ') || 'Sin servicio'}
-                    {' - '}
-                    {appointment.status.replace(/_/gu, ' ')}
-                  </Text>
-                  {appointment.source === 'public_booking' ? (
-                    <Text style={styles.publicBookingBadge}>
-                      Reserva online
-                    </Text>
-                  ) : null}
-                </View>
-                <Ionicons color="#687282" name="ellipsis-vertical" size={18} />
-              </Pressable>
-            ))}
             {displayedTimeline.length ? (
-              displayedTimeline.map((minute) => (
+              displayedTimeline.map((minute, index) => (
                 <View key={minute} style={styles.hourRow}>
                   <Text style={styles.hour}>{formatMinute(minute)}</Text>
                   <View style={styles.hourContent}>
                     <View style={styles.hourDivider} />
+                    {filteredAppointments
+                      .filter((appointment) => {
+                        const startsAtMinute = minuteAtTimeZone(
+                          appointment.startsAt,
+                          timeZone,
+                        );
+                        const nextMinute =
+                          displayedTimeline[index + 1] ?? minute + 60;
+                        return (
+                          startsAtMinute >= minute &&
+                          startsAtMinute < nextMinute
+                        );
+                      })
+                      .map((appointment) => (
+                        <Pressable
+                          key={appointment.id}
+                          onPress={() => manageAppointment(appointment)}
+                          style={styles.appointmentCard}
+                        >
+                          <Text style={styles.appointmentTime}>
+                            {new Date(appointment.startsAt).toLocaleTimeString(
+                              'es-EC',
+                              {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                timeZone,
+                              },
+                            )}
+                          </Text>
+                          <View style={styles.appointmentCopy}>
+                            <Text style={styles.appointmentClient}>
+                              {appointment.clientName}
+                            </Text>
+                            <Text
+                              style={styles.appointmentMeta}
+                              numberOfLines={1}
+                            >
+                              {appointment.services
+                                .map((service) => service.serviceName)
+                                .join(', ') || 'Sin servicio'}
+                            </Text>
+                            {appointment.source === 'public_booking' ? (
+                              <Text style={styles.publicBookingBadge}>
+                                Reserva online
+                              </Text>
+                            ) : null}
+                          </View>
+                          <Ionicons
+                            color="#687282"
+                            name="ellipsis-vertical"
+                            size={18}
+                          />
+                        </Pressable>
+                      ))}
                   </View>
                 </View>
               ))
@@ -985,6 +997,69 @@ export default function AgendaScreen() {
         </View>
       </Modal>
 
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setSelectedAppointment(null)}
+        transparent
+        visible={Boolean(selectedAppointment)}
+      >
+        <Pressable
+          onPress={() => setSelectedAppointment(null)}
+          style={styles.appointmentModalBackdrop}
+        >
+          <Pressable
+            onPress={(event) => event.stopPropagation()}
+            style={styles.appointmentModal}
+          >
+            <View style={styles.modalHandle} />
+            <Text style={styles.appointmentModalTitle}>
+              {selectedAppointment?.clientName}
+            </Text>
+            <Text style={styles.appointmentModalCopy}>
+              {selectedAppointment?.services
+                .map((service) => service.serviceName)
+                .join(', ') || 'Sin servicio'}
+            </Text>
+            <Pressable
+              onPress={() => {
+                if (!selectedAppointment) return;
+                setSelectedAppointment(null);
+                router.push({
+                  pathname: '/reschedule-booking' as never,
+                  params: {
+                    appointmentId: selectedAppointment.id,
+                    membershipId: selectedAppointment.professionalMembershipId,
+                    serviceIds: selectedAppointment.services
+                      .map((service) => service.serviceId)
+                      .join(','),
+                  },
+                });
+              }}
+              style={styles.modalPrimaryAction}
+            >
+              <Ionicons color="#ffffff" name="calendar-outline" size={20} />
+              <Text style={styles.modalPrimaryText}>Reprogramar cita</Text>
+            </Pressable>
+            <Pressable
+              onPress={() =>
+                selectedAppointment &&
+                cancelAppointment.mutate(selectedAppointment.id)
+              }
+              style={styles.modalDangerAction}
+            >
+              <Ionicons color="#B42318" name="close-circle-outline" size={20} />
+              <Text style={styles.modalDangerText}>Cancelar cita</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setSelectedAppointment(null)}
+              style={styles.modalCloseAction}
+            >
+              <Text style={styles.modalCloseText}>Cerrar</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <Pressable
         accessibilityLabel="Crear cita"
         accessibilityRole="button"
@@ -1024,6 +1099,27 @@ const styles = StyleSheet.create({
   appointmentClient: { color: '#111318', fontSize: 15, fontWeight: '900' },
   appointmentCopy: { flex: 1 },
   appointmentMeta: { color: '#666666', fontSize: 12, marginTop: 3 },
+  appointmentModal: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    bottom: 0,
+    left: 0,
+    padding: 22,
+    position: 'absolute',
+    right: 0,
+  },
+  appointmentModalBackdrop: {
+    backgroundColor: 'rgba(17, 19, 24, 0.42)',
+    flex: 1,
+  },
+  appointmentModalCopy: { color: '#666666', fontSize: 15, marginTop: 6 },
+  appointmentModalTitle: {
+    color: '#111318',
+    fontSize: 23,
+    fontWeight: '900',
+    marginTop: 14,
+  },
   publicBookingBadge: {
     alignSelf: 'flex-start',
     backgroundColor: '#DDEBFF',
@@ -1036,6 +1132,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
+  modalCloseAction: { alignItems: 'center', paddingVertical: 16 },
+  modalCloseText: { color: '#4F5965', fontSize: 15, fontWeight: '800' },
+  modalDangerAction: {
+    alignItems: 'center',
+    borderColor: '#F4C7C3',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 9,
+    justifyContent: 'center',
+    marginTop: 10,
+    paddingVertical: 15,
+  },
+  modalDangerText: { color: '#B42318', fontSize: 15, fontWeight: '900' },
+  modalHandle: {
+    alignSelf: 'center',
+    backgroundColor: '#C7CBD0',
+    borderRadius: 3,
+    height: 5,
+    width: 46,
+  },
+  modalPrimaryAction: {
+    alignItems: 'center',
+    backgroundColor: '#111318',
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 9,
+    justifyContent: 'center',
+    marginTop: 23,
+    paddingVertical: 16,
+  },
+  modalPrimaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
   appointmentTime: { color: '#111318', fontSize: 13, fontWeight: '900' },
   checkboxLabel: { color: '#111318', flex: 1, fontSize: 15, fontWeight: '700' },
   checkboxRow: {
