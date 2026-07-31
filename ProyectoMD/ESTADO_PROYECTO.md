@@ -2582,3 +2582,37 @@ WhatsApp no forma parte de este corte. Puede añadirse después como un canal ad
 Estado de este corte:
 
 > **IMPLEMENTADO, VERIFICADO AUTOMÁTICAMENTE Y ACEPTADO EN EL FLUJO PÚBLICO — AJUSTES MENORES DE UI/UX Y CONFIGURACIÓN EXTERNA PENDIENTES.**
+
+## Corte de continuidad 2026-07-30 — Notificaciones de reservas
+
+### Estado completado en este corte
+
+- [x] Agenda móvil actualiza las citas cada 2 segundos.
+- [x] Las reservas públicas se distinguen en Agenda con la insignia `Reserva online`.
+- [x] Las citas se muestran dentro de la fila horaria que corresponde a su inicio.
+- [x] Al tocar una cita activa, Agenda muestra una hoja con las acciones `Reprogramar cita`, `Cancelar cita` y `Cerrar`; no depende de `Alert` en Expo Web.
+- [x] EAS Project ID configurado en `apps/mobile/app.json`:
+      `0feb8bfa-2e01-44e6-8e79-22927a8a7dcb`.
+- [x] Base PostgreSQL local de desarrollo `barber_saas` en `127.0.0.1:5434` reiniciada con autorización explícita; sus datos de desarrollo fueron eliminados y las migraciones existentes se reaplicaron.
+- [x] Migración `20260730202030_app_notifications` creada y aplicada localmente. Añade el enum `AppNotificationType`, las tablas `app_notifications` y `push_tokens`, y el cliente Prisma fue regenerado.
+
+### Implementación completada
+
+- [x] Módulo de API de notificaciones internas conectado.
+- [x] Al confirmar una reserva pública, se crean notificaciones para el profesional asignado y propietario/administradores; se envía correo SMTP a esos destinatarios cuando está configurado.
+- [x] La cancelación y reprogramación desde el enlace privado generan las mismas notificaciones.
+- [x] Bandeja interna autenticada: lista, marca como leídas y navega a Agenda.
+- [x] Registro y revocación de tokens Expo Push por usuario/dispositivo mediante `push_tokens`.
+- [x] Envío push mediante Expo al profesional asignado y propietario/administradores con token registrado.
+- [x] Botón global de notificaciones visible en todas las pantallas autenticadas; muestra contador de no leídas y despliega una bandeja animada desde la izquierda.
+- [x] Acción manual `Enviar recordatorio por WhatsApp` desde la cita: abre WhatsApp con el nombre real del negocio, profesional asignado y fecha/hora formateada en la zona horaria de la sucursal, sin automatización ni proveedor.
+
+### Permisos de Agenda vigentes
+
+- Propietario, administrador y recepción tienen `appointment.manage` y pueden cancelar o reprogramar citas de la organización.
+- Un barbero tiene `appointment.manage` limitado a sus propias citas.
+- Las acciones se encuentran en **Agenda**: tocar una cita activa abre la hoja de gestión. Citas canceladas, finalizadas o marcadas como no asistió conservan historial y no se vuelven a gestionar.
+
+### Estado del corte
+
+> **IMPLEMENTADO Y VERIFICADO AUTOMÁTICAMENTE.** La validación visual manual del banner global y del contenido final de WhatsApp fue completada durante este corte.

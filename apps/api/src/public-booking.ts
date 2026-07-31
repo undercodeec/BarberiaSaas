@@ -26,6 +26,7 @@ import {
   zonedDateTimeToUtc,
 } from './agenda';
 import { ApiError } from './errors';
+import type { AppointmentNotifier } from './notifications';
 import {
   createOpaqueToken,
   createVerificationCode,
@@ -568,6 +569,7 @@ export async function processPublicBookingLifecycle(
   database: DatabaseClient,
   mailer: PublicBookingMailer | null,
   publicBaseUrl = DEFAULT_PUBLIC_BOOKING_BASE_URL,
+  notifier: AppointmentNotifier | null = null,
 ) {
   const now = new Date();
   await database.appointment.updateMany({
@@ -664,6 +666,7 @@ export async function processPublicBookingLifecycle(
         },
         where: { id: appointment.id },
       });
+      await notifier?.notify(appointment.id, 'cancelled');
       if (mailer && appointment.publicAccess && appointment.clientEmail) {
         const cancellationToken = createOpaqueToken();
         await database.publicBookingAccess.update({
@@ -714,6 +717,7 @@ export function registerPublicBookingRoutes(
   database: DatabaseClient,
   authenticate: Authenticate,
   mailer: PublicBookingMailer | null,
+  notifier: AppointmentNotifier | null,
   appEnvironment: 'local' | 'preview' | 'production' | 'staging',
   publicBaseUrl = DEFAULT_PUBLIC_BOOKING_BASE_URL,
 ) {
@@ -1055,6 +1059,7 @@ export function registerPublicBookingRoutes(
             })
         : null,
     );
+    await notifier?.notify(existing.id, 'created');
     return {
       booking: publicAppointment({
         ...existing,
@@ -1132,6 +1137,7 @@ export function registerPublicBookingRoutes(
       },
       where: { id: access.appointmentId },
     });
+    await notifier?.notify(appointment.id, 'cancelled');
     return publicManagedAppointment(appointment);
   });
 
@@ -1196,6 +1202,7 @@ export function registerPublicBookingRoutes(
         },
         where: { id: access.id },
       });
+      await notifier?.notify(appointment.id, 'rescheduled');
       return publicManagedAppointment(appointment);
     } catch (error) {
       if (isAppointmentConflict(error)) {

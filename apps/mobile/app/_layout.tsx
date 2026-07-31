@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { GlobalNotificationsBanner } from '../src/components/GlobalNotificationsBanner';
 import { NavaPreloader } from '../src/components/NavaPreloader';
 import { AppProviders } from '../src/providers/AppProviders';
 import { SessionLock } from '../src/components/SessionLock';
@@ -19,6 +20,7 @@ export default function RootLayout() {
         <SessionLock>
           <StatusBar style={showPreloader ? 'dark' : 'light'} />
           <Stack screenOptions={{ headerShown: false }} />
+          `n <GlobalNotificationsBanner />
         </SessionLock>
       </AppProviders>
       {showPreloader ? <NavaPreloader onFinish={finishPreloader} /> : null}

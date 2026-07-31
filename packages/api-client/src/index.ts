@@ -408,6 +408,25 @@ export interface ReviewsResponse {
   readonly reviews: readonly ReviewRecord[];
 }
 
+export interface AppNotificationRecord {
+  readonly appointmentId: string | null;
+  readonly body: string;
+  readonly createdAt: string;
+  readonly data: {
+    readonly appointmentId?: string;
+    readonly route?: string;
+    readonly type?: string;
+  };
+  readonly id: string;
+  readonly readAt: string | null;
+  readonly title: string;
+  readonly type:
+    'appointment_cancelled' | 'appointment_created' | 'appointment_rescheduled';
+}
+
+export interface AppNotificationsResponse {
+  readonly notifications: readonly AppNotificationRecord[];
+}
 export class ApiClientError extends Error {
   public constructor(
     public readonly statusCode: number,

@@ -76,6 +76,12 @@ enum AppointmentEventType {
   STATUS_CHANGED
 }
 
+enum AppNotificationType {
+  APPOINTMENT_CREATED
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_RESCHEDULED
+}
+
 enum RegistrationAccountType {
   BUSINESS
   PROFESSIONAL
@@ -118,6 +124,8 @@ model User {
   clientLabelsUpdated     ClientLabel[]            @relation("ClientLabelUpdater")
   reviewsHidden           AppointmentReview[]      @relation("ReviewHiddenBy")
   portfolioItems          UserPortfolioItem[]
+  appNotifications        AppNotification[]
+  pushTokens              PushToken[]
 
   @@map("users")
 }
@@ -304,6 +312,7 @@ model Organization {
   clients                            Client[]
   clientLabels                       ClientLabel[]
   clientNotes                        ClientNote[]
+  appNotifications                   AppNotification[]
 
   @@map("organizations")
 }
@@ -641,6 +650,7 @@ model Appointment {
   events                            AppointmentEvent[]
   publicAccess                      PublicBookingAccess?
   review                            AppointmentReview?
+  appNotifications                  AppNotification[]
 
   @@unique([organizationId, publicIdempotencyKeyHash])
   @@index([organizationId, startsAt])
@@ -648,6 +658,38 @@ model Appointment {
   @@index([professionalMembershipId, startsAt])
   @@index([clientId, startsAt])
   @@map("appointments")
+}
+
+model AppNotification {
+  id             String              @id @default(uuid()) @db.Uuid
+  userId         String              @map("user_id") @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  appointmentId  String?             @map("appointment_id") @db.Uuid
+  type           AppNotificationType
+  title          String              @db.VarChar(160)
+  body           String              @db.VarChar(500)
+  data           Json                @default("{}")
+  readAt         DateTime?           @map("read_at") @db.Timestamptz(3)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointment    Appointment?        @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@map("app_notifications")
+}
+
+model PushToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  token     String   @unique @db.VarChar(255)
+  platform  String   @db.VarChar(20)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_tokens")
 }
 
 model PublicBookingAccess {

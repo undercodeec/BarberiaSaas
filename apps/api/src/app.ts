@@ -33,6 +33,10 @@ import { registerBusinessScheduleRoutes } from './business-schedule';
 import { registerCashRegisterRoutes } from './cash-register';
 import { registerClientRoutes } from './clients';
 import { registerOperationsRoutes } from './operations';
+import {
+  createAppointmentNotifier,
+  registerNotificationRoutes,
+} from './notifications';
 import { registerProfileRoutes } from './profile';
 import {
   processPublicBookingLifecycle,
@@ -1502,6 +1506,8 @@ export async function buildApi({
     };
   });
 
+  const appointmentNotifier = createAppointmentNotifier(database, config);
+
   registerOperationsRoutes(
     app,
     database,
@@ -1515,9 +1521,11 @@ export async function buildApi({
     database,
     authenticate,
     publicBookingMailer,
+    appointmentNotifier,
     config.APP_ENV,
     config.PUBLIC_WEB_URL,
   );
+  registerNotificationRoutes(app, database, authenticate);
   registerBusinessScheduleRoutes(app, database, authenticate);
   registerClientRoutes(app, database, authenticate);
   registerCashRegisterRoutes(app, database, authenticate);
@@ -1528,6 +1536,7 @@ export async function buildApi({
       database,
       publicBookingMailer,
       config.PUBLIC_WEB_URL,
+      appointmentNotifier,
     ).catch((error: unknown) => app.log.error(error));
   }, 60_000);
   publicBookingLifecycleTimer.unref();

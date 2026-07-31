@@ -15,6 +15,7 @@ import {
   Animated,
   Alert,
   Easing,
+  Linking,
   Modal,
   PanResponder,
   Pressable,
@@ -1041,6 +1042,46 @@ export default function AgendaScreen() {
               <Text style={styles.modalPrimaryText}>Reprogramar cita</Text>
             </Pressable>
             <Pressable
+              onPress={() => {
+                if (!selectedAppointment?.clientPhone) {
+                  Alert.alert(
+                    'WhatsApp no disponible',
+                    'Esta cita no tiene un teléfono de cliente.',
+                  );
+                  return;
+                }
+                const phone = selectedAppointment.clientPhone.replace(
+                  /\D/gu,
+                  '',
+                );
+                const businessName =
+                  organizationQuery.data?.organization?.name ??
+                  organizationQuery.data?.location?.name ??
+                  'nuestro negocio';
+                const professionalName =
+                  teamQuery.data?.members.find(
+                    (member) =>
+                      member.id ===
+                      selectedAppointment.professionalMembershipId,
+                  )?.user.fullName ?? 'tu profesional';
+                const appointmentDate = new Intl.DateTimeFormat('es-EC', {
+                  dateStyle: 'full',
+                  timeStyle: 'short',
+                  timeZone,
+                }).format(new Date(selectedAppointment.startsAt));
+                const message = `Hola ${selectedAppointment.clientName}. Te recordamos tu cita en ${businessName} con ${professionalName}, el ${appointmentDate}. ¡Te esperamos!`;
+                void Linking.openURL(
+                  `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+                );
+              }}
+              style={styles.modalWhatsAppAction}
+            >
+              <Ionicons color="#176B3A" name="logo-whatsapp" size={20} />
+              <Text style={styles.modalWhatsAppText}>
+                Enviar recordatorio por WhatsApp
+              </Text>
+            </Pressable>{' '}
+            <Pressable
               onPress={() =>
                 selectedAppointment &&
                 cancelAppointment.mutate(selectedAppointment.id)
@@ -1164,6 +1205,19 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   modalPrimaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
+  modalWhatsAppAction: {
+    alignItems: 'center',
+    backgroundColor: '#EAF6EE',
+    borderColor: '#9DCCAC',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'center',
+    marginTop: 10,
+    minHeight: 54,
+  },
+  modalWhatsAppText: { color: '#176B3A', fontSize: 15, fontWeight: '900' },
   appointmentTime: { color: '#111318', fontSize: 13, fontWeight: '900' },
   checkboxLabel: { color: '#111318', flex: 1, fontSize: 15, fontWeight: '700' },
   checkboxRow: {

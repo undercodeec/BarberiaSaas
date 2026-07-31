@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { OnboardingAccountDetailsResponse } from '@barber-saas/api-client';
 import { useQuery } from '@tanstack/react-query';
+import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect, useRef, useState } from 'react';
@@ -106,6 +107,17 @@ function shouldShowWelcomeSurvey(storedResponse: string | null) {
   }
 }
 
+async function syncPushToken() {
+  if (Platform.OS === 'web') return;
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId as
+    string | undefined;
+  if (!projectId) return;
+  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  await requireApiClient().request('/v1/push-tokens', {
+    body: { platform: Platform.OS, token },
+    method: 'PUT',
+  });
+}
 function greeting() {
   const hour = new Date().getHours();
   if (hour < 12) return '\u00a1Buenos d\u00edas! Bienvenido';
@@ -809,6 +821,8 @@ export default function DashboardScreen() {
 
           setIsNotificationSheetOpen(false);
           setNotificationFlowState('completed');
+          if (status === Notifications.PermissionStatus.GRANTED)
+            void syncPushToken();
         }
       } catch {
         // Some development environments do not expose native notifications.
@@ -858,12 +872,7 @@ export default function DashboardScreen() {
 
     if (!session || !user || !accountQuery.isSuccess) return;
     setNeedsLocationBanner(!accountQuery.data?.addressLine?.trim());
-  }, [
-    accountQuery.data?.addressLine,
-    accountQuery.isSuccess,
-    session,
-    user,
-  ]);
+  }, [accountQuery.data?.addressLine, accountQuery.isSuccess, session, user]);
 
   useEffect(() => {
     if (
@@ -888,7 +897,9 @@ export default function DashboardScreen() {
 
   const requestNotificationPermission = async () => {
     try {
-      await Notifications.requestPermissionsAsync();
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status === Notifications.PermissionStatus.GRANTED)
+        await syncPushToken();
     } catch {
       // The permission prompt is only shown once during each app session.
     } finally {
@@ -970,14 +981,6 @@ export default function DashboardScreen() {
               {businessName}
             </Text>
           </View>
-          <Pressable
-            accessibilityLabel="Notificaciones"
-            accessibilityRole="button"
-            onPress={() => unavailable('Notificaciones')}
-            style={styles.notificationButton}
-          >
-            <Ionicons color="#101c2d" name="notifications-outline" size={29} />
-          </Pressable>
         </View>
 
         <View style={styles.salesCard}>

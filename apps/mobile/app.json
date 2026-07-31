@@ -8,6 +8,7 @@
     "userInterfaceStyle": "dark",
     "plugins": [
       "expo-router",
+      "expo-notifications",
       [
         "expo-image-picker",
         {
@@ -24,7 +25,19 @@
     ],
     "experiments": { "typedRoutes": true },
     "web": { "bundler": "metro" },
-    "android": { "package": "com.barbersaas.mobile" },
-    "ios": { "bundleIdentifier": "com.barbersaas.mobile" }
+    "android": {
+      "package": "com.barbersaas.mobile",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS"
+      ]
+    },
+    "ios": { "bundleIdentifier": "com.barbersaas.mobile" },
+    "extra": {
+      "router": {},
+      "eas": { "projectId": "0feb8bfa-2e01-44e6-8e79-22927a8a7dcb" }
+    },
+    "owner": "undercodeec"
   }
 }
