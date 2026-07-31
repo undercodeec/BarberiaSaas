@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
+  CashRegisterSummaryResponse,
   CurrentCashRegisterResponse,
   TeamResponse,
 } from '@barber-saas/api-client';
@@ -10,6 +11,7 @@ import {
   Alert,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -26,8 +28,21 @@ export default function CashRegisterScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [sheetMode, setSheetMode] = useState<'close' | 'movement' | 'open'>(
+    'open',
+  );
   const [responsibleId, setResponsibleId] = useState<string | null>(null);
   const [openingAmount, setOpeningAmount] = useState('0');
+  const [movementAmount, setMovementAmount] = useState('');
+  const [movementDescription, setMovementDescription] = useState('');
+  const [movementPayment, setMovementPayment] = useState<
+    'card' | 'cash' | 'transfer' | 'other'
+  >('cash');
+  const [movementType, setMovementType] = useState<
+    'expense' | 'sale' | 'withdrawal'
+  >('sale');
+  const [closingAmount, setClosingAmount] = useState('');
+  const [closingNote, setClosingNote] = useState('');
   const [isBaseInfoVisible, setIsBaseInfoVisible] = useState(false);
   const cashQuery = useQuery({
     enabled: Boolean(session),
@@ -41,6 +56,14 @@ export default function CashRegisterScreen() {
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<TeamResponse>('/v1/team'),
     queryKey: ['team'],
+  });
+  const summaryQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<CashRegisterSummaryResponse>(
+        '/v1/cash-register/summary',
+      ),
+    queryKey: ['cash-register-summary'],
   });
   const openCash = useMutation({
     mutationFn: () => {
@@ -65,37 +88,206 @@ export default function CashRegisterScreen() {
       ),
     onSuccess: async () => {
       setIsSheetOpen(false);
-      await queryClient.invalidateQueries({
-        queryKey: ['cash-register-current'],
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['cash-register-current'] }),
+        queryClient.invalidateQueries({ queryKey: ['cash-register-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['cash-register-history'] }),
+      ]);
+    },
+  });
+  const registerMovement = useMutation({
+    mutationFn: () => {
+      const amount = Number(movementAmount.replace(',', '.'));
+      if (!Number.isFinite(amount) || amount <= 0)
+        throw new Error('Ingresa un monto válido.');
+      if (movementDescription.trim().length < 2)
+        throw new Error('Describe el movimiento.');
+      return requireApiClient().request('/v1/cash-register/movements', {
+        body: {
+          amountCents: Math.round(amount * 100),
+          description: movementDescription.trim(),
+          paymentMethod: movementPayment,
+          type: movementType,
+        },
+        method: 'POST',
       });
+    },
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos registrar el movimiento',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      setIsSheetOpen(false);
+      setMovementAmount('');
+      setMovementDescription('');
+      await queryClient.invalidateQueries({
+        queryKey: ['cash-register-summary'],
+      });
+    },
+  });
+  const closeCash = useMutation({
+    mutationFn: () => {
+      const amount = Number(closingAmount.replace(',', '.'));
+      if (!Number.isFinite(amount) || amount < 0)
+        throw new Error('Ingresa el efectivo contado válido.');
+      return requireApiClient().request('/v1/cash-register/close', {
+        body: {
+          closingAmountCents: Math.round(amount * 100),
+          note: closingNote.trim() || undefined,
+        },
+        method: 'POST',
+      });
+    },
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos cerrar la caja',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      setIsSheetOpen(false);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['cash-register-current'] }),
+        queryClient.invalidateQueries({ queryKey: ['cash-register-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['cash-register-history'] }),
+      ]);
     },
   });
   if (!session) return <Redirect href="/(auth)/login" />;
   const sessionData = cashQuery.data?.session;
+  const totals = summaryQuery.data?.totals;
+  const availableResponsibles = (teamQuery.data?.members ?? []).filter(
+    (member) => member.user.id !== user?.id,
+  );
+  const formatMoney = (amountCents: number) =>
+    `$${(amountCents / 100).toFixed(2)}`;
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
       <View style={styles.header}>
-        <Pressable
-          accessibilityLabel="Volver"
-          onPress={() => router.replace('/agenda')}
-          style={styles.back}
-        >
-          <Ionicons color="#111827" name="chevron-back" size={24} />
-        </Pressable>
         <Text style={styles.title}>Caja</Text>
-        <View style={styles.back} />
+        <Ionicons color="#111827" name="receipt-outline" size={27} />
       </View>
       {sessionData ? (
-        <View style={styles.empty}>
-          <Ionicons color="#111827" name="cash-outline" size={58} />
-          <Text style={styles.state}>Caja abierta</Text>
-          <Text style={styles.copy}>
-            Responsable: {sessionData.responsibleName}
-          </Text>
-          <Text style={styles.copy}>
-            Base: ${(sessionData.openingAmountCents / 100).toFixed(2)}
-          </Text>
-        </View>
+        <ScrollView contentContainerStyle={styles.openContent}>
+          <View style={styles.balanceCard}>
+            <Text style={styles.balanceLabel}>Saldo en caja</Text>
+            <Text style={styles.balanceAmount}>
+              {formatMoney(
+                totals?.expectedCash ?? sessionData.openingAmountCents,
+              )}
+            </Text>
+            <View style={styles.balanceDivider} />
+            <View style={styles.balanceFooter}>
+              <View style={styles.balanceInformation}>
+                <Text style={styles.balanceMetaLabel}>Fecha de apertura</Text>
+                <Text style={styles.balanceMeta}>
+                  {new Date(sessionData.openedAt).toLocaleString()}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityLabel="Ver detalle de caja"
+                onPress={() =>
+                  router.push({
+                    params: { sessionId: sessionData.id },
+                    pathname: '/cash-register-detail',
+                  })
+                }
+              >
+                <Text style={styles.detailsLink}>Ver detalles</Text>
+              </Pressable>
+            </View>
+          </View>
+          <View style={styles.dayCard}>
+            <Text style={styles.dayTitle}>
+              {totals?.sales ? 'Tu día en movimiento' : 'El día apenas empieza'}
+            </Text>
+            <Text style={styles.dayLabel}>Ventas registradas</Text>
+            <Text style={styles.dayAmount}>
+              {formatMoney(totals?.sales ?? 0)}
+            </Text>
+            <Text style={styles.dayCopy}>
+              {totals?.sales
+                ? 'Sigue registrando cada cobro para mantener tu caja al día.'
+                : 'Registra tu primera venta o salida de dinero.'}
+            </Text>
+          </View>
+          <Text style={styles.movementsTitle}>Movimientos recientes</Text>
+          {(summaryQuery.data?.movements ?? []).slice(0, 3).map((movement) => (
+            <View key={movement.id} style={styles.movementRow}>
+              <View style={styles.movementIcon}>
+                <Ionicons
+                  color={movement.type === 'sale' ? '#288B52' : '#B54747'}
+                  name={
+                    movement.type === 'sale'
+                      ? 'trending-up-outline'
+                      : 'trending-down-outline'
+                  }
+                  size={20}
+                />
+              </View>
+              <View style={styles.movementCopy}>
+                <Text style={styles.movementName}>{movement.description}</Text>
+                <Text style={styles.movementMeta}>
+                  {movement.type === 'sale'
+                    ? 'Venta'
+                    : movement.type === 'expense'
+                      ? 'Gasto'
+                      : 'Retiro'}
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.movementAmount,
+                  movement.type === 'sale'
+                    ? styles.movementIncome
+                    : styles.movementExpense,
+                ]}
+              >
+                {movement.type === 'sale' ? '+' : '-'}
+                {formatMoney(movement.amountCents)}
+              </Text>
+            </View>
+          ))}
+          {!summaryQuery.data?.movements.length ? (
+            <Text style={styles.noMovements}>
+              No tienes movimientos todavía.
+            </Text>
+          ) : null}
+          <View style={styles.sessionActions}>
+            <Pressable
+              onPress={() => {
+                setMovementType('sale');
+                setSheetMode('movement');
+                setIsSheetOpen(true);
+              }}
+              style={styles.primary}
+            >
+              <Text style={styles.primaryText}>Registrar venta</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setMovementType('expense');
+                setSheetMode('movement');
+                setIsSheetOpen(true);
+              }}
+              style={styles.secondary}
+            >
+              <Text style={styles.secondaryText}>Gasto o retiro</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setClosingAmount(
+                  ((totals?.expectedCash ?? 0) / 100).toFixed(2),
+                );
+                setSheetMode('close');
+                setIsSheetOpen(true);
+              }}
+              style={styles.closeButton}
+            >
+              <Text style={styles.closeText}>Cerrar caja</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
       ) : (
         <View style={styles.empty}>
           <View style={styles.icon}>
@@ -106,7 +298,10 @@ export default function CashRegisterScreen() {
             Abre una caja para registrar ventas y gastos diarios.
           </Text>
           <Pressable
-            onPress={() => setIsSheetOpen(true)}
+            onPress={() => {
+              setSheetMode('open');
+              setIsSheetOpen(true);
+            }}
             style={styles.primary}
           >
             <Ionicons color="#FFFFFF" name="lock-open-outline" size={20} />
@@ -127,91 +322,238 @@ export default function CashRegisterScreen() {
           />
           <View style={styles.sheet}>
             <View style={styles.handle} />
-            <Text style={styles.sheetTitle}>Abrir caja</Text>
-            <Text style={styles.label}>Responsable</Text>
-            <View style={styles.members}>
-              <Pressable
-                onPress={() => setResponsibleId(null)}
-                style={[styles.member, !responsibleId && styles.selected]}
-              >
-                <Text
-                  style={[
-                    styles.memberText,
-                    !responsibleId && styles.selectedText,
-                  ]}
-                >
-                  {user?.fullName ?? 'Yo'}
-                </Text>
-              </Pressable>
-              {(teamQuery.data?.members ?? []).map((member) => (
-                <Pressable
-                  key={member.id}
-                  onPress={() => setResponsibleId(member.id)}
-                  style={[
-                    styles.member,
-                    responsibleId === member.id && styles.selected,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.memberText,
-                      responsibleId === member.id && styles.selectedText,
-                    ]}
+            {sheetMode === 'open' ? (
+              <>
+                <Text style={styles.sheetTitle}>Abrir caja</Text>
+                <Text style={styles.label}>Responsable</Text>
+                <View style={styles.members}>
+                  <Pressable
+                    onPress={() => setResponsibleId(null)}
+                    style={[styles.member, !responsibleId && styles.selected]}
                   >
-                    {member.user.fullName}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <View style={styles.moneyLabel}>
-              <Text style={styles.label}>Dinero base</Text>
-              <Pressable
-                accessibilityLabel="Informacion sobre dinero base"
-                onPress={() => setIsBaseInfoVisible((visible) => !visible)}
-                style={styles.infoButton}
-              >
-                <Text style={styles.infoButtonLabel}>!</Text>
-              </Pressable>
-            </View>
-            {isBaseInfoVisible ? (
-              <View style={styles.baseInfoBox}>
-                <Ionicons
-                  color="#5D6672"
-                  name="information-circle-outline"
-                  size={18}
+                    <Text
+                      style={[
+                        styles.memberText,
+                        !responsibleId && styles.selectedText,
+                      ]}
+                    >
+                      {user?.fullName ?? 'Yo'}
+                    </Text>
+                  </Pressable>
+                  {availableResponsibles.map((member) => (
+                    <Pressable
+                      key={member.id}
+                      onPress={() => setResponsibleId(member.id)}
+                      style={[
+                        styles.member,
+                        responsibleId === member.id && styles.selected,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.memberText,
+                          responsibleId === member.id && styles.selectedText,
+                        ]}
+                      >
+                        {member.user.fullName}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <View style={styles.moneyLabel}>
+                  <Text style={styles.label}>Dinero base</Text>
+                  <Pressable
+                    accessibilityLabel="Informacion sobre dinero base"
+                    onPress={() => setIsBaseInfoVisible((visible) => !visible)}
+                    style={styles.infoButton}
+                  >
+                    <Text style={styles.infoButtonLabel}>!</Text>
+                  </Pressable>
+                </View>
+                {isBaseInfoVisible ? (
+                  <View style={styles.baseInfoBox}>
+                    <Ionicons
+                      color="#5D6672"
+                      name="information-circle-outline"
+                      size={18}
+                    />
+                    <Text style={styles.baseInfo}>
+                      Ingresa el efectivo fisico disponible al iniciar la caja.
+                      No incluyas ventas ni gastos del dia.
+                    </Text>
+                  </View>
+                ) : null}
+                <TextInput
+                  accessibilityLabel="Dinero base"
+                  keyboardType="decimal-pad"
+                  onChangeText={setOpeningAmount}
+                  placeholder="0.00"
+                  placeholderTextColor="#8B96A5"
+                  style={styles.input}
+                  value={openingAmount}
                 />
-                <Text style={styles.baseInfo}>
-                  Ingresa el efectivo fisico disponible al iniciar la caja. No
-                  incluyas ventas ni gastos del dia.
+                <View style={styles.actions}>
+                  <Pressable
+                    onPress={() => setIsSheetOpen(false)}
+                    style={styles.exit}
+                  >
+                    <Text style={styles.exitText}>Salir</Text>
+                  </Pressable>
+                  <Pressable
+                    disabled={openCash.isPending}
+                    onPress={() => openCash.mutate()}
+                    style={styles.confirm}
+                  >
+                    <Text style={styles.primaryText}>
+                      {openCash.isPending ? 'Abriendo...' : 'Abrir caja'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : sheetMode === 'movement' ? (
+              <>
+                <Text style={styles.sheetTitle}>
+                  {movementType === 'sale'
+                    ? 'Registrar venta'
+                    : 'Registrar salida'}
                 </Text>
-              </View>
-            ) : null}
-            <TextInput
-              accessibilityLabel="Dinero base"
-              keyboardType="decimal-pad"
-              onChangeText={setOpeningAmount}
-              placeholder="0.00"
-              placeholderTextColor="#8B96A5"
-              style={styles.input}
-              value={openingAmount}
-            />
-            <View style={styles.actions}>
-              <Pressable
-                onPress={() => setIsSheetOpen(false)}
-                style={styles.exit}
-              >
-                <Text style={styles.exitText}>Salir</Text>
-              </Pressable>
-              <Pressable
-                disabled={openCash.isPending}
-                onPress={() => openCash.mutate()}
-                style={styles.confirm}
-              >
-                <Text style={styles.primaryText}>
-                  {openCash.isPending ? 'Abriendo...' : 'Abrir caja'}
+                <Text style={styles.label}>Tipo</Text>
+                <View style={styles.members}>
+                  {(['sale', 'expense', 'withdrawal'] as const).map((type) => (
+                    <Pressable
+                      key={type}
+                      onPress={() => setMovementType(type)}
+                      style={[
+                        styles.member,
+                        movementType === type && styles.selected,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.memberText,
+                          movementType === type && styles.selectedText,
+                        ]}
+                      >
+                        {type === 'sale'
+                          ? 'Venta'
+                          : type === 'expense'
+                            ? 'Gasto'
+                            : 'Retiro'}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Text style={styles.label}>Descripción</Text>
+                <TextInput
+                  accessibilityLabel="Descripción del movimiento"
+                  onChangeText={setMovementDescription}
+                  placeholder="Ej. corte y barba"
+                  placeholderTextColor="#8B96A5"
+                  style={styles.input}
+                  value={movementDescription}
+                />
+                <Text style={styles.label}>Monto</Text>
+                <TextInput
+                  accessibilityLabel="Monto del movimiento"
+                  keyboardType="decimal-pad"
+                  onChangeText={setMovementAmount}
+                  placeholder="0.00"
+                  placeholderTextColor="#8B96A5"
+                  style={styles.input}
+                  value={movementAmount}
+                />
+                <Text style={styles.label}>Método de pago</Text>
+                <View style={styles.members}>
+                  {(['cash', 'card', 'transfer', 'other'] as const).map(
+                    (method) => (
+                      <Pressable
+                        key={method}
+                        onPress={() => setMovementPayment(method)}
+                        style={[
+                          styles.member,
+                          movementPayment === method && styles.selected,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.memberText,
+                            movementPayment === method && styles.selectedText,
+                          ]}
+                        >
+                          {method === 'cash'
+                            ? 'Efectivo'
+                            : method === 'card'
+                              ? 'Tarjeta'
+                              : method === 'transfer'
+                                ? 'Transferencia'
+                                : 'Otro'}
+                        </Text>
+                      </Pressable>
+                    ),
+                  )}
+                </View>
+                <View style={styles.actions}>
+                  <Pressable
+                    onPress={() => setIsSheetOpen(false)}
+                    style={styles.exit}
+                  >
+                    <Text style={styles.exitText}>Salir</Text>
+                  </Pressable>
+                  <Pressable
+                    disabled={registerMovement.isPending}
+                    onPress={() => registerMovement.mutate()}
+                    style={styles.confirm}
+                  >
+                    <Text style={styles.primaryText}>
+                      {registerMovement.isPending ? 'Guardando...' : 'Guardar'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.sheetTitle}>Cerrar caja</Text>
+                <Text style={styles.copy}>
+                  Efectivo esperado: {formatMoney(totals?.expectedCash ?? 0)}
                 </Text>
-              </Pressable>
-            </View>
+                <Text style={styles.label}>Efectivo contado</Text>
+                <TextInput
+                  accessibilityLabel="Efectivo contado"
+                  keyboardType="decimal-pad"
+                  onChangeText={setClosingAmount}
+                  placeholder="0.00"
+                  placeholderTextColor="#8B96A5"
+                  style={styles.input}
+                  value={closingAmount}
+                />
+                <Text style={styles.label}>Nota del cierre (opcional)</Text>
+                <TextInput
+                  accessibilityLabel="Nota del cierre"
+                  onChangeText={setClosingNote}
+                  placeholder="Observaciones"
+                  placeholderTextColor="#8B96A5"
+                  style={styles.input}
+                  value={closingNote}
+                />
+                <View style={styles.actions}>
+                  <Pressable
+                    onPress={() => setIsSheetOpen(false)}
+                    style={styles.exit}
+                  >
+                    <Text style={styles.exitText}>Salir</Text>
+                  </Pressable>
+                  <Pressable
+                    disabled={closeCash.isPending}
+                    onPress={() => closeCash.mutate()}
+                    style={styles.confirm}
+                  >
+                    <Text style={styles.primaryText}>
+                      {closeCash.isPending ? 'Cerrando...' : 'Confirmar cierre'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -221,6 +563,34 @@ export default function CashRegisterScreen() {
 }
 const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 10, marginTop: 24 },
+  balanceAmount: {
+    color: '#288B52',
+    fontSize: 38,
+    fontWeight: '900',
+    marginTop: 4,
+  },
+  balanceCard: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 22,
+  },
+  balanceDivider: { backgroundColor: '#E5E7EB', height: 1, marginVertical: 18 },
+  balanceFooter: {
+    alignItems: 'flex-end',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  balanceInformation: { flex: 1, paddingRight: 12 },
+  balanceLabel: { color: '#303743', fontSize: 16, fontWeight: '800' },
+  balanceMeta: {
+    color: '#111827',
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 3,
+  },
+  balanceMetaLabel: { color: '#737B87', fontSize: 13 },
   baseInfo: { color: '#5D6672', flex: 1, fontSize: 13, lineHeight: 19 },
   baseInfoBox: {
     alignItems: 'flex-start',
@@ -253,6 +623,27 @@ const styles = StyleSheet.create({
     marginTop: 9,
     textAlign: 'center',
   },
+  dayAmount: {
+    color: '#288B52',
+    fontSize: 30,
+    fontWeight: '900',
+    marginTop: 3,
+  },
+  dayCard: { backgroundColor: '#F1F4FA', borderRadius: 25, padding: 23 },
+  dayCopy: { color: '#59697C', fontSize: 14, lineHeight: 20, marginTop: 14 },
+  dayLabel: {
+    color: '#59697C',
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 22,
+  },
+  dayTitle: { color: '#111827', fontSize: 19, fontWeight: '900' },
+  detailsLink: {
+    color: '#111827',
+    fontSize: 14,
+    fontWeight: '900',
+    textDecorationLine: 'underline',
+  },
   empty: {
     alignItems: 'center',
     flex: 1,
@@ -278,11 +669,10 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    borderBottomColor: '#E1E5EA',
-    borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 18,
+    paddingHorizontal: 24,
+    paddingVertical: 18,
   },
   infoButton: {
     alignItems: 'center',
@@ -326,6 +716,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+  movementAmount: { fontSize: 14, fontWeight: '900' },
+  movementCopy: { flex: 1 },
+  movementExpense: { color: '#B54747' },
+  movementIcon: {
+    alignItems: 'center',
+    backgroundColor: '#F3F5F7',
+    borderRadius: 15,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  movementIncome: { color: '#288B52' },
+  movementMeta: { color: '#737B87', fontSize: 12, marginTop: 2 },
+  movementName: { color: '#111827', fontSize: 14, fontWeight: '800' },
+  movementRow: {
+    alignItems: 'center',
+    borderBottomColor: '#E9EBEE',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: 11,
+    paddingVertical: 12,
+  },
+  movementsTitle: {
+    color: '#111827',
+    fontSize: 18,
+    fontWeight: '900',
+    marginTop: 8,
+  },
+  noMovements: {
+    color: '#7A828E',
+    fontSize: 15,
+    paddingVertical: 24,
+    textAlign: 'center',
+  },
+  openContent: { flex: 1, gap: 16, paddingBottom: 105, paddingHorizontal: 24 },
   overlay: {
     backgroundColor: 'rgba(17,24,39,.4)',
     flex: 1,
@@ -343,6 +768,19 @@ const styles = StyleSheet.create({
   },
   primaryText: { color: '#FFFFFF', fontWeight: '900' },
   screen: { backgroundColor: '#FBFCFF', flex: 1 },
+  secondary: {
+    alignItems: 'center',
+    borderColor: '#111827',
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  secondaryText: { color: '#111827', fontWeight: '900' },
+  sessionActions: { alignSelf: 'stretch', marginTop: 24 },
+  closeButton: { alignItems: 'center', marginTop: 20, padding: 10 },
+  closeText: { color: '#9F1D2F', fontWeight: '900' },
   selected: { backgroundColor: '#111827', borderColor: '#111827' },
   selectedText: { color: '#FFFFFF' },
   sheet: {

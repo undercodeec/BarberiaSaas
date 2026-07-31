@@ -2622,6 +2622,13 @@ Estado de este corte:
 - [x] Migración `20260731090000_cash_register_pos` aplicada en PostgreSQL local.
 - [x] Modelo de movimientos de caja para ventas, gastos y retiros, con métodos de pago.
 - [x] API para consultar el resumen de una caja abierta, registrar movimientos y cerrar caja con efectivo esperado, contado y diferencia.
-- [x] Ruta móvil `/wallet` conectada desde `Nava Wallet` en Ajustes del negocio; presenta el resumen inicial, el acceso a Caja física y el estado de PayPhone.`n- [ ] Completar las pestañas funcionales de Wallet (Resumen, Historial y Configuración) y los formularios de movimientos/cierre de Caja.
-- [ ] Auditoría detallada de operaciones de caja y pruebas de integración.
+- [x] Ruta móvil `/wallet` conectada desde `Nava Wallet` en Ajustes del negocio; presenta el resumen inicial, el acceso a Caja física y el estado de PayPhone.
+- [x] Pestañas funcionales de Wallet: resumen de cobros por método, historial de cierres y estado de configuración de PayPhone; formularios de ventas, gastos, retiros y cierre de Caja disponibles desde móvil.
+- [x] Auditoría de apertura, movimientos y cierre; pruebas de integración para totales, cierre e historial.
+- [x] Migración `20260731110000_cash_register_open_session_guard` aplicada en desarrollo y pruebas; impide dos cajas abiertas para el mismo negocio o propietario.
+- [x] Pantalla móvil de Caja rediseñada con saldo esperado, apertura, resumen diario y movimientos recientes; el propietario no se duplica en el selector de responsable.
+- [x] Historial de Wallet muestra explícitamente el efectivo contado al cierre, separado del total de ventas, y cada cierre abre su detalle.
+- [x] Detalle de Caja disponible para sesiones abiertas y cerradas: responsable, base, estado, ventas, gastos, retiros, efectivo esperado, contado, diferencia, nota y fecha de cierre.
+- [x] Desglose desplegable de todos los métodos de pago (efectivo, tarjeta, transferencia y otro) y listado completo de movimientos, incluida la referencia de una cita vinculada cuando existe.
+- [x] Endpoint autenticado de detalle por sesión de caja y prueba PostgreSQL específica aprobada para los datos de cierre y movimientos.
 - [ ] Pruebas manuales en dispositivo físico se mantienen en espera por decisión de producto.

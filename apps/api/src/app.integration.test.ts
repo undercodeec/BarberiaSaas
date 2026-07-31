@@ -1156,4 +1156,100 @@ describeWithDatabase('API con PostgreSQL', () => {
     });
     expect(replacementResponse.statusCode).toBe(201);
   });
+
+  it('audita caja, conserva el efectivo esperado y expone cierres en historial', async () => {
+    const token = await register('cash-register@example.com');
+    const organization = await onboard(token, 'caja-prueba');
+    const opened = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'POST',
+      payload: { openingAmountCents: 1_000 },
+      url: '/v1/cash-register/open',
+    });
+    expect(opened.statusCode).toBe(201);
+
+    const movement = async (
+      type: 'expense' | 'sale' | 'withdrawal',
+      paymentMethod: 'card' | 'cash' | 'transfer',
+      amountCents: number,
+    ) =>
+      app.inject({
+        headers: { authorization: `Bearer ${token}` },
+        method: 'POST',
+        payload: {
+          amountCents,
+          description: `${type} de prueba`,
+          paymentMethod,
+          type,
+        },
+        url: '/v1/cash-register/movements',
+      });
+    expect((await movement('sale', 'cash', 2_000)).statusCode).toBe(201);
+    expect((await movement('expense', 'transfer', 500)).statusCode).toBe(201);
+    expect((await movement('withdrawal', 'cash', 300)).statusCode).toBe(201);
+
+    const summary = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: '/v1/cash-register/summary',
+    });
+    expect(summary.statusCode).toBe(200);
+    expect(
+      summary.json<{ totals: { expectedCash: number } }>().totals.expectedCash,
+    ).toBe(2_700);
+
+    const closed = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'POST',
+      payload: { closingAmountCents: 2_600, note: 'Faltante comprobado' },
+      url: '/v1/cash-register/close',
+    });
+    expect(closed.statusCode).toBe(200);
+    expect(
+      closed.json<{ session: { differenceCents: number } }>().session
+        .differenceCents,
+    ).toBe(-100);
+
+    const history = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: '/v1/cash-register/history',
+    });
+    expect(history.json<{ sessions: unknown[] }>().sessions).toHaveLength(1);
+    const sessionId = closed.json<{ session: { id: string } }>().session.id;
+    const detail = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: `/v1/cash-register/sessions/${sessionId}`,
+    });
+    expect(detail.statusCode).toBe(200);
+    expect(
+      detail.json<{
+        movements: unknown[];
+        session: {
+          closingAmountCents: number | null;
+          closingNote: string | null;
+        };
+        totals: { cashSales: number; expectedCash: number; sales: number };
+      }>(),
+    ).toMatchObject({
+      movements: expect.any(Array),
+      session: {
+        closingAmountCents: 2_600,
+        closingNote: 'Faltante comprobado',
+      },
+      totals: { cashSales: 2_000, expectedCash: 2_700, sales: 2_000 },
+    });
+    const actions = await database.auditLog.findMany({
+      select: { action: true },
+      where: { organizationId: organization.organizationId },
+    });
+    expect(actions.map(({ action }) => action)).toEqual(
+      expect.arrayContaining([
+        'cash_register.opened',
+        'cash_movement.created',
+        'cash_register.closed',
+      ]),
+    );
+  });
 });

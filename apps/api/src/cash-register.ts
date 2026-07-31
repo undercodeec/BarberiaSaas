@@ -46,6 +46,11 @@ async function scope(database: DatabaseClient, userId: string) {
 }
 
 function publicSession(session: {
+  closedAt?: Date | null;
+  closingNote?: string | null;
+  closingAmountCents?: number | null;
+  differenceCents?: number | null;
+  expectedAmountCents?: number | null;
   id: string;
   openedAt: Date;
   openingAmountCents: number;
@@ -53,12 +58,103 @@ function publicSession(session: {
   status: CashRegisterStatus;
 }) {
   return {
+    closedAt: session.closedAt?.toISOString() ?? null,
+    closingNote: session.closingNote ?? null,
+    closingAmountCents: session.closingAmountCents ?? null,
+    differenceCents: session.differenceCents ?? null,
+    expectedAmountCents: session.expectedAmountCents ?? null,
     id: session.id,
     openedAt: session.openedAt.toISOString(),
     openingAmountCents: session.openingAmountCents,
     responsibleName: session.responsibleName,
     status: session.status.toLowerCase(),
   };
+}
+
+function totalsFor(
+  openingAmountCents: number,
+  movements: ReadonlyArray<{
+    amountCents: number;
+    paymentMethod: PaymentMethod | null;
+    type: CashMovementType;
+  }>,
+) {
+  return movements.reduce(
+    (totals, movement) => {
+      const isCash = movement.paymentMethod === PaymentMethod.CASH;
+      if (movement.type === CashMovementType.SALE) {
+        totals.sales += movement.amountCents;
+        if (isCash) totals.cash += movement.amountCents;
+        if (isCash) totals.cashSales += movement.amountCents;
+        if (movement.paymentMethod === PaymentMethod.CARD)
+          totals.card += movement.amountCents;
+        if (movement.paymentMethod === PaymentMethod.TRANSFER)
+          totals.transfers += movement.amountCents;
+        if (movement.paymentMethod === PaymentMethod.OTHER)
+          totals.other += movement.amountCents;
+      } else {
+        if (movement.type === CashMovementType.EXPENSE)
+          totals.expenses += movement.amountCents;
+        if (movement.type === CashMovementType.WITHDRAWAL)
+          totals.withdrawals += movement.amountCents;
+        if (isCash) totals.cash -= movement.amountCents;
+      }
+      return totals;
+    },
+    {
+      card: 0,
+      cash: openingAmountCents,
+      cashSales: 0,
+      expenses: 0,
+      other: 0,
+      sales: 0,
+      transfers: 0,
+      withdrawals: 0,
+    },
+  );
+}
+
+function publicMovement(movement: {
+  amountCents: number;
+  appointmentId: string | null;
+  createdAt: Date;
+  description: string;
+  id: string;
+  paymentMethod: PaymentMethod | null;
+  type: CashMovementType;
+}) {
+  return {
+    amountCents: movement.amountCents,
+    appointmentId: movement.appointmentId,
+    createdAt: movement.createdAt.toISOString(),
+    description: movement.description,
+    id: movement.id,
+    paymentMethod: movement.paymentMethod?.toLowerCase() ?? null,
+    type: movement.type.toLowerCase(),
+  };
+}
+
+async function recordAudit(
+  database: DatabaseClient,
+  currentScope: Awaited<ReturnType<typeof scope>>,
+  userId: string,
+  entityType: string,
+  entityId: string,
+  action: string,
+  afterData: Record<string, unknown>,
+) {
+  if (!currentScope.organizationId) return;
+  await database.auditLog.create({
+    data: {
+      action,
+      actorUserId: userId,
+      afterData: afterData as never,
+      entityId,
+      entityType,
+      locationId: currentScope.locationId,
+      organizationId: currentScope.organizationId,
+    },
+  });
 }
 
 export function registerCashRegisterRoutes(
@@ -140,6 +236,15 @@ export function registerCashRegisterRoutes(
         responsibleName,
       },
     });
+    await recordAudit(
+      database,
+      currentScope,
+      user.id,
+      'cash_register_session',
+      session.id,
+      'cash_register.opened',
+      { openingAmountCents: input.openingAmountCents, responsibleName },
+    );
     return reply.code(201).send({ session: publicSession(session) });
   });
   app.get('/v1/cash-register/summary', async (request) => {
@@ -156,58 +261,80 @@ export function registerCashRegisterRoutes(
       },
     });
     if (!session) return { session: null, movements: [], totals: null };
-    const totals = session.movements.reduce(
-      (value, movement) => ({
-        card:
-          value.card +
-          (movement.type === CashMovementType.SALE &&
-          movement.paymentMethod === PaymentMethod.CARD
-            ? movement.amountCents
-            : 0),
-        cash:
-          value.cash +
-          (movement.type === CashMovementType.SALE &&
-          movement.paymentMethod === PaymentMethod.CASH
-            ? movement.amountCents
-            : 0) -
-          (movement.type !== CashMovementType.SALE ? movement.amountCents : 0),
-        expenses:
-          value.expenses +
-          (movement.type === CashMovementType.EXPENSE
-            ? movement.amountCents
-            : 0),
-        sales:
-          value.sales +
-          (movement.type === CashMovementType.SALE ? movement.amountCents : 0),
-        withdrawals:
-          value.withdrawals +
-          (movement.type === CashMovementType.WITHDRAWAL
-            ? movement.amountCents
-            : 0),
-      }),
-      {
-        card: 0,
-        cash: session.openingAmountCents,
-        expenses: 0,
-        sales: 0,
-        withdrawals: 0,
-      },
-    );
+    const totals = totalsFor(session.openingAmountCents, session.movements);
     return {
       session: publicSession(session),
-      movements: session.movements.map((movement) => ({
-        ...movement,
-        createdAt: movement.createdAt.toISOString(),
-        paymentMethod: movement.paymentMethod?.toLowerCase() ?? null,
-        type: movement.type.toLowerCase(),
-      })),
+      movements: session.movements.map(publicMovement),
       totals: { ...totals, expectedCash: totals.cash },
+    };
+  });
+
+  app.get('/v1/cash-register/history', async (request) => {
+    const { user } = await authenticate(database, request);
+    const currentScope = await scope(database, user.id);
+    const sessions = await database.cashRegisterSession.findMany({
+      include: { movements: true },
+      orderBy: { openedAt: 'desc' },
+      take: 60,
+      where: {
+        status: CashRegisterStatus.CLOSED,
+        ...(currentScope.organizationId
+          ? { organizationId: currentScope.organizationId }
+          : { organizationId: null, ownerUserId: user.id }),
+      },
+    });
+    return {
+      sessions: sessions.map((session) => {
+        const totals = totalsFor(session.openingAmountCents, session.movements);
+        return {
+          ...publicSession(session),
+          totals: { ...totals, expectedCash: totals.cash },
+        };
+      }),
+    };
+  });
+
+  app.get('/v1/cash-register/sessions/:sessionId', async (request) => {
+    const { user } = await authenticate(database, request);
+    const { sessionId } = z
+      .object({ sessionId: z.uuid() })
+      .parse(request.params);
+    const currentScope = await scope(database, user.id);
+    const session = await database.cashRegisterSession.findFirst({
+      include: { movements: { orderBy: { createdAt: 'desc' } } },
+      where: {
+        id: sessionId,
+        ...(currentScope.organizationId
+          ? { organizationId: currentScope.organizationId }
+          : { organizationId: null, ownerUserId: user.id }),
+      },
+    });
+    if (!session)
+      throw new ApiError(404, 'CASH_REGISTER_NOT_FOUND', 'La caja no existe.');
+    const calculated = totalsFor(session.openingAmountCents, session.movements);
+    const expectedCash = session.expectedAmountCents ?? calculated.cash;
+    return {
+      movements: session.movements.map(publicMovement),
+      session: publicSession(session),
+      totals: { ...calculated, cash: expectedCash, expectedCash },
     };
   });
 
   app.post('/v1/cash-register/movements', async (request, reply) => {
     const { user } = await authenticate(database, request);
     const input = createMovementSchema.parse(request.body);
+    if (input.appointmentId && input.type !== 'sale')
+      throw new ApiError(
+        400,
+        'APPOINTMENT_REQUIRES_SALE',
+        'Una cita solo puede vincularse a una venta.',
+      );
+    if (input.type === 'sale' && !input.paymentMethod)
+      throw new ApiError(
+        400,
+        'PAYMENT_METHOD_REQUIRED',
+        'Selecciona el método de pago de la venta.',
+      );
     const currentScope = await scope(database, user.id);
     const session = await database.cashRegisterSession.findFirst({
       where: {
@@ -234,6 +361,12 @@ export function registerCashRegisterRoutes(
       });
       if (!appointment)
         throw new ApiError(404, 'APPOINTMENT_NOT_FOUND', 'La cita no existe.');
+      if (appointment.paymentStatus === AppointmentPaymentStatus.PAID)
+        throw new ApiError(
+          409,
+          'APPOINTMENT_ALREADY_PAID',
+          'La cita ya fue cobrada.',
+        );
       await database.appointment.update({
         data: { paymentStatus: AppointmentPaymentStatus.PAID },
         where: { id: appointment.id },
@@ -252,16 +385,22 @@ export function registerCashRegisterRoutes(
         type: input.type.toUpperCase() as CashMovementType,
       },
     });
-    return reply
-      .code(201)
-      .send({
-        movement: {
-          ...movement,
-          createdAt: movement.createdAt.toISOString(),
-          paymentMethod: movement.paymentMethod?.toLowerCase() ?? null,
-          type: movement.type.toLowerCase(),
-        },
-      });
+    await recordAudit(
+      database,
+      currentScope,
+      user.id,
+      'cash_movement',
+      movement.id,
+      'cash_movement.created',
+      {
+        amountCents: movement.amountCents,
+        appointmentId: movement.appointmentId,
+        cashRegisterSessionId: session.id,
+        paymentMethod: movement.paymentMethod,
+        type: movement.type,
+      },
+    );
+    return reply.code(201).send({ movement: publicMovement(movement) });
   });
 
   app.post('/v1/cash-register/close', async (request) => {
@@ -283,16 +422,10 @@ export function registerCashRegisterRoutes(
         'CASH_REGISTER_CLOSED',
         'No hay una caja abierta.',
       );
-    const expected = session.movements.reduce(
-      (total, movement) =>
-        total +
-        (movement.type === CashMovementType.SALE &&
-        movement.paymentMethod === PaymentMethod.CASH
-          ? movement.amountCents
-          : 0) -
-        (movement.type !== CashMovementType.SALE ? movement.amountCents : 0),
+    const expected = totalsFor(
       session.openingAmountCents,
-    );
+      session.movements,
+    ).cash;
     const closed = await database.cashRegisterSession.update({
       data: {
         closedAt: new Date(),
@@ -305,6 +438,20 @@ export function registerCashRegisterRoutes(
       },
       where: { id: session.id },
     });
+    await recordAudit(
+      database,
+      currentScope,
+      user.id,
+      'cash_register_session',
+      closed.id,
+      'cash_register.closed',
+      {
+        closingAmountCents: input.closingAmountCents,
+        differenceCents: closed.differenceCents,
+        expectedAmountCents: expected,
+        note: input.note ?? null,
+      },
+    );
     return {
       session: {
         ...publicSession(closed),
