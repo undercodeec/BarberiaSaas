@@ -180,6 +180,7 @@ export const completeOnboardingSchema = organizationOnboardingSchema.extend({
 });
 
 export const createTeamInvitationSchema = z.object({
+  commissionPercentage: z.number().int().min(0).max(100).nullish(),
   email: emailSchema,
   fullName: z
     .string()
@@ -189,6 +190,26 @@ export const createTeamInvitationSchema = z.object({
   locationId: uuidSchema,
   role: z.enum(['manager', 'receptionist', 'barber']),
 });
+
+export const updateTeamMemberSchema = z
+  .object({
+    commissionPercentage: z.number().int().min(0).max(100).nullish(),
+    fullName: z
+      .string()
+      .trim()
+      .min(2, 'Ingresa el nombre del colaborador.')
+      .max(120),
+    role: z.enum(['manager', 'receptionist', 'barber']),
+  })
+  .superRefine((input, context) => {
+    if (input.role === 'barber' && input.commissionPercentage == null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Indica el porcentaje de comisión del profesional.',
+        path: ['commissionPercentage'],
+      });
+    }
+  });
 
 export const acceptTeamInvitationSchema = z.object({
   token: z.string().min(32, 'La invitación no es válida.'),
@@ -498,6 +519,7 @@ export type CreateServiceInput = z.infer<typeof createServiceSchema>;
 export type CreateTeamInvitationInput = z.infer<
   typeof createTeamInvitationSchema
 >;
+export type UpdateTeamMemberInput = z.infer<typeof updateTeamMemberSchema>;
 export type DailyAppointmentsQuery = z.infer<
   typeof dailyAppointmentsQuerySchema
 >;

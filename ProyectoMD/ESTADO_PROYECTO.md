@@ -22,7 +22,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [ ] Fase 3 — Motor de agenda _(implementada y verificada contra PostgreSQL; aceptación manual móvil pendiente)_
 - [ ] Fase 4 — Reservas públicas _(implementada, verificada contra PostgreSQL y recorrida manualmente; quedan ajustes menores de UI/UX y configuración externa)_
 - [ ] Fase 5 — Clientes e historial _(directorio, creación, importación, historial vinculado y eliminación lógica implementados; edición, notas y fotografías privadas pendientes)_
-- [ ] Fase 6 — Caja y POS básico
+- [ ] Fase 6 — Caja y POS básico _(implementada técnicamente; validación manual en dispositivo físico diferida al cierre integral del MVP)_
 - [ ] Fase 7 — Comisiones
 - [ ] Fase 8 — Inventario básico
 - [ ] Fase 9 — Notificaciones
@@ -246,6 +246,19 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 ### Fase 7 — Comisiones
 
 - [ ] Reglas, cálculo backend, snapshots, liquidaciones y reversión.
+
+Decisión de alcance para el MVP:
+
+- las citas completadas y cobradas calculan comisión automáticamente a partir del profesional y los servicios ya vinculados;
+- una venta manual comisionable desde Caja debe seleccionar un servicio del catálogo y un profesional; una venta libre sin servicio no genera comisión;
+- cada servicio vendido origina una única entrada de comisión idempotente;
+- gastos y retiros no generan comisión;
+- las anulaciones o devoluciones crearán una reversión auditable, nunca eliminarán la entrada original;
+- no se admitirán pagos parciales en este corte: la comisión nace con el cobro completo;
+- productos y reglas de comisión de productos se integrarán junto con Inventario (Fase 8).
+- [x] Base de datos inicial de Comisiones creada mediante la migración `20260731214903_commission_engine`: reglas, entradas idempotentes con snapshot y liquidaciones.
+- [x] Alta de profesionales desde Gestión de colaboradores con comisión inicial persistida en la invitación. Al aceptar, se crea una regla `SERVICE_PERCENTAGE`; antes de aceptar no existe regla activa ni puede calcularse comisión.
+- [ ] Conectar el cálculo automático al cobro de citas y el registro manual comisionable desde Caja.
 
 ### Fase 8 — Inventario básico
 
@@ -2283,19 +2296,32 @@ La edición del tipo de cuenta, la personalización detallada de permisos y la
 edición del `slug` todavía no están implementadas. En este corte sólo se muestra
 el tipo actual y se ofrecen las acciones existentes sobre el enlace.
 
-#### 6. Gestión de colaboradores: alcance temporal
+#### 6. Gestión de colaboradores e invitaciones
 
 - `/team-management` está disponible únicamente para `Tengo un negocio`.
-- Muestra integrantes actuales.
-- Muestra invitaciones pendientes existentes.
+- Muestra integrantes actuales e invitaciones pendientes.
+- Propietario y administrador pueden enviar una invitación con nombre, correo,
+  rol y, para profesionales, porcentaje de comisión inicial.
+- Las tarjetas de integrantes activos permiten editar nombre, rol y porcentaje
+  de comisión. El correo queda bloqueado porque identifica la cuenta aceptada.
+- Eliminar un colaborador suspende su membresía y desactiva sus reglas futuras;
+  no elimina citas, movimientos de caja, comisiones históricas ni auditoría.
+- Las invitaciones pendientes pueden cancelarse y ya no se duplican dentro de
+  la lista de integrantes activos.
+- La invitación queda pendiente hasta que el destinatario acepte el enlace por
+  correo. Solo entonces se activa su membresía y se crea la regla porcentual de
+  comisión; una invitación pendiente no genera pagos ni comisiones.
+- El enlace profundo `/accept-invitation?token=…` conserva el token al iniciar
+  sesión o registrarse y permite completar la aceptación desde la app.
+- El valor actual de `MOBILE_INVITATION_URL` y el esquema `barbersaas://` se
+  mantienen temporalmente para desarrollo. Antes del despliegue se debe
+  configurar un enlace HTTPS real de producción, asociado a la app mediante
+  Universal Links/App Links y con una página web de respaldo. Este cambio queda
+  pendiente y no bloquea las pruebas locales del flujo.
 - Una cuenta `Solo yo` es devuelta a Ajustes del negocio si intenta abrir la
   ruta directamente.
-- Crear y enviar nuevas invitaciones está deshabilitado y marcado como
-  `Próximamente`.
-
-Esta desactivación es intencional: la pantalla antigua de aceptación de
-invitaciones fue eliminada y el flujo será rediseñado completamente. Los
-endpoints del backend se conservaron para la implementación futura.
+- El envío exige que SMTP esté configurado; no se generan colaboradores ni
+  registros ficticios.
 
 #### 7. Eliminación de la interfaz heredada
 
@@ -2397,9 +2423,11 @@ definir.
 - [ ] Abrir Gestión de colaboradores y comprobar:
   - [ ] total de integrantes;
   - [ ] propietario en Equipo actual;
-  - [ ] invitaciones pendientes, si existen;
-  - [ ] bloque Añadir colaborador marcado `Próximamente`;
-  - [ ] ausencia de un botón activo para enviar invitaciones.
+  - [ ] abrir `Enviar invitación`;
+  - [ ] registrar nombre, correo, rol Profesional y comisión entre 0% y 100%;
+  - [ ] confirmar que la invitación aparece como pendiente con su comisión;
+  - [ ] aceptar el enlace con el correo invitado y confirmar que el integrante
+        pasa a activo; entonces debe existir su regla inicial de comisión.
 - [ ] Abrir Configuración avanzada y confirmar:
   - [ ] tipo de cuenta `Tengo un negocio`;
   - [ ] acceso a colaboradores;
@@ -2631,4 +2659,4 @@ Estado de este corte:
 - [x] Detalle de Caja disponible para sesiones abiertas y cerradas: responsable, base, estado, ventas, gastos, retiros, efectivo esperado, contado, diferencia, nota y fecha de cierre.
 - [x] Desglose desplegable de todos los métodos de pago (efectivo, tarjeta, transferencia y otro) y listado completo de movimientos, incluida la referencia de una cita vinculada cuando existe.
 - [x] Endpoint autenticado de detalle por sesión de caja y prueba PostgreSQL específica aprobada para los datos de cierre y movimientos.
-- [ ] Pruebas manuales en dispositivo físico se mantienen en espera por decisión de producto.
+- [ ] Pruebas manuales en dispositivo físico diferidas al proceso final de validación integral del MVP; no bloquean el inicio de las fases siguientes.

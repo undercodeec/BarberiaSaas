@@ -82,6 +82,25 @@ enum PaymentMethod {
   OTHER
 }
 
+enum CommissionRuleType {
+  SERVICE_PERCENTAGE
+  SERVICE_FIXED
+}
+
+enum CommissionEntryStatus {
+  PENDING
+  APPROVED
+  SETTLED
+  REVERSED
+}
+
+enum CommissionSettlementStatus {
+  DRAFT
+  APPROVED
+  PAID
+  CANCELLED
+}
+
 enum AppointmentEventType {
   CREATED
   RESCHEDULED
@@ -221,6 +240,8 @@ model OnboardingCollaborator {
   id                    String                     @id @default(uuid()) @db.Uuid
   ownerUserId           String                     @map("owner_user_id") @db.Uuid
   name                  String                     @db.VarChar(120)
+  invitationEmail       String?                    @map("invitation_email") @db.VarChar(254)
+  commissionPercentage  Int?                       @map("commission_percentage") @db.SmallInt
   description           String?                    @db.VarChar(500)
   photoUri              String?                    @map("photo_uri") @db.VarChar(2048)
   role                  OnboardingCollaboratorRole
@@ -482,6 +503,7 @@ model TeamInvitation {
   inviterUserId  String           @map("inviter_user_id") @db.Uuid
   email          String           @db.VarChar(254)
   role           MembershipRole
+  commissionPercentage Int?       @map("commission_percentage") @db.SmallInt
   status         InvitationStatus @default(PENDING)
   tokenHash      String           @unique @map("token_hash") @db.Char(64)
   expiresAt      DateTime         @map("expires_at") @db.Timestamptz(3)
@@ -645,6 +667,66 @@ model CashMovement {
   @@index([cashRegisterSessionId, createdAt])
   @@index([appointmentId])
   @@map("cash_movements")
+}
+
+model CommissionRule {
+  id                       String             @id @default(uuid()) @db.Uuid
+  organizationId           String             @map("organization_id") @db.Uuid
+  professionalMembershipId String             @map("professional_membership_id") @db.Uuid
+  serviceId                String?            @map("service_id") @db.Uuid
+  type                     CommissionRuleType
+  value                    Int
+  priority                 Int                @default(0)
+  isActive                 Boolean            @default(true) @map("is_active")
+  effectiveFrom            DateTime           @map("effective_from") @db.Date
+  effectiveTo              DateTime?          @map("effective_to") @db.Date
+  createdAt                DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([organizationId, professionalMembershipId, isActive])
+  @@index([serviceId, effectiveFrom])
+  @@map("commission_rules")
+}
+
+model CommissionSettlement {
+  id                       String                     @id @default(uuid()) @db.Uuid
+  organizationId           String                     @map("organization_id") @db.Uuid
+  professionalMembershipId String                     @map("professional_membership_id") @db.Uuid
+  periodStart              DateTime                   @map("period_start") @db.Date
+  periodEnd                DateTime                   @map("period_end") @db.Date
+  grossGeneratedCents      Int                        @map("gross_generated_cents")
+  commissionAmountCents    Int                        @map("commission_amount_cents")
+  totalPayableCents        Int                        @map("total_payable_cents")
+  status                   CommissionSettlementStatus @default(DRAFT)
+  notes                    String?                    @db.VarChar(500)
+  createdAt                DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([organizationId, professionalMembershipId, periodStart, periodEnd])
+  @@index([organizationId, status, periodStart])
+  @@map("commission_settlements")
+}
+
+model CommissionEntry {
+  id                       String                @id @default(uuid()) @db.Uuid
+  organizationId           String                @map("organization_id") @db.Uuid
+  locationId               String                @map("location_id") @db.Uuid
+  professionalMembershipId String                @map("professional_membership_id") @db.Uuid
+  appointmentId            String                @map("appointment_id") @db.Uuid
+  appointmentServiceId     String                @unique @map("appointment_service_id") @db.Uuid
+  ruleId                   String?               @map("rule_id") @db.Uuid
+  settlementId             String?               @map("settlement_id") @db.Uuid
+  baseAmountCents          Int                   @map("base_amount_cents")
+  commissionAmountCents    Int                   @map("commission_amount_cents")
+  status                   CommissionEntryStatus @default(PENDING)
+  calculationSnapshot      Json                  @map("calculation_snapshot")
+  reversalOfEntryId        String?               @unique @map("reversal_of_entry_id") @db.Uuid
+  createdAt                DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([organizationId, professionalMembershipId, status, createdAt])
+  @@index([settlementId])
+  @@map("commission_entries")
 }
 model Appointment {
   id                                String                   @id @default(uuid()) @db.Uuid

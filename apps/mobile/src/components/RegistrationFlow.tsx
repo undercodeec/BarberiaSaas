@@ -4,7 +4,7 @@ import {
   registrationAvailabilitySchema,
   type SignUpInput,
 } from '@barber-saas/validation';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Controller, useForm } from 'react-hook-form';
 import {
@@ -90,6 +90,7 @@ type Values = Omit<SignUpInput, 'accountType' | 'countryCode'> & {
 
 export function RegistrationFlow() {
   const router = useRouter();
+  const { inviteToken } = useLocalSearchParams<{ inviteToken?: string }>();
   const { resendVerification, signUp, verifyEmail } = useAuth();
   const [step, setStep] = useState<Step>('choice');
   const [account, setAccount] = useState<AccountType | null>(null);
@@ -319,7 +320,12 @@ export function RegistrationFlow() {
     setVerifying(true);
     try {
       await verifyEmail({ code: verificationCode, email: verificationEmail });
-      router.replace('/(onboarding)/account-setup');
+      if (inviteToken) {
+        router.replace({
+          params: { token: inviteToken },
+          pathname: '/(onboarding)/accept-invitation',
+        });
+      } else router.replace('/(onboarding)/account-setup');
     } catch (error) {
       setVerificationError(
         error instanceof Error

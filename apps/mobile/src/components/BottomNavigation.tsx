@@ -1,13 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { OnboardingAccountDetailsResponse } from '@barber-saas/api-client';
-import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { requireApiClient } from '../lib/api';
-import { useAuth } from '../providers/AuthProvider';
-
-type NavigationTab = 'agenda' | 'cash' | 'dashboard' | 'settings' | 'team';
+type NavigationTab = 'agenda' | 'cash' | 'clients' | 'dashboard' | 'settings';
 
 export function BottomNavigation({
   active,
@@ -15,16 +10,6 @@ export function BottomNavigation({
   readonly active: NavigationTab;
 }) {
   const router = useRouter();
-  const { session, user } = useAuth();
-  const accountQuery = useQuery({
-    enabled: Boolean(session),
-    queryFn: () =>
-      requireApiClient().request<OnboardingAccountDetailsResponse>(
-        '/v1/onboarding/account-details',
-      ),
-    queryKey: ['onboarding-account-details', user?.id],
-  });
-  const isBusiness = accountQuery.data?.accountType === 'business';
   const items: ReadonlyArray<{
     readonly icon: React.ComponentProps<typeof Ionicons>['name'];
     readonly label: string;
@@ -51,9 +36,9 @@ export function BottomNavigation({
     },
     {
       icon: 'people-outline',
-      label: 'Equipo',
-      route: '/team-management',
-      value: 'team',
+      label: 'Clientes',
+      route: '/clients',
+      value: 'clients',
     },
     {
       icon: 'settings-outline',
@@ -62,13 +47,9 @@ export function BottomNavigation({
       value: 'settings',
     },
   ];
-  const visibleItems = items.filter(
-    (item) => item.value !== 'team' || isBusiness,
-  );
-
   return (
     <View style={styles.navigation}>
-      {visibleItems.map((item) => {
+      {items.map((item) => {
         const selected = item.value === active;
         return (
           <Pressable

@@ -374,7 +374,7 @@ export default function ClientsScreen() {
         <Ionicons color="#ffffff" name="add" size={29} />
       </Pressable>
 
-      <BottomNavigation active="team" />
+      <BottomNavigation active="clients" />
       <Modal
         animationType="none"
         onRequestClose={dismissCreateSheet}

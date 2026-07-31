@@ -17,7 +17,9 @@ import {
   createServiceSchema,
   createTeamInvitationSchema,
   replaceWeeklySchedulesSchema,
+  updateTeamMemberSchema,
 } from '@barber-saas/validation';
+import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import type { ApiConfig } from './config';
@@ -26,6 +28,7 @@ import type { InvitationMailer } from './recovery-mailer';
 import { createOpaqueToken, hashOpaqueToken } from './security';
 
 const INVITATION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+const teamRecordParamsSchema = z.object({ id: z.uuid() });
 
 interface AuthenticatedIdentity {
   readonly user: {
@@ -158,7 +161,7 @@ export function registerOperationsRoutes(
       permissionRole(current.role),
       'membership.manage',
     );
-    const [members, pendingInvitations] = await Promise.all([
+    const [members, pendingInvitations, commissionRules] = await Promise.all([
       database.membership.findMany({
         include: {
           memberLocations: { include: { location: true } },
@@ -167,6 +170,7 @@ export function registerOperationsRoutes(
         orderBy: { createdAt: 'asc' },
         where: {
           organizationId: current.organizationId,
+          status: MembershipStatus.ACTIVE,
           ...(canReadTeam ? {} : { id: current.id }),
         },
       }),
@@ -180,9 +184,25 @@ export function registerOperationsRoutes(
             },
           })
         : Promise.resolve([]),
+      database.commissionRule.findMany({
+        orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+        where: {
+          isActive: true,
+          organizationId: current.organizationId,
+          serviceId: null,
+          type: 'SERVICE_PERCENTAGE',
+        },
+      }),
     ]);
+    const commissionByMembership = new Map<string, number>();
+    for (const rule of commissionRules) {
+      if (!commissionByMembership.has(rule.professionalMembershipId)) {
+        commissionByMembership.set(rule.professionalMembershipId, rule.value);
+      }
+    }
     return {
       members: members.map((member) => ({
+        commissionPercentage: commissionByMembership.get(member.id) ?? null,
         id: member.id,
         locations: member.memberLocations.map(({ location }) => ({
           id: location.id,
@@ -197,12 +217,253 @@ export function registerOperationsRoutes(
         },
       })),
       pendingInvitations: pendingInvitations.map((invitation) => ({
+        commissionPercentage: invitation.commissionPercentage,
         email: invitation.email,
         expiresAt: invitation.expiresAt.toISOString(),
         id: invitation.id,
         role: invitation.role.toLowerCase(),
       })),
     };
+  });
+
+  app.patch('/v1/team/members/:id', async (request) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(
+      database,
+      user.id,
+      'membership.manage',
+    );
+    const { id } = teamRecordParamsSchema.parse(request.params);
+    const input = updateTeamMemberSchema.parse(request.body);
+    const member = await database.membership.findFirst({
+      include: { user: true },
+      where: {
+        id,
+        organizationId: current.organizationId,
+        status: MembershipStatus.ACTIVE,
+      },
+    });
+    if (!member) {
+      throw new ApiError(
+        404,
+        'TEAM_MEMBER_NOT_FOUND',
+        'El colaborador no existe o ya no está activo.',
+      );
+    }
+    if (member.role === MembershipRole.OWNER || member.id === current.id) {
+      throw new ApiError(
+        403,
+        'TEAM_MEMBER_PROTECTED',
+        'No puedes modificar al propietario ni tu propia membresía desde esta pantalla.',
+      );
+    }
+    const role = input.role.toUpperCase() as MembershipRole;
+    const updated = await database.$transaction(async (transaction) => {
+      const now = new Date();
+      const updatedMembership = await transaction.membership.update({
+        data: { role },
+        where: { id: member.id },
+      });
+      const updatedUser = await transaction.user.update({
+        data: { fullName: input.fullName.trim() },
+        where: { id: member.userId },
+      });
+      const activeRules = await transaction.commissionRule.findMany({
+        where: {
+          isActive: true,
+          organizationId: current.organizationId,
+          professionalMembershipId: member.id,
+          serviceId: null,
+          type: 'SERVICE_PERCENTAGE',
+        },
+      });
+      const commissionPercentage =
+        role === MembershipRole.BARBER
+          ? (input.commissionPercentage ?? null)
+          : null;
+      const unchangedRule =
+        activeRules.length === 1 &&
+        activeRules[0]?.value === commissionPercentage;
+      if (!unchangedRule && activeRules.length > 0) {
+        await transaction.commissionRule.updateMany({
+          data: { effectiveTo: now, isActive: false },
+          where: { id: { in: activeRules.map(({ id: ruleId }) => ruleId) } },
+        });
+      }
+      if (commissionPercentage !== null && !unchangedRule) {
+        await transaction.commissionRule.create({
+          data: {
+            effectiveFrom: now,
+            organizationId: current.organizationId,
+            professionalMembershipId: member.id,
+            type: 'SERVICE_PERCENTAGE',
+            value: commissionPercentage,
+          },
+        });
+      }
+      await transaction.auditLog.create({
+        data: {
+          action: 'team.member.updated',
+          actorUserId: user.id,
+          afterData: {
+            commissionPercentage,
+            fullName: updatedUser.fullName,
+            role: input.role,
+          },
+          beforeData: {
+            fullName: member.user.fullName,
+            role: member.role.toLowerCase(),
+          },
+          entityId: member.id,
+          entityType: 'membership',
+          organizationId: current.organizationId,
+        },
+      });
+      return { membership: updatedMembership, user: updatedUser };
+    });
+    return {
+      member: {
+        commissionPercentage:
+          role === MembershipRole.BARBER
+            ? (input.commissionPercentage ?? null)
+            : null,
+        id: updated.membership.id,
+        role: updated.membership.role.toLowerCase(),
+        status: updated.membership.status.toLowerCase(),
+        user: {
+          email: updated.user.email,
+          fullName: updated.user.fullName,
+          id: updated.user.id,
+        },
+      },
+    };
+  });
+
+  app.delete('/v1/team/members/:id', async (request, reply) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(
+      database,
+      user.id,
+      'membership.manage',
+    );
+    const { id } = teamRecordParamsSchema.parse(request.params);
+    const member = await database.membership.findFirst({
+      include: { user: true },
+      where: {
+        id,
+        organizationId: current.organizationId,
+        status: MembershipStatus.ACTIVE,
+      },
+    });
+    if (!member) {
+      throw new ApiError(
+        404,
+        'TEAM_MEMBER_NOT_FOUND',
+        'El colaborador no existe o ya no está activo.',
+      );
+    }
+    if (member.role === MembershipRole.OWNER || member.id === current.id) {
+      throw new ApiError(
+        403,
+        'TEAM_MEMBER_PROTECTED',
+        'No puedes eliminar al propietario ni tu propia membresía.',
+      );
+    }
+    await database.$transaction(async (transaction) => {
+      await transaction.membership.update({
+        data: { status: MembershipStatus.SUSPENDED },
+        where: { id: member.id },
+      });
+      await transaction.commissionRule.updateMany({
+        data: { effectiveTo: new Date(), isActive: false },
+        where: {
+          isActive: true,
+          organizationId: current.organizationId,
+          professionalMembershipId: member.id,
+        },
+      });
+      await transaction.teamInvitation.updateMany({
+        data: { status: InvitationStatus.REVOKED },
+        where: {
+          email: member.user.email,
+          organizationId: current.organizationId,
+          status: InvitationStatus.PENDING,
+        },
+      });
+      await transaction.auditLog.create({
+        data: {
+          action: 'team.member.suspended',
+          actorUserId: user.id,
+          beforeData: {
+            email: member.user.email,
+            role: member.role.toLowerCase(),
+            status: member.status.toLowerCase(),
+          },
+          entityId: member.id,
+          entityType: 'membership',
+          organizationId: current.organizationId,
+        },
+      });
+    });
+    return reply.code(204).send();
+  });
+
+  app.delete('/v1/team/invitations/:id', async (request, reply) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(
+      database,
+      user.id,
+      'membership.manage',
+    );
+    const { id } = teamRecordParamsSchema.parse(request.params);
+    const invitation = await database.teamInvitation.findFirst({
+      where: {
+        id,
+        organizationId: current.organizationId,
+        status: InvitationStatus.PENDING,
+      },
+    });
+    if (!invitation) {
+      throw new ApiError(
+        404,
+        'TEAM_INVITATION_NOT_FOUND',
+        'La invitación no existe o ya no está pendiente.',
+      );
+    }
+    await database.$transaction(async (transaction) => {
+      await transaction.teamInvitation.update({
+        data: { status: InvitationStatus.REVOKED },
+        where: { id: invitation.id },
+      });
+      const invitedMembership = await transaction.membership.findFirst({
+        where: {
+          organizationId: current.organizationId,
+          status: MembershipStatus.INVITED,
+          user: { email: invitation.email },
+        },
+      });
+      if (invitedMembership) {
+        await transaction.membership.update({
+          data: { status: MembershipStatus.SUSPENDED },
+          where: { id: invitedMembership.id },
+        });
+      }
+      await transaction.auditLog.create({
+        data: {
+          action: 'team.invitation.revoked',
+          actorUserId: user.id,
+          beforeData: {
+            email: invitation.email,
+            role: invitation.role.toLowerCase(),
+          },
+          entityId: invitation.id,
+          entityType: 'team_invitation',
+          locationId: invitation.locationId,
+          organizationId: current.organizationId,
+        },
+      });
+    });
+    return reply.code(204).send();
   });
 
   app.post('/v1/team/invitations', async (request, reply) => {
@@ -296,6 +557,7 @@ export function registerOperationsRoutes(
         });
         const createdInvitation = await transaction.teamInvitation.create({
           data: {
+            commissionPercentage: input.commissionPercentage ?? null,
             email: normalizedEmail,
             expiresAt: new Date(Date.now() + INVITATION_DURATION_MS),
             inviterUserId: user.id,
@@ -422,6 +684,20 @@ export function registerOperationsRoutes(
         data: { acceptedAt: new Date(), status: InvitationStatus.ACCEPTED },
         where: { id: invitation.id },
       });
+      if (
+        invitation.role === MembershipRole.BARBER &&
+        invitation.commissionPercentage !== null
+      ) {
+        await transaction.commissionRule.create({
+          data: {
+            effectiveFrom: new Date(),
+            organizationId: invitation.organizationId,
+            professionalMembershipId: acceptedMembership.id,
+            type: 'SERVICE_PERCENTAGE',
+            value: invitation.commissionPercentage,
+          },
+        });
+      }
       await transaction.auditLog.create({
         data: {
           action: 'team.invitation.accepted',

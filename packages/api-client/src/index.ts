@@ -197,6 +197,7 @@ export interface OnboardingCollaboratorsResponse {
 }
 
 export interface TeamMember {
+  readonly commissionPercentage: number | null;
   readonly id: string;
   readonly locations: ReadonlyArray<{
     readonly id: string;
@@ -210,6 +211,7 @@ export interface TeamMember {
 export interface TeamResponse {
   readonly members: readonly TeamMember[];
   readonly pendingInvitations: ReadonlyArray<{
+    readonly commissionPercentage: number | null;
     readonly email: string;
     readonly expiresAt: string;
     readonly id: string;
