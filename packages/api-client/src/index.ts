@@ -96,6 +96,11 @@ export interface UserProfileResponse {
   };
 }
 export interface CashRegisterSession {
+  readonly closedAt?: string | null;
+  readonly closingNote?: string | null;
+  readonly closingAmountCents?: number | null;
+  readonly differenceCents?: number | null;
+  readonly expectedAmountCents?: number | null;
   readonly id: string;
   readonly openedAt: string;
   readonly openingAmountCents: number;
@@ -106,6 +111,47 @@ export interface CashRegisterSession {
 export interface CurrentCashRegisterResponse {
   readonly session: CashRegisterSession | null;
 }
+
+export interface CashMovementRecord {
+  readonly amountCents: number;
+  readonly appointmentId: string | null;
+  readonly createdAt: string;
+  readonly description: string;
+  readonly id: string;
+  readonly paymentMethod: 'card' | 'cash' | 'other' | 'transfer' | null;
+  readonly type: 'expense' | 'sale' | 'withdrawal';
+}
+
+export interface CashRegisterTotals {
+  readonly card: number;
+  readonly cash: number;
+  readonly cashSales: number;
+  readonly expectedCash: number;
+  readonly expenses: number;
+  readonly other: number;
+  readonly sales: number;
+  readonly transfers: number;
+  readonly withdrawals: number;
+}
+
+export interface CashRegisterSummaryResponse {
+  readonly movements: readonly CashMovementRecord[];
+  readonly session: CashRegisterSession | null;
+  readonly totals: CashRegisterTotals | null;
+}
+
+export interface CashRegisterHistoryResponse {
+  readonly sessions: ReadonlyArray<
+    CashRegisterSession & { readonly totals: CashRegisterTotals }
+  >;
+}
+
+export interface CashRegisterDetailResponse {
+  readonly movements: readonly CashMovementRecord[];
+  readonly session: CashRegisterSession;
+  readonly totals: CashRegisterTotals;
+}
+
 export interface ApiMessageResponse {
   readonly message: string;
   // Reserved for future shared message fields.
