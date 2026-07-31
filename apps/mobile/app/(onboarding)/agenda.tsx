@@ -1080,7 +1080,7 @@ export default function AgendaScreen() {
               <Text style={styles.modalWhatsAppText}>
                 Enviar recordatorio por WhatsApp
               </Text>
-            </Pressable>{' '}
+            </Pressable>
             <Pressable
               onPress={() =>
                 selectedAppointment &&
