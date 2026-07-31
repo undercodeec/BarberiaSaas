@@ -87,6 +87,7 @@ const settingsSections: readonly SettingsSection[] = [
         description: 'Solicita pagos adelantados de tus clientes.',
         icon: 'wallet-outline',
         id: 'wallet',
+        route: '/wallet',
         title: 'Nava Wallet',
       },
       {

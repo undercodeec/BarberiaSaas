@@ -2616,3 +2616,12 @@ Estado de este corte:
 ### Estado del corte
 
 > **IMPLEMENTADO Y VERIFICADO AUTOMÁTICAMENTE.** La validación visual manual del banner global y del contenido final de WhatsApp fue completada durante este corte.
+
+## Inicio de Fase 6 — Caja y POS básico
+
+- [x] Migración `20260731090000_cash_register_pos` aplicada en PostgreSQL local.
+- [x] Modelo de movimientos de caja para ventas, gastos y retiros, con métodos de pago.
+- [x] API para consultar el resumen de una caja abierta, registrar movimientos y cerrar caja con efectivo esperado, contado y diferencia.
+- [x] Ruta móvil `/wallet` conectada desde `Nava Wallet` en Ajustes del negocio; presenta el resumen inicial, el acceso a Caja física y el estado de PayPhone.`n- [ ] Completar las pestañas funcionales de Wallet (Resumen, Historial y Configuración) y los formularios de movimientos/cierre de Caja.
+- [ ] Auditoría detallada de operaciones de caja y pruebas de integración.
+- [ ] Pruebas manuales en dispositivo físico se mantienen en espera por decisión de producto.

@@ -69,6 +69,19 @@ enum CashRegisterStatus {
   CLOSED
 }
 
+enum CashMovementType {
+  SALE
+  EXPENSE
+  WITHDRAWAL
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  OTHER
+}
+
 enum AppointmentEventType {
   CREATED
   RESCHEDULED
@@ -603,14 +616,36 @@ model CashRegisterSession {
   status                  CashRegisterStatus @default(OPEN)
   openedAt                DateTime           @default(now()) @map("opened_at") @db.Timestamptz(3)
   closedAt                DateTime?          @map("closed_at") @db.Timestamptz(3)
+  expectedAmountCents     Int?                @map("expected_amount_cents")
+  closingAmountCents      Int?                @map("closing_amount_cents")
+  differenceCents         Int?                @map("difference_cents")
+  closedByUserId          String?             @map("closed_by_user_id") @db.Uuid
+  closingNote             String?             @map("closing_note") @db.VarChar(500)
   createdAt               DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt               DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  movements               CashMovement[]
 
   @@index([organizationId, status])
   @@index([ownerUserId, status])
   @@map("cash_register_sessions")
 }
 
+model CashMovement {
+  id                    String              @id @default(uuid()) @db.Uuid
+  cashRegisterSessionId String              @map("cash_register_session_id") @db.Uuid
+  type                  CashMovementType
+  paymentMethod         PaymentMethod?      @map("payment_method")
+  amountCents           Int                 @map("amount_cents")
+  description           String              @db.VarChar(240)
+  appointmentId         String?             @map("appointment_id") @db.Uuid
+  createdByUserId       String              @map("created_by_user_id") @db.Uuid
+  createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  cashRegisterSession   CashRegisterSession @relation(fields: [cashRegisterSessionId], references: [id], onDelete: Cascade)
+
+  @@index([cashRegisterSessionId, createdAt])
+  @@index([appointmentId])
+  @@map("cash_movements")
+}
 model Appointment {
   id                                String                   @id @default(uuid()) @db.Uuid
   organizationId                    String                   @map("organization_id") @db.Uuid
