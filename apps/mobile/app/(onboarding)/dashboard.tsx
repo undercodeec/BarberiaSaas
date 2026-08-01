@@ -5,7 +5,7 @@ import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect, useRef, useState } from 'react';
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
   Alert,
@@ -759,7 +759,6 @@ function LocationBannerSheet({
 
 export default function DashboardScreen() {
   const { session, user } = useAuth();
-  const router = useRouter();
   const currentNotificationSessionKey =
     session && user ? `${user.id}:${session.expiresAt}` : null;
   const accountQuery = useQuery({
@@ -799,6 +798,16 @@ export default function DashboardScreen() {
     let notificationPromptTimer: ReturnType<typeof setTimeout> | null = null;
     setNotificationFlowState('checking');
     setIsNotificationSheetOpen(false);
+
+    // Expo Web can report the browser permission as undetermined after a
+    // refresh or sign-out. Push registration is native-only, so do not start
+    // the permission flow in the web build.
+    if (Platform.OS === 'web') {
+      setNotificationFlowState('completed');
+      return () => {
+        isMounted = false;
+      };
+    }
 
     const checkNotificationPermission = async () => {
       try {

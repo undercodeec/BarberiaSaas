@@ -216,14 +216,6 @@ export default function ClientsScreen() {
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
       <View style={styles.header}>
-        <Pressable
-          accessibilityLabel="Volver"
-          accessibilityRole="button"
-          onPress={() => router.back()}
-          style={styles.iconButton}
-        >
-          <Ionicons color="#101c2d" name="chevron-back" size={25} />
-        </Pressable>
         <Text accessibilityRole="header" style={styles.headerTitle}>
           Clientes
         </Text>
