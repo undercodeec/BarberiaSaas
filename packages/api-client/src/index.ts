@@ -277,13 +277,14 @@ export interface TeamMember {
     readonly name: string;
   }>;
   readonly role: 'barber' | 'manager' | 'owner' | 'receptionist';
-  readonly status: 'active' | 'invited' | 'suspended';
+  readonly status: 'active';
   readonly user: AuthenticatedUser;
 }
 
 export interface TeamResponse {
   readonly members: readonly TeamMember[];
   readonly pendingInvitations: ReadonlyArray<{
+    readonly activationStatus: 'pending_acceptance';
     readonly commissionPercentage: number | null;
     readonly email: string;
     readonly expiresAt: string;

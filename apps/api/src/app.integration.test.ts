@@ -775,6 +775,32 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(
       invitationResponse.json<{ member: { status: string } }>().member.status,
     ).toBe('invited');
+    const teamBeforeAcceptance = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      url: '/v1/team',
+    });
+    expect(teamBeforeAcceptance.statusCode).toBe(200);
+    expect(
+      teamBeforeAcceptance
+        .json<{ members: Array<{ id: string }> }>()
+        .members.some(({ id }) => id === barberMembershipId),
+    ).toBe(false);
+    expect(
+      teamBeforeAcceptance.json<{
+        pendingInvitations: Array<{
+          activationStatus: string;
+          email: string;
+        }>;
+      }>().pendingInvitations,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          activationStatus: 'pending_acceptance',
+          email: 'phase2-barber@example.com',
+        }),
+      ]),
+    );
 
     const categoryResponse = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },
@@ -850,6 +876,25 @@ describeWithDatabase('API con PostgreSQL', () => {
     });
     expect(accessBeforeAcceptance.statusCode).toBe(403);
 
+    await database.user.update({
+      data: { emailVerifiedAt: null },
+      where: { email: 'phase2-barber@example.com' },
+    });
+    const unverifiedAcceptanceResponse = await app.inject({
+      headers: { authorization: `Bearer ${barberToken}` },
+      method: 'POST',
+      payload: { token: invitationToken },
+      url: '/v1/team/invitations/accept',
+    });
+    expect(unverifiedAcceptanceResponse.statusCode).toBe(403);
+    expect(unverifiedAcceptanceResponse.json<{ code: string }>().code).toBe(
+      'EMAIL_NOT_VERIFIED',
+    );
+    await database.user.update({
+      data: { emailVerifiedAt: new Date() },
+      where: { email: 'phase2-barber@example.com' },
+    });
+
     const acceptanceResponse = await app.inject({
       headers: { authorization: `Bearer ${barberToken}` },
       method: 'POST',
@@ -860,6 +905,36 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(
       acceptanceResponse.json<{ membership: { id: string } }>().membership.id,
     ).toBe(barberMembershipId);
+    const reusedInvitationResponse = await app.inject({
+      headers: { authorization: `Bearer ${barberToken}` },
+      method: 'POST',
+      payload: { token: invitationToken },
+      url: '/v1/team/invitations/accept',
+    });
+    expect(reusedInvitationResponse.statusCode).toBe(400);
+    expect(reusedInvitationResponse.json<{ code: string }>().code).toBe(
+      'INVALID_INVITATION',
+    );
+
+    const teamAfterAcceptance = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      url: '/v1/team',
+    });
+    expect(
+      teamAfterAcceptance
+        .json<{ members: Array<{ id: string }> }>()
+        .members.some(({ id }) => id === barberMembershipId),
+    ).toBe(true);
+    expect(
+      teamAfterAcceptance.json<{
+        pendingInvitations: Array<{ email: string }>;
+      }>().pendingInvitations,
+    ).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ email: 'phase2-barber@example.com' }),
+      ]),
+    );
 
     const blockResponse = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },

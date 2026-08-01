@@ -2731,11 +2731,11 @@ públicas pertenecen a Wallet y son un flujo diferente.
 
 ### Ejemplo de liquidación
 
-| Concepto | Importe |
-| --- | ---: |
-| Comisiones generadas del período | $180.00 |
+| Concepto                          | Importe |
+| --------------------------------- | ------: |
+| Comisiones generadas del período  | $180.00 |
 | Anticipo entregado el 3 de agosto | -$50.00 |
-| Neto pagado al profesional | $130.00 |
+| Neto pagado al profesional        | $130.00 |
 
 Si la comisión es $40.00 y el anticipo pendiente $50.00, se descuenta $40.00,
 el pago neto es $0.00 y $10.00 queda pendiente para la siguiente liquidación.
@@ -2816,13 +2816,13 @@ registrará desde el formulario genérico `Gasto o retiro`.
 La pantalla de Comisiones tendrá:
 
 1. Resumen con `Comisiones pendientes`, `Anticipos por descontar` y `Neto
-   estimado`.
+estimado`.
 2. Filtros por período y profesional, y lista con generado, anticipos y neto de
    cada integrante.
 3. Detalle del profesional con pestañas `Comisiones`, `Anticipos` y
    `Liquidaciones`.
 4. Para propietario/manager, acciones `Registrar anticipo` y `Crear
-   liquidación`; para el barbero, vista `Mis comisiones` sin acciones de
+liquidación`; para el barbero, vista `Mis comisiones` sin acciones de
    gestión.
 
 El panel `Registrar anticipo` solicitará profesional, monto, método, fecha de
@@ -2832,13 +2832,13 @@ confirmación con el texto `Este valor se descontará de futuras liquidaciones`.
 
 La previsualización de liquidación mostrará:
 
-| Concepto | Contenido |
-| --- | --- |
-| Período | inicio y fin en la zona horaria del negocio |
-| Comisiones | servicios/ventas incluidos y total generado |
-| Reversos/ajustes | compensaciones con referencia al origen |
-| Anticipos | fecha, importe aplicado y saldo restante |
-| Neto a pagar | total final, nunca menor que cero |
+| Concepto         | Contenido                                   |
+| ---------------- | ------------------------------------------- |
+| Período          | inicio y fin en la zona horaria del negocio |
+| Comisiones       | servicios/ventas incluidos y total generado |
+| Reversos/ajustes | compensaciones con referencia al origen     |
+| Anticipos        | fecha, importe aplicado y saldo restante    |
+| Neto a pagar     | total final, nunca menor que cero           |
 
 El detalle de un anticipo mostrará una línea de tiempo: entrega, reserva en
 borrador, descuento aprobado y saldo restante. Cada evento enlazará a Caja o a
@@ -2930,3 +2930,53 @@ Estado del corte:
 
 > **IMPLEMENTADO Y VERIFICADO AUTOMÁTICAMENTE — ACEPTACIÓN VISUAL MANUAL Y
 > PRUEBA ESPECÍFICA DE CONCURRENCIA PENDIENTES.**
+
+## Endurecimiento de invitaciones y visibilidad del equipo — 1 de agosto de 2026
+
+### Regla funcional
+
+Una invitación enviada no convierte a la persona en colaborador visible ni le
+otorga acceso operativo. La activación exige, en este orden:
+
+1. recibir el enlace con token opaco y vigencia limitada;
+2. registrar o completar la cuenta con el mismo correo invitado;
+3. verificar ese correo (`users.email_verified_at`);
+4. abrir el enlace e iniciar sesión;
+5. aceptar la invitación pendiente;
+6. activar la membresía y aplicar rol, sucursal y comisión inicial.
+
+Mientras falte cualquiera de esos pasos, la membresía permanece `INVITED` y no
+forma parte de `Equipo actual`, Agenda, Caja ni selectores operativos. Solo
+propietarios y administradores pueden verla en el bloque administrativo
+`Invitaciones pendientes`, claramente separado de los integrantes activos, para
+consultar su vencimiento o cancelarla.
+
+### Implementación y pruebas
+
+- [x] `GET /v1/team` devuelve en `members` únicamente membresías `ACTIVE`.
+- [x] Las invitaciones pendientes se devuelven por separado con
+      `activationStatus: pending_acceptance`.
+- [x] `POST /v1/team/invitations/accept` exige explícitamente correo verificado,
+      coincidencia entre el correo autenticado y el invitado, token pendiente y
+      fecha de vencimiento vigente.
+- [x] La aceptación reclama el token atómicamente dentro de la misma transacción
+      que activa la membresía; un token usado, revocado o vencido no puede
+      reutilizarse.
+- [x] La UI cuenta solo integrantes activos y explica que los pendientes aún no
+      son colaboradores ni tienen acceso.
+- [x] Prueba de integración: el invitado no aparece antes de aceptar; una cuenta
+      sin verificar recibe `EMAIL_NOT_VERIFIED`; tras verificar y aceptar aparece
+      en el equipo; el segundo uso del token recibe `INVALID_INVITATION`.
+
+### Dependencia externa pendiente
+
+- [ ] Adquirir y configurar el dominio definitivo para enlaces HTTPS de
+      invitación.
+- [ ] Asociar la ruta de aceptación con Universal Links/App Links y mantener una
+      página web de respaldo para equipos sin la aplicación instalada.
+- [ ] Cambiar `MOBILE_INVITATION_URL` en producción al enlace HTTPS del dominio y
+      validar entrega, apertura y redirección en Android, iOS y Web.
+
+Hasta completar esa dependencia, el flujo puede probarse con el esquema local
+`barbersaas://accept-invitation`; la regla de seguridad y activación no depende
+del dominio y ya queda preparada en el servidor.

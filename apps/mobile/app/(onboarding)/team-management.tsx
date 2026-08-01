@@ -257,9 +257,9 @@ export default function TeamManagementScreen() {
             <Text style={styles.sectionTitle}>Añadir colaborador</Text>
           </View>
           <Text style={styles.sectionDescription}>
-            Envía una invitación con el rol y la comisión inicial. Para los
-            profesionales, la comisión se activa solo cuando aceptan la
-            invitación.
+            Envía una invitación con el rol y la comisión inicial. La persona no
+            aparecerá en el equipo ni tendrá acceso hasta verificar su correo y
+            aceptar el enlace.
           </Text>
           {canManageTeam ? (
             <Pressable
@@ -330,11 +330,18 @@ export default function TeamManagementScreen() {
         {(teamQuery.data?.pendingInvitations.length ?? 0) > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Invitaciones pendientes</Text>
+            <Text style={styles.sectionDescription}>
+              Estas personas todavía no son colaboradores activos. Solo se
+              muestran aquí para seguimiento o cancelación de la invitación.
+            </Text>
             {teamQuery.data?.pendingInvitations.map((invitation) => (
               <View key={invitation.id} style={styles.invitationRow}>
                 <Ionicons color="#a67714" name="mail-outline" size={21} />
                 <View style={styles.memberCopy}>
                   <Text style={styles.memberName}>{invitation.email}</Text>
+                  <Text style={styles.memberMeta}>
+                    Pendiente de verificación y aceptación
+                  </Text>
                   <Text style={styles.memberMeta}>
                     {ROLE_LABELS[invitation.role] ?? invitation.role} · vence{' '}
                     {new Date(invitation.expiresAt).toLocaleDateString()}

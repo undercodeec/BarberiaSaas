@@ -217,6 +217,7 @@ export function registerOperationsRoutes(
         },
       })),
       pendingInvitations: pendingInvitations.map((invitation) => ({
+        activationStatus: 'pending_acceptance' as const,
         commissionPercentage: invitation.commissionPercentage,
         email: invitation.email,
         expiresAt: invitation.expiresAt.toISOString(),
@@ -619,11 +620,23 @@ export function registerOperationsRoutes(
 
   app.post('/v1/team/invitations/accept', async (request) => {
     const { user } = await authenticate(database, request);
+    const acceptingUser = await database.user.findUnique({
+      select: { emailVerifiedAt: true },
+      where: { id: user.id },
+    });
+    if (!acceptingUser?.emailVerifiedAt) {
+      throw new ApiError(
+        403,
+        'EMAIL_NOT_VERIFIED',
+        'Verifica tu correo antes de aceptar una invitación.',
+      );
+    }
     const input = acceptTeamInvitationSchema.parse(request.body);
+    const now = new Date();
     const invitation = await database.teamInvitation.findFirst({
       where: {
         email: user.email.toLowerCase(),
-        expiresAt: { gt: new Date() },
+        expiresAt: { gt: now },
         status: InvitationStatus.PENDING,
         tokenHash: hashOpaqueToken(input.token),
       },
@@ -652,6 +665,21 @@ export function registerOperationsRoutes(
       );
     }
     const membership = await database.$transaction(async (transaction) => {
+      const claimedInvitation = await transaction.teamInvitation.updateMany({
+        data: { acceptedAt: now, status: InvitationStatus.ACCEPTED },
+        where: {
+          expiresAt: { gt: now },
+          id: invitation.id,
+          status: InvitationStatus.PENDING,
+        },
+      });
+      if (claimedInvitation.count !== 1) {
+        throw new ApiError(
+          400,
+          'INVALID_INVITATION',
+          'La invitación no es válida, ya fue utilizada o venció.',
+        );
+      }
       const acceptedMembership = await transaction.membership.upsert({
         create: {
           organizationId: invitation.organizationId,
@@ -679,10 +707,6 @@ export function registerOperationsRoutes(
             membershipId: acceptedMembership.id,
           },
         },
-      });
-      await transaction.teamInvitation.update({
-        data: { acceptedAt: new Date(), status: InvitationStatus.ACCEPTED },
-        where: { id: invitation.id },
       });
       if (
         invitation.role === MembershipRole.BARBER &&
