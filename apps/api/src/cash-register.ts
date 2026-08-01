@@ -103,16 +103,30 @@ function totalsFor(
           totals.expenses += movement.amountCents;
         if (movement.type === CashMovementType.WITHDRAWAL)
           totals.withdrawals += movement.amountCents;
-        if (isCash) totals.cash -= movement.amountCents;
+        if (movement.type === CashMovementType.PROFESSIONAL_ADVANCE)
+          totals.professionalAdvances += movement.amountCents;
+        if (movement.type === CashMovementType.COMMISSION_SETTLEMENT)
+          totals.commissionSettlements += movement.amountCents;
+        if (movement.type === CashMovementType.PROFESSIONAL_ADVANCE_REVERSAL)
+          totals.advanceReversals += movement.amountCents;
+        if (isCash) {
+          totals.cash +=
+            movement.type === CashMovementType.PROFESSIONAL_ADVANCE_REVERSAL
+              ? movement.amountCents
+              : -movement.amountCents;
+        }
       }
       return totals;
     },
     {
+      advanceReversals: 0,
       card: 0,
       cash: openingAmountCents,
       cashSales: 0,
+      commissionSettlements: 0,
       expenses: 0,
       other: 0,
+      professionalAdvances: 0,
       sales: 0,
       transfers: 0,
       withdrawals: 0,

@@ -1,5 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { CashRegisterDetailResponse } from '@barber-saas/api-client';
+import type {
+  CashMovementRecord,
+  CashRegisterDetailResponse,
+} from '@barber-saas/api-client';
 import { useQuery } from '@tanstack/react-query';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -8,6 +11,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
+
+function movementLabel(type: CashMovementRecord['type']) {
+  if (type === 'sale') return 'Venta';
+  if (type === 'expense') return 'Gasto';
+  if (type === 'withdrawal') return 'Retiro';
+  if (type === 'professional_advance') return 'Anticipo a colaborador';
+  if (type === 'professional_advance_reversal') return 'Reverso de anticipo';
+  return 'Pago de liquidación';
+}
+
+function movementIsIncome(type: CashMovementRecord['type']) {
+  return type === 'sale' || type === 'professional_advance_reversal';
+}
 
 export default function CashRegisterDetailScreen() {
   const { session } = useAuth();
@@ -155,6 +171,20 @@ export default function CashRegisterDetailScreen() {
               value={formatMoney(totals.withdrawals)}
             />
             <DetailRow
+              label="Anticipos a colaboradores"
+              negative
+              value={formatMoney(totals.professionalAdvances)}
+            />
+            <DetailRow
+              label="Pagos de liquidaciones"
+              negative
+              value={formatMoney(totals.commissionSettlements)}
+            />
+            <DetailRow
+              label="Reversos de anticipos"
+              value={formatMoney(totals.advanceReversals)}
+            />
+            <DetailRow
               label="Cobros con tarjeta"
               value={formatMoney(totals.card)}
             />
@@ -237,11 +267,7 @@ export default function CashRegisterDetailScreen() {
                       {movement.description}
                     </Text>
                     <Text style={styles.movementMeta}>
-                      {movement.type === 'sale'
-                        ? 'Venta'
-                        : movement.type === 'expense'
-                          ? 'Gasto'
-                          : 'Retiro'}
+                      {movementLabel(movement.type)}
                       {' · '}
                       {paymentLabel(movement.paymentMethod)}
                       {movement.appointmentId ? ' · Cita vinculada' : ''}
@@ -251,10 +277,11 @@ export default function CashRegisterDetailScreen() {
                     <Text
                       style={[
                         styles.movementAmount,
-                        movement.type !== 'sale' && styles.negativeValue,
+                        !movementIsIncome(movement.type) &&
+                          styles.negativeValue,
                       ]}
                     >
-                      {movement.type === 'sale' ? '+' : '-'}
+                      {movementIsIncome(movement.type) ? '+' : '-'}
                       {formatMoney(movement.amountCents)}
                     </Text>
                     <Text style={styles.movementMeta}>

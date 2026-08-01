@@ -73,6 +73,9 @@ enum CashMovementType {
   SALE
   EXPENSE
   WITHDRAWAL
+  PROFESSIONAL_ADVANCE
+  PROFESSIONAL_ADVANCE_REVERSAL
+  COMMISSION_SETTLEMENT
 }
 
 enum PaymentMethod {
@@ -99,6 +102,19 @@ enum CommissionSettlementStatus {
   APPROVED
   PAID
   CANCELLED
+}
+
+enum ProfessionalAdvanceStatus {
+  PENDING
+  PARTIALLY_DEDUCTED
+  FULLY_DEDUCTED
+  REVERSED
+}
+
+enum SettlementAdvanceStatus {
+  RESERVED
+  APPLIED
+  RELEASED
 }
 
 enum AppointmentEventType {
@@ -699,15 +715,69 @@ model CommissionSettlement {
   periodEnd                DateTime                   @map("period_end") @db.Date
   grossGeneratedCents      Int                        @map("gross_generated_cents")
   commissionAmountCents    Int                        @map("commission_amount_cents")
+  advanceDeductionCents    Int                        @default(0) @map("advance_deduction_cents")
+  adjustmentCents          Int                        @default(0) @map("adjustment_cents")
   totalPayableCents        Int                        @map("total_payable_cents")
   status                   CommissionSettlementStatus @default(DRAFT)
   notes                    String?                    @db.VarChar(500)
+  createdByUserId          String                     @map("created_by_user_id") @db.Uuid
+  approvedAt               DateTime?                  @map("approved_at") @db.Timestamptz(3)
+  approvedByUserId         String?                    @map("approved_by_user_id") @db.Uuid
+  paidAt                   DateTime?                  @map("paid_at") @db.Timestamptz(3)
+  paidByUserId             String?                    @map("paid_by_user_id") @db.Uuid
+  paymentMethod            PaymentMethod?             @map("payment_method")
+  paymentReference         String?                    @map("payment_reference") @db.VarChar(120)
+  cashMovementId           String?                    @unique @map("cash_movement_id") @db.Uuid
+  cancelledAt              DateTime?                  @map("cancelled_at") @db.Timestamptz(3)
+  cancelledByUserId        String?                    @map("cancelled_by_user_id") @db.Uuid
+  cancellationReason       String?                    @map("cancellation_reason") @db.VarChar(240)
   createdAt                DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([organizationId, professionalMembershipId, periodStart, periodEnd])
   @@index([organizationId, status, periodStart])
   @@map("commission_settlements")
+}
+
+model ProfessionalAdvance {
+  id                       String                    @id @default(uuid()) @db.Uuid
+  organizationId           String                    @map("organization_id") @db.Uuid
+  professionalMembershipId String                    @map("professional_membership_id") @db.Uuid
+  cashMovementId           String?                   @unique @map("cash_movement_id") @db.Uuid
+  reversalCashMovementId   String?                   @unique @map("reversal_cash_movement_id") @db.Uuid
+  originalAmountCents      Int                       @map("original_amount_cents")
+  reservedAmountCents      Int                       @default(0) @map("reserved_amount_cents")
+  deductedAmountCents      Int                       @default(0) @map("deducted_amount_cents")
+  paymentMethod            PaymentMethod             @map("payment_method")
+  reference                String?                   @db.VarChar(120)
+  notes                    String?                   @db.VarChar(500)
+  status                   ProfessionalAdvanceStatus @default(PENDING)
+  occurredAt               DateTime                  @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  createdByUserId          String                    @map("created_by_user_id") @db.Uuid
+  reversedAt               DateTime?                 @map("reversed_at") @db.Timestamptz(3)
+  reversedByUserId         String?                   @map("reversed_by_user_id") @db.Uuid
+  reversalReason           String?                   @map("reversal_reason") @db.VarChar(240)
+  createdAt                DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([organizationId, professionalMembershipId, status, occurredAt])
+  @@map("professional_advances")
+}
+
+model CommissionSettlementAdvance {
+  id           String                  @id @default(uuid()) @db.Uuid
+  settlementId String                  @map("settlement_id") @db.Uuid
+  advanceId    String                  @map("advance_id") @db.Uuid
+  amountCents  Int                     @map("amount_cents")
+  status       SettlementAdvanceStatus @default(RESERVED)
+  appliedAt    DateTime?               @map("applied_at") @db.Timestamptz(3)
+  releasedAt   DateTime?               @map("released_at") @db.Timestamptz(3)
+  createdAt    DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([settlementId, advanceId])
+  @@index([advanceId, status])
+  @@map("commission_settlement_advances")
 }
 
 model CommissionEntry {
@@ -725,6 +795,7 @@ model CommissionEntry {
   status                   CommissionEntryStatus @default(PENDING)
   calculationSnapshot      Json                  @map("calculation_snapshot")
   reversalOfEntryId        String?               @unique @map("reversal_of_entry_id") @db.Uuid
+  occurredAt               DateTime              @default(now()) @map("occurred_at") @db.Timestamptz(3)
   createdAt                DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
 

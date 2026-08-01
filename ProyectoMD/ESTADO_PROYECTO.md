@@ -2,7 +2,7 @@
 
 Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión posterior documentada en `docs/adr/0003-postgresql-prisma-y-api-en-vps.md`. Se marca `[x]` solo cuando la tarea está implementada y cuenta con la verificación indicada; `[ ]` significa pendiente o aún no demostrada.
 
-Última actualización: 2026-07-31
+Última actualización: 2026-08-01
 
 ## Decisión de infraestructura vigente
 
@@ -23,7 +23,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [ ] Fase 4 — Reservas públicas _(implementada, verificada contra PostgreSQL y recorrida manualmente; quedan ajustes menores de UI/UX y configuración externa)_
 - [ ] Fase 5 — Clientes e historial _(directorio, creación, importación, historial vinculado y eliminación lógica implementados; edición, notas y fotografías privadas pendientes)_
 - [ ] Fase 6 — Caja y POS básico _(implementada técnicamente; validación manual en dispositivo físico diferida al cierre integral del MVP)_
-- [ ] Fase 7 — Comisiones _(cálculo automático y ventas manuales comisionables implementados; liquidaciones y reversos pendientes)_
+- [ ] Fase 7 — Comisiones _(cálculo automático, anticipos profesionales y liquidaciones implementados; reversos generales de comisiones pendientes)_
 - [ ] Fase 8 — Inventario básico
 - [ ] Fase 9 — Notificaciones
 - [ ] Fase 10 — Reportes esenciales
@@ -2676,5 +2676,257 @@ Estado de este corte:
 - [x] Suite API/PostgreSQL: 23/23 pruebas aprobadas, incluyendo cobro antes/después de completar e idempotencia.
 - [x] ESLint de los archivos modificados, bundle de API y exportación Expo Web aprobados.
 - [ ] Implementar reversos auditables para anulaciones o devoluciones.
-- [ ] Implementar creación, aprobación y pago de liquidaciones.
-- [ ] Añadir consulta y gestión móvil de comisiones y liquidaciones.
+- [x] Implementar creación, aprobación y pago de liquidaciones.
+- [x] Añadir consulta y gestión móvil de comisiones y liquidaciones.
+
+## Extensión aprobada de Fase 7 — Anticipos a profesionales
+
+### Alcance
+
+Un **anticipo a profesional** es dinero entregado por el negocio a un barbero
+o profesional activo que se recupera exclusivamente de sus futuras
+liquidaciones de comisión. No es una venta, una comisión generada ni una
+edición de una comisión previa. Los anticipos de clientes para reservas
+públicas pertenecen a Wallet y son un flujo diferente.
+
+### Flujo operativo
+
+1. Propietario o administrador registra el anticipo indicando profesional,
+   monto en centavos, fecha/hora de entrega, método de pago, referencia y nota.
+2. Si la entrega es en efectivo y existe Caja abierta, se registra además una
+   salida de Caja vinculada al anticipo. Una transferencia u otro medio no
+   altera el efectivo esperado de Caja.
+3. El anticipo queda con saldo pendiente y no modifica el cálculo ni el estado
+   de las comisiones ya generadas.
+4. Al crear una liquidación, la API toma las comisiones pendientes del período
+   y aplica, por antigüedad, anticipos pendientes del mismo profesional hasta
+   el total de comisión disponible.
+5. Cada descuento se almacena como una asignación inmutable
+   `anticipo → liquidación`, con monto y fecha de aplicación. Un anticipo puede
+   descontarse parcialmente en varias liquidaciones.
+6. Al aprobar la liquidación se fija la fecha de descuento; al pagarla se
+   registra fecha, método y referencia del pago neto al profesional.
+7. Si una liquidación en borrador se cancela, se liberan sus asignaciones y el
+   saldo de los anticipos vuelve a estar disponible. Un anticipo ya entregado
+   no se borra: una corrección crea un reverso con actor, fecha y motivo.
+
+### Reglas y controles obligatorios
+
+- [x] Cada anticipo conserva importe original, saldo pendiente, profesional,
+      método, referencia, notas, entregado por, fecha de entrega y auditoría.
+- [x] Estados: `PENDING`, `PARTIALLY_DEDUCTED`, `FULLY_DEDUCTED` y
+      `REVERSED`.
+- [x] El neto de una liquidación nunca baja de cero. Si el anticipo supera la
+      comisión del período, el saldo restante pasa al siguiente período.
+- [x] Un anticipo no puede descontarse dos veces; la asignación única por
+      liquidación y anticipo, junto con la transacción de base de datos,
+      protege de concurrencia.
+- [x] Solo propietario y administrador pueden registrar, revertir, aprobar o
+      pagar. El profesional ve únicamente sus propios anticipos, descuentos y
+      liquidaciones.
+- [x] Si el profesional deja la organización, los anticipos pendientes se
+      conservan para un cierre administrativo; no se eliminan en cascada.
+- [ ] Las políticas laborales, tributarias o de nómina aplicables se validarán
+      con asesoría local antes de usar esta función como préstamo formal.
+
+### Ejemplo de liquidación
+
+| Concepto | Importe |
+| --- | ---: |
+| Comisiones generadas del período | $180.00 |
+| Anticipo entregado el 3 de agosto | -$50.00 |
+| Neto pagado al profesional | $130.00 |
+
+Si la comisión es $40.00 y el anticipo pendiente $50.00, se descuenta $40.00,
+el pago neto es $0.00 y $10.00 queda pendiente para la siguiente liquidación.
+
+### Entregables de implementación
+
+- [x] Migración: anticipos profesionales, asignaciones a liquidaciones,
+      referencias de aprobación/pago y tipos de salida de Caja.
+- [x] API transaccional para crear/listar/revertir anticipos y crear,
+      aprobar, cancelar y pagar liquidaciones.
+- [x] Integración de las salidas en efectivo con Caja y de los pagos en efectivo
+      de liquidaciones con su detalle y auditoría.
+- [x] Pantalla móvil de comisiones: saldo por profesional, historial de
+      anticipos, detalle de descuentos y acciones autorizadas.
+- [ ] Pruebas PostgreSQL de aislamiento multi-tenant, concurrencia, descuentos
+      parciales, cancelación de borrador, reversos y no duplicación.
+
+### Revisión de lógica previa a implementación — 1 de agosto de 2026
+
+La revisión contra el esquema, API y UI actuales fija las siguientes
+decisiones para evitar ambigüedades contables:
+
+- La fecha que incluye una comisión en un período será `occurredAt`: inicio de
+  la cita para servicios y fecha del movimiento para ventas manuales. No se
+  usará `commission_entries.created_at`, porque una cita puede cobrarse días
+  después de prestarse.
+- Crear una liquidación `DRAFT` reserva sus comisiones y anticipos, pero todavía
+  no considera descontado el anticipo. La asignación recibe `appliedAt` y reduce
+  formalmente el saldo cuando la liquidación pasa a `APPROVED`.
+- La UI mostrará por separado saldo pendiente, saldo reservado en borradores y
+  saldo efectivamente descontado. Cancelar un borrador libera sus reservas.
+- La liquidación será por organización, profesional y período, incluyendo
+  todas sus sucursales, con desglose por sucursal. La Caja usada para entregar
+  o pagar efectivo sí conserva su sucursal de origen.
+- Solo se admitirán `CASH`, `TRANSFER` y `OTHER` para entregar anticipos o pagar
+  liquidaciones. `CARD` permanece como método de cobro a clientes y no se
+  presentará para pagos al profesional.
+- Un pago neto de cero por descuento total se cierra con fecha y auditoría, sin
+  crear un movimiento de Caja por valor cero.
+- No se permiten períodos que reutilicen una comisión ya reservada o liquidada.
+  La selección y asignación se ejecutan en una transacción y se comprueba el
+  número de filas actualizado para resolver solicitudes concurrentes.
+- Un anticipo se puede revertir directamente solo mientras no tenga descuentos
+  aprobados. Si ya fue descontado parcial o totalmente, la corrección se hace
+  con un ajuste compensatorio a favor del profesional dentro de una siguiente
+  liquidación; nunca se altera el historial aprobado.
+- El profesional debe estar activo al entregar el anticipo. Si después queda
+  suspendido o sale del equipo, conserva historial y saldo para cierre
+  administrativo.
+- Se usará el término visible `Anticipo de comisión`; `préstamo` se reservará
+  para una futura función contractual que tenga cuotas, vencimiento o interés.
+
+### Permisos financieros requeridos
+
+El paquete actual de permisos no incluye Caja, comisiones, anticipos ni
+liquidaciones. Antes de exponer las rutas se agregarán y probarán capacidades
+financieras explícitas:
+
+- `commission.read.own`: profesional consulta únicamente sus datos.
+- `commission.read.all`: propietario y manager consultan el equipo.
+- `commission.manage`: propietario y manager crean/revierten anticipos y crean
+  liquidaciones.
+- `commission.approve`: propietario aprueba liquidaciones; puede delegarse al
+  manager posteriormente mediante permisos personalizados.
+- `commission.pay`: propietario registra el pago; puede delegarse después.
+- `cash.manage`: controla las salidas en efectivo asociadas.
+
+Recepción y barbero no pueden registrar anticipos, aprobar ni pagar. Además de
+ocultar acciones en móvil, cada endpoint vuelve a validar rol, organización y
+alcance en el servidor.
+
+### Flujo y estructura de UI aprobados
+
+`Nava Wallet` conservará Caja e historial financiero. En Resumen se añadirá una
+tarjeta `Comisiones del equipo`, que abre `/commissions`; el anticipo no se
+registrará desde el formulario genérico `Gasto o retiro`.
+
+La pantalla de Comisiones tendrá:
+
+1. Resumen con `Comisiones pendientes`, `Anticipos por descontar` y `Neto
+   estimado`.
+2. Filtros por período y profesional, y lista con generado, anticipos y neto de
+   cada integrante.
+3. Detalle del profesional con pestañas `Comisiones`, `Anticipos` y
+   `Liquidaciones`.
+4. Para propietario/manager, acciones `Registrar anticipo` y `Crear
+   liquidación`; para el barbero, vista `Mis comisiones` sin acciones de
+   gestión.
+
+El panel `Registrar anticipo` solicitará profesional, monto, método, fecha de
+entrega, referencia y nota. Al elegir efectivo mostrará la Caja abierta y
+bloqueará la confirmación si no existe una. Antes de guardar presentará una
+confirmación con el texto `Este valor se descontará de futuras liquidaciones`.
+
+La previsualización de liquidación mostrará:
+
+| Concepto | Contenido |
+| --- | --- |
+| Período | inicio y fin en la zona horaria del negocio |
+| Comisiones | servicios/ventas incluidos y total generado |
+| Reversos/ajustes | compensaciones con referencia al origen |
+| Anticipos | fecha, importe aplicado y saldo restante |
+| Neto a pagar | total final, nunca menor que cero |
+
+El detalle de un anticipo mostrará una línea de tiempo: entrega, reserva en
+borrador, descuento aprobado y saldo restante. Cada evento enlazará a Caja o a
+la liquidación relacionada. En Detalle de Caja se separarán `Anticipos a
+colaboradores` y `Pagos de liquidaciones`; ambos reducirán efectivo esperado
+solo cuando su método sea efectivo.
+
+### Matriz de pruebas obligatoria
+
+#### Cálculos unitarios
+
+- [ ] Comisión $180, anticipo $50: neto $130 y saldo $0.
+- [ ] Comisión $40, anticipo $50: neto $0 y saldo siguiente $10.
+- [ ] Varios anticipos se aplican de más antiguo a más reciente.
+- [ ] Un anticipo se distribuye parcialmente entre varias liquidaciones.
+- [ ] Reversos y ajustes se incluyen una sola vez y el neto nunca es negativo.
+- [ ] Redondeo en centavos para reglas porcentuales y fijas.
+
+#### API y PostgreSQL
+
+- [ ] Crear anticipo en efectivo exige Caja abierta y crea una única salida
+      vinculada; transferencia no altera efectivo esperado.
+- [ ] Un barbero no puede crear/revertir anticipos ni aprobar/pagar.
+- [ ] Un barbero solo consulta sus propios registros; no puede cambiar el ID
+      para leer los de otro profesional u organización.
+- [ ] Dos solicitudes concurrentes no asignan la misma comisión ni el mismo
+      saldo de anticipo dos veces.
+- [ ] Cancelar `DRAFT` libera reservas; cancelar `APPROVED` se rechaza.
+- [ ] Aprobar fija snapshots y fechas; pagar es idempotente.
+- [ ] Una liquidación de neto cero se cierra sin movimiento monetario.
+- [ ] Revertir anticipo sin descuentos crea trazabilidad; con descuento
+      aprobado exige ajuste compensatorio.
+- [ ] Suspender o retirar al profesional conserva historial y saldo.
+- [ ] Aislamiento multi-tenant y auditoría con actor, antes/después y motivo.
+
+#### Componentes móviles automatizados
+
+- [ ] Resumen, estados vacíos, carga, error recuperable y permisos por rol.
+- [ ] Validación de monto, método, referencia y Caja abierta.
+- [ ] Previsualización correcta del bruto, anticipos y neto.
+- [ ] Confirmaciones de anticipo, aprobación, pago, cancelación y reverso.
+- [ ] Etiquetas accesibles y foco/teclado en paneles inferiores.
+
+#### Aceptación manual Android, iOS y Web
+
+- [ ] Navegar Wallet → Comisiones → profesional → anticipo/liquidación y volver
+      sin perder filtros.
+- [ ] Probar alturas pequeñas/grandes, teclado, área segura, scroll y cierre de
+      panel tocando fuera, botón y gesto.
+- [ ] Verificar importes, fechas y zona horaria en lista, detalle y Caja.
+- [ ] Confirmar que el barbero ve sus datos pero nunca acciones administrativas.
+- [ ] Confirmar persistencia tras recargar, cerrar sesión y volver a entrar.
+- [ ] Simular error de red y doble toque; no debe duplicar anticipos ni pagos.
+
+### Implementación completada — 1 de agosto de 2026
+
+- [x] Migración `20260801110000_professional_advances_and_settlements` creada y
+      aplicada en PostgreSQL de desarrollo (`5434`) y pruebas (`5433`).
+- [x] `commission_entries.occurred_at` conserva la fecha económica de la cita o
+      venta para seleccionar correctamente el período.
+- [x] Libro de anticipos con importe original, reservado, descontado,
+      disponible, método, referencia, notas, actor, fechas y reverso.
+- [x] Asignaciones de anticipos a liquidaciones con estados `RESERVED`,
+      `APPLIED` y `RELEASED`.
+- [x] API de resumen, creación y reverso de anticipos; creación, aprobación,
+      cancelación y pago idempotente por estado de liquidaciones.
+- [x] Propietario aprueba y paga; propietario/manager consultan y gestionan;
+      barbero consulta únicamente sus datos. Todos los endpoints validan la
+      organización derivada de la sesión.
+- [x] Caja registra salidas por anticipos y pagos de liquidación, además de
+      entradas compensatorias por reversos en efectivo.
+- [x] Wallet incluye la pestaña `Comisiones`, filtro por profesional, neto
+      estimado, anticipos, liquidaciones, creación, aprobación, cancelación y
+      pago. Detalle de Caja distingue cada tipo de movimiento.
+- [x] Suite API/PostgreSQL: 25/25 pruebas aprobadas; incluye autorización,
+      descuento total con saldo remanente, neto cero, aprobación/pago,
+      cancelación de borrador, liberación de reservas, reverso y auditoría.
+- [x] Typecheck de API, móvil y cliente compartido; ESLint de archivos
+      modificados; Prisma validate; bundle de API; Jest móvil 5/5 y exportación
+      Expo Web aprobados.
+- [ ] Revisión visual manual en Android, iOS y Web. El navegador integrado del
+      entorno no pudo inicializarse durante este corte, por lo que la validación
+      visual no se marca como realizada.
+- [ ] Añadir pruebas específicas de concurrencia simultánea sobre dos creaciones
+      o aprobaciones de la misma liquidación, además de la protección
+      transaccional ya implementada.
+
+Estado del corte:
+
+> **IMPLEMENTADO Y VERIFICADO AUTOMÁTICAMENTE — ACEPTACIÓN VISUAL MANUAL Y
+> PRUEBA ESPECÍFICA DE CONCURRENCIA PENDIENTES.**

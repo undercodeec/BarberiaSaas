@@ -96,6 +96,8 @@ describeWithDatabase('API con PostgreSQL', () => {
     });
     invitationMessages.length = 0;
     await database.onboardingCollaborator.deleteMany();
+    await database.commissionSettlementAdvance.deleteMany();
+    await database.professionalAdvance.deleteMany();
     await database.commissionEntry.deleteMany();
     await database.commissionSettlement.deleteMany();
     await database.commissionRule.deleteMany();
@@ -1326,6 +1328,260 @@ describeWithDatabase('API con PostgreSQL', () => {
       serviceId: agenda.serviceId,
       source: 'manual_sale',
     });
+  });
+
+  it('reserva, aprueba y paga anticipos dentro de una liquidación auditable', async () => {
+    const agenda = await setupAgenda('anticipos-liquidaciones');
+    await database.commissionRule.create({
+      data: {
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        organizationId: agenda.organizationId,
+        professionalMembershipId: agenda.membershipId,
+        type: 'SERVICE_PERCENTAGE',
+        value: 25,
+      },
+    });
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${agenda.ownerToken}` },
+          method: 'POST',
+          payload: { openingAmountCents: 10_000 },
+          url: '/v1/cash-register/open',
+        })
+      ).statusCode,
+    ).toBe(201);
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${agenda.ownerToken}` },
+          method: 'POST',
+          payload: {
+            amountCents: 10_000,
+            description: 'Venta para liquidación',
+            paymentMethod: 'cash',
+            professionalMembershipId: agenda.membershipId,
+            serviceId: agenda.serviceId,
+            type: 'sale',
+          },
+          url: '/v1/cash-register/movements',
+        })
+      ).statusCode,
+    ).toBe(201);
+
+    const forbiddenAdvance = await app.inject({
+      headers: { authorization: `Bearer ${agenda.barberToken}` },
+      method: 'POST',
+      payload: {
+        amountCents: 3_000,
+        paymentMethod: 'cash',
+        professionalMembershipId: agenda.membershipId,
+      },
+      url: '/v1/commissions/advances',
+    });
+    expect(forbiddenAdvance.statusCode).toBe(403);
+
+    const advanceResponse = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        amountCents: 3_000,
+        notes: 'Anticipo solicitado',
+        paymentMethod: 'cash',
+        professionalMembershipId: agenda.membershipId,
+        reference: 'ANT-001',
+      },
+      url: '/v1/commissions/advances',
+    });
+    expect(advanceResponse.statusCode, advanceResponse.body).toBe(201);
+    const advanceId = advanceResponse.json<{
+      advance: { id: string };
+    }>().advance.id;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const settlementResponse = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        periodEnd: today,
+        periodStart: today,
+        professionalMembershipId: agenda.membershipId,
+      },
+      url: '/v1/commissions/settlements',
+    });
+    expect(settlementResponse.statusCode).toBe(201);
+    const settlement = settlementResponse.json<{
+      settlement: {
+        advanceDeductionCents: number;
+        id: string;
+        status: string;
+        totalPayableCents: number;
+      };
+    }>().settlement;
+    expect(settlement).toMatchObject({
+      advanceDeductionCents: 2_500,
+      status: 'draft',
+      totalPayableCents: 0,
+    });
+    expect(
+      await database.professionalAdvance.findUnique({
+        where: { id: advanceId },
+      }),
+    ).toMatchObject({
+      deductedAmountCents: 0,
+      reservedAmountCents: 2_500,
+      status: 'PENDING',
+    });
+
+    const approved = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {},
+      url: `/v1/commissions/settlements/${settlement.id}/approve`,
+    });
+    expect(approved.statusCode).toBe(200);
+    expect(
+      await database.professionalAdvance.findUnique({
+        where: { id: advanceId },
+      }),
+    ).toMatchObject({
+      deductedAmountCents: 2_500,
+      reservedAmountCents: 0,
+      status: 'PARTIALLY_DEDUCTED',
+    });
+
+    const paid = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {},
+      url: `/v1/commissions/settlements/${settlement.id}/pay`,
+    });
+    expect(paid.statusCode).toBe(200);
+    expect(
+      paid.json<{ settlement: { status: string } }>().settlement.status,
+    ).toBe('paid');
+    expect(
+      await database.cashMovement.count({
+        where: { type: 'COMMISSION_SETTLEMENT' },
+      }),
+    ).toBe(0);
+    expect(
+      await database.auditLog.count({
+        where: {
+          entityId: settlement.id,
+          entityType: 'commission_settlement',
+        },
+      }),
+    ).toBe(3);
+  });
+
+  it('libera reservas al cancelar borradores y permite revertir anticipos sin descuentos', async () => {
+    const agenda = await setupAgenda('cancelacion-anticipos');
+    await database.commissionRule.create({
+      data: {
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        organizationId: agenda.organizationId,
+        professionalMembershipId: agenda.membershipId,
+        type: 'SERVICE_PERCENTAGE',
+        value: 25,
+      },
+    });
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${agenda.ownerToken}` },
+          method: 'POST',
+          payload: { openingAmountCents: 0 },
+          url: '/v1/cash-register/open',
+        })
+      ).statusCode,
+    ).toBe(201);
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${agenda.ownerToken}` },
+          method: 'POST',
+          payload: {
+            amountCents: 8_000,
+            description: 'Venta para cancelar liquidación',
+            paymentMethod: 'transfer',
+            professionalMembershipId: agenda.membershipId,
+            serviceId: agenda.serviceId,
+            type: 'sale',
+          },
+          url: '/v1/cash-register/movements',
+        })
+      ).statusCode,
+    ).toBe(201);
+    const advanceResponse = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        amountCents: 1_500,
+        paymentMethod: 'transfer',
+        professionalMembershipId: agenda.membershipId,
+        reference: 'TRX-TEST',
+      },
+      url: '/v1/commissions/advances',
+    });
+    expect(advanceResponse.statusCode, advanceResponse.body).toBe(201);
+    const advanceId = advanceResponse.json<{
+      advance: { id: string };
+    }>().advance.id;
+    const today = new Date().toISOString().slice(0, 10);
+    const settlementResponse = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        periodEnd: today,
+        periodStart: today,
+        professionalMembershipId: agenda.membershipId,
+      },
+      url: '/v1/commissions/settlements',
+    });
+    expect(settlementResponse.statusCode).toBe(201);
+    const settlementId = settlementResponse.json<{
+      settlement: { id: string };
+    }>().settlement.id;
+    expect(
+      await database.professionalAdvance.findUnique({
+        where: { id: advanceId },
+      }),
+    ).toMatchObject({ reservedAmountCents: 1_500 });
+
+    const cancelled = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: { reason: 'Período incorrecto' },
+      url: `/v1/commissions/settlements/${settlementId}/cancel`,
+    });
+    expect(cancelled.statusCode).toBe(200);
+    expect(
+      await database.professionalAdvance.findUnique({
+        where: { id: advanceId },
+      }),
+    ).toMatchObject({ deductedAmountCents: 0, reservedAmountCents: 0 });
+    expect(
+      await database.commissionSettlementAdvance.findFirst({
+        where: { advanceId, settlementId },
+      }),
+    ).toMatchObject({ status: 'RELEASED' });
+    expect(
+      await database.commissionEntry.findFirst({
+        where: { organizationId: agenda.organizationId },
+      }),
+    ).toMatchObject({ settlementId: null, status: 'PENDING' });
+
+    const reversed = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: { reason: 'Transferencia no realizada' },
+      url: `/v1/commissions/advances/${advanceId}/reverse`,
+    });
+    expect(reversed.statusCode).toBe(200);
+    expect(
+      reversed.json<{ advance: { status: string } }>().advance.status,
+    ).toBe('reversed');
   });
 
   it('audita caja, conserva el efectivo esperado y expone cierres en historial', async () => {

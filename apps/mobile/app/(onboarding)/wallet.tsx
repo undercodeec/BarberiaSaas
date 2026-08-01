@@ -2,11 +2,22 @@
 import type {
   CashRegisterHistoryResponse,
   CashRegisterSummaryResponse,
+  CommissionOverviewResponse,
+  CurrentOrganizationResponse,
 } from '@barber-saas/api-client';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requireApiClient } from '../../src/lib/api';
@@ -15,7 +26,25 @@ import { useAuth } from '../../src/providers/AuthProvider';
 export default function WalletScreen() {
   const router = useRouter();
   const { session } = useAuth();
-  const [tab, setTab] = useState<'summary' | 'history' | 'settings'>('summary');
+  const queryClient = useQueryClient();
+  const [tab, setTab] = useState<
+    'commissions' | 'history' | 'settings' | 'summary'
+  >('summary');
+  const [selectedProfessionalId, setSelectedProfessionalId] = useState<
+    string | null
+  >(null);
+  const [sheetMode, setSheetMode] = useState<'advance' | 'settlement' | null>(
+    null,
+  );
+  const [amount, setAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<
+    'cash' | 'other' | 'transfer'
+  >('cash');
+  const [reference, setReference] = useState('');
+  const [notes, setNotes] = useState('');
+  const today = new Date().toISOString().slice(0, 10);
+  const [periodStart, setPeriodStart] = useState(`${today.slice(0, 8)}01`);
+  const [periodEnd, setPeriodEnd] = useState(today);
   const summaryQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -31,6 +60,122 @@ export default function WalletScreen() {
         '/v1/cash-register/history',
       ),
     queryKey: ['cash-register-history'],
+  });
+  const organizationQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<CurrentOrganizationResponse>(
+        '/v1/organizations/current',
+      ),
+    queryKey: ['current-organization'],
+  });
+  const commissionsQuery = useQuery({
+    enabled: Boolean(session) && tab === 'commissions',
+    queryFn: () =>
+      requireApiClient().request<CommissionOverviewResponse>(
+        '/v1/commissions/overview',
+      ),
+    queryKey: ['commission-overview'],
+  });
+  const role = organizationQuery.data?.membership?.role;
+  const canManageCommissions = role === 'owner' || role === 'manager';
+  const canApproveCommissions = role === 'owner';
+  const selectedProfessional = commissionsQuery.data?.professionals.find(
+    (professional) => professional.id === selectedProfessionalId,
+  );
+  const effectiveProfessional =
+    selectedProfessional ?? commissionsQuery.data?.professionals[0];
+  const selectedAdvances = (commissionsQuery.data?.advances ?? []).filter(
+    (advance) => advance.professionalMembershipId === effectiveProfessional?.id,
+  );
+  const selectedSettlements = (commissionsQuery.data?.settlements ?? []).filter(
+    (settlement) =>
+      settlement.professionalMembershipId === effectiveProfessional?.id,
+  );
+  const refreshCommissions = () =>
+    queryClient.invalidateQueries({ queryKey: ['commission-overview'] });
+  const createAdvance = useMutation({
+    mutationFn: async () => {
+      if (!effectiveProfessional) throw new Error('Selecciona un profesional.');
+      const parsedAmount = Math.round(Number(amount.replace(',', '.')) * 100);
+      if (!Number.isFinite(parsedAmount) || parsedAmount <= 0)
+        throw new Error('Ingresa un monto válido.');
+      return requireApiClient().request('/v1/commissions/advances', {
+        body: {
+          amountCents: parsedAmount,
+          notes: notes.trim() || undefined,
+          paymentMethod,
+          professionalMembershipId: effectiveProfessional.id,
+          reference: reference.trim() || undefined,
+        },
+        method: 'POST',
+      });
+    },
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos registrar el anticipo',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      await Promise.all([
+        refreshCommissions(),
+        queryClient.invalidateQueries({ queryKey: ['cash-register-summary'] }),
+      ]);
+      setSheetMode(null);
+      setAmount('');
+      setReference('');
+      setNotes('');
+    },
+  });
+  const createSettlement = useMutation({
+    mutationFn: async () => {
+      if (!effectiveProfessional) throw new Error('Selecciona un profesional.');
+      return requireApiClient().request('/v1/commissions/settlements', {
+        body: {
+          notes: notes.trim() || undefined,
+          periodEnd,
+          periodStart,
+          professionalMembershipId: effectiveProfessional.id,
+        },
+        method: 'POST',
+      });
+    },
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos crear la liquidación',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      await refreshCommissions();
+      setSheetMode(null);
+      setNotes('');
+    },
+  });
+  const settlementAction = useMutation({
+    mutationFn: (input: { action: 'approve' | 'cancel' | 'pay'; id: string }) =>
+      requireApiClient().request(
+        `/v1/commissions/settlements/${input.id}/${input.action}`,
+        {
+          body:
+            input.action === 'cancel'
+              ? { reason: 'Cancelada desde Nava Wallet' }
+              : input.action === 'pay'
+                ? { paymentMethod: 'cash' }
+                : {},
+          method: 'POST',
+        },
+      ),
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos completar la acción',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      await Promise.all([
+        refreshCommissions(),
+        queryClient.invalidateQueries({ queryKey: ['cash-register-summary'] }),
+      ]);
+    },
   });
   const totals = summaryQuery.data?.totals;
   const formatMoney = (amountCents: number) =>
@@ -69,6 +214,7 @@ export default function WalletScreen() {
             [
               ['summary', 'Resumen'],
               ['history', 'Historial'],
+              ['commissions', 'Comisiones'],
               ['settings', 'Configuración'],
             ] as const
           ).map(([value, label]) => (
@@ -154,6 +300,204 @@ export default function WalletScreen() {
             ) : null}
           </View>
         ) : null}
+        {tab === 'commissions' ? (
+          <View style={styles.commissionSection}>
+            {commissionsQuery.isLoading ? (
+              <Text style={styles.cardDescription}>Cargando comisiones...</Text>
+            ) : null}
+            {commissionsQuery.isError ? (
+              <Pressable
+                onPress={() => commissionsQuery.refetch()}
+                style={styles.card}
+              >
+                <Text style={styles.cardDescription}>
+                  No pudimos cargar las comisiones. Toca para reintentar.
+                </Text>
+              </Pressable>
+            ) : null}
+            <ScrollView
+              contentContainerStyle={styles.professionalFilters}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+            >
+              {(commissionsQuery.data?.professionals ?? []).map(
+                (professional) => (
+                  <Pressable
+                    accessibilityRole="button"
+                    key={professional.id}
+                    onPress={() => setSelectedProfessionalId(professional.id)}
+                    style={[
+                      styles.professionalChip,
+                      effectiveProfessional?.id === professional.id &&
+                        styles.professionalChipActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.professionalChipText,
+                        effectiveProfessional?.id === professional.id &&
+                          styles.professionalChipTextActive,
+                      ]}
+                    >
+                      {professional.name}
+                    </Text>
+                  </Pressable>
+                ),
+              )}
+            </ScrollView>
+            {effectiveProfessional ? (
+              <>
+                <View style={styles.commissionBalance}>
+                  <Text style={styles.balanceLabel}>Neto estimado</Text>
+                  <Text style={styles.balanceValue}>
+                    {formatMoney(
+                      Math.max(
+                        0,
+                        effectiveProfessional.commissionPendingCents -
+                          effectiveProfessional.availableAdvanceCents,
+                      ),
+                    )}
+                  </Text>
+                  <View style={styles.commissionMetrics}>
+                    <Text style={styles.commissionMetric}>
+                      Comisiones{' '}
+                      {formatMoney(
+                        effectiveProfessional.commissionPendingCents,
+                      )}
+                    </Text>
+                    <Text style={styles.commissionMetric}>
+                      Anticipos -
+                      {formatMoney(
+                        effectiveProfessional.outstandingAdvanceCents,
+                      )}
+                    </Text>
+                  </View>
+                </View>
+                {canManageCommissions ? (
+                  <View style={styles.actionRow}>
+                    <Pressable
+                      accessibilityLabel="Registrar anticipo de comisión"
+                      onPress={() => setSheetMode('advance')}
+                      style={styles.secondaryAction}
+                    >
+                      <Text style={styles.secondaryActionText}>
+                        Registrar anticipo
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityLabel="Crear liquidación de comisión"
+                      onPress={() => setSheetMode('settlement')}
+                      style={styles.primaryAction}
+                    >
+                      <Text style={styles.primaryActionText}>
+                        Crear liquidación
+                      </Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+                <Text style={styles.sectionTitle}>Anticipos</Text>
+                {selectedAdvances.map((advance) => (
+                  <View key={advance.id} style={styles.financialRow}>
+                    <View style={styles.copy}>
+                      <Text style={styles.cardTitle}>
+                        {formatMoney(advance.originalAmountCents)} ·{' '}
+                        {advance.paymentMethod === 'cash'
+                          ? 'Efectivo'
+                          : advance.paymentMethod === 'transfer'
+                            ? 'Transferencia'
+                            : 'Otro'}
+                      </Text>
+                      <Text style={styles.cardDescription}>
+                        {new Date(advance.occurredAt).toLocaleDateString()} ·
+                        Pendiente {formatMoney(advance.outstandingAmountCents)}
+                      </Text>
+                    </View>
+                    <Text style={styles.statusText}>
+                      {advance.status.replaceAll('_', ' ')}
+                    </Text>
+                  </View>
+                ))}
+                {!selectedAdvances.length ? (
+                  <Text style={styles.cardDescription}>
+                    No hay anticipos para este profesional.
+                  </Text>
+                ) : null}
+                <Text style={styles.sectionTitle}>Liquidaciones</Text>
+                {selectedSettlements.map((settlement) => (
+                  <View key={settlement.id} style={styles.settlementCard}>
+                    <View style={styles.financialRowHeader}>
+                      <View style={styles.copy}>
+                        <Text style={styles.cardTitle}>
+                          {settlement.periodStart} → {settlement.periodEnd}
+                        </Text>
+                        <Text style={styles.cardDescription}>
+                          Comisión{' '}
+                          {formatMoney(settlement.commissionAmountCents)}
+                          {' · '}Anticipos -
+                          {formatMoney(settlement.advanceDeductionCents)}
+                        </Text>
+                      </View>
+                      <Text style={styles.settlementAmount}>
+                        {formatMoney(settlement.totalPayableCents)}
+                      </Text>
+                    </View>
+                    <Text style={styles.statusText}>
+                      Estado: {settlement.status}
+                    </Text>
+                    {canManageCommissions && settlement.status === 'draft' ? (
+                      <View style={styles.rowButtons}>
+                        <Pressable
+                          onPress={() =>
+                            settlementAction.mutate({
+                              action: 'cancel',
+                              id: settlement.id,
+                            })
+                          }
+                        >
+                          <Text style={styles.dangerText}>Cancelar</Text>
+                        </Pressable>
+                        {canApproveCommissions ? (
+                          <Pressable
+                            onPress={() =>
+                              settlementAction.mutate({
+                                action: 'approve',
+                                id: settlement.id,
+                              })
+                            }
+                          >
+                            <Text style={styles.linkText}>Aprobar</Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
+                    ) : null}
+                    {canApproveCommissions &&
+                    settlement.status === 'approved' ? (
+                      <Pressable
+                        onPress={() =>
+                          settlementAction.mutate({
+                            action: 'pay',
+                            id: settlement.id,
+                          })
+                        }
+                      >
+                        <Text style={styles.linkText}>Pagar en efectivo</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ))}
+                {!selectedSettlements.length ? (
+                  <Text style={styles.cardDescription}>
+                    Aún no existen liquidaciones.
+                  </Text>
+                ) : null}
+              </>
+            ) : !commissionsQuery.isLoading ? (
+              <Text style={styles.cardDescription}>
+                No hay profesionales activos con comisiones.
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
         {tab === 'settings' ? (
           <View style={styles.card}>
             <View style={styles.icon}>
@@ -172,10 +516,135 @@ export default function WalletScreen() {
           </View>
         ) : null}
       </ScrollView>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setSheetMode(null)}
+        transparent
+        visible={sheetMode !== null}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable
+            accessibilityLabel="Cerrar formulario"
+            onPress={() => setSheetMode(null)}
+            style={styles.modalBackdrop}
+          />
+          <View style={styles.sheet}>
+            <Text style={styles.sheetTitle}>
+              {sheetMode === 'advance'
+                ? 'Registrar anticipo'
+                : 'Crear liquidación'}
+            </Text>
+            <Text style={styles.sheetCopy}>
+              {effectiveProfessional?.name ?? 'Selecciona un profesional'}
+            </Text>
+            {sheetMode === 'advance' ? (
+              <>
+                <Text style={styles.inputLabel}>Monto</Text>
+                <TextInput
+                  accessibilityLabel="Monto del anticipo"
+                  keyboardType="decimal-pad"
+                  onChangeText={setAmount}
+                  placeholder="0.00"
+                  style={styles.input}
+                  value={amount}
+                />
+                <Text style={styles.inputLabel}>Método de entrega</Text>
+                <View style={styles.methodRow}>
+                  {(
+                    [
+                      ['cash', 'Efectivo'],
+                      ['transfer', 'Transferencia'],
+                      ['other', 'Otro'],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <Pressable
+                      key={value}
+                      onPress={() => setPaymentMethod(value)}
+                      style={[
+                        styles.method,
+                        paymentMethod === value && styles.methodActive,
+                      ]}
+                    >
+                      <Text
+                        style={
+                          paymentMethod === value
+                            ? styles.methodTextActive
+                            : styles.methodText
+                        }
+                      >
+                        {label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Text style={styles.inputLabel}>Referencia opcional</Text>
+                <TextInput
+                  accessibilityLabel="Referencia del anticipo"
+                  onChangeText={setReference}
+                  style={styles.input}
+                  value={reference}
+                />
+              </>
+            ) : (
+              <View style={styles.dateRow}>
+                <View style={styles.dateField}>
+                  <Text style={styles.inputLabel}>Desde</Text>
+                  <TextInput
+                    accessibilityLabel="Inicio del período"
+                    onChangeText={setPeriodStart}
+                    placeholder="AAAA-MM-DD"
+                    style={styles.input}
+                    value={periodStart}
+                  />
+                </View>
+                <View style={styles.dateField}>
+                  <Text style={styles.inputLabel}>Hasta</Text>
+                  <TextInput
+                    accessibilityLabel="Fin del período"
+                    onChangeText={setPeriodEnd}
+                    placeholder="AAAA-MM-DD"
+                    style={styles.input}
+                    value={periodEnd}
+                  />
+                </View>
+              </View>
+            )}
+            <Text style={styles.inputLabel}>Nota opcional</Text>
+            <TextInput
+              accessibilityLabel="Nota"
+              multiline
+              onChangeText={setNotes}
+              style={[styles.input, styles.notesInput]}
+              value={notes}
+            />
+            {sheetMode === 'advance' ? (
+              <Text style={styles.warningCopy}>
+                Este valor se descontará de futuras liquidaciones.
+              </Text>
+            ) : null}
+            <Pressable
+              disabled={createAdvance.isPending || createSettlement.isPending}
+              onPress={() =>
+                sheetMode === 'advance'
+                  ? createAdvance.mutate()
+                  : createSettlement.mutate()
+              }
+              style={styles.confirmButton}
+            >
+              <Text style={styles.confirmButtonText}>
+                {createAdvance.isPending || createSettlement.isPending
+                  ? 'Guardando...'
+                  : 'Confirmar'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 const styles = StyleSheet.create({
+  actionRow: { flexDirection: 'row', gap: 10 },
   screen: { backgroundColor: '#fff', flex: 1 },
   header: { alignItems: 'center', flexDirection: 'row', gap: 12, padding: 20 },
   back: {
@@ -216,6 +685,113 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 10,
   },
+  commissionBalance: {
+    backgroundColor: '#17191d',
+    borderRadius: 20,
+    padding: 18,
+  },
+  commissionMetric: { color: '#d9dcdf', fontSize: 12, fontWeight: '700' },
+  commissionMetrics: { flexDirection: 'row', gap: 16, marginTop: 10 },
+  commissionSection: { gap: 12 },
+  confirmButton: {
+    alignItems: 'center',
+    backgroundColor: '#111827',
+    borderRadius: 14,
+    marginTop: 8,
+    padding: 15,
+  },
+  confirmButtonText: { color: '#fff', fontSize: 15, fontWeight: '900' },
+  dangerText: { color: '#B54747', fontSize: 13, fontWeight: '900' },
+  dateField: { flex: 1 },
+  dateRow: { flexDirection: 'row', gap: 10 },
+  financialRow: {
+    alignItems: 'center',
+    backgroundColor: '#f7f7f6',
+    borderRadius: 14,
+    flexDirection: 'row',
+    padding: 14,
+  },
+  financialRowHeader: { alignItems: 'center', flexDirection: 'row' },
+  input: {
+    borderColor: '#d9dde2',
+    borderRadius: 12,
+    borderWidth: 1,
+    color: '#111827',
+    padding: 12,
+  },
+  inputLabel: {
+    color: '#374151',
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 8,
+  },
+  linkText: { color: '#2464E8', fontSize: 13, fontWeight: '900' },
+  method: {
+    borderColor: '#d9dde2',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+  },
+  methodActive: { backgroundColor: '#111827', borderColor: '#111827' },
+  methodRow: { flexDirection: 'row', gap: 8 },
+  methodText: { color: '#59606a', fontSize: 12, fontWeight: '800' },
+  methodTextActive: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  modalBackdrop: { flex: 1 },
+  modalRoot: { backgroundColor: 'rgba(0,0,0,0.35)', flex: 1 },
+  notesInput: { minHeight: 70, textAlignVertical: 'top' },
+  primaryAction: {
+    alignItems: 'center',
+    backgroundColor: '#111827',
+    borderRadius: 14,
+    flex: 1,
+    padding: 13,
+  },
+  primaryActionText: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  professionalChip: {
+    backgroundColor: '#eef0f2',
+    borderRadius: 16,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+  },
+  professionalChipActive: { backgroundColor: '#111827' },
+  professionalChipText: { color: '#59606a', fontSize: 12, fontWeight: '800' },
+  professionalChipTextActive: { color: '#fff' },
+  professionalFilters: { gap: 8 },
+  rowButtons: {
+    flexDirection: 'row',
+    gap: 18,
+    justifyContent: 'flex-end',
+  },
+  secondaryAction: {
+    alignItems: 'center',
+    borderColor: '#d5d9df',
+    borderRadius: 14,
+    borderWidth: 1,
+    flex: 1,
+    padding: 13,
+  },
+  secondaryActionText: { color: '#111827', fontSize: 12, fontWeight: '900' },
+  sectionTitle: { color: '#111827', fontSize: 16, fontWeight: '900' },
+  settlementAmount: { color: '#111827', fontSize: 18, fontWeight: '900' },
+  settlementCard: {
+    backgroundColor: '#f7f7f6',
+    borderRadius: 16,
+    gap: 9,
+    padding: 14,
+  },
+  sheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    gap: 8,
+    padding: 22,
+    paddingBottom: 30,
+  },
+  sheetCopy: { color: '#69717c', fontSize: 13 },
+  sheetTitle: { color: '#111827', fontSize: 22, fontWeight: '900' },
+  statusText: { color: '#69717c', fontSize: 11, textTransform: 'capitalize' },
+  warningCopy: { color: '#8a5b0a', fontSize: 12, lineHeight: 17 },
   tabs: {
     borderBottomColor: '#e2e4e6',
     borderBottomWidth: 1,

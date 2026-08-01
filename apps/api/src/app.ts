@@ -31,6 +31,7 @@ import { ApiError, isUniqueConstraintError } from './errors';
 import { registerAgendaRoutes } from './agenda';
 import { registerBusinessScheduleRoutes } from './business-schedule';
 import { registerCashRegisterRoutes } from './cash-register';
+import { registerCommissionRoutes } from './commissions';
 import { registerClientRoutes } from './clients';
 import { registerOperationsRoutes } from './operations';
 import {
@@ -1529,6 +1530,7 @@ export async function buildApi({
   registerBusinessScheduleRoutes(app, database, authenticate);
   registerClientRoutes(app, database, authenticate);
   registerCashRegisterRoutes(app, database, authenticate);
+  registerCommissionRoutes(app, database, authenticate);
   registerProfileRoutes(app, database, authenticate);
 
   const publicBookingLifecycleTimer = setInterval(() => {

@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
+  CashMovementRecord,
   CashRegisterSummaryResponse,
   CurrentCashRegisterResponse,
   ServicesResponse,
@@ -23,6 +24,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BottomNavigation } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
+
+function movementLabel(type: CashMovementRecord['type']) {
+  if (type === 'sale') return 'Venta';
+  if (type === 'expense') return 'Gasto';
+  if (type === 'withdrawal') return 'Retiro';
+  if (type === 'professional_advance') return 'Anticipo a colaborador';
+  if (type === 'professional_advance_reversal') return 'Reverso de anticipo';
+  return 'Pago de liquidación';
+}
+
+function movementIsIncome(type: CashMovementRecord['type']) {
+  return type === 'sale' || type === 'professional_advance_reversal';
+}
 
 export default function CashRegisterScreen() {
   const { session, user } = useAuth();
@@ -257,9 +271,11 @@ export default function CashRegisterScreen() {
             <View key={movement.id} style={styles.movementRow}>
               <View style={styles.movementIcon}>
                 <Ionicons
-                  color={movement.type === 'sale' ? '#288B52' : '#B54747'}
+                  color={
+                    movementIsIncome(movement.type) ? '#288B52' : '#B54747'
+                  }
                   name={
-                    movement.type === 'sale'
+                    movementIsIncome(movement.type)
                       ? 'trending-up-outline'
                       : 'trending-down-outline'
                   }
@@ -269,22 +285,18 @@ export default function CashRegisterScreen() {
               <View style={styles.movementCopy}>
                 <Text style={styles.movementName}>{movement.description}</Text>
                 <Text style={styles.movementMeta}>
-                  {movement.type === 'sale'
-                    ? 'Venta'
-                    : movement.type === 'expense'
-                      ? 'Gasto'
-                      : 'Retiro'}
+                  {movementLabel(movement.type)}
                 </Text>
               </View>
               <Text
                 style={[
                   styles.movementAmount,
-                  movement.type === 'sale'
+                  movementIsIncome(movement.type)
                     ? styles.movementIncome
                     : styles.movementExpense,
                 ]}
               >
-                {movement.type === 'sale' ? '+' : '-'}
+                {movementIsIncome(movement.type) ? '+' : '-'}
                 {formatMoney(movement.amountCents)}
               </Text>
             </View>

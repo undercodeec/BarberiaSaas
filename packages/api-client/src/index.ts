@@ -121,19 +121,90 @@ export interface CashMovementRecord {
   readonly paymentMethod: 'card' | 'cash' | 'other' | 'transfer' | null;
   readonly professionalMembershipId: string | null;
   readonly serviceId: string | null;
-  readonly type: 'expense' | 'sale' | 'withdrawal';
+  readonly type:
+    | 'commission_settlement'
+    | 'expense'
+    | 'professional_advance'
+    | 'professional_advance_reversal'
+    | 'sale'
+    | 'withdrawal';
 }
 
 export interface CashRegisterTotals {
+  readonly advanceReversals: number;
   readonly card: number;
   readonly cash: number;
   readonly cashSales: number;
+  readonly commissionSettlements: number;
   readonly expectedCash: number;
   readonly expenses: number;
   readonly other: number;
+  readonly professionalAdvances: number;
   readonly sales: number;
   readonly transfers: number;
   readonly withdrawals: number;
+}
+
+export interface CommissionProfessionalSummary {
+  readonly availableAdvanceCents: number;
+  readonly commissionPendingCents: number;
+  readonly id: string;
+  readonly name: string;
+  readonly outstandingAdvanceCents: number;
+}
+
+export interface ProfessionalAdvanceRecord {
+  readonly availableAmountCents: number;
+  readonly createdAt: string;
+  readonly deductedAmountCents: number;
+  readonly id: string;
+  readonly notes: string | null;
+  readonly occurredAt: string;
+  readonly originalAmountCents: number;
+  readonly outstandingAmountCents: number;
+  readonly paymentMethod: 'cash' | 'other' | 'transfer';
+  readonly professionalMembershipId: string;
+  readonly reference: string | null;
+  readonly reservedAmountCents: number;
+  readonly reversalReason: string | null;
+  readonly reversedAt: string | null;
+  readonly status:
+    'fully_deducted' | 'partially_deducted' | 'pending' | 'reversed';
+}
+
+export interface CommissionSettlementRecord {
+  readonly advanceDeductionCents: number;
+  readonly adjustmentCents: number;
+  readonly approvedAt: string | null;
+  readonly cancelledAt: string | null;
+  readonly commissionAmountCents: number;
+  readonly createdAt: string;
+  readonly grossGeneratedCents: number;
+  readonly id: string;
+  readonly notes: string | null;
+  readonly paidAt: string | null;
+  readonly paymentMethod: 'cash' | 'other' | 'transfer' | null;
+  readonly paymentReference: string | null;
+  readonly periodEnd: string;
+  readonly periodStart: string;
+  readonly professionalMembershipId: string;
+  readonly status: 'approved' | 'cancelled' | 'draft' | 'paid';
+  readonly totalPayableCents: number;
+}
+
+export interface CommissionOverviewResponse {
+  readonly advances: readonly ProfessionalAdvanceRecord[];
+  readonly entries: ReadonlyArray<{
+    readonly amountCents: number;
+    readonly baseAmountCents: number;
+    readonly id: string;
+    readonly occurredAt: string;
+    readonly professionalMembershipId: string;
+    readonly settlementId: string | null;
+    readonly status: 'approved' | 'pending' | 'reversed' | 'settled';
+  }>;
+  readonly professionals: readonly CommissionProfessionalSummary[];
+  readonly settlements: readonly CommissionSettlementRecord[];
 }
 
 export interface CashRegisterSummaryResponse {
