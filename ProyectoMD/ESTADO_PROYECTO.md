@@ -443,7 +443,7 @@ Decisión de alcance para el MVP:
 
 ### Pantalla Equipo / Clientes
 
-- [x] Nueva pantalla protegida `/clients` con el lenguaje visual del dashboard y la referencia de `nava-new-booking-client.png`.
+- [x] Nueva pantalla protegida `/clients` con el lenguaje visual vigente del dashboard.
 - [x] La ruta `/equipo` funciona como alias y redirige al directorio de clientes.
 - [x] El boton Equipo de la navegacion inferior abre la pantalla creada.
 - [x] Directorio con busqueda local por nombre o telefono, estado vacio y listado de clientes persistidos.
