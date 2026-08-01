@@ -1050,6 +1050,12 @@ describeWithDatabase('API con PostgreSQL', () => {
         .json<{ members: Array<{ id: string }> }>()
         .members.some(({ id }) => id === barberMembershipId),
     ).toBe(true);
+    const forbiddenGlobalReport = await app.inject({
+      headers: { authorization: `Bearer ${barberToken}` },
+      method: 'GET',
+      url: '/v1/reports/business-summary?range=today',
+    });
+    expect(forbiddenGlobalReport.statusCode).toBe(403);
     expect(
       teamAfterAcceptance.json<{
         pendingInvitations: Array<{ email: string }>;
@@ -1599,6 +1605,21 @@ describeWithDatabase('API con PostgreSQL', () => {
     const advanceId = advanceResponse.json<{
       advance: { id: string };
     }>().advance.id;
+    const reportWithCashAdvance = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'GET',
+      url: '/v1/reports/business-summary?range=today',
+    });
+    expect(reportWithCashAdvance.statusCode).toBe(200);
+    expect(
+      reportWithCashAdvance.json<{
+        expenses: { collaboratorPaymentsCents: number };
+        sales: { servicesCents: number };
+      }>(),
+    ).toMatchObject({
+      expenses: { collaboratorPaymentsCents: 3_000 },
+      sales: { servicesCents: 10_000 },
+    });
 
     const today = new Date().toISOString().slice(0, 10);
     const settlementResponse = await app.inject({
@@ -1730,6 +1751,21 @@ describeWithDatabase('API con PostgreSQL', () => {
     const advanceId = advanceResponse.json<{
       advance: { id: string };
     }>().advance.id;
+    const reportWithTransferAdvance = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'GET',
+      url: '/v1/reports/business-summary?range=today',
+    });
+    expect(reportWithTransferAdvance.statusCode).toBe(200);
+    expect(
+      reportWithTransferAdvance.json<{
+        expenses: { collaboratorPaymentsCents: number };
+        sales: { servicesCents: number };
+      }>(),
+    ).toMatchObject({
+      expenses: { collaboratorPaymentsCents: 1_500 },
+      sales: { servicesCents: 8_000 },
+    });
     const today = new Date().toISOString().slice(0, 10);
     const settlementResponse = await app.inject({
       headers: { authorization: `Bearer ${agenda.ownerToken}` },
@@ -1784,6 +1820,16 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(
       reversed.json<{ advance: { status: string } }>().advance.status,
     ).toBe('reversed');
+    const reportAfterAdvanceReversal = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'GET',
+      url: '/v1/reports/business-summary?range=today',
+    });
+    expect(
+      reportAfterAdvanceReversal.json<{
+        expenses: { collaboratorPaymentsCents: number };
+      }>().expenses.collaboratorPaymentsCents,
+    ).toBe(0);
   });
 
   it('audita caja, conserva el efectivo esperado y expone cierres en historial', async () => {
@@ -1816,6 +1862,34 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect((await movement('sale', 'cash', 2_000)).statusCode).toBe(201);
     expect((await movement('expense', 'transfer', 500)).statusCode).toBe(201);
     expect((await movement('withdrawal', 'cash', 300)).statusCode).toBe(201);
+
+    const businessSummary = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: '/v1/reports/business-summary?range=today',
+    });
+    expect(businessSummary.statusCode).toBe(200);
+    expect(
+      businessSummary.json<{
+        expenses: { operatingCents: number; totalCents: number };
+        netResultCents: number;
+        sales: {
+          grossCents: number;
+          transactionCount: number;
+          uncategorizedCents: number;
+        };
+        withdrawalsCents: number;
+      }>(),
+    ).toMatchObject({
+      expenses: { operatingCents: 500, totalCents: 500 },
+      netResultCents: 1_500,
+      sales: {
+        grossCents: 2_000,
+        transactionCount: 1,
+        uncategorizedCents: 2_000,
+      },
+      withdrawalsCents: 300,
+    });
 
     const summary = await app.inject({
       headers: { authorization: `Bearer ${token}` },

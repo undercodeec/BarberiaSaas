@@ -40,6 +40,7 @@ import {
   registerNotificationRoutes,
 } from './notifications';
 import { registerProfileRoutes } from './profile';
+import { registerReportRoutes } from './reports';
 import {
   processPublicBookingLifecycle,
   registerPublicBookingRoutes,
@@ -1612,6 +1613,7 @@ export async function buildApi({
   registerCashRegisterRoutes(app, database, authenticate);
   registerCommissionRoutes(app, database, authenticate);
   registerProfileRoutes(app, database, authenticate);
+  registerReportRoutes(app, database, authenticate);
 
   const publicBookingLifecycleTimer = setInterval(() => {
     void processPublicBookingLifecycle(

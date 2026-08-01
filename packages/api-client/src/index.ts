@@ -225,6 +225,46 @@ export interface CashRegisterDetailResponse {
   readonly totals: CashRegisterTotals;
 }
 
+export interface BusinessSummaryResponse {
+  readonly accessibleLocations: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+  }>;
+  readonly commissions: {
+    readonly productsGeneratedCents: number;
+    readonly servicesGeneratedCents: number;
+    readonly totalGeneratedCents: number;
+  };
+  readonly currencyCode: string;
+  readonly expenses: {
+    readonly collaboratorPaymentsCents: number;
+    readonly operatingCents: number;
+    readonly totalCents: number;
+  };
+  readonly income: {
+    readonly otherIncomeCents: number;
+    readonly salesCents: number;
+    readonly totalCents: number;
+  };
+  readonly netResultCents: number;
+  readonly period: {
+    readonly from: string;
+    readonly locationId: string | null;
+    readonly locationName: string;
+    readonly preset: 'last_7_days' | 'last_30_days' | 'this_month' | 'today';
+    readonly to: string;
+  };
+  readonly sales: {
+    readonly averageTicketCents: number;
+    readonly grossCents: number;
+    readonly productsCents: number;
+    readonly servicesCents: number;
+    readonly transactionCount: number;
+    readonly uncategorizedCents: number;
+  };
+  readonly withdrawalsCents: number;
+}
+
 export interface ApiMessageResponse {
   readonly message: string;
   // Reserved for future shared message fields.

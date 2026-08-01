@@ -3058,3 +3058,63 @@ caja, comisiones y registros históricos.
 - [x] Suite móvil: 3 archivos y 5/5 pruebas aprobadas; exportación Web de Expo
       completada sin errores de compilación.
 - [ ] Recorrido visual manual de las nuevas pantallas en Android, iOS y Web.
+
+## Inicio de Reportes esenciales — 1 de agosto de 2026
+
+### Resumen del negocio
+
+- [x] Nueva ruta móvil `/business-summary`, accesible desde
+      `Estadísticas e informes`, inspirada en las referencias
+      `UI-resumen.jpeg` y `UI-resumen2.jpeg` y adaptada a la paleta global de
+      Nava.
+- [x] Nuevo endpoint `GET /v1/reports/business-summary` con períodos `Hoy`,
+      `Últimos 7 días`, `Este mes` y `Últimos 30 días`; admite además
+      `from`/`to` para un futuro selector personalizado de hasta 366 días.
+- [x] El reporte respeta la zona horaria de cada sucursal y permite consolidar
+      únicamente monedas iguales. Si una futura organización tiene monedas
+      distintas, exige seleccionar una sucursal.
+- [x] El propietario puede consultar todas sus sucursales; el administrador
+      solo las sucursales asignadas. Recepción y profesionales no pueden leer
+      reportes financieros globales.
+- [x] La UI presenta resultado neto, ingresos y egresos, tipos de venta, número
+      de transacciones, ticket promedio y comisiones generadas, con filtros por
+      período y sucursal.
+
+### Definiciones contables del resumen MVP
+
+| Indicador            | Fuente actual                            | Regla                                                                                                                           |
+| -------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Ventas cobradas      | `CashMovement.SALE`                      | Incluye únicamente cobros registrados en Caja.                                                                                  |
+| Venta de servicios   | Venta vinculada a cita o servicio        | Usa `appointmentId` o `serviceId`; una venta sin ambos queda como venta libre.                                                  |
+| Productos            | Inventario/POS futuro                    | Permanece en cero y se muestra como pendiente; no se simulan datos.                                                             |
+| Gastos operativos    | `CashMovement.EXPENSE`                   | Reduce el resultado neto del período.                                                                                           |
+| Pago a colaboradores | Liquidaciones y anticipos menos reversos | Refleja salida neta de efectivo; conserva la trazabilidad de descuentos posteriores.                                            |
+| Retiros              | `CashMovement.WITHDRAWAL`                | Se informa, pero no reduce el resultado porque mover efectivo no constituye un gasto.                                           |
+| Comisiones           | `CommissionEntry` no revertida           | Muestra comisión generada, no necesariamente pagada en el mismo período.                                                        |
+| Resultado neto       | Ventas − gastos − pagos a colaboradores  | Es un resultado operativo de Caja, no utilidad contable: todavía no incorpora impuestos, costo de inventario ni depreciaciones. |
+
+### Plan de las demás opciones de Reportes
+
+| Opción                             | Estado e integración definida                                                                                                                                  |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Historial de caja                  | Disponible mediante la pestaña Historial de Wallet: cierres, efectivo esperado, contado y diferencia.                                                          |
+| Historial de gastos                | Pendiente: listado paginado de movimientos `EXPENSE`, filtros por fecha/sucursal/categoría/responsable y CSV.                                                  |
+| Historial de depósitos             | Pendiente: primero debe existir un tipo auditable `DEPOSIT`/`OTHER_INCOME`; no se reutilizará `SALE`.                                                          |
+| Pagar a colaboradores              | Disponible mediante Wallet/Comisiones y sus liquidaciones auditables.                                                                                          |
+| Historial de pagos a colaboradores | Disponible inicialmente en Wallet/Comisiones; luego tendrá filtros y exportación propios.                                                                      |
+| Alerta de inventario               | Pendiente de Fase 8: producto, stock por sucursal, movimientos y umbral mínimo.                                                                                |
+| Historial de ventas                | Pendiente: detalle paginado de `SALE` por método, servicio, profesional, cita y cliente.                                                                       |
+| Préstamos a clientes               | Pendiente de definición. No se desarrollará hasta validar una funcionalidad y reglas adecuadas para el MVP; no debe confundirse con anticipos a colaboradores. |
+| Reseñas de clientes                | Disponible mediante Gestión de reseñas.                                                                                                                        |
+
+### Verificación de este corte
+
+- [x] Typecheck de API, móvil y cliente compartido; ESLint de los archivos
+      modificados.
+- [x] Suite API/PostgreSQL: 26/26 pruebas aprobadas, incluidos totales del
+      resumen y denegación del reporte global al profesional.
+- [x] Suite móvil: 3 archivos y 5/5 pruebas aprobadas.
+- [x] Exportación Web de Expo completada con la nueva ruta.
+- [ ] Recorrido visual del resumen en viewport móvil: diferido porque el
+      navegador integrado del entorno no pudo inicializar sus recursos
+      internos; requiere validación manual en dispositivo o navegador.

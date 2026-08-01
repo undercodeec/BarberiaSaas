@@ -6,7 +6,7 @@ import type {
   CurrentOrganizationResponse,
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert,
@@ -25,11 +25,21 @@ import { useAuth } from '../../src/providers/AuthProvider';
 
 export default function WalletScreen() {
   const router = useRouter();
+  const searchParams = useLocalSearchParams<{ tab?: string | string[] }>();
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<
     'commissions' | 'history' | 'settings' | 'summary'
-  >('summary');
+  >(() => {
+    const requestedTab = Array.isArray(searchParams.tab)
+      ? searchParams.tab[0]
+      : searchParams.tab;
+    return requestedTab === 'commissions' ||
+      requestedTab === 'history' ||
+      requestedTab === 'settings'
+      ? requestedTab
+      : 'summary';
+  });
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<
     string | null
   >(null);

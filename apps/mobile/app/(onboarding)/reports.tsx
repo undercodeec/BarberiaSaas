@@ -18,6 +18,9 @@ type ReportMenuItem = {
   readonly description: string;
   readonly icon: IconName;
   readonly id: string;
+  readonly planning?: string;
+  readonly route?: string;
+  readonly status: 'available' | 'planned';
   readonly title: string;
 };
 type ReportSection = {
@@ -34,8 +37,10 @@ const reportSections: readonly ReportSection[] = [
         id: 'business-overview',
         title: 'Resumen del negocio',
         description:
-          'Podr\u00e1s ver gr\u00e1ficas de las ventas, gastos, ingresos.',
+          'Ventas, gastos, pagos, resultado neto y comisiones por período.',
         icon: 'bar-chart-outline',
+        route: '/business-summary',
+        status: 'available',
       },
     ],
   },
@@ -47,41 +52,55 @@ const reportSections: readonly ReportSection[] = [
         id: 'cash-history',
         title: 'Historial de caja',
         description:
-          'Podr\u00e1s ver historial de caja filtrando por fechas que desees.',
+          'Consulta cierres, efectivo esperado, contado y diferencias.',
         icon: 'wallet-outline',
+        route: '/wallet?tab=history',
+        status: 'available',
       },
       {
         id: 'expense-history',
         title: 'Historial de gastos',
         description:
-          'Podr\u00e1s ver historial de gastos filtrando por fechas que desees.',
+          'Movimientos de gasto por fecha, sucursal, categoría y responsable.',
         icon: 'trending-down-outline',
+        planning:
+          'Usará los movimientos EXPENSE de Caja con filtros y exportación CSV.',
+        status: 'planned',
       },
       {
         id: 'deposit-history',
         title: 'Historial de dep\u00f3sitos',
-        description:
-          'Podr\u00e1s ver historial de dep\u00f3sitos filtrando por fechas que desees.',
+        description: 'Entradas de dinero que no corresponden a una venta.',
         icon: 'trending-up-outline',
+        planning:
+          'Requiere crear el movimiento DEPOSIT/OTHER_INCOME antes de mostrar datos reales.',
+        status: 'planned',
       },
       {
         id: 'pay-collaborators',
         title: 'Pagar a colaboradores',
         description: 'Pagar a tus colaboradores por rango de fechas.',
         icon: 'cash-outline',
+        route: '/wallet?tab=commissions',
+        status: 'available',
       },
       {
         id: 'collaborator-payment-history',
         title: 'Historial de pagos a colaboradores',
         description:
-          'Podr\u00e1s ver historial de los pagos realizados a tus colaboradores filtrando por fechas que desees.',
+          'Liquidaciones pagadas, anticipos, descuentos y reversos auditables.',
         icon: 'receipt-outline',
+        route: '/wallet?tab=commissions',
+        status: 'available',
       },
       {
         id: 'inventory-alert',
         title: 'Alerta de inventario',
         description: 'Descubre los productos que est\u00e1n agotados.',
         icon: 'shield-outline',
+        planning:
+          'Depende de Inventario: productos, existencias por sucursal y umbral mínimo.',
+        status: 'planned',
       },
     ],
   },
@@ -93,14 +112,20 @@ const reportSections: readonly ReportSection[] = [
         id: 'sales-history',
         title: 'Historial de ventas',
         description:
-          'Podr\u00e1s ver historial de las ventas filtrando por fechas que desees.',
+          'Detalle paginado por fecha, método, servicio, profesional y cliente.',
         icon: 'pricetag-outline',
+        planning:
+          'Partirá de movimientos SALE y conservará el vínculo con cita, servicio y profesional.',
+        status: 'planned',
       },
       {
         id: 'customer-loans',
         title: 'Pr\u00e9stamos a clientes',
-        description: 'Visualiza el estado de pr\u00e9stamo de tus clientes',
+        description: 'Funcionalidad pendiente de definici\u00f3n para el MVP.',
         icon: 'card-outline',
+        planning:
+          'Su alcance y reglas se definirán después de validar un caso de uso adecuado para el MVP.',
+        status: 'planned',
       },
     ],
   },
@@ -113,6 +138,8 @@ const reportSections: readonly ReportSection[] = [
         title: 'Rese\u00f1as de tus clientes',
         description: 'Vea las opiniones de sus clientes',
         icon: 'star-outline',
+        route: '/reviews-management',
+        status: 'available',
       },
     ],
   },
@@ -122,22 +149,29 @@ export default function ReportsScreen() {
   const { session } = useAuth();
   const router = useRouter();
   const isOpening = useRef(false);
-  const openReport = useCallback((title: string) => {
-    if (isOpening.current) return;
-    isOpening.current = true;
-    Alert.alert(
-      title,
-      'Esta secci\u00f3n estar\u00e1 disponible pr\u00f3ximamente.',
-      [
-        {
-          text: 'Entendido',
-          onPress: () => {
-            isOpening.current = false;
+  const openReport = useCallback(
+    (item: ReportMenuItem) => {
+      if (item.route) {
+        router.push(item.route as never);
+        return;
+      }
+      if (isOpening.current) return;
+      isOpening.current = true;
+      Alert.alert(
+        item.title,
+        item.planning ?? 'Esta sección estará disponible en una próxima etapa.',
+        [
+          {
+            text: 'Entendido',
+            onPress: () => {
+              isOpening.current = false;
+            },
           },
-        },
-      ],
-    );
-  }, []);
+        ],
+      );
+    },
+    [router],
+  );
   const goBack = useCallback(() => {
     if (router.canGoBack()) {
       router.back();
@@ -184,7 +218,7 @@ export default function ReportsScreen() {
                 <ReportNavigationCard
                   item={item}
                   key={item.id}
-                  onPress={() => openReport(item.title)}
+                  onPress={() => openReport(item)}
                 />
               ))}
             </View>
@@ -214,7 +248,26 @@ function ReportNavigationCard({
         <Ionicons color="#101c2d" name={item.icon} size={28} />
       </View>
       <View style={styles.cardCopy}>
-        <Text style={styles.cardTitle}>{item.title}</Text>
+        <View style={styles.cardTitleRow}>
+          <Text style={styles.cardTitle}>{item.title}</Text>
+          <View
+            style={
+              item.status === 'available'
+                ? styles.availableBadge
+                : styles.plannedBadge
+            }
+          >
+            <Text
+              style={
+                item.status === 'available'
+                  ? styles.availableLabel
+                  : styles.plannedLabel
+              }
+            >
+              {item.status === 'available' ? 'Disponible' : 'Planificado'}
+            </Text>
+          </View>
+        </View>
         <Text style={styles.cardDescription}>{item.description}</Text>
       </View>
       <View style={styles.chevron}>
@@ -225,6 +278,13 @@ function ReportNavigationCard({
 }
 
 const styles = StyleSheet.create({
+  availableBadge: {
+    backgroundColor: '#dff3e7',
+    borderRadius: 99,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  availableLabel: { color: '#287247', fontSize: 10, fontWeight: '900' },
   backButton: {
     alignItems: 'center',
     borderRadius: 22,
@@ -253,10 +313,12 @@ const styles = StyleSheet.create({
   cardList: { gap: 16, marginTop: 14 },
   cardTitle: {
     color: '#101c2d',
+    flex: 1,
     fontSize: 18,
     fontWeight: '700',
     lineHeight: 23,
   },
+  cardTitleRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   chevron: {
     alignItems: 'center',
     height: 44,
@@ -297,6 +359,13 @@ const styles = StyleSheet.create({
     width: 60,
   },
   pressed: { opacity: 0.74, transform: [{ scale: 0.985 }] },
+  plannedBadge: {
+    backgroundColor: '#e5e8ec',
+    borderRadius: 99,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  plannedLabel: { color: '#667080', fontSize: 10, fontWeight: '900' },
   screen: { backgroundColor: '#ffffff', flex: 1 },
   section: { marginBottom: 36 },
   sectionTitle: {
