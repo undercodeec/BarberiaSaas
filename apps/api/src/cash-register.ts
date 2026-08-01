@@ -9,6 +9,10 @@ import {
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
+import {
+  createManualSaleCommission,
+  reconcileAppointmentCommissions,
+} from './commissions';
 import { ApiError } from './errors';
 
 type Authenticate = (
@@ -23,6 +27,8 @@ const createMovementSchema = z.object({
   appointmentId: z.uuid().optional(),
   description: z.string().trim().min(2).max(240),
   paymentMethod: z.enum(['cash', 'card', 'transfer', 'other']).optional(),
+  professionalMembershipId: z.uuid().optional(),
+  serviceId: z.uuid().optional(),
   type: z.enum(['sale', 'expense', 'withdrawal']),
 });
 const closeCashRegisterSchema = z.object({
@@ -121,6 +127,8 @@ function publicMovement(movement: {
   description: string;
   id: string;
   paymentMethod: PaymentMethod | null;
+  professionalMembershipId: string | null;
+  serviceId: string | null;
   type: CashMovementType;
 }) {
   return {
@@ -130,6 +138,8 @@ function publicMovement(movement: {
     description: movement.description,
     id: movement.id,
     paymentMethod: movement.paymentMethod?.toLowerCase() ?? null,
+    professionalMembershipId: movement.professionalMembershipId,
+    serviceId: movement.serviceId,
     type: movement.type.toLowerCase(),
   };
 }
@@ -329,6 +339,29 @@ export function registerCashRegisterRoutes(
         'APPOINTMENT_REQUIRES_SALE',
         'Una cita solo puede vincularse a una venta.',
       );
+    const hasCommissionService = Boolean(input.serviceId);
+    const hasCommissionProfessional = Boolean(input.professionalMembershipId);
+    if (hasCommissionService !== hasCommissionProfessional)
+      throw new ApiError(
+        400,
+        'COMMISSION_SOURCE_INCOMPLETE',
+        'Selecciona el servicio y el profesional para registrar una venta comisionable.',
+      );
+    if (
+      (hasCommissionService || hasCommissionProfessional) &&
+      input.type !== 'sale'
+    )
+      throw new ApiError(
+        400,
+        'COMMISSION_REQUIRES_SALE',
+        'Solo las ventas pueden generar comisiÃ³n.',
+      );
+    if (input.appointmentId && hasCommissionService)
+      throw new ApiError(
+        400,
+        'DUPLICATE_COMMISSION_SOURCE',
+        'La cita ya define el servicio y el profesional de la comisiÃ³n.',
+      );
     if (input.type === 'sale' && !input.paymentMethod)
       throw new ApiError(
         400,
@@ -350,40 +383,123 @@ export function registerCashRegisterRoutes(
         'CASH_REGISTER_CLOSED',
         'Abre una caja antes de registrar movimientos.',
       );
-    if (input.appointmentId) {
-      const appointment = await database.appointment.findFirst({
-        where: {
-          id: input.appointmentId,
-          ...(currentScope.organizationId
-            ? { organizationId: currentScope.organizationId }
-            : {}),
+    const movement = await database.$transaction(async (transaction) => {
+      if (input.appointmentId) {
+        if (!currentScope.organizationId)
+          throw new ApiError(
+            403,
+            'ORGANIZATION_REQUIRED',
+            'La cita debe pertenecer a una organizaciÃ³n activa.',
+          );
+        const appointment = await transaction.appointment.findFirst({
+          include: { services: true },
+          where: {
+            id: input.appointmentId,
+            organizationId: currentScope.organizationId,
+          },
+        });
+        if (!appointment)
+          throw new ApiError(
+            404,
+            'APPOINTMENT_NOT_FOUND',
+            'La cita no existe.',
+          );
+        if (appointment.paymentStatus === AppointmentPaymentStatus.PAID)
+          throw new ApiError(
+            409,
+            'APPOINTMENT_ALREADY_PAID',
+            'La cita ya fue cobrada.',
+          );
+        const totalCents = appointment.services.reduce(
+          (total, service) => total + service.priceCents,
+          0,
+        );
+        if (input.amountCents !== totalCents)
+          throw new ApiError(
+            400,
+            'APPOINTMENT_TOTAL_MISMATCH',
+            'El cobro debe coincidir con el total completo de la cita.',
+          );
+        await transaction.appointment.update({
+          data: { paymentStatus: AppointmentPaymentStatus.PAID },
+          where: { id: appointment.id },
+        });
+      }
+
+      let commissionableService: { id: string; name: string } | null = null;
+      if (input.serviceId && input.professionalMembershipId) {
+        if (!currentScope.organizationId || !session.locationId)
+          throw new ApiError(
+            400,
+            'COMMISSION_CONTEXT_REQUIRED',
+            'Configura una organizaciÃ³n y sucursal para registrar comisiones.',
+          );
+        const assignment = await transaction.professionalService.findFirst({
+          include: { service: true },
+          where: {
+            locationId: session.locationId,
+            membershipId: input.professionalMembershipId,
+            serviceId: input.serviceId,
+            membership: {
+              organizationId: currentScope.organizationId,
+              status: MembershipStatus.ACTIVE,
+            },
+            service: {
+              isActive: true,
+              organizationId: currentScope.organizationId,
+            },
+          },
+        });
+        if (!assignment)
+          throw new ApiError(
+            404,
+            'COMMISSION_ASSIGNMENT_NOT_FOUND',
+            'El servicio no estÃ¡ asignado al profesional seleccionado.',
+          );
+        commissionableService = assignment.service;
+      }
+
+      const created = await transaction.cashMovement.create({
+        data: {
+          amountCents: input.amountCents,
+          appointmentId: input.appointmentId ?? null,
+          cashRegisterSessionId: session.id,
+          createdByUserId: user.id,
+          description: input.description,
+          paymentMethod: input.paymentMethod
+            ? (input.paymentMethod.toUpperCase() as PaymentMethod)
+            : null,
+          professionalMembershipId: input.professionalMembershipId ?? null,
+          serviceId: input.serviceId ?? null,
+          type: input.type.toUpperCase() as CashMovementType,
         },
       });
-      if (!appointment)
-        throw new ApiError(404, 'APPOINTMENT_NOT_FOUND', 'La cita no existe.');
-      if (appointment.paymentStatus === AppointmentPaymentStatus.PAID)
-        throw new ApiError(
-          409,
-          'APPOINTMENT_ALREADY_PAID',
-          'La cita ya fue cobrada.',
-        );
-      await database.appointment.update({
-        data: { paymentStatus: AppointmentPaymentStatus.PAID },
-        where: { id: appointment.id },
-      });
-    }
-    const movement = await database.cashMovement.create({
-      data: {
-        amountCents: input.amountCents,
-        appointmentId: input.appointmentId ?? null,
-        cashRegisterSessionId: session.id,
-        createdByUserId: user.id,
-        description: input.description,
-        paymentMethod: input.paymentMethod
-          ? (input.paymentMethod.toUpperCase() as PaymentMethod)
-          : null,
-        type: input.type.toUpperCase() as CashMovementType,
-      },
+      if (input.appointmentId) {
+        await reconcileAppointmentCommissions(transaction, input.appointmentId);
+      } else if (
+        commissionableService &&
+        input.professionalMembershipId &&
+        currentScope.organizationId &&
+        session.locationId
+      ) {
+        const commission = await createManualSaleCommission(transaction, {
+          amountCents: created.amountCents,
+          cashMovementId: created.id,
+          locationId: session.locationId,
+          occurredAt: created.createdAt,
+          organizationId: currentScope.organizationId,
+          professionalMembershipId: input.professionalMembershipId,
+          serviceId: commissionableService.id,
+          serviceName: commissionableService.name,
+        });
+        if (!commission)
+          throw new ApiError(
+            409,
+            'COMMISSION_RULE_NOT_FOUND',
+            'El profesional no tiene una regla de comisiÃ³n vigente.',
+          );
+      }
+      return created;
     });
     await recordAudit(
       database,
@@ -397,6 +513,8 @@ export function registerCashRegisterRoutes(
         appointmentId: movement.appointmentId,
         cashRegisterSessionId: session.id,
         paymentMethod: movement.paymentMethod,
+        professionalMembershipId: movement.professionalMembershipId,
+        serviceId: movement.serviceId,
         type: movement.type,
       },
     );

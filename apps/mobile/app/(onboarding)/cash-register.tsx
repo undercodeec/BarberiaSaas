@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
   CashRegisterSummaryResponse,
   CurrentCashRegisterResponse,
+  ServicesResponse,
   TeamResponse,
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -41,6 +42,13 @@ export default function CashRegisterScreen() {
   const [movementType, setMovementType] = useState<
     'expense' | 'sale' | 'withdrawal'
   >('sale');
+  const [isCommissionableSale, setIsCommissionableSale] = useState(false);
+  const [movementServiceId, setMovementServiceId] = useState<string | null>(
+    null,
+  );
+  const [movementProfessionalId, setMovementProfessionalId] = useState<
+    string | null
+  >(null);
   const [closingAmount, setClosingAmount] = useState('');
   const [closingNote, setClosingNote] = useState('');
   const [isBaseInfoVisible, setIsBaseInfoVisible] = useState(false);
@@ -56,6 +64,11 @@ export default function CashRegisterScreen() {
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<TeamResponse>('/v1/team'),
     queryKey: ['team'],
+  });
+  const servicesQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () => requireApiClient().request<ServicesResponse>('/v1/services'),
+    queryKey: ['services'],
   });
   const summaryQuery = useQuery({
     enabled: Boolean(session),
@@ -102,11 +115,25 @@ export default function CashRegisterScreen() {
         throw new Error('Ingresa un monto válido.');
       if (movementDescription.trim().length < 2)
         throw new Error('Describe el movimiento.');
+      if (
+        movementType === 'sale' &&
+        isCommissionableSale &&
+        (!movementServiceId || !movementProfessionalId)
+      )
+        throw new Error('Selecciona el servicio y el profesional.');
       return requireApiClient().request('/v1/cash-register/movements', {
         body: {
           amountCents: Math.round(amount * 100),
           description: movementDescription.trim(),
           paymentMethod: movementPayment,
+          professionalMembershipId:
+            movementType === 'sale' && isCommissionableSale
+              ? movementProfessionalId
+              : undefined,
+          serviceId:
+            movementType === 'sale' && isCommissionableSale
+              ? movementServiceId
+              : undefined,
           type: movementType,
         },
         method: 'POST',
@@ -121,6 +148,9 @@ export default function CashRegisterScreen() {
       setIsSheetOpen(false);
       setMovementAmount('');
       setMovementDescription('');
+      setIsCommissionableSale(false);
+      setMovementProfessionalId(null);
+      setMovementServiceId(null);
       await queryClient.invalidateQueries({
         queryKey: ['cash-register-summary'],
       });
@@ -158,6 +188,17 @@ export default function CashRegisterScreen() {
   const totals = summaryQuery.data?.totals;
   const availableResponsibles = (teamQuery.data?.members ?? []).filter(
     (member) => member.user.id !== user?.id,
+  );
+  const selectedMovementService = servicesQuery.data?.services.find(
+    (service) => service.id === movementServiceId,
+  );
+  const commissionableProfessionals = (teamQuery.data?.members ?? []).filter(
+    (member) =>
+      (member.role === 'barber' || member.role === 'owner') &&
+      member.commissionPercentage !== null &&
+      selectedMovementService?.assignments.some(
+        (assignment) => assignment.membershipId === member.id,
+      ),
   );
   const formatMoney = (amountCents: number) =>
     `$${(amountCents / 100).toFixed(2)}`;
@@ -320,7 +361,11 @@ export default function CashRegisterScreen() {
             onPress={() => setIsSheetOpen(false)}
             style={styles.backdrop}
           />
-          <View style={styles.sheet}>
+          <ScrollView
+            contentContainerStyle={styles.sheetContent}
+            keyboardShouldPersistTaps="handled"
+            style={styles.sheet}
+          >
             <View style={styles.handle} />
             {sheetMode === 'open' ? (
               <>
@@ -422,7 +467,14 @@ export default function CashRegisterScreen() {
                   {(['sale', 'expense', 'withdrawal'] as const).map((type) => (
                     <Pressable
                       key={type}
-                      onPress={() => setMovementType(type)}
+                      onPress={() => {
+                        setMovementType(type);
+                        if (type !== 'sale') {
+                          setIsCommissionableSale(false);
+                          setMovementProfessionalId(null);
+                          setMovementServiceId(null);
+                        }
+                      }}
                       style={[
                         styles.member,
                         movementType === type && styles.selected,
@@ -443,6 +495,118 @@ export default function CashRegisterScreen() {
                     </Pressable>
                   ))}
                 </View>
+                {movementType === 'sale' ? (
+                  <>
+                    <Text style={styles.label}>Clase de venta</Text>
+                    <View style={styles.members}>
+                      <Pressable
+                        onPress={() => {
+                          setIsCommissionableSale(false);
+                          setMovementProfessionalId(null);
+                          setMovementServiceId(null);
+                        }}
+                        style={[
+                          styles.member,
+                          !isCommissionableSale && styles.selected,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.memberText,
+                            !isCommissionableSale && styles.selectedText,
+                          ]}
+                        >
+                          Venta libre
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => setIsCommissionableSale(true)}
+                        style={[
+                          styles.member,
+                          isCommissionableSale && styles.selected,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.memberText,
+                            isCommissionableSale && styles.selectedText,
+                          ]}
+                        >
+                          Servicio comisionable
+                        </Text>
+                      </Pressable>
+                    </View>
+                    {isCommissionableSale ? (
+                      <>
+                        <Text style={styles.label}>Servicio</Text>
+                        <View style={styles.members}>
+                          {(servicesQuery.data?.services ?? []).map(
+                            (service) => (
+                              <Pressable
+                                key={service.id}
+                                onPress={() => {
+                                  setMovementServiceId(service.id);
+                                  setMovementProfessionalId(null);
+                                  setMovementAmount(
+                                    (service.priceCents / 100).toFixed(2),
+                                  );
+                                  setMovementDescription(service.name);
+                                }}
+                                style={[
+                                  styles.member,
+                                  movementServiceId === service.id &&
+                                    styles.selected,
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.memberText,
+                                    movementServiceId === service.id &&
+                                      styles.selectedText,
+                                  ]}
+                                >
+                                  {service.name}
+                                </Text>
+                              </Pressable>
+                            ),
+                          )}
+                        </View>
+                        <Text style={styles.label}>Profesional</Text>
+                        <View style={styles.members}>
+                          {commissionableProfessionals.map((member) => (
+                            <Pressable
+                              key={member.id}
+                              onPress={() =>
+                                setMovementProfessionalId(member.id)
+                              }
+                              style={[
+                                styles.member,
+                                movementProfessionalId === member.id &&
+                                  styles.selected,
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.memberText,
+                                  movementProfessionalId === member.id &&
+                                    styles.selectedText,
+                                ]}
+                              >
+                                {member.user.fullName}
+                              </Text>
+                            </Pressable>
+                          ))}
+                          {movementServiceId &&
+                          commissionableProfessionals.length === 0 ? (
+                            <Text style={styles.inlineEmpty}>
+                              Este servicio no tiene profesionales asignados.
+                            </Text>
+                          ) : null}
+                        </View>
+                      </>
+                    ) : null}
+                  </>
+                ) : null}
                 <Text style={styles.label}>Descripción</Text>
                 <TextInput
                   accessibilityLabel="Descripción del movimiento"
@@ -554,7 +718,7 @@ export default function CashRegisterScreen() {
                 </View>
               </>
             )}
-          </View>
+          </ScrollView>
         </View>
       </Modal>
       <BottomNavigation active="cash" />
@@ -701,6 +865,7 @@ const styles = StyleSheet.create({
     marginTop: 9,
     padding: 15,
   },
+  inlineEmpty: { color: '#737B87', fontSize: 13, paddingVertical: 8 },
   label: { color: '#111827', fontSize: 14, fontWeight: '800', marginTop: 22 },
   member: {
     borderColor: '#D8DDE3',
@@ -787,6 +952,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
+    maxHeight: '92%',
+  },
+  sheetContent: {
     paddingBottom: 34,
     paddingHorizontal: 22,
     paddingTop: 14,

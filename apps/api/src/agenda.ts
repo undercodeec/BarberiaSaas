@@ -23,6 +23,7 @@ import {
 } from '@barber-saas/validation';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
+import { reconcileAppointmentCommissions } from './commissions';
 import { ApiError } from './errors';
 
 interface AuthenticatedIdentity {
@@ -919,6 +920,7 @@ export function registerAgendaRoutes(
           type: AppointmentEventType.STATUS_CHANGED,
         },
       });
+      await reconcileAppointmentCommissions(transaction, appointment.id);
       return appointment;
     });
     return { appointment: publicAppointment(updated) };

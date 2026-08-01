@@ -96,6 +96,9 @@ describeWithDatabase('API con PostgreSQL', () => {
     });
     invitationMessages.length = 0;
     await database.onboardingCollaborator.deleteMany();
+    await database.commissionEntry.deleteMany();
+    await database.commissionSettlement.deleteMany();
+    await database.commissionRule.deleteMany();
     await database.appointmentEvent.deleteMany();
     await database.appointmentService.deleteMany();
     await database.appointment.deleteMany();
@@ -255,6 +258,7 @@ describeWithDatabase('API con PostgreSQL', () => {
       barberToken,
       locationId: organization.locationId,
       membershipId,
+      organizationId: organization.organizationId,
       ownerToken,
       serviceId,
     };
@@ -1155,6 +1159,173 @@ describeWithDatabase('API con PostgreSQL', () => {
       url: '/v1/appointments',
     });
     expect(replacementResponse.statusCode).toBe(201);
+  });
+
+  it('genera comisiones idempotentes al cobrar citas y ventas manuales', async () => {
+    const agenda = await setupAgenda('comisiones-caja');
+    await database.commissionRule.create({
+      data: {
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        organizationId: agenda.organizationId,
+        professionalMembershipId: agenda.membershipId,
+        type: 'SERVICE_PERCENTAGE',
+        value: 25,
+      },
+    });
+    const created = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        clientName: 'Cliente comisionable',
+        locationId: agenda.locationId,
+        professionalMembershipId: agenda.membershipId,
+        serviceIds: [agenda.serviceId],
+        startsAt: '2030-01-14T15:00:00.000Z',
+      },
+      url: '/v1/appointments',
+    });
+    expect(created.statusCode).toBe(201);
+    const appointmentId = created.json<{ appointment: { id: string } }>()
+      .appointment.id;
+
+    const completed = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'PATCH',
+      payload: { status: 'completed' },
+      url: `/v1/appointments/${appointmentId}/status`,
+    });
+    expect(completed.statusCode).toBe(200);
+    expect(await database.commissionEntry.count()).toBe(0);
+
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${agenda.ownerToken}` },
+          method: 'POST',
+          payload: { openingAmountCents: 0 },
+          url: '/v1/cash-register/open',
+        })
+      ).statusCode,
+    ).toBe(201);
+    const appointmentSale = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        amountCents: 1_200,
+        appointmentId,
+        description: 'Cobro completo de cita',
+        paymentMethod: 'cash',
+        type: 'sale',
+      },
+      url: '/v1/cash-register/movements',
+    });
+    expect(appointmentSale.statusCode).toBe(201);
+    expect(
+      await database.commissionEntry.findFirst({
+        where: { appointmentId },
+      }),
+    ).toMatchObject({
+      baseAmountCents: 1_200,
+      commissionAmountCents: 300,
+      professionalMembershipId: agenda.membershipId,
+      status: 'PENDING',
+    });
+
+    const repeatedCompletion = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'PATCH',
+      payload: { status: 'completed' },
+      url: `/v1/appointments/${appointmentId}/status`,
+    });
+    expect(repeatedCompletion.statusCode).toBe(200);
+    expect(
+      await database.commissionEntry.count({ where: { appointmentId } }),
+    ).toBe(1);
+
+    const paidFirst = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        clientName: 'Cliente cobrado primero',
+        locationId: agenda.locationId,
+        professionalMembershipId: agenda.membershipId,
+        serviceIds: [agenda.serviceId],
+        startsAt: '2030-01-14T16:00:00.000Z',
+      },
+      url: '/v1/appointments',
+    });
+    expect(paidFirst.statusCode).toBe(201);
+    const paidFirstAppointmentId = paidFirst.json<{
+      appointment: { id: string };
+    }>().appointment.id;
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${agenda.ownerToken}` },
+          method: 'POST',
+          payload: {
+            amountCents: 1_200,
+            appointmentId: paidFirstAppointmentId,
+            description: 'Cobro antes de completar',
+            paymentMethod: 'cash',
+            type: 'sale',
+          },
+          url: '/v1/cash-register/movements',
+        })
+      ).statusCode,
+    ).toBe(201);
+    expect(
+      await database.commissionEntry.count({
+        where: { appointmentId: paidFirstAppointmentId },
+      }),
+    ).toBe(0);
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${agenda.ownerToken}` },
+          method: 'PATCH',
+          payload: { status: 'completed' },
+          url: `/v1/appointments/${paidFirstAppointmentId}/status`,
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      await database.commissionEntry.findFirst({
+        where: { appointmentId: paidFirstAppointmentId },
+      }),
+    ).toMatchObject({ commissionAmountCents: 300 });
+
+    const manualSale = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        amountCents: 2_000,
+        description: 'Servicio vendido sin cita',
+        paymentMethod: 'card',
+        professionalMembershipId: agenda.membershipId,
+        serviceId: agenda.serviceId,
+        type: 'sale',
+      },
+      url: '/v1/cash-register/movements',
+    });
+    expect(manualSale.statusCode).toBe(201);
+    const manualMovementId = manualSale.json<{
+      movement: { id: string };
+    }>().movement.id;
+    const manualEntry = await database.commissionEntry.findUnique({
+      where: { cashMovementId: manualMovementId },
+    });
+    expect(manualEntry).toMatchObject({
+      appointmentId: null,
+      baseAmountCents: 2_000,
+      commissionAmountCents: 500,
+      professionalMembershipId: agenda.membershipId,
+      status: 'PENDING',
+    });
+    expect(manualEntry?.calculationSnapshot).toMatchObject({
+      serviceId: agenda.serviceId,
+      source: 'manual_sale',
+    });
   });
 
   it('audita caja, conserva el efectivo esperado y expone cierres en historial', async () => {

@@ -2,7 +2,7 @@
 
 Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión posterior documentada en `docs/adr/0003-postgresql-prisma-y-api-en-vps.md`. Se marca `[x]` solo cuando la tarea está implementada y cuenta con la verificación indicada; `[ ]` significa pendiente o aún no demostrada.
 
-Última actualización: 2026-07-30
+Última actualización: 2026-07-31
 
 ## Decisión de infraestructura vigente
 
@@ -23,7 +23,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [ ] Fase 4 — Reservas públicas _(implementada, verificada contra PostgreSQL y recorrida manualmente; quedan ajustes menores de UI/UX y configuración externa)_
 - [ ] Fase 5 — Clientes e historial _(directorio, creación, importación, historial vinculado y eliminación lógica implementados; edición, notas y fotografías privadas pendientes)_
 - [ ] Fase 6 — Caja y POS básico _(implementada técnicamente; validación manual en dispositivo físico diferida al cierre integral del MVP)_
-- [ ] Fase 7 — Comisiones
+- [ ] Fase 7 — Comisiones _(cálculo automático y ventas manuales comisionables implementados; liquidaciones y reversos pendientes)_
 - [ ] Fase 8 — Inventario básico
 - [ ] Fase 9 — Notificaciones
 - [ ] Fase 10 — Reportes esenciales
@@ -241,7 +241,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 
 ### Fase 6 — Caja y POS básico
 
-- [ ] Apertura, ventas, pagos, gastos, retiros, cierre y auditoría.
+- [x] Apertura, ventas, pagos, gastos, retiros, cierre y auditoría.
 
 ### Fase 7 — Comisiones
 
@@ -258,7 +258,7 @@ Decisión de alcance para el MVP:
 - productos y reglas de comisión de productos se integrarán junto con Inventario (Fase 8).
 - [x] Base de datos inicial de Comisiones creada mediante la migración `20260731214903_commission_engine`: reglas, entradas idempotentes con snapshot y liquidaciones.
 - [x] Alta de profesionales desde Gestión de colaboradores con comisión inicial persistida en la invitación. Al aceptar, se crea una regla `SERVICE_PERCENTAGE`; antes de aceptar no existe regla activa ni puede calcularse comisión.
-- [ ] Conectar el cálculo automático al cobro de citas y el registro manual comisionable desde Caja.
+- [x] Conectar el cálculo automático al cobro de citas y el registro manual comisionable desde Caja.
 
 ### Fase 8 — Inventario básico
 
@@ -2660,3 +2660,21 @@ Estado de este corte:
 - [x] Desglose desplegable de todos los métodos de pago (efectivo, tarjeta, transferencia y otro) y listado completo de movimientos, incluida la referencia de una cita vinculada cuando existe.
 - [x] Endpoint autenticado de detalle por sesión de caja y prueba PostgreSQL específica aprobada para los datos de cierre y movimientos.
 - [ ] Pruebas manuales en dispositivo físico diferidas al proceso final de validación integral del MVP; no bloquean el inicio de las fases siguientes.
+
+## Continuación de Fase 7 — Cálculo automático de comisiones
+
+- [x] Migración `20260731232000_commission_sources` aplicada en PostgreSQL de desarrollo y pruebas.
+- [x] Las ventas manuales de Caja pueden identificar servicio y profesional; las ventas libres continúan sin generar comisión.
+- [x] La API verifica que el servicio esté activo y asignado al profesional dentro de la organización y sucursal de la sesión.
+- [x] Una venta marcada como comisionable exige una regla vigente y crea su movimiento de Caja y entrada de comisión en una sola transacción.
+- [x] El cobro de una cita exige el importe completo, marca la cita como pagada y reconcilia la comisión en la misma transacción.
+- [x] La comisión de una cita se genera cuando coinciden los estados `COMPLETED` y `PAID`, independientemente del orden en que se registren.
+- [x] Cada servicio de cita y cada venta manual producen como máximo una entrada idempotente, con snapshot de servicio, base, regla y resultado.
+- [x] Las reglas específicas por servicio prevalecen sobre la regla general del profesional; dentro del mismo alcance se respeta prioridad y fecha de creación.
+- [x] Caja móvil permite elegir entre venta libre y servicio comisionable, seleccionando servicio y profesional asignado.
+- [x] Prisma validado y cliente regenerado; typecheck de API y móvil aprobado.
+- [x] Suite API/PostgreSQL: 23/23 pruebas aprobadas, incluyendo cobro antes/después de completar e idempotencia.
+- [x] ESLint de los archivos modificados, bundle de API y exportación Expo Web aprobados.
+- [ ] Implementar reversos auditables para anulaciones o devoluciones.
+- [ ] Implementar creación, aprobación y pago de liquidaciones.
+- [ ] Añadir consulta y gestión móvil de comisiones y liquidaciones.

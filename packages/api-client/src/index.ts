@@ -119,6 +119,8 @@ export interface CashMovementRecord {
   readonly description: string;
   readonly id: string;
   readonly paymentMethod: 'card' | 'cash' | 'other' | 'transfer' | null;
+  readonly professionalMembershipId: string | null;
+  readonly serviceId: string | null;
   readonly type: 'expense' | 'sale' | 'withdrawal';
 }
 
