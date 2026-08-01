@@ -2980,3 +2980,16 @@ consultar su vencimiento o cancelarla.
 Hasta completar esa dependencia, el flujo puede probarse con el esquema local
 `barbersaas://accept-invitation`; la regla de seguridad y activación no depende
 del dominio y ya queda preparada en el servidor.
+
+### Limpieza de invitaciones pendientes — 1 de agosto de 2026
+
+- [x] Se eliminaron de la base de desarrollo las 2 invitaciones `PENDING`, las
+      2 membresías `INVITED` y sus 2 asignaciones de sucursal asociadas.
+- [x] Verificación posterior: cero invitaciones, membresías o asignaciones
+      pendientes de activación.
+- [x] Las cuentas sin verificar se conservaron: no son colaboradoras activas y
+      pueden completar un registro válido o recibir una nueva invitación.
+- [ ] Corregir los botones de retorno heredados que ejecutan `router.back()` sin
+      confirmar `router.canGoBack()`. El aviso observado en `logs.log`
+      (`GO_BACK was not handled by any navigator`) solo ocurre en desarrollo,
+      pero debe resolverse con una ruta alternativa específica por pantalla.
