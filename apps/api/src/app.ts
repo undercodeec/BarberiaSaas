@@ -21,6 +21,7 @@ import {
   updateOnboardingCollaboratorSchema,
   updateOnboardingServiceSchema,
   updateOnboardingAccountDetailsSchema,
+  updateAccountTypeSchema,
   verifyEmailSchema,
 } from '@barber-saas/validation';
 import Fastify, { type FastifyRequest } from 'fastify';
@@ -1050,6 +1051,85 @@ export async function buildApi({
       }
       throw error;
     }
+  });
+
+  app.patch('/v1/onboarding/account-type', async (request) => {
+    const { user } = await authenticate(database, request);
+    const input = updateAccountTypeSchema.parse(request.body);
+    const [profile, membership] = await Promise.all([
+      database.userRegistrationProfile.findUnique({
+        where: { userId: user.id },
+      }),
+      database.membership.findFirst({
+        where: { status: MembershipStatus.ACTIVE, userId: user.id },
+      }),
+    ]);
+    if (!profile || !membership) {
+      throw new ApiError(
+        404,
+        'ACCOUNT_TYPE_NOT_AVAILABLE',
+        'No encontramos una cuenta activa para actualizar.',
+      );
+    }
+    if (membership.role !== MembershipRole.OWNER) {
+      throw new ApiError(
+        403,
+        'ACCOUNT_TYPE_OWNER_REQUIRED',
+        'Solo el propietario puede cambiar el tipo de cuenta.',
+      );
+    }
+    const nextType =
+      input.accountType === 'business'
+        ? RegistrationAccountType.BUSINESS
+        : RegistrationAccountType.PROFESSIONAL;
+    if (profile.accountType === nextType) {
+      return { accountType: input.accountType };
+    }
+    if (nextType === RegistrationAccountType.PROFESSIONAL) {
+      const [otherMembers, pendingInvitations, locations] = await Promise.all([
+        database.membership.count({
+          where: {
+            id: { not: membership.id },
+            organizationId: membership.organizationId,
+            status: MembershipStatus.ACTIVE,
+          },
+        }),
+        database.teamInvitation.count({
+          where: {
+            organizationId: membership.organizationId,
+            status: 'PENDING',
+          },
+        }),
+        database.location.count({
+          where: { isActive: true, organizationId: membership.organizationId },
+        }),
+      ]);
+      if (otherMembers > 0 || pendingInvitations > 0 || locations > 1) {
+        throw new ApiError(
+          409,
+          'PROFESSIONAL_ACCOUNT_REQUIRES_SOLO_OPERATION',
+          'Para cambiar a Solo yo, primero retira los colaboradores activos, cancela las invitaciones pendientes y conserva una sola sucursal.',
+        );
+      }
+    }
+    await database.$transaction([
+      database.userRegistrationProfile.update({
+        data: { accountType: nextType },
+        where: { userId: user.id },
+      }),
+      database.auditLog.create({
+        data: {
+          action: 'account_type.updated',
+          actorUserId: user.id,
+          afterData: { accountType: input.accountType },
+          beforeData: { accountType: profile.accountType.toLowerCase() },
+          entityId: membership.id,
+          entityType: 'membership',
+          organizationId: membership.organizationId,
+        },
+      }),
+    ]);
+    return { accountType: input.accountType };
   });
 
   app.post('/v1/onboarding/complete-account-setup', async (request) => {

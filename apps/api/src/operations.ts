@@ -2,6 +2,7 @@ import {
   InvitationStatus,
   MembershipRole,
   MembershipStatus,
+  SubscriptionStatus,
   type DatabaseClient,
 } from '@barber-saas/database';
 import {
@@ -17,6 +18,7 @@ import {
   createServiceSchema,
   createTeamInvitationSchema,
   replaceWeeklySchedulesSchema,
+  updateServiceSchema,
   updateTeamMemberSchema,
 } from '@barber-saas/validation';
 import { z } from 'zod';
@@ -28,7 +30,42 @@ import type { InvitationMailer } from './recovery-mailer';
 import { createOpaqueToken, hashOpaqueToken } from './security';
 
 const INVITATION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const TRIAL_DAYS = 14;
+const GRACE_DAYS = 7;
 const teamRecordParamsSchema = z.object({ id: z.uuid() });
+const SUBSCRIPTION_PLANS = [
+  {
+    available: true,
+    code: 'essential',
+    features: [
+      'Una sucursal',
+      'Colaboradores ilimitados',
+      'Agenda, clientes, servicios y reservas',
+      'Página pública y enlace de reservas',
+      'Caja, Nava Wallet y comisiones',
+      'Permisos por perfil de acceso',
+      'Reportes esenciales',
+    ],
+    limits: { locations: 1, teamMembers: null },
+    name: 'Esencial',
+    sortOrder: 10,
+  },
+  {
+    available: false,
+    code: 'multi',
+    features: [
+      'Hasta cinco sucursales',
+      'Agenda y reportes consolidados',
+      'Caja y configuración por sucursal',
+      'Permisos con alcance por sucursal',
+      'Soporte prioritario',
+    ],
+    limits: { locations: 5, teamMembers: null },
+    name: 'Multi',
+    sortOrder: 20,
+  },
+] as const;
 
 interface AuthenticatedIdentity {
   readonly user: {
@@ -150,6 +187,119 @@ export function registerOperationsRoutes(
   invitationMailer: InvitationMailer | null,
   config: ApiConfig,
 ) {
+  app.get('/v1/subscription', async (request) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(database, user.id);
+    const now = new Date();
+    const trialEndsAt = new Date(now.getTime() + TRIAL_DAYS * DAY_MS);
+    const graceEndsAt = new Date(trialEndsAt.getTime() + GRACE_DAYS * DAY_MS);
+    const { plans, subscription } = await database.$transaction(
+      async (transaction) => {
+        const storedPlans = [];
+        for (const definition of SUBSCRIPTION_PLANS) {
+          storedPlans.push(
+            await transaction.plan.upsert({
+              create: {
+                code: definition.code,
+                features: [...definition.features],
+                isPublic: definition.available,
+                limits: definition.limits,
+                name: definition.name,
+                sortOrder: definition.sortOrder,
+              },
+              update: {
+                features: [...definition.features],
+                isActive: true,
+                isPublic: definition.available,
+                limits: definition.limits,
+                name: definition.name,
+                sortOrder: definition.sortOrder,
+              },
+              where: { code: definition.code },
+            }),
+          );
+        }
+        const essential = storedPlans.find(({ code }) => code === 'essential');
+        if (!essential) throw new Error('El plan Esencial no está disponible.');
+        let activeSubscription = await transaction.subscription.upsert({
+          create: {
+            currentPeriodEnd: trialEndsAt,
+            currentPeriodStart: now,
+            graceEndsAt,
+            organizationId: current.organizationId,
+            planId: essential.id,
+            status: SubscriptionStatus.TRIAL,
+            trialEndsAt,
+          },
+          update: {},
+          where: { organizationId: current.organizationId },
+        });
+        if (
+          activeSubscription.status === SubscriptionStatus.TRIAL &&
+          activeSubscription.trialEndsAt &&
+          activeSubscription.trialEndsAt <= now
+        ) {
+          activeSubscription = await transaction.subscription.update({
+            data: { status: SubscriptionStatus.PAST_DUE },
+            where: { id: activeSubscription.id },
+          });
+        }
+        if (
+          activeSubscription.status === SubscriptionStatus.PAST_DUE &&
+          activeSubscription.graceEndsAt &&
+          activeSubscription.graceEndsAt <= now
+        ) {
+          activeSubscription = await transaction.subscription.update({
+            data: { status: SubscriptionStatus.SUSPENDED },
+            where: { id: activeSubscription.id },
+          });
+        }
+        return { plans: storedPlans, subscription: activeSubscription };
+      },
+    );
+    const [locations, teamMembers] = await Promise.all([
+      database.location.count({
+        where: { isActive: true, organizationId: current.organizationId },
+      }),
+      database.membership.count({
+        where: {
+          organizationId: current.organizationId,
+          status: MembershipStatus.ACTIVE,
+        },
+      }),
+    ]);
+    const currentPlan = plans.find(({ id }) => id === subscription.planId);
+    if (!currentPlan)
+      throw new Error('La suscripción no tiene un plan válido.');
+    return {
+      current: {
+        currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
+        graceEndsAt: subscription.graceEndsAt?.toISOString() ?? null,
+        planCode: currentPlan.code,
+        readOnly:
+          subscription.status === SubscriptionStatus.CANCELLED ||
+          subscription.status === SubscriptionStatus.SUSPENDED,
+        status: subscription.status.toLowerCase(),
+        trialEndsAt: subscription.trialEndsAt?.toISOString() ?? null,
+      },
+      plans: plans.map((plan) => {
+        const definition = SUBSCRIPTION_PLANS.find(
+          ({ code }) => code === plan.code,
+        );
+        return {
+          available: definition?.available ?? false,
+          code: plan.code,
+          currencyCode: plan.currencyCode,
+          features: plan.features,
+          limits: plan.limits,
+          monthlyPriceCents: plan.monthlyPriceCents,
+          name: plan.name,
+        };
+      }),
+      usage: { locations, teamMembers },
+    };
+  });
+
   app.get('/v1/team', async (request) => {
     const { user } = await authenticate(database, request);
     const current = await requireMembership(database, user.id);
@@ -765,6 +915,7 @@ export function registerOperationsRoutes(
           membershipId: assignment.membershipId,
         })),
         categoryId: service.categoryId,
+        description: service.description,
         durationMinutes: service.durationMinutes,
         id: service.id,
         name: service.name,
@@ -817,28 +968,187 @@ export function registerOperationsRoutes(
           'La categoría no existe.',
         );
     }
-    const service = await database.service.create({
-      data: {
-        categoryId: input.categoryId ?? null,
-        description: input.description ?? null,
-        durationMinutes: input.durationMinutes,
-        name: input.name,
-        onlineBooking: input.onlineBooking,
-        organizationId: current.organizationId,
-        priceCents: input.priceCents,
+    const existing = await database.service.findUnique({
+      where: {
+        organizationId_name: {
+          name: input.name,
+          organizationId: current.organizationId,
+        },
       },
     });
-    await database.auditLog.create({
-      data: {
-        action: 'service.created',
-        actorUserId: user.id,
-        afterData: input,
-        entityId: service.id,
-        entityType: 'service',
-        organizationId: current.organizationId,
-      },
+    if (existing?.isActive) {
+      throw new ApiError(
+        409,
+        'SERVICE_NAME_ALREADY_EXISTS',
+        'Ya existe un servicio activo con ese nombre.',
+      );
+    }
+    const service = await database.$transaction(async (transaction) => {
+      const record = existing
+        ? await transaction.service.update({
+            data: {
+              categoryId: input.categoryId ?? null,
+              description: input.description ?? null,
+              durationMinutes: input.durationMinutes,
+              isActive: true,
+              onlineBooking: input.onlineBooking,
+              priceCents: input.priceCents,
+            },
+            where: { id: existing.id },
+          })
+        : await transaction.service.create({
+            data: {
+              categoryId: input.categoryId ?? null,
+              description: input.description ?? null,
+              durationMinutes: input.durationMinutes,
+              name: input.name,
+              onlineBooking: input.onlineBooking,
+              organizationId: current.organizationId,
+              priceCents: input.priceCents,
+            },
+          });
+      await transaction.auditLog.create({
+        data: {
+          action: existing ? 'service.reactivated' : 'service.created',
+          actorUserId: user.id,
+          afterData: input,
+          ...(existing
+            ? {
+                beforeData: {
+                  isActive: existing.isActive,
+                  name: existing.name,
+                  onlineBooking: existing.onlineBooking,
+                },
+              }
+            : {}),
+          entityId: record.id,
+          entityType: 'service',
+          organizationId: current.organizationId,
+        },
+      });
+      return record;
     });
     return reply.code(201).send({ service });
+  });
+
+  app.patch('/v1/services/:id', async (request) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(
+      database,
+      user.id,
+      'service.manage',
+    );
+    const { id } = teamRecordParamsSchema.parse(request.params);
+    const input = updateServiceSchema.parse(request.body);
+    const service = await database.service.findFirst({
+      where: { id, isActive: true, organizationId: current.organizationId },
+    });
+    if (!service) {
+      throw new ApiError(404, 'SERVICE_NOT_FOUND', 'El servicio no existe.');
+    }
+    if (input.categoryId) {
+      const category = await database.serviceCategory.findFirst({
+        where: {
+          id: input.categoryId,
+          isActive: true,
+          organizationId: current.organizationId,
+        },
+      });
+      if (!category) {
+        throw new ApiError(
+          404,
+          'CATEGORY_NOT_FOUND',
+          'La categoría no existe.',
+        );
+      }
+    }
+    const duplicate = await database.service.findFirst({
+      where: {
+        id: { not: service.id },
+        name: input.name,
+        organizationId: current.organizationId,
+      },
+    });
+    if (duplicate) {
+      throw new ApiError(
+        409,
+        'SERVICE_NAME_ALREADY_EXISTS',
+        'Ya existe otro servicio con ese nombre.',
+      );
+    }
+    const updated = await database.$transaction(async (transaction) => {
+      const record = await transaction.service.update({
+        data: {
+          categoryId: input.categoryId ?? null,
+          description: input.description ?? null,
+          durationMinutes: input.durationMinutes,
+          name: input.name,
+          onlineBooking: input.onlineBooking,
+          priceCents: input.priceCents,
+        },
+        where: { id: service.id },
+      });
+      await transaction.auditLog.create({
+        data: {
+          action: 'service.updated',
+          actorUserId: user.id,
+          afterData: input,
+          beforeData: {
+            categoryId: service.categoryId,
+            description: service.description,
+            durationMinutes: service.durationMinutes,
+            name: service.name,
+            onlineBooking: service.onlineBooking,
+            priceCents: service.priceCents,
+          },
+          entityId: service.id,
+          entityType: 'service',
+          organizationId: current.organizationId,
+        },
+      });
+      return record;
+    });
+    return { service: updated };
+  });
+
+  app.delete('/v1/services/:id', async (request, reply) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(
+      database,
+      user.id,
+      'service.manage',
+    );
+    const { id } = teamRecordParamsSchema.parse(request.params);
+    const service = await database.service.findFirst({
+      where: { id, isActive: true, organizationId: current.organizationId },
+    });
+    if (!service) {
+      throw new ApiError(404, 'SERVICE_NOT_FOUND', 'El servicio no existe.');
+    }
+    await database.$transaction(async (transaction) => {
+      await transaction.professionalService.deleteMany({
+        where: { serviceId: service.id },
+      });
+      await transaction.service.update({
+        data: { isActive: false, onlineBooking: false },
+        where: { id: service.id },
+      });
+      await transaction.auditLog.create({
+        data: {
+          action: 'service.archived',
+          actorUserId: user.id,
+          beforeData: {
+            isActive: service.isActive,
+            name: service.name,
+            onlineBooking: service.onlineBooking,
+          },
+          entityId: service.id,
+          entityType: 'service',
+          organizationId: current.organizationId,
+        },
+      });
+    });
+    return reply.code(204).send();
   });
 
   app.post('/v1/services/assignments', async (request, reply) => {

@@ -27,6 +27,14 @@ enum OrganizationStatus {
   CANCELLED
 }
 
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+}
+
 enum InvitationStatus {
   PENDING
   ACCEPTED
@@ -363,8 +371,46 @@ model Organization {
   clientLabels                       ClientLabel[]
   clientNotes                        ClientNote[]
   appNotifications                   AppNotification[]
+  subscription                       Subscription?
 
   @@map("organizations")
+}
+
+model Plan {
+  id                String         @id @default(uuid()) @db.Uuid
+  code              String         @unique @db.VarChar(40)
+  name              String         @db.VarChar(80)
+  monthlyPriceCents Int?           @map("monthly_price_cents")
+  currencyCode      String         @default("USD") @map("currency_code") @db.Char(3)
+  limits            Json           @default("{}")
+  features          Json           @default("[]")
+  isActive          Boolean        @default(true) @map("is_active")
+  isPublic          Boolean        @default(false) @map("is_public")
+  sortOrder         Int            @default(0) @map("sort_order")
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  subscriptions     Subscription[]
+
+  @@index([isActive, sortOrder])
+  @@map("plans")
+}
+
+model Subscription {
+  id                 String             @id @default(uuid()) @db.Uuid
+  organizationId     String             @unique @map("organization_id") @db.Uuid
+  planId             String             @map("plan_id") @db.Uuid
+  status             SubscriptionStatus @default(TRIAL)
+  trialEndsAt        DateTime?          @map("trial_ends_at") @db.Timestamptz(3)
+  graceEndsAt        DateTime?          @map("grace_ends_at") @db.Timestamptz(3)
+  currentPeriodStart DateTime           @map("current_period_start") @db.Timestamptz(3)
+  currentPeriodEnd   DateTime           @map("current_period_end") @db.Timestamptz(3)
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan               Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@index([planId, status])
+  @@map("subscriptions")
 }
 
 model Client {

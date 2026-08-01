@@ -751,6 +751,75 @@ describeWithDatabase('API con PostgreSQL', () => {
     );
   });
 
+  it('expone suscripción simulada y protege el cambio a cuenta individual', async () => {
+    const ownerToken = await register('settings-owner@example.com');
+    const organization = await onboard(ownerToken, 'settings-account');
+
+    const subscriptionResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      url: '/v1/subscription',
+    });
+    expect(subscriptionResponse.statusCode).toBe(200);
+    expect(
+      subscriptionResponse.json<{
+        current: { planCode: string; status: string };
+        plans: Array<{ available: boolean; code: string }>;
+        usage: { locations: number; teamMembers: number };
+      }>(),
+    ).toMatchObject({
+      current: { planCode: 'essential', status: 'trial' },
+      plans: expect.arrayContaining([
+        expect.objectContaining({ available: true, code: 'essential' }),
+        expect.objectContaining({ available: false, code: 'multi' }),
+      ]),
+      usage: { locations: 1, teamMembers: 1 },
+    });
+
+    const professionalResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'PATCH',
+      payload: { accountType: 'professional' },
+      url: '/v1/onboarding/account-type',
+    });
+    expect(professionalResponse.statusCode).toBe(200);
+    expect(
+      professionalResponse.json<{ accountType: string }>().accountType,
+    ).toBe('professional');
+
+    const businessResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'PATCH',
+      payload: { accountType: 'business' },
+      url: '/v1/onboarding/account-type',
+    });
+    expect(businessResponse.statusCode).toBe(200);
+
+    const invitationResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        email: 'settings-invited@example.com',
+        fullName: 'Invitado pendiente',
+        locationId: organization.locationId,
+        role: 'receptionist',
+      },
+      url: '/v1/team/invitations',
+    });
+    expect(invitationResponse.statusCode).toBe(201);
+
+    const blockedResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'PATCH',
+      payload: { accountType: 'professional' },
+      url: '/v1/onboarding/account-type',
+    });
+    expect(blockedResponse.statusCode).toBe(409);
+    expect(blockedResponse.json<{ code: string }>().code).toBe(
+      'PROFESSIONAL_ACCOUNT_REQUIRES_SOLO_OPERATION',
+    );
+  });
+
   it('configura equipo, servicios y horarios con auditoría', async () => {
     const ownerToken = await register('phase2-owner@example.com');
     const organization = await onboard(ownerToken, 'fase-dos');
@@ -839,6 +908,26 @@ describeWithDatabase('API con PostgreSQL', () => {
     const serviceId = serviceResponse.json<{ service: { id: string } }>()
       .service.id;
 
+    const updateServiceResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'PATCH',
+      payload: {
+        categoryId,
+        description: 'Servicio actualizado desde gestión',
+        durationMinutes: 45,
+        name: 'Corte clásico actualizado',
+        onlineBooking: false,
+        priceCents: 1500,
+      },
+      url: `/v1/services/${serviceId}`,
+    });
+    expect(updateServiceResponse.statusCode).toBe(200);
+    expect(
+      updateServiceResponse.json<{
+        service: { durationMinutes: number; onlineBooking: boolean };
+      }>().service,
+    ).toMatchObject({ durationMinutes: 45, onlineBooking: false });
+
     const assignmentResponse = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },
       method: 'POST',
@@ -867,6 +956,41 @@ describeWithDatabase('API con PostgreSQL', () => {
       url: '/v1/schedules',
     });
     expect(scheduleResponse.statusCode).toBe(200);
+
+    const archiveServiceResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'DELETE',
+      url: `/v1/services/${serviceId}`,
+    });
+    expect(archiveServiceResponse.statusCode).toBe(204);
+    const servicesAfterArchive = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      url: '/v1/services',
+    });
+    expect(
+      servicesAfterArchive
+        .json<{ services: Array<{ id: string }> }>()
+        .services.some(({ id }) => id === serviceId),
+    ).toBe(false);
+
+    const reactivateServiceResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        categoryId,
+        description: 'Servicio reactivado desde gestión',
+        durationMinutes: 40,
+        name: 'Corte clásico actualizado',
+        onlineBooking: true,
+        priceCents: 1450,
+      },
+      url: '/v1/services',
+    });
+    expect(reactivateServiceResponse.statusCode).toBe(201);
+    expect(
+      reactivateServiceResponse.json<{ service: { id: string } }>().service.id,
+    ).toBe(serviceId);
 
     const barberToken = await register('phase2-barber@example.com');
     const accessBeforeAcceptance = await app.inject({
@@ -989,6 +1113,9 @@ describeWithDatabase('API con PostgreSQL', () => {
         'team.invitation.accepted',
         'service_category.created',
         'service.created',
+        'service.updated',
+        'service.archived',
+        'service.reactivated',
         'professional_service.assigned',
         'weekly_schedule.replaced',
         'schedule_block.created',

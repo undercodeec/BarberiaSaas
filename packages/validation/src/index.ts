@@ -292,6 +292,12 @@ export const createServiceSchema = z.object({
   priceCents: z.number().int().min(0, 'El precio no puede ser negativo.'),
 });
 
+export const updateServiceSchema = createServiceSchema;
+
+export const updateAccountTypeSchema = z.object({
+  accountType: z.enum(['business', 'professional']),
+});
+
 export const assignProfessionalServiceSchema = z.object({
   customDurationMinutes: durationMinutesSchema.nullish(),
   customPriceCents: z.number().int().min(0).nullish(),
@@ -516,6 +522,8 @@ export type CreateServiceCategoryInput = z.infer<
   typeof createServiceCategorySchema
 >;
 export type CreateServiceInput = z.infer<typeof createServiceSchema>;
+export type UpdateServiceInput = z.infer<typeof updateServiceSchema>;
+export type UpdateAccountTypeInput = z.infer<typeof updateAccountTypeSchema>;
 export type CreateTeamInvitationInput = z.infer<
   typeof createTeamInvitationSchema
 >;

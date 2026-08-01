@@ -88,7 +88,14 @@ export default function AdvancedSettingsScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.card}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/account-type' as never)}
+          style={({ pressed }) => [
+            styles.card,
+            pressed ? styles.pressed : null,
+          ]}
+        >
           <View style={styles.cardIcon}>
             <Ionicons
               color={COLORS.text}
@@ -102,15 +109,13 @@ export default function AdvancedSettingsScreen() {
               {isBusiness ? 'Tengo un negocio' : 'Solo yo'}
             </Text>
           </View>
-          <View style={styles.configuredBadge}>
-            <Text style={styles.configuredLabel}>Configurado</Text>
-          </View>
-        </View>
+          <Ionicons color={COLORS.text} name="chevron-forward" size={23} />
+        </Pressable>
 
         {isBusiness ? (
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push('/team-management')}
+            onPress={() => router.push('/collaborator-permissions' as never)}
             style={({ pressed }) => [
               styles.card,
               pressed ? styles.pressed : null,
@@ -126,7 +131,7 @@ export default function AdvancedSettingsScreen() {
             <View style={styles.cardCopy}>
               <Text style={styles.cardTitle}>Permisos a colaboradores</Text>
               <Text style={styles.cardDescription}>
-                Abre la gestión del equipo y sus accesos.
+                Asigna perfiles de acceso y consulta sus capacidades.
               </Text>
             </View>
             <Ionicons color={COLORS.text} name="chevron-forward" size={23} />
@@ -172,7 +177,7 @@ export default function AdvancedSettingsScreen() {
         </View>
 
         <ComingSoonRow
-          description="Opciones adicionales para personalizar el software."
+          description="Idioma, zona horaria, moneda, formatos regionales y preferencias operativas por defecto."
           title="Configuración general"
         />
         <Pressable

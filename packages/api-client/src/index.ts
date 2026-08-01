@@ -299,6 +299,7 @@ export interface ServiceRecord {
     readonly membershipId: string;
   }>;
   readonly categoryId: string | null;
+  readonly description: string | null;
   readonly durationMinutes: number;
   readonly id: string;
   readonly name: string;
@@ -312,6 +313,36 @@ export interface ServicesResponse {
     readonly name: string;
   }>;
   readonly services: readonly ServiceRecord[];
+}
+
+export interface SubscriptionPlanRecord {
+  readonly available: boolean;
+  readonly code: 'essential' | 'multi';
+  readonly currencyCode: string;
+  readonly features: readonly string[];
+  readonly limits: {
+    readonly locations: number;
+    readonly teamMembers: null;
+  };
+  readonly monthlyPriceCents: number | null;
+  readonly name: string;
+}
+
+export interface SubscriptionResponse {
+  readonly current: {
+    readonly currentPeriodEnd: string;
+    readonly graceEndsAt: string | null;
+    readonly planCode: 'essential' | 'multi';
+    readonly readOnly: boolean;
+    readonly status:
+      'active' | 'cancelled' | 'past_due' | 'suspended' | 'trial';
+    readonly trialEndsAt: string | null;
+  };
+  readonly plans: readonly SubscriptionPlanRecord[];
+  readonly usage: {
+    readonly locations: number;
+    readonly teamMembers: number;
+  };
 }
 
 export interface ClientLabelRecord {

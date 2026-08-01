@@ -101,6 +101,7 @@ const settingsSections: readonly SettingsSection[] = [
         description: '\u00a1Tu negocio est\u00e1 en buenas manos!',
         icon: 'sparkles-outline',
         id: 'subscription',
+        route: '/subscription',
         title: 'Suscripci\u00f3n',
       },
     ],

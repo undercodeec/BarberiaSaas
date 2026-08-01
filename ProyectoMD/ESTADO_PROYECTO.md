@@ -2993,3 +2993,68 @@ del dominio y ya queda preparada en el servidor.
       confirmar `router.canGoBack()`. El aviso observado en `logs.log`
       (`GO_BACK was not handled by any navigator`) solo ocurre en desarrollo,
       pero debe resolverse con una ruta alternativa específica por pantalla.
+
+## Suscripción, servicios y configuración de acceso — 1 de agosto de 2026
+
+### Suscripción simulada
+
+- [x] Modelos `Plan` y `Subscription` con estados `TRIAL`, `ACTIVE`, `PAST_DUE`,
+      `SUSPENDED` y `CANCELLED`.
+- [x] Migración `20260801195214_subscription_plans` aplicada en desarrollo y
+      pruebas.
+- [x] Definiciones de Esencial y Multi viven en backend, sin precios
+      provisionales ni cobro real.
+- [x] Esencial ofrece prueba de 14 días y período de gracia de siete días;
+      después puede marcar la suscripción en modo de solo lectura.
+- [x] Multi permanece visible como `Próximamente` y no puede activarse.
+- [x] `GET /v1/subscription` devuelve plan, estado, fechas, funciones y consumo
+      de sucursales e integrantes.
+- [x] Ruta móvil `/subscription` conectada desde Ajustes del negocio, con plan
+      actual, estado, uso y comparación de planes.
+- [ ] Integrar facturación de Nava únicamente cuando existan proveedor, precios,
+      política comercial y revisión legal aprobados.
+
+### Gestión de servicios
+
+- [x] Cada servicio activo abre edición de nombre, descripción, categoría,
+      duración, precio y disponibilidad para reservas en línea.
+- [x] `PATCH /v1/services/:id` valida organización, permiso, categoría y nombre
+      duplicado; registra auditoría antes/después.
+- [x] `DELETE /v1/services/:id` realiza baja lógica, retira asignaciones activas
+      y conserva las citas históricas; registra `service.archived`.
+- [x] Crear nuevamente un nombre archivado reactiva el mismo servicio, conserva
+      su identidad histórica y registra `service.reactivated`; un nombre activo
+      duplicado devuelve conflicto controlado.
+- [x] La UI confirma la eliminación y actualiza el catálogo sin recargar.
+
+### Tipo de cuenta y permisos
+
+- [x] `Tipo de cuenta` abre `/account-type` y permite cambiar entre `Solo yo` y
+      `Tengo un negocio` sin eliminar información operativa.
+- [x] Solo el propietario puede cambiar el tipo. El cambio a `Solo yo` se bloquea
+      si existen colaboradores activos, invitaciones pendientes o más de una
+      sucursal.
+- [x] `Permisos a colaboradores` abre una página separada y asigna perfiles de
+      acceso Administrador, Recepción o Profesional usando el RBAC vigente.
+- [x] Los perfiles muestran sus capacidades y la API sigue siendo la autoridad
+      final; los permisos no se duplican como reglas editables en el cliente.
+- [ ] Permisos personalizados por acción y alcance de sucursal quedan para una
+      fase posterior que centralice excepciones en backend y auditoría.
+
+### Configuración general definida
+
+La futura pantalla `Configuración general` agrupará idioma, zona horaria,
+moneda, formatos regionales de fecha/hora y preferencias operativas por defecto.
+No incluirá política de reservas, permisos, suscripción, Wallet ni información
+del negocio, porque esas funciones ya tienen secciones independientes. Antes de
+habilitar cambios de zona horaria o moneda se debe definir cómo afectan citas,
+caja, comisiones y registros históricos.
+
+### Verificación
+
+- [x] Typecheck de API, móvil, cliente y validaciones compartidas.
+- [x] ESLint de todos los archivos modificados.
+- [x] Suite API/PostgreSQL: 26/26 pruebas aprobadas.
+- [x] Suite móvil: 3 archivos y 5/5 pruebas aprobadas; exportación Web de Expo
+      completada sin errores de compilación.
+- [ ] Recorrido visual manual de las nuevas pantallas en Android, iOS y Web.
