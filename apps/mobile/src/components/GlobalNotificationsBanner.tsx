@@ -5,9 +5,10 @@ import type {
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Easing,
   Modal,
   Pressable,
   ScrollView,
@@ -40,7 +41,36 @@ export function GlobalNotificationsBanner() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
+  const borderDotProgress = useRef(new Animated.Value(0)).current;
   const [translateX] = useState(() => new Animated.Value(-520));
+  useEffect(() => {
+    let isActive = true;
+
+    const animateBorderDot = () => {
+      borderDotProgress.setValue(0);
+      Animated.timing(borderDotProgress, {
+        duration: 24_000,
+        easing: Easing.linear,
+        isInteraction: false,
+        toValue: 1,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished && isActive) animateBorderDot();
+      });
+    };
+
+    animateBorderDot();
+    return () => {
+      isActive = false;
+      borderDotProgress.stopAnimation();
+    };
+  }, [borderDotProgress]);
+
+  const borderDotRotation = borderDotProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
   const query = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -95,12 +125,23 @@ export function GlobalNotificationsBanner() {
   return (
     <>
       <Pressable
-        accessibilityLabel="Notificaciones"
+        accessibilityLabel={
+          unread ? `Notificaciones, ${unread} sin leer` : 'Notificaciones'
+        }
         accessibilityRole="button"
         onPress={openBanner}
         style={[styles.trigger, { top: insets.top + 14 }]}
       >
-        <Ionicons color="#FFFFFF" name="notifications-outline" size={24} />
+        <Ionicons color="#B47D17" name="notifications-outline" size={24} />
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.borderDotOrbit,
+            { transform: [{ rotate: borderDotRotation }] },
+          ]}
+        >
+          <View style={styles.borderDot} />
+        </Animated.View>
         {unread ? (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
@@ -234,18 +275,34 @@ const styles = StyleSheet.create({
   },
   badge: {
     alignItems: 'center',
-    backgroundColor: '#D92D20',
-    borderColor: '#FFFFFF',
+    backgroundColor: '#B47D17',
     borderRadius: 11,
-    borderWidth: 2,
     height: 22,
     justifyContent: 'center',
-    position: 'absolute',
-    right: -6,
-    top: -6,
     minWidth: 22,
+    position: 'absolute',
+    right: -8,
+    top: 15,
   },
   badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+  borderDot: {
+    backgroundColor: '#B47D17',
+    borderRadius: 3,
+    height: 6,
+    left: '50%',
+    marginLeft: -3,
+    position: 'absolute',
+    top: -3,
+    width: 6,
+  },
+  borderDotOrbit: {
+    height: 52,
+    left: 0,
+    position: 'absolute',
+    top: 0,
+    width: 52,
+    zIndex: 2,
+  },
   banner: {
     backgroundColor: '#FFFFFF',
     bottom: 0,
@@ -324,17 +381,15 @@ const styles = StyleSheet.create({
   title: { color: '#101c2d', fontSize: 23, fontWeight: '900' },
   trigger: {
     alignItems: 'center',
-    backgroundColor: '#C79532',
-    borderColor: '#FFFFFF',
+    backgroundColor: '#FFFFFF',
     borderRadius: 26,
-    borderWidth: 2,
     elevation: 16,
     height: 52,
     justifyContent: 'center',
     position: 'absolute',
     right: 18,
-    shadowColor: '#956816',
-    shadowOpacity: 0.28,
+    shadowColor: '#B47D17',
+    shadowOpacity: 0.22,
     shadowRadius: 10,
     width: 52,
     zIndex: 9999,

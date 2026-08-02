@@ -12,6 +12,7 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
+  Image,
   Modal,
   PanResponder,
   Platform,
@@ -415,9 +416,7 @@ const dashboardProgressStyles = StyleSheet.create({
   label: {
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.74)',
-    borderColor: 'rgba(199, 149, 50, 0.28)',
     borderRadius: 20,
-    borderWidth: 1,
     bottom: 18,
     flexDirection: 'row',
     gap: 7,
@@ -426,7 +425,7 @@ const dashboardProgressStyles = StyleSheet.create({
     paddingVertical: 7,
     position: 'absolute',
     right: 18,
-    shadowColor: '#956816',
+    shadowColor: '#B47D17',
     shadowOpacity: 0.1,
     shadowRadius: 8,
     zIndex: 5,
@@ -529,6 +528,54 @@ function QuickAction({
       </View>
       <Text style={styles.quickLabel}>{label}</Text>
     </Pressable>
+  );
+}
+
+function OpenButtonFlare() {
+  const translateX = useRef(new Animated.Value(-25)).current;
+
+  useEffect(() => {
+    let isActive = true;
+
+    const move = (toValue: number): void => {
+      Animated.timing(translateX, {
+        duration: 6_500,
+        easing: Easing.inOut(Easing.sin),
+        isInteraction: false,
+        toValue,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished && isActive) move(toValue > 0 ? -25 : 25);
+      });
+    };
+
+    move(25);
+    return () => {
+      isActive = false;
+      translateX.stopAnimation();
+    };
+  }, [translateX]);
+
+  const opacity = translateX.interpolate({
+    extrapolate: 'clamp',
+    inputRange: [-25, 0, 25],
+    outputRange: [0.7, 1, 0.7],
+  });
+  const scale = translateX.interpolate({
+    extrapolate: 'clamp',
+    inputRange: [-25, 0, 25],
+    outputRange: [0.86, 1.22, 0.86],
+  });
+
+  return (
+    <View pointerEvents="none" style={styles.openButtonBottomGlow}>
+      <Animated.View
+        style={[
+          styles.openButtonFlare,
+          { opacity, transform: [{ translateX }, { scale }] },
+        ]}
+      />
+    </View>
   );
 }
 
@@ -1132,7 +1179,10 @@ export default function DashboardScreen() {
     boolean | null
   >(null);
   const [isLocationBannerOpen, setIsLocationBannerOpen] = useState(false);
-  const bookingUrl = accountQuery.data?.bookingUrl ?? '';
+  const rawBookingUrl = accountQuery.data?.bookingUrl?.trim() ?? '';
+  const bookingUrl = /^https?:\/\/\S+$/i.test(rawBookingUrl)
+    ? rawBookingUrl
+    : '';
   const shouldShowWelcome =
     accountQuery.isSuccess && !accountQuery.data?.onboardingCompletedAt;
   const unavailable = (title: string) =>
@@ -1398,31 +1448,46 @@ export default function DashboardScreen() {
         ) : null}
 
         <View style={styles.reservationCard}>
-          <View style={styles.cardHeading}>
-            <Text style={styles.cardTitle}>Recibe reservas</Text>
-            <View style={styles.qrBadge}>
-              <Ionicons color="#B47D17" name="qr-code-outline" size={31} />
-              <View style={styles.qrSparkle} />
-            </View>
-          </View>
-          <Text style={styles.cardCopy}>
-            Comparte el enlace de reservas de tu negocio en tus redes sociales y
-            aumenta tus citas.
-          </Text>
-          <View style={styles.linkBox}>
-            <View style={styles.linkCopy}>
-              <Text style={styles.linkLabel}>Enlace de tu negocio</Text>
-              <Text numberOfLines={2} style={styles.linkValue}>
-                {bookingUrl || 'Preparando tu enlace de reservas'}
+          <View style={styles.reservationTopRow}>
+            <View style={styles.reservationCopyColumn}>
+              <Text style={styles.cardTitle}>Recibe reservas</Text>
+              <Text style={styles.cardCopy}>
+                Comparte el enlace de reservas de tu negocio en tus redes
+                sociales y aumenta tus citas.
               </Text>
+              <View style={[styles.linkBox, styles.reservationLinkBox]}>
+                <View style={styles.linkCopy}>
+                  <Text style={styles.linkLabel}>Enlace de tu negocio</Text>
+                  <Text
+                    ellipsizeMode="middle"
+                    numberOfLines={1}
+                    style={styles.linkValue}
+                  >
+                    {bookingUrl || 'Preparando tu enlace de reservas'}
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setIsBookingSheetOpen(true)}
+                  style={[styles.openButton, styles.reservationOpenButton]}
+                >
+                  <View
+                    pointerEvents="none"
+                    style={styles.openButtonInnerBorder}
+                  />
+                  <Text style={styles.openLabel}>Abrir</Text>
+                  <OpenButtonFlare />
+                </Pressable>
+              </View>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setIsBookingSheetOpen(true)}
-              style={styles.openButton}
-            >
-              <Text style={styles.openLabel}>Abrir</Text>
-            </Pressable>
+            <View style={styles.reservationImageColumn}>
+              <Image
+                accessibilityLabel="Silla de barbería"
+                resizeMode="contain"
+                source={require('../../assets/silla.png')}
+                style={styles.reservationChair}
+              />
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -1465,7 +1530,7 @@ const styles = StyleSheet.create({
     letterSpacing: -1.2,
     marginTop: 2,
   },
-  cardCopy: { color: '#747474', fontSize: 15, lineHeight: 22, marginTop: 12 },
+  cardCopy: { color: '#000000', fontSize: 15, lineHeight: 22, marginTop: 12 },
   cardHeading: {
     alignItems: 'flex-start',
     flexDirection: 'row',
@@ -1483,9 +1548,7 @@ const styles = StyleSheet.create({
   linkBox: {
     alignItems: 'center',
     backgroundColor: '#FAF9F6',
-    borderColor: '#EEECE7',
     borderRadius: 17,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
     marginTop: 18,
@@ -1493,7 +1556,7 @@ const styles = StyleSheet.create({
     padding: 11,
   },
   linkCopy: { flex: 1 },
-  linkLabel: { color: '#747474', fontSize: 12, marginBottom: 5 },
+  linkLabel: { color: '#000000', fontSize: 12, marginBottom: 5 },
   linkValue: {
     color: '#1C1C1C',
     fontSize: 14,
@@ -1588,9 +1651,7 @@ const styles = StyleSheet.create({
   },
   locationInputWrap: {
     alignItems: 'center',
-    borderColor: '#aeb2b7',
     borderRadius: 16,
-    borderWidth: 1,
     flexDirection: 'row',
     marginTop: 24,
     minHeight: 58,
@@ -1598,9 +1659,7 @@ const styles = StyleSheet.create({
   },
   locationMap: {
     backgroundColor: '#e9eaec',
-    borderColor: '#d2d4d8',
     borderRadius: 20,
-    borderWidth: 1,
     height: 145,
     marginTop: 18,
     overflow: 'hidden',
@@ -1615,14 +1674,12 @@ const styles = StyleSheet.create({
   locationMarker: {
     alignItems: 'center',
     backgroundColor: '#1c1f24',
-    borderColor: '#ffffff',
     borderRadius: 18,
-    borderWidth: 3,
     elevation: 4,
     height: 36,
     justifyContent: 'center',
     position: 'absolute',
-    shadowColor: '#111318',
+    shadowColor: '#B47D17',
     shadowOpacity: 0.24,
     shadowRadius: 5,
     width: 36,
@@ -1658,9 +1715,7 @@ const styles = StyleSheet.create({
   locationSecondaryButton: {
     alignItems: 'center',
     backgroundColor: '#f4f4f3',
-    borderColor: '#101c2d',
     borderRadius: 28,
-    borderWidth: 1,
     flex: 0.75,
     justifyContent: 'center',
     minHeight: 56,
@@ -1673,7 +1728,7 @@ const styles = StyleSheet.create({
     elevation: 14,
     paddingHorizontal: 24,
     paddingTop: 14,
-    shadowColor: '#111318',
+    shadowColor: '#B47D17',
     shadowOpacity: 0.16,
     shadowRadius: 14,
   },
@@ -1702,9 +1757,7 @@ const styles = StyleSheet.create({
   },
   navigation: {
     backgroundColor: 'rgba(250, 250, 250, 0.97)',
-    borderColor: '#ced1d5',
     borderRadius: 33,
-    borderWidth: 1,
     bottom: 18,
     elevation: 8,
     flexDirection: 'row',
@@ -1712,7 +1765,7 @@ const styles = StyleSheet.create({
     padding: 5,
     position: 'absolute',
     right: 24,
-    shadowColor: '#111318',
+    shadowColor: '#B47D17',
     shadowOpacity: 0.16,
     shadowRadius: 14,
   },
@@ -1752,7 +1805,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     minHeight: 56,
-    shadowColor: '#956816',
+    shadowColor: '#B47D17',
     shadowOffset: { height: 4, width: 0 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -1761,9 +1814,7 @@ const styles = StyleSheet.create({
   permissionSecondaryButton: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderColor: '#B47D17',
     borderRadius: 28,
-    borderWidth: 1,
     flex: 1,
     justifyContent: 'center',
     minHeight: 56,
@@ -1790,29 +1841,70 @@ const styles = StyleSheet.create({
   openButton: {
     alignItems: 'center',
     backgroundColor: '#C79532',
+    borderBottomColor: 'rgba(255, 244, 214, 0.42)',
+    borderBottomWidth: 1,
+    borderLeftColor: 'rgba(255, 244, 214, 0.42)',
+    borderLeftWidth: 1,
     borderRadius: 15,
+    borderRightColor: 'rgba(255, 244, 214, 0.42)',
+    borderRightWidth: 1,
+    borderTopColor: 'rgba(255, 244, 214, 0.42)',
+    borderTopWidth: 1,
     elevation: 4,
     experimental_backgroundImage:
       'linear-gradient(135deg, #C79532 0%, #E1B85B 50%, #B47D17 100%)',
     justifyContent: 'center',
     minHeight: 51,
+    overflow: 'visible',
     paddingHorizontal: 19,
-    shadowColor: '#956816',
+    shadowColor: '#B47D17',
     shadowOffset: { height: 4, width: 0 },
     shadowOpacity: 0.24,
     shadowRadius: 8,
+  },
+  openButtonFlare: {
+    backgroundColor: '#FFFDF2',
+    borderRadius: 3,
+    bottom: -1,
+    boxShadow:
+      '0 0 3px 1px rgba(255, 255, 255, 0.96), 0 0 8px 4px rgba(255, 231, 163, 0.64), 0 2px 14px 7px rgba(225, 184, 91, 0.28)',
+    height: 3,
+    position: 'absolute',
+    width: 6,
+    zIndex: 3,
+  },
+  openButtonBottomGlow: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 2,
+    bottom: 1,
+    boxShadow: '0 -1px 5px 1px rgba(255, 246, 218, 0.2)',
+    height: 1,
+    left: 10,
+    position: 'absolute',
+    right: 10,
+    zIndex: 2,
+  },
+  openButtonInnerBorder: {
+    borderColor: 'rgba(255, 255, 255, 0.58)',
+    borderRadius: 13,
+    borderWidth: 1,
+    bottom: 1,
+    left: 1,
+    position: 'absolute',
+    right: 1,
+    top: 1,
+    zIndex: 1,
   },
   openLabel: { color: '#ffffff', fontSize: 16, fontWeight: '900' },
   qrBadge: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderColor: '#E4E1DA',
     borderRadius: 25,
-    borderWidth: 1,
     elevation: 4,
     height: 58,
     justifyContent: 'center',
-    shadowColor: '#956816',
+    shadowColor: '#B47D17',
     shadowOffset: { height: 5, width: 0 },
     shadowOpacity: 0.13,
     shadowRadius: 9,
@@ -1843,14 +1935,12 @@ const styles = StyleSheet.create({
   quickIcon: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderColor: '#E4E1DA',
     borderRadius: 20,
-    borderWidth: 1,
     elevation: 3,
     height: 44,
     justifyContent: 'center',
     overflow: 'hidden',
-    shadowColor: '#956816',
+    shadowColor: '#B47D17',
     shadowOffset: { height: 4, width: 0 },
     shadowOpacity: 0.08,
     shadowRadius: 9,
@@ -1859,11 +1949,9 @@ const styles = StyleSheet.create({
   quickIconShimmer: {
     backgroundColor: 'rgba(255, 255, 255, 0.72)',
     bottom: -20,
-    borderColor: 'rgba(255, 255, 255, 0.95)',
-    borderWidth: 1,
     left: 21,
     position: 'absolute',
-    shadowColor: '#ffffff',
+    shadowColor: '#B47D17',
     shadowOpacity: 0.8,
     shadowRadius: 8,
     top: -20,
@@ -1877,28 +1965,54 @@ const styles = StyleSheet.create({
   },
   reservationCard: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#E4E1DA',
     borderRadius: 30,
-    borderWidth: 1,
     elevation: 3,
     marginTop: 24,
     padding: 22,
-    shadowColor: '#956816',
+    shadowColor: '#B47D17',
     shadowOffset: { height: 6, width: 0 },
     shadowOpacity: 0.08,
     shadowRadius: 14,
   },
+  reservationChair: {
+    height: 220,
+    width: '128%',
+  },
+  reservationCopyColumn: {
+    flex: 1,
+    paddingVertical: 8,
+  },
+  reservationLinkBox: {
+    alignItems: 'stretch',
+    flexDirection: 'column',
+    gap: 8,
+    marginTop: 16,
+    minHeight: 0,
+    padding: 10,
+  },
+  reservationImageColumn: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  reservationOpenButton: {
+    alignSelf: 'stretch',
+    minHeight: 44,
+    paddingHorizontal: 14,
+  },
+  reservationTopRow: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+  },
   salesCard: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#E4E1DA',
     borderRadius: 30,
-    borderWidth: 1,
     marginTop: 48,
     overflow: 'hidden',
     padding: 21,
     position: 'relative',
     elevation: 4,
-    shadowColor: '#956816',
+    shadowColor: '#B47D17',
     shadowOffset: { height: 7, width: 0 },
     shadowOpacity: 0.1,
     shadowRadius: 15,
@@ -1918,7 +2032,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 1,
   },
-  salesMetaText: { color: '#747474', fontSize: 15 },
+  salesMetaText: { color: '#000000', fontSize: 15 },
   salesTitle: { color: '#1C1C1C', fontSize: 18, fontWeight: '600' },
   salesValue: {
     color: '#1C1C1C',
@@ -1932,14 +2046,12 @@ const styles = StyleSheet.create({
   summaryButton: {
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.88)',
-    borderColor: '#E4E1DA',
     borderRadius: 22,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: 7,
     minHeight: 48,
     paddingHorizontal: 15,
-    shadowColor: '#956816',
+    shadowColor: '#B47D17',
     shadowOffset: { height: 4, width: 0 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -1974,9 +2086,7 @@ const styles = StyleSheet.create({
   },
   welcomeSurveyCheckbox: {
     alignItems: 'center',
-    borderColor: '#8e939b',
     borderRadius: 9,
-    borderWidth: 1.5,
     height: 24,
     justifyContent: 'center',
     marginRight: 13,
@@ -1984,7 +2094,6 @@ const styles = StyleSheet.create({
   },
   welcomeSurveyCheckboxSelected: {
     backgroundColor: '#1c1f24',
-    borderColor: '#1c1f24',
   },
   welcomeSurveyError: {
     color: '#b42318',
@@ -2022,9 +2131,7 @@ const styles = StyleSheet.create({
   },
   welcomeSurveyOption: {
     alignItems: 'center',
-    borderColor: '#d2d4d8',
     borderRadius: 16,
-    borderWidth: 1,
     flexDirection: 'row',
     minHeight: 53,
     paddingHorizontal: 14,
@@ -2039,7 +2146,6 @@ const styles = StyleSheet.create({
   },
   welcomeSurveyOptionSelected: {
     backgroundColor: '#e8e9eb',
-    borderColor: '#aeb2b7',
   },
   welcomeSurveyOptions: { gap: 9, marginTop: 18 },
   welcomeSurveyOverlay: { flex: 1, justifyContent: 'flex-end' },
@@ -2057,7 +2163,7 @@ const styles = StyleSheet.create({
     elevation: 14,
     paddingHorizontal: 24,
     paddingTop: 14,
-    shadowColor: '#111318',
+    shadowColor: '#B47D17',
     shadowOpacity: 0.16,
     shadowRadius: 14,
   },

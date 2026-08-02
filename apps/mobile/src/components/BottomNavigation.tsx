@@ -1,8 +1,64 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import {
+  Animated,
+  Easing,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 type NavigationTab = 'agenda' | 'cash' | 'clients' | 'dashboard' | 'settings';
+
+function GoldIndicator() {
+  const translateX = useRef(new Animated.Value(-14)).current;
+
+  useEffect(() => {
+    let isActive = true;
+
+    const move = (toValue: number): void => {
+      Animated.timing(translateX, {
+        duration: 5_500,
+        easing: Easing.inOut(Easing.sin),
+        isInteraction: false,
+        toValue,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished && isActive) move(toValue > 0 ? -14 : 14);
+      });
+    };
+
+    move(14);
+    return () => {
+      isActive = false;
+      translateX.stopAnimation();
+    };
+  }, [translateX]);
+
+  const opacity = translateX.interpolate({
+    extrapolate: 'clamp',
+    inputRange: [-14, 0, 14],
+    outputRange: [0.72, 1, 0.72],
+  });
+  const scale = translateX.interpolate({
+    extrapolate: 'clamp',
+    inputRange: [-14, 0, 14],
+    outputRange: [0.86, 1.2, 0.86],
+  });
+
+  return (
+    <View pointerEvents="none" style={styles.goldIndicator}>
+      <Animated.View
+        style={[
+          styles.goldIndicatorFlare,
+          { opacity, transform: [{ translateX }, { scale }] },
+        ]}
+      />
+    </View>
+  );
+}
 
 export function BottomNavigation({
   active,
@@ -102,7 +158,7 @@ export function BottomNavigation({
                 {isGold ? item.goldLabel : item.label}
               </Text>
             ) : null}
-            {isGold && selected ? <View style={styles.goldIndicator} /> : null}
+            {isGold && selected ? <GoldIndicator /> : null}
           </Pressable>
         );
       })}
@@ -115,6 +171,7 @@ const styles = StyleSheet.create({
   activeLabel: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
   goldActiveLabel: { color: '#956816', fontWeight: '800' },
   goldIndicator: {
+    alignItems: 'center',
     backgroundColor: '#C79532',
     borderRadius: 999,
     bottom: -5,
@@ -125,6 +182,17 @@ const styles = StyleSheet.create({
     shadowColor: '#E1B85B',
     shadowOpacity: 0.85,
     shadowRadius: 6,
+  },
+  goldIndicatorFlare: {
+    backgroundColor: '#FFFDF2',
+    borderRadius: 3,
+    bottom: -1,
+    boxShadow:
+      '0 0 3px 1px rgba(255, 255, 255, 0.96), 0 0 8px 4px rgba(255, 231, 163, 0.64), 0 2px 14px 7px rgba(225, 184, 91, 0.28)',
+    height: 3,
+    position: 'absolute',
+    width: 6,
+    zIndex: 2,
   },
   goldItem: {
     gap: 4,
@@ -137,15 +205,16 @@ const styles = StyleSheet.create({
   },
   goldNavigation: {
     backgroundColor: 'rgba(255, 255, 255, 0.98)',
-    borderColor: '#E4E1DA',
     borderRadius: 34,
-    bottom: 14,
+    boxShadow:
+      '0 14px 32px rgba(235, 216, 170, 0.06), 0 5px 14px rgba(248, 238, 211, 0.05)',
+    elevation: 20,
     paddingBottom: 7,
     paddingHorizontal: 6,
     paddingTop: 7,
-    shadowColor: '#956816',
-    shadowOffset: { height: 7, width: 0 },
-    shadowOpacity: 0.12,
+    shadowColor: '#F3E6C8',
+    shadowOffset: { height: 12, width: 0 },
+    shadowOpacity: 0.06,
     shadowRadius: 18,
   },
   item: {
@@ -159,10 +228,8 @@ const styles = StyleSheet.create({
   navigation: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderColor: '#E1E1E1',
     borderRadius: 28,
-    borderWidth: 1,
-    bottom: 17,
+    bottom: 12,
     flexDirection: 'row',
     elevation: 12,
     left: 16,

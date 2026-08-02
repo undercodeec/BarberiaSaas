@@ -20,7 +20,7 @@ export default function RootLayout() {
         <SessionLock>
           <StatusBar style={showPreloader ? 'dark' : 'light'} />
           <Stack screenOptions={{ headerShown: false }} />
-          `n <GlobalNotificationsBanner />
+          <GlobalNotificationsBanner />
         </SessionLock>
       </AppProviders>
       {showPreloader ? <NavaPreloader onFinish={finishPreloader} /> : null}
