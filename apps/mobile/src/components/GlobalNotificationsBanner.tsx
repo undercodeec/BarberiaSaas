@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   title: { color: '#101c2d', fontSize: 23, fontWeight: '900' },
   trigger: {
     alignItems: 'center',
-    backgroundColor: '#17191D',
+    backgroundColor: '#C79532',
     borderColor: '#FFFFFF',
     borderRadius: 26,
     borderWidth: 2,
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'absolute',
     right: 18,
-    shadowColor: '#101c2d',
+    shadowColor: '#956816',
     shadowOpacity: 0.28,
     shadowRadius: 10,
     width: 52,

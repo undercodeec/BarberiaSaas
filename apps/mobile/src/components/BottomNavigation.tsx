@@ -6,67 +6,103 @@ type NavigationTab = 'agenda' | 'cash' | 'clients' | 'dashboard' | 'settings';
 
 export function BottomNavigation({
   active,
+  appearance = 'default',
 }: {
   readonly active: NavigationTab;
+  readonly appearance?: 'default' | 'gold';
 }) {
   const router = useRouter();
   const items: ReadonlyArray<{
     readonly icon: React.ComponentProps<typeof Ionicons>['name'];
+    readonly goldLabel: string;
     readonly label: string;
     readonly route: string;
     readonly value: NavigationTab;
   }> = [
     {
       icon: 'home-outline',
+      goldLabel: 'Inicio',
       label: 'Inicio',
       route: '/dashboard',
       value: 'dashboard',
     },
     {
       icon: 'calendar-outline',
+      goldLabel: 'Calendario',
       label: 'Agenda',
       route: '/agenda',
       value: 'agenda',
     },
     {
       icon: 'receipt-outline',
+      goldLabel: 'Ventas',
       label: 'Caja',
       route: '/cash-register',
       value: 'cash',
     },
     {
       icon: 'people-outline',
+      goldLabel: 'Clientes',
       label: 'Clientes',
       route: '/clients',
       value: 'clients',
     },
     {
       icon: 'settings-outline',
+      goldLabel: 'Ajustes',
       label: 'Ajustes',
       route: '/settings',
       value: 'settings',
     },
   ];
   return (
-    <View style={styles.navigation}>
+    <View
+      style={[
+        styles.navigation,
+        appearance === 'gold' && styles.goldNavigation,
+      ]}
+    >
       {items.map((item) => {
         const selected = item.value === active;
+        const isGold = appearance === 'gold';
         return (
           <Pressable
             accessibilityLabel={item.label}
             accessibilityRole="button"
             key={item.value}
             onPress={() => router.replace(item.route as never)}
-            style={[styles.item, selected && styles.active]}
+            style={[
+              styles.item,
+              isGold && styles.goldItem,
+              selected && !isGold && styles.active,
+            ]}
           >
             <Ionicons
-              color={selected ? '#FFFFFF' : '#111318'}
+              color={
+                isGold
+                  ? selected
+                    ? '#956816'
+                    : '#292929'
+                  : selected
+                    ? '#FFFFFF'
+                    : '#111318'
+              }
               name={item.icon}
-              size={23}
+              size={isGold ? 25 : 23}
             />
-            {selected ? (
-              <Text style={styles.activeLabel}>{item.label}</Text>
+            {selected || isGold ? (
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.activeLabel,
+                  isGold && styles.goldLabel,
+                  isGold && selected && styles.goldActiveLabel,
+                ]}
+              >
+                {isGold ? item.goldLabel : item.label}
+              </Text>
             ) : null}
+            {isGold && selected ? <View style={styles.goldIndicator} /> : null}
           </Pressable>
         );
       })}
@@ -77,6 +113,41 @@ export function BottomNavigation({
 const styles = StyleSheet.create({
   active: { backgroundColor: '#17191D' },
   activeLabel: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  goldActiveLabel: { color: '#956816', fontWeight: '800' },
+  goldIndicator: {
+    backgroundColor: '#C79532',
+    borderRadius: 999,
+    bottom: -5,
+    height: 3,
+    left: '20%',
+    position: 'absolute',
+    right: '20%',
+    shadowColor: '#E1B85B',
+    shadowOpacity: 0.85,
+    shadowRadius: 6,
+  },
+  goldItem: {
+    gap: 4,
+    height: 58,
+  },
+  goldLabel: {
+    color: '#555555',
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  goldNavigation: {
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderColor: '#E4E1DA',
+    borderRadius: 34,
+    bottom: 14,
+    paddingBottom: 7,
+    paddingHorizontal: 6,
+    paddingTop: 7,
+    shadowColor: '#956816',
+    shadowOffset: { height: 7, width: 0 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+  },
   item: {
     alignItems: 'center',
     borderRadius: 26,

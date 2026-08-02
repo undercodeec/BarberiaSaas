@@ -9,6 +9,7 @@ import { Redirect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
   Alert,
+  AccessibilityInfo,
   Animated,
   Easing,
   Modal,
@@ -25,8 +26,14 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
+import Svg, {
+  Defs,
+  LinearGradient as SvgLinearGradient,
+  Path,
+  Rect,
+  Stop,
+} from 'react-native-svg';
 
-import { DashboardProgress } from '../../src/components/DashboardProgress';
 import { BottomNavigation } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { BookingLinkSheet } from '../../src/components/BookingLinkSheet';
@@ -125,6 +132,347 @@ function greeting() {
   return '\u00a1Buenas noches! Bienvenido';
 }
 
+type DashboardProgressProps = {
+  readonly value: number;
+};
+
+const PRIMARY_WAVE_PATH = 'M0 10 Q25 0 50 10 T100 10 T150 10 T200 10 V20 H0 Z';
+const SECONDARY_WAVE_PATH =
+  'M0 10 Q25 20 50 10 T100 10 T150 10 T200 10 V20 H0 Z';
+
+function TankGradient() {
+  return (
+    <Svg
+      height="100%"
+      preserveAspectRatio="none"
+      style={StyleSheet.absoluteFill}
+      viewBox="0 0 100 100"
+      width="100%"
+    >
+      <Defs>
+        <SvgLinearGradient id="dashboard-tank-fill" x1="0" x2="0" y1="0" y2="1">
+          <Stop offset="0" stopColor="#FFFFFF" />
+          <Stop offset="0.72" stopColor="#FAF9F6" />
+          <Stop offset="1" stopColor="#F8F0DD" />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect height="100" width="100" fill="url(#dashboard-tank-fill)" />
+    </Svg>
+  );
+}
+
+function LiquidGradient() {
+  return (
+    <Svg
+      height="100%"
+      preserveAspectRatio="none"
+      style={StyleSheet.absoluteFill}
+      viewBox="0 0 100 100"
+      width="100%"
+    >
+      <Defs>
+        <SvgLinearGradient
+          id="dashboard-liquid-fill"
+          x1="0"
+          x2="0"
+          y1="0"
+          y2="1"
+        >
+          <Stop offset="0" stopColor="#EBD8AA" />
+          <Stop offset="0.42" stopColor="#EBD8AA" />
+          <Stop offset="0.72" stopColor="#E1C47E" />
+          <Stop offset="1" stopColor="#E1B85B" stopOpacity={0.84} />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect height="100" width="100" fill="url(#dashboard-liquid-fill)" />
+    </Svg>
+  );
+}
+
+function LiquidWaveSurface({
+  copy,
+  secondary = false,
+}: {
+  readonly copy: 1 | 2;
+  readonly secondary?: boolean;
+}) {
+  const path = secondary ? SECONDARY_WAVE_PATH : PRIMARY_WAVE_PATH;
+  const fillId = `dashboard-${secondary ? 'secondary' : 'primary'}-wave-${copy}`;
+
+  return (
+    <Svg
+      height="20"
+      preserveAspectRatio="none"
+      viewBox="0 0 200 20"
+      width="100%"
+    >
+      <Defs>
+        <SvgLinearGradient id={fillId} x1="0" x2="0" y1="0" y2="1">
+          <Stop
+            offset="0"
+            stopColor={secondary ? '#C79532' : '#FAF9F6'}
+            stopOpacity={secondary ? 0.72 : 1}
+          />
+          <Stop
+            offset={secondary ? '0.52' : '0.5'}
+            stopColor={secondary ? '#E1B85B' : '#F8F0DD'}
+            stopOpacity={secondary ? 0.42 : 1}
+          />
+          <Stop
+            offset="1"
+            stopColor="#EBD8AA"
+            stopOpacity={secondary ? 0 : 1}
+          />
+        </SvgLinearGradient>
+      </Defs>
+      <Path d={path} fill={`url(#${fillId})`} />
+    </Svg>
+  );
+}
+
+function DashboardProgress({ value }: DashboardProgressProps) {
+  const normalizedValue = Math.min(100, Math.max(0, value));
+  const [progress] = useState(() => new Animated.Value(0));
+  const [firstWave] = useState(() => new Animated.Value(0));
+  const [secondWave] = useState(() => new Animated.Value(0));
+  const [displayValue, setDisplayValue] = useState(0);
+  const [tankWidth, setTankWidth] = useState(0);
+  const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void AccessibilityInfo.isReduceMotionEnabled().then((isEnabled) => {
+      if (isMounted) setReduceMotion(isEnabled);
+    });
+
+    const subscription = AccessibilityInfo.addEventListener(
+      'reduceMotionChanged',
+      setReduceMotion,
+    );
+
+    return () => {
+      isMounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion === null) return;
+
+    const listenerId = progress.addListener(({ value: animatedValue }) => {
+      setDisplayValue(Math.round(animatedValue));
+    });
+
+    progress.stopAnimation();
+    progress.setValue(0);
+
+    const animation = Animated.timing(progress, {
+      duration: reduceMotion ? 0 : 780,
+      easing: Easing.out(Easing.cubic),
+      toValue: normalizedValue,
+      useNativeDriver: false,
+    });
+
+    animation.start();
+    return () => {
+      animation.stop();
+      progress.removeListener(listenerId);
+    };
+  }, [normalizedValue, progress, reduceMotion]);
+
+  useEffect(() => {
+    if (reduceMotion === null || tankWidth === 0) return;
+
+    firstWave.stopAnimation();
+    secondWave.stopAnimation();
+    firstWave.setValue(0);
+    secondWave.setValue(0);
+
+    if (reduceMotion) return;
+
+    let isActive = true;
+
+    const startWaveCycle = (
+      animatedValue: Animated.Value,
+      duration: number,
+    ) => {
+      if (!isActive) return;
+
+      animatedValue.setValue(0);
+      Animated.timing(animatedValue, {
+        duration,
+        easing: Easing.linear,
+        isInteraction: false,
+        toValue: 1,
+        useNativeDriver: false,
+      }).start(({ finished }) => {
+        if (finished) startWaveCycle(animatedValue, duration);
+      });
+    };
+
+    startWaveCycle(firstWave, 4_000);
+    startWaveCycle(secondWave, 6_000);
+
+    return () => {
+      isActive = false;
+      firstWave.stopAnimation();
+      secondWave.stopAnimation();
+    };
+  }, [firstWave, reduceMotion, secondWave, tankWidth]);
+
+  const fillHeight = progress.interpolate({
+    inputRange: [0, 100],
+    outputRange: ['0%', '100%'],
+  });
+  const firstWaveTranslateX = firstWave.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -tankWidth],
+  });
+  const secondWaveTranslateX = secondWave.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-tankWidth, 0],
+  });
+  return (
+    <View
+      accessibilityLabel={`${normalizedValue}% del mes transcurrido`}
+      accessibilityRole="progressbar"
+      accessibilityValue={{ max: 100, min: 0, now: normalizedValue }}
+      onLayout={(event) => setTankWidth(event.nativeEvent.layout.width)}
+      pointerEvents="none"
+      style={dashboardProgressStyles.tank}
+    >
+      <TankGradient />
+      <View style={dashboardProgressStyles.ambientGlow} />
+
+      <Animated.View
+        style={[dashboardProgressStyles.liquid, { height: fillHeight }]}
+      >
+        <LiquidGradient />
+
+        <Animated.View
+          style={[
+            dashboardProgressStyles.waveTrack,
+            dashboardProgressStyles.primaryWave,
+            {
+              transform: [{ translateX: firstWaveTranslateX }],
+              width: tankWidth * 2,
+            },
+          ]}
+        >
+          <View style={{ width: tankWidth }}>
+            <LiquidWaveSurface copy={1} />
+          </View>
+          <View style={{ width: tankWidth }}>
+            <LiquidWaveSurface copy={2} />
+          </View>
+        </Animated.View>
+
+        <Animated.View
+          style={[
+            dashboardProgressStyles.waveTrack,
+            dashboardProgressStyles.secondaryWave,
+            {
+              transform: [{ translateX: secondWaveTranslateX }],
+              width: tankWidth * 2,
+            },
+          ]}
+        >
+          <View style={{ width: tankWidth }}>
+            <LiquidWaveSurface copy={1} secondary />
+          </View>
+          <View style={{ width: tankWidth }}>
+            <LiquidWaveSurface copy={2} secondary />
+          </View>
+        </Animated.View>
+      </Animated.View>
+
+      <View style={dashboardProgressStyles.label}>
+        <Text style={dashboardProgressStyles.percentage}>{displayValue}%</Text>
+        <Text style={dashboardProgressStyles.caption}>
+          del mes transcurrido
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const dashboardProgressStyles = StyleSheet.create({
+  ambientGlow: {
+    backgroundColor: 'rgba(225, 184, 91, 0.1)',
+    borderRadius: 180,
+    bottom: '-32%',
+    height: '68%',
+    left: '12%',
+    position: 'absolute',
+    right: '-14%',
+  },
+  caption: {
+    color: '#555555',
+    fontSize: 13,
+    letterSpacing: 0.1,
+  },
+  label: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.74)',
+    borderColor: 'rgba(199, 149, 50, 0.28)',
+    borderRadius: 20,
+    borderWidth: 1,
+    bottom: 18,
+    flexDirection: 'row',
+    gap: 7,
+    justifyContent: 'center',
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    position: 'absolute',
+    right: 18,
+    shadowColor: '#956816',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    zIndex: 5,
+  },
+  liquid: {
+    backgroundColor: '#EBD8AA',
+    bottom: 0,
+    left: 0,
+    overflow: 'visible',
+    position: 'absolute',
+    right: 0,
+  },
+  percentage: {
+    color: '#956816',
+    fontSize: 20,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+  },
+  primaryWave: {
+    opacity: 0.9,
+    top: -18,
+    zIndex: 3,
+  },
+  secondaryWave: {
+    opacity: 0.68,
+    top: -14,
+    zIndex: 2,
+  },
+  tank: {
+    backgroundColor: '#FFFFFF',
+    bottom: 0,
+    left: 0,
+    overflow: 'hidden',
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 0,
+  },
+  waveTrack: {
+    flexDirection: 'row',
+    height: 20,
+    left: 0,
+    position: 'absolute',
+  },
+});
+
 function QuickAction({
   icon,
   label,
@@ -165,7 +513,7 @@ function QuickAction({
       style={styles.quickAction}
     >
       <View style={styles.quickIcon}>
-        <Ionicons color="#101c2d" name={icon} size={27} />
+        <Ionicons color="#B47D17" name={icon} size={30} />
         <Animated.View
           pointerEvents="none"
           style={[
@@ -1003,7 +1351,7 @@ export default function DashboardScreen() {
               style={styles.summaryButton}
             >
               <Text style={styles.summaryLabel}>Resumen</Text>
-              <Ionicons color="#101c2d" name="bar-chart-outline" size={22} />
+              <Ionicons color="#B47D17" name="bar-chart-outline" size={22} />
             </Pressable>
           </View>
           <Text style={styles.salesValue}>$0</Text>
@@ -1053,7 +1401,8 @@ export default function DashboardScreen() {
           <View style={styles.cardHeading}>
             <Text style={styles.cardTitle}>Recibe reservas</Text>
             <View style={styles.qrBadge}>
-              <Ionicons color="#f4f4f5" name="qr-code-outline" size={29} />
+              <Ionicons color="#B47D17" name="qr-code-outline" size={31} />
+              <View style={styles.qrSparkle} />
             </View>
           </View>
           <Text style={styles.cardCopy}>
@@ -1078,7 +1427,7 @@ export default function DashboardScreen() {
         </View>
       </ScrollView>
 
-      <BottomNavigation active="dashboard" />
+      <BottomNavigation active="dashboard" appearance="gold" />
       <BookingLinkSheet
         onClose={() => setIsBookingSheetOpen(false)}
         url={bookingUrl}
@@ -1110,44 +1459,46 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   businessName: {
-    color: '#101c2d',
-    fontSize: 33,
+    color: '#111111',
+    fontSize: 35,
     fontWeight: '900',
-    letterSpacing: -1.1,
-    marginTop: 4,
+    letterSpacing: -1.2,
+    marginTop: 2,
   },
-  cardCopy: { color: '#555a63', fontSize: 16, lineHeight: 23, marginTop: 12 },
+  cardCopy: { color: '#747474', fontSize: 15, lineHeight: 22, marginTop: 12 },
   cardHeading: {
     alignItems: 'flex-start',
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   cardTitle: {
-    color: '#101c2d',
-    fontSize: 24,
+    color: '#1C1C1C',
+    fontSize: 25,
     fontWeight: '900',
     letterSpacing: -0.4,
   },
 
-  content: { paddingBottom: 128, paddingHorizontal: 24, paddingTop: 20 },
-  greeting: { color: '#555a63', fontSize: 20, lineHeight: 28 },
+  content: { paddingBottom: 126, paddingHorizontal: 24, paddingTop: 17 },
+  greeting: { color: '#555555', fontSize: 17, lineHeight: 24 },
   linkBox: {
     alignItems: 'center',
-    backgroundColor: '#dcdee1',
-    borderRadius: 19,
+    backgroundColor: '#FAF9F6',
+    borderColor: '#EEECE7',
+    borderRadius: 17,
+    borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
-    marginTop: 22,
-    minHeight: 84,
-    padding: 13,
+    marginTop: 18,
+    minHeight: 72,
+    padding: 11,
   },
   linkCopy: { flex: 1 },
-  linkLabel: { color: '#555a63', fontSize: 13, marginBottom: 6 },
+  linkLabel: { color: '#747474', fontSize: 12, marginBottom: 5 },
   linkValue: {
-    color: '#101c2d',
-    fontSize: 15,
+    color: '#1C1C1C',
+    fontSize: 14,
     fontWeight: '800',
-    lineHeight: 21,
+    lineHeight: 19,
   },
   locationActions: { flexDirection: 'row', gap: 12, marginTop: 20 },
   locationBackdrop: {
@@ -1365,14 +1716,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.16,
     shadowRadius: 14,
   },
-  notificationButton: {
-    alignItems: 'center',
-    backgroundColor: '#e3e4e6',
-    borderRadius: 28,
-    height: 64,
-    justifyContent: 'center',
-    width: 64,
-  },
   permissionActions: { flexDirection: 'row', gap: 12, marginTop: 30 },
   permissionBackdrop: {
     backgroundColor: 'rgba(16, 28, 45, 0.58)',
@@ -1403,17 +1746,22 @@ const styles = StyleSheet.create({
   },
   permissionPrimaryButton: {
     alignItems: 'center',
-    backgroundColor: '#1c1f24',
+    backgroundColor: '#C79532',
     borderRadius: 28,
+    elevation: 3,
     flex: 1,
     justifyContent: 'center',
     minHeight: 56,
+    shadowColor: '#956816',
+    shadowOffset: { height: 4, width: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
   permissionPrimaryLabel: { color: '#ffffff', fontSize: 16, fontWeight: '900' },
   permissionSecondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#f4f4f3',
-    borderColor: '#101c2d',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#B47D17',
     borderRadius: 28,
     borderWidth: 1,
     flex: 1,
@@ -1421,7 +1769,7 @@ const styles = StyleSheet.create({
     minHeight: 56,
   },
   permissionSecondaryLabel: {
-    color: '#101c2d',
+    color: '#B47D17',
     fontSize: 16,
     fontWeight: '900',
   },
@@ -1441,37 +1789,72 @@ const styles = StyleSheet.create({
   },
   openButton: {
     alignItems: 'center',
-    backgroundColor: '#1c1f24',
+    backgroundColor: '#C79532',
     borderRadius: 15,
+    elevation: 4,
+    experimental_backgroundImage:
+      'linear-gradient(135deg, #C79532 0%, #E1B85B 50%, #B47D17 100%)',
     justifyContent: 'center',
-    minHeight: 49,
-    paddingHorizontal: 15,
+    minHeight: 51,
+    paddingHorizontal: 19,
+    shadowColor: '#956816',
+    shadowOffset: { height: 4, width: 0 },
+    shadowOpacity: 0.24,
+    shadowRadius: 8,
   },
   openLabel: { color: '#ffffff', fontSize: 16, fontWeight: '900' },
   qrBadge: {
     alignItems: 'center',
-    backgroundColor: '#1c1f24',
-    borderRadius: 22,
-    height: 55,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E4E1DA',
+    borderRadius: 25,
+    borderWidth: 1,
+    elevation: 4,
+    height: 58,
     justifyContent: 'center',
-    width: 55,
+    shadowColor: '#956816',
+    shadowOffset: { height: 5, width: 0 },
+    shadowOpacity: 0.13,
+    shadowRadius: 9,
+    width: 58,
   },
-  quickAction: { alignItems: 'center', flex: 1, gap: 9 },
+  qrSparkle: {
+    backgroundColor: '#E1B85B',
+    borderRadius: 5,
+    height: 7,
+    position: 'absolute',
+    right: 1,
+    top: 8,
+    width: 7,
+  },
+  quickAction: {
+    alignItems: 'center',
+    flex: 1,
+    gap: 5,
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
   quickActions: {
     flexDirection: 'row',
+    gap: 8,
     justifyContent: 'space-between',
-    marginTop: 28,
+    marginTop: 22,
   },
   quickIcon: {
     alignItems: 'center',
-    backgroundColor: '#e1e2e4',
-    borderColor: '#cfd1d4',
-    borderRadius: 26,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E4E1DA',
+    borderRadius: 20,
     borderWidth: 1,
-    height: 60,
+    elevation: 3,
+    height: 44,
     justifyContent: 'center',
     overflow: 'hidden',
-    width: 60,
+    shadowColor: '#956816',
+    shadowOffset: { height: 4, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 9,
+    width: 54,
   },
   quickIconShimmer: {
     backgroundColor: 'rgba(255, 255, 255, 0.72)',
@@ -1487,31 +1870,38 @@ const styles = StyleSheet.create({
     width: 13,
   },
   quickLabel: {
-    color: '#101c2d',
-    fontSize: 13,
-    fontWeight: '700',
+    color: '#1C1C1C',
+    fontSize: 11,
+    fontWeight: '800',
     textAlign: 'center',
   },
   reservationCard: {
-    backgroundColor: '#eeeff1',
-    borderColor: '#d2d4d8',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E4E1DA',
     borderRadius: 30,
     borderWidth: 1,
-    marginTop: 38,
-    padding: 24,
+    elevation: 3,
+    marginTop: 24,
+    padding: 22,
+    shadowColor: '#956816',
+    shadowOffset: { height: 6, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
   },
   salesCard: {
-    backgroundColor: '#111318',
-    borderColor: '#343943',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E4E1DA',
     borderRadius: 30,
     borderWidth: 1,
     marginTop: 48,
     overflow: 'hidden',
     padding: 21,
     position: 'relative',
-    shadowColor: '#111318',
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
+    elevation: 4,
+    shadowColor: '#956816',
+    shadowOffset: { height: 7, width: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
   },
   salesHeader: {
     alignItems: 'center',
@@ -1528,32 +1918,37 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 1,
   },
-  salesMetaText: { color: '#f4f4f5', fontSize: 15 },
-  salesTitle: { color: '#f4f4f5', fontSize: 18, fontWeight: '600' },
+  salesMetaText: { color: '#747474', fontSize: 15 },
+  salesTitle: { color: '#1C1C1C', fontSize: 18, fontWeight: '600' },
   salesValue: {
-    color: '#ffffff',
+    color: '#1C1C1C',
     fontSize: 47,
     fontWeight: '900',
     marginTop: 24,
     position: 'relative',
     zIndex: 1,
   },
-  screen: { backgroundColor: '#ffffff', flex: 1 },
+  screen: { backgroundColor: '#FAF9F6', flex: 1 },
   summaryButton: {
     alignItems: 'center',
-    backgroundColor: '#e1e2e4',
-    borderColor: '#cfd1d4',
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+    borderColor: '#E4E1DA',
     borderRadius: 22,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 7,
     minHeight: 48,
     paddingHorizontal: 15,
+    shadowColor: '#956816',
+    shadowOffset: { height: 4, width: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
-  summaryLabel: { color: '#101c2d', fontSize: 16, fontWeight: '800' },
+  summaryLabel: { color: '#B47D17', fontSize: 16, fontWeight: '800' },
   topRow: {
     alignItems: 'center',
     flexDirection: 'row',
+    gap: 12,
     justifyContent: 'space-between',
   },
   welcome: { alignItems: 'center', marginTop: 52 },
