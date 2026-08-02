@@ -20,11 +20,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BottomNavigation } from '../../src/components/BottomNavigation';
+import {
+  appStyles,
+  appTheme,
+  BottomNavigation,
+  goldShadow,
+} from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
-const PRIMARY = '#1C1F24';
+const PRIMARY = appTheme.colors.accent;
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
 export default function SettingsScreen() {
@@ -513,7 +518,7 @@ const styles = StyleSheet.create({
   cardTitle: { color: '#111827', fontSize: 16, fontWeight: '900' },
   cardIcon: {
     alignItems: 'center',
-    backgroundColor: '#EEEFF1',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 15,
     height: 48,
     justifyContent: 'center',
@@ -578,8 +583,8 @@ const styles = StyleSheet.create({
   },
   linkCard: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E0E5EC',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
     borderRadius: 20,
     borderWidth: 1,
     flexDirection: 'row',
@@ -610,7 +615,7 @@ const styles = StyleSheet.create({
   profile: { alignItems: 'center', marginTop: 30 },
   promoCard: {
     alignItems: 'center',
-    backgroundColor: '#EEEFF1',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 22,
     flexDirection: 'row',
     gap: 15,
@@ -631,21 +636,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 58,
   },
-  screen: { backgroundColor: '#FFFFFF', flex: 1 },
+  screen: appStyles.screen,
   settingsCard: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E0E5EC',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
     borderRadius: 20,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 13,
     marginTop: 28,
     padding: 16,
-    shadowColor: '#243247',
-    shadowOffset: { height: 4, width: 0 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    ...goldShadow,
   },
   skeleton: {
     backgroundColor: '#E9EDF2',
@@ -655,7 +657,7 @@ const styles = StyleSheet.create({
     width: 145,
   },
   title: {
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 32,
     fontWeight: '900',
     letterSpacing: -0.7,

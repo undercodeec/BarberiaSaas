@@ -21,7 +21,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BottomNavigation } from '../../src/components/BottomNavigation';
+import {
+  appStyles,
+  appTheme,
+  BottomNavigation,
+  goldShadow,
+} from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -746,11 +751,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   balanceCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E5E7EB',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
     borderRadius: 24,
     borderWidth: 1,
     padding: 22,
+    ...goldShadow,
   },
   balanceDivider: { backgroundColor: '#E5E7EB', height: 1, marginVertical: 18 },
   balanceFooter: {
@@ -786,7 +792,7 @@ const styles = StyleSheet.create({
   backdrop: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
   confirm: {
     alignItems: 'center',
-    backgroundColor: '#111827',
+    backgroundColor: appTheme.colors.accent,
     borderRadius: 15,
     flex: 1,
     justifyContent: 'center',
@@ -935,7 +941,7 @@ const styles = StyleSheet.create({
   },
   primary: {
     alignItems: 'center',
-    backgroundColor: '#111827',
+    backgroundColor: appTheme.colors.accent,
     borderRadius: 16,
     flexDirection: 'row',
     gap: 8,
@@ -944,7 +950,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   primaryText: { color: '#FFFFFF', fontWeight: '900' },
-  screen: { backgroundColor: '#FBFCFF', flex: 1 },
+  screen: appStyles.screen,
   secondary: {
     alignItems: 'center',
     borderColor: '#111827',
@@ -958,12 +964,15 @@ const styles = StyleSheet.create({
   sessionActions: { alignSelf: 'stretch', marginTop: 24 },
   closeButton: { alignItems: 'center', marginTop: 20, padding: 10 },
   closeText: { color: '#9F1D2F', fontWeight: '900' },
-  selected: { backgroundColor: '#111827', borderColor: '#111827' },
+  selected: {
+    backgroundColor: appTheme.colors.accent,
+    borderColor: appTheme.colors.accent,
+  },
   selectedText: { color: '#FFFFFF' },
   sheet: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderTopLeftRadius: appTheme.radii.sheet,
+    borderTopRightRadius: appTheme.radii.sheet,
     maxHeight: '92%',
   },
   sheetContent: {

@@ -26,7 +26,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BottomNavigation } from '../../src/components/BottomNavigation';
+import {
+  appStyles,
+  appTheme,
+  BottomNavigation,
+  goldShadow,
+} from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -1196,7 +1201,7 @@ const styles = StyleSheet.create({
   },
   modalPrimaryAction: {
     alignItems: 'center',
-    backgroundColor: '#111318',
+    backgroundColor: appTheme.colors.accent,
     borderRadius: 14,
     flexDirection: 'row',
     gap: 9,
@@ -1240,7 +1245,10 @@ const styles = StyleSheet.create({
   },
   optionTileLabel: { color: '#111318', fontSize: 14, fontWeight: '800' },
   optionTileLabelSelected: { color: '#FFFFFF' },
-  optionTileSelected: { backgroundColor: '#111318', borderColor: '#111318' },
+  optionTileSelected: {
+    backgroundColor: appTheme.colors.accent,
+    borderColor: appTheme.colors.accent,
+  },
   settingsBackdrop: {
     bottom: 0,
     left: 0,
@@ -1325,7 +1333,7 @@ const styles = StyleSheet.create({
     textDecorationStyle: 'solid',
   },
   eyebrow: {
-    color: '#111318',
+    color: appTheme.colors.accentDark,
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 0.5,
@@ -1344,7 +1352,7 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', gap: 9 },
   floatingButton: {
     alignItems: 'center',
-    backgroundColor: '#111318',
+    backgroundColor: appTheme.colors.accent,
     borderRadius: 28,
     bottom: 94,
     flexDirection: 'row',
@@ -1353,7 +1361,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     position: 'absolute',
     right: 20,
-    shadowColor: '#111318',
+    shadowColor: appTheme.colors.accentDark,
     shadowOffset: { height: 8, width: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 15,
@@ -1382,38 +1390,11 @@ const styles = StyleSheet.create({
     marginBottom: 9,
   },
   hourRow: { flexDirection: 'row' },
-  navActive: { backgroundColor: '#17191d' },
-  navActiveLabel: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
-  navItem: {
-    alignItems: 'center',
-    borderRadius: 26,
-    flex: 1,
-    gap: 2,
-    height: 53,
-    justifyContent: 'center',
-  },
-  navigation: {
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderColor: '#e1e1e1',
-    borderRadius: 28,
-    borderWidth: 1,
-    bottom: 17,
-    flexDirection: 'row',
-    left: 16,
-    padding: 5,
-    position: 'absolute',
-    right: 16,
-    shadowColor: '#222222',
-    shadowOffset: { height: 5, width: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 14,
-  },
-  screen: { backgroundColor: '#f8f8f7', flex: 1 },
+  screen: appStyles.screen,
   summary: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderColor: '#e3e3e3',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
     borderRadius: 22,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1421,6 +1402,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 16,
     padding: 16,
+    ...goldShadow,
   },
   summaryLabel: { color: '#737373', fontSize: 13, marginTop: 2 },
   summaryValue: { color: '#111318', fontSize: 21, fontWeight: '900' },
@@ -1438,7 +1420,7 @@ const styles = StyleSheet.create({
   },
   timelineTitle: { color: '#111318', fontSize: 18, fontWeight: '900' },
   title: {
-    color: '#111318',
+    color: appTheme.colors.text,
     fontSize: 33,
     fontWeight: '900',
     letterSpacing: -1,
@@ -1472,7 +1454,7 @@ const styles = StyleSheet.create({
   },
   calendarClose: {
     alignItems: 'center',
-    backgroundColor: '#111318',
+    backgroundColor: appTheme.colors.accent,
     borderRadius: 14,
     marginTop: 18,
     paddingVertical: 13,
@@ -1483,7 +1465,7 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     marginHorizontal: 20,
     padding: 20,
-    shadowColor: '#111318',
+    shadowColor: appTheme.colors.accentDark,
     shadowOffset: { height: 10, width: 0 },
     shadowOpacity: 0.22,
     shadowRadius: 22,
@@ -1524,7 +1506,10 @@ const styles = StyleSheet.create({
   },
   monthDateLabel: { color: '#111318', fontSize: 14, fontWeight: '700' },
   monthDateLabelSelected: { color: '#ffffff' },
-  monthDateSelected: { backgroundColor: '#111318', borderRadius: 14 },
+  monthDateSelected: {
+    backgroundColor: appTheme.colors.accent,
+    borderRadius: 14,
+  },
   monthDateToday: { color: '#2464e8', textDecorationLine: 'underline' },
   monthGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 },
   monthWeekday: {

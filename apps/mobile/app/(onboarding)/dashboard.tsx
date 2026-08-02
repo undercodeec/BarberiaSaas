@@ -35,7 +35,10 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 
-import { BottomNavigation } from '../../src/components/BottomNavigation';
+import {
+  appStyles,
+  BottomNavigation,
+} from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { BookingLinkSheet } from '../../src/components/BookingLinkSheet';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -1492,7 +1495,7 @@ export default function DashboardScreen() {
         </View>
       </ScrollView>
 
-      <BottomNavigation active="dashboard" appearance="gold" />
+      <BottomNavigation active="dashboard" />
       <BookingLinkSheet
         onClose={() => setIsBookingSheetOpen(false)}
         url={bookingUrl}
@@ -1744,30 +1747,6 @@ const styles = StyleSheet.create({
     fontSize: 25,
     fontWeight: '900',
     letterSpacing: -0.4,
-  },
-  navActive: { backgroundColor: '#17191d' },
-  navActiveLabel: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
-  navItem: {
-    alignItems: 'center',
-    borderRadius: 26,
-    flex: 1,
-    gap: 3,
-    height: 64,
-    justifyContent: 'center',
-  },
-  navigation: {
-    backgroundColor: 'rgba(250, 250, 250, 0.97)',
-    borderRadius: 33,
-    bottom: 18,
-    elevation: 8,
-    flexDirection: 'row',
-    left: 24,
-    padding: 5,
-    position: 'absolute',
-    right: 24,
-    shadowColor: '#B47D17',
-    shadowOpacity: 0.16,
-    shadowRadius: 14,
   },
   permissionActions: { flexDirection: 'row', gap: 12, marginTop: 30 },
   permissionBackdrop: {
@@ -2042,7 +2021,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 1,
   },
-  screen: { backgroundColor: '#FAF9F6', flex: 1 },
+  screen: appStyles.screen,
   summaryButton: {
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.88)',
