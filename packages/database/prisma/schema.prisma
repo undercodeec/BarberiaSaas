@@ -159,6 +159,7 @@ model User {
   profileBio              String?                  @map("profile_bio") @db.VarChar(500)
   emailVerifiedAt         DateTime?                @map("email_verified_at") @db.Timestamptz(3)
   locale                  String                   @default("es") @db.VarChar(10)
+  deletedAt               DateTime?                @map("deleted_at") @db.Timestamptz(3)
   createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
   sessions                Session[]
@@ -183,6 +184,7 @@ model User {
   appNotifications        AppNotification[]
   pushTokens              PushToken[]
 
+  @@index([deletedAt])
   @@map("users")
 }
 

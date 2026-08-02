@@ -3118,3 +3118,50 @@ caja, comisiones y registros históricos.
 - [ ] Recorrido visual del resumen en viewport móvil: diferido porque el
       navegador integrado del entorno no pudo inicializar sus recursos
       internos; requiere validación manual en dispositivo o navegador.
+
+## Cierre de sesión y eliminación de cuenta — 1 de agosto de 2026
+
+### Cierre de sesión
+
+- [x] `Cerrar sesión` solicita confirmación y muestra estado de progreso para
+      evitar acciones repetidas.
+- [x] `POST /v1/auth/logout` revoca la sesión actual en el servidor; el cliente
+      elimina el token local y limpia la caché privada de React Query.
+- [x] Una sesión revocada ya no puede consultar `GET /v1/auth/session`.
+
+### Eliminación segura y auditable
+
+- [x] Nueva operación autenticada `DELETE /v1/account`, protegida por la
+      contraseña actual y la confirmación literal `ELIMINAR`.
+- [x] La eliminación revoca todas las sesiones, elimina datos transitorios del
+      perfil y anonimiza correo, nombre, teléfono, contraseña, biografía y foto.
+- [x] Se incorporó `users.deleted_at`; autenticación y sesiones rechazan cuentas
+      eliminadas, aunque quedara un token anterior en otro dispositivo.
+- [x] No se destruyen citas, movimientos de Caja, comisiones, liquidaciones ni
+      auditorías. Esos registros se conservan con la referencia técnica del
+      usuario anonimizado para mantener integridad financiera y trazabilidad.
+- [x] Cada organización vinculada recibe el evento auditable
+      `account.deleted`, sin copiar datos personales originales al evento.
+- [x] Si quien elimina es colaborador, se suspenden sus membresías, reglas de
+      comisión y asignaciones de servicios; el negocio del propietario continúa.
+- [x] Si quien elimina es propietario, se cancelan su organización, suscripción,
+      servicios y enlace público, y se revocan invitaciones pendientes.
+- [x] El propietario debe retirar primero colaboradores activos, cerrar Caja y
+      resolver citas futuras. Cada bloqueo devuelve un conflicto explícito y la
+      cuenta permanece intacta.
+- [x] Migración `20260801223000_user_account_deletion` aplicada en desarrollo y
+      pruebas.
+
+### Verificación de este corte
+
+- [x] Typecheck de base de datos, validaciones, API y aplicación móvil.
+- [x] ESLint de API, prueba de integración, validación y pantalla de Ajustes.
+- [x] Build de API y exportación Web de Expo completados.
+- [x] Prueba PostgreSQL específica: cierre de sesión, contraseña incorrecta,
+      bloqueos por Caja y colaboradores, anonimización, cancelación del negocio
+      e invalidación definitiva del token.
+- [x] Suite móvil: 3 archivos y 5/5 pruebas aprobadas.
+- [ ] La suite general conserva tres fallos ajenos a este cambio: la prueba de
+      doble reserva puede responder `500` en vez de `409` bajo concurrencia y
+      dos pruebas de liquidación calculan «hoy» en UTC, que cambia de fecha a
+      las 19:00 de Ecuador; deben estabilizarse por separado.

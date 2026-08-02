@@ -1,17 +1,21 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { OnboardingAccountDetailsResponse } from '@barber-saas/api-client';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { Redirect, useRouter } from 'expo-router';
 import type { ComponentProps } from 'react';
+import { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Linking,
+  Modal,
   Pressable,
   ScrollView,
   Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,6 +30,11 @@ type IconName = ComponentProps<typeof Ionicons>['name'];
 export default function SettingsScreen() {
   const { session, signOut } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const accountQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -33,6 +42,23 @@ export default function SettingsScreen() {
         '/v1/onboarding/account-details',
       ),
     queryKey: ['onboarding-account-details'],
+  });
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      await requireApiClient().request<void>('/v1/account', {
+        body: {
+          confirmation: deleteConfirmation,
+          password: deletePassword,
+        },
+        method: 'DELETE',
+      });
+      queryClient.clear();
+      try {
+        await signOut();
+      } catch {
+        // La API ya cerró la cuenta; signOut siempre elimina el token local.
+      }
+    },
   });
   if (!session) return <Redirect href="/(auth)/login" />;
 
@@ -51,14 +77,35 @@ export default function SettingsScreen() {
     await Linking.openURL(url);
   };
   const logout = () =>
-    Alert.alert('Cerrar sesion', '¿Estas seguro de que deseas cerrar sesion?', [
-      { style: 'cancel', text: 'Cancelar' },
-      {
-        onPress: () => void signOut(),
-        style: 'destructive',
-        text: 'Cerrar sesion',
-      },
-    ]);
+    Alert.alert(
+      'Cerrar sesión',
+      '¿Estás seguro de que deseas cerrar sesión en este dispositivo?',
+      [
+        { style: 'cancel', text: 'Cancelar' },
+        {
+          onPress: () => {
+            setIsSigningOut(true);
+            void signOut()
+              .catch(() => undefined)
+              .finally(() => {
+                queryClient.clear();
+                setIsSigningOut(false);
+              });
+          },
+          style: 'destructive',
+          text: 'Cerrar sesión',
+        },
+      ],
+    );
+  const closeDeleteModal = () => {
+    if (deleteAccountMutation.isPending) return;
+    setIsDeleteOpen(false);
+    setDeletePassword('');
+    setDeleteConfirmation('');
+    deleteAccountMutation.reset();
+  };
+  const canDelete =
+    deletePassword.length >= 8 && deleteConfirmation === 'ELIMINAR';
 
   return (
     <SafeAreaView
@@ -157,20 +204,27 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
         <Pressable
+          accessibilityRole="button"
+          disabled={isSigningOut}
           onPress={logout}
-          style={({ pressed }) => [styles.logout, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.logout,
+            pressed && styles.pressed,
+            isSigningOut && styles.disabled,
+          ]}
         >
-          <Ionicons color="#FFFFFF" name="log-out-outline" size={21} />
-          <Text style={styles.logoutLabel}>Cerrar sesion</Text>
+          {isSigningOut ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Ionicons color="#FFFFFF" name="log-out-outline" size={21} />
+          )}
+          <Text style={styles.logoutLabel}>
+            {isSigningOut ? 'Cerrando sesión…' : 'Cerrar sesión'}
+          </Text>
         </Pressable>
         <Pressable
-          onPress={() =>
-            Alert.alert(
-              'Borrar mi cuenta',
-              'Esta accion puede ser irreversible. Tu cuenta no se eliminara desde este aviso y requerira una verificacion adicional.',
-              [{ style: 'cancel', text: 'Cancelar' }, { text: 'Entendido' }],
-            )
-          }
+          accessibilityRole="button"
+          onPress={() => setIsDeleteOpen(true)}
           style={styles.deleteAction}
         >
           <Ionicons color="#5D6672" name="trash-outline" size={19} />
@@ -185,6 +239,92 @@ export default function SettingsScreen() {
         </View>
       </ScrollView>
       <BottomNavigation active="settings" />
+      <Modal
+        animationType="fade"
+        onRequestClose={closeDeleteModal}
+        transparent
+        visible={isDeleteOpen}
+      >
+        <View style={styles.modalBackdrop}>
+          <ScrollView
+            contentContainerStyle={styles.deleteModalContent}
+            keyboardShouldPersistTaps="handled"
+            style={styles.deleteModal}
+          >
+            <View style={styles.deleteIcon}>
+              <Ionicons color="#B93838" name="warning-outline" size={28} />
+            </View>
+            <Text style={styles.deleteTitle}>Borrar mi cuenta</Text>
+            <Text style={styles.deleteCopy}>
+              Esta acción anonimiza tu perfil y revoca todas tus sesiones. Los
+              registros de citas, Caja, comisiones y auditoría se conservan por
+              integridad del negocio.
+            </Text>
+            <View style={styles.warningBox}>
+              <Text style={styles.warningText}>
+                Si eres propietario, primero debes retirar colaboradores
+                activos, cerrar Caja y resolver citas futuras. Al continuar, tu
+                negocio y enlace de reservas quedarán cancelados.
+              </Text>
+            </View>
+            <Text style={styles.inputLabel}>Contraseña actual</Text>
+            <TextInput
+              autoCapitalize="none"
+              autoComplete="password"
+              onChangeText={setDeletePassword}
+              placeholder="Ingresa tu contraseña"
+              secureTextEntry
+              style={styles.input}
+              value={deletePassword}
+            />
+            <Text style={styles.inputLabel}>
+              Escribe ELIMINAR para confirmar
+            </Text>
+            <TextInput
+              autoCapitalize="characters"
+              autoCorrect={false}
+              onChangeText={setDeleteConfirmation}
+              placeholder="ELIMINAR"
+              style={styles.input}
+              value={deleteConfirmation}
+            />
+            {deleteAccountMutation.error ? (
+              <Text style={styles.deleteError}>
+                {deleteAccountMutation.error instanceof Error
+                  ? deleteAccountMutation.error.message
+                  : 'No pudimos borrar la cuenta.'}
+              </Text>
+            ) : null}
+            <View style={styles.modalActions}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={deleteAccountMutation.isPending}
+                onPress={closeDeleteModal}
+                style={styles.cancelButton}
+              >
+                <Text style={styles.cancelLabel}>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={!canDelete || deleteAccountMutation.isPending}
+                onPress={() => deleteAccountMutation.mutate()}
+                style={[
+                  styles.confirmDeleteButton,
+                  (!canDelete || deleteAccountMutation.isPending) &&
+                    styles.disabled,
+                ]}
+              >
+                {deleteAccountMutation.isPending ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Ionicons color="#FFFFFF" name="trash-outline" size={18} />
+                )}
+                <Text style={styles.confirmDeleteLabel}>Borrar cuenta</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -263,6 +403,96 @@ function PromoCard({
 }
 
 const styles = StyleSheet.create({
+  cancelButton: {
+    alignItems: 'center',
+    borderColor: '#D8DDE4',
+    borderRadius: 14,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 50,
+  },
+  cancelLabel: { color: '#303A48', fontSize: 14, fontWeight: '900' },
+  confirmDeleteButton: {
+    alignItems: 'center',
+    backgroundColor: '#B93838',
+    borderRadius: 14,
+    flex: 1.25,
+    flexDirection: 'row',
+    gap: 7,
+    justifyContent: 'center',
+    minHeight: 50,
+  },
+  confirmDeleteLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  deleteCopy: {
+    color: '#5D6672',
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  deleteError: {
+    backgroundColor: '#FDECEC',
+    borderRadius: 12,
+    color: '#A52F2F',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 12,
+    padding: 11,
+  },
+  deleteIcon: {
+    alignItems: 'center',
+    backgroundColor: '#FDECEC',
+    borderRadius: 24,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  deleteModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    maxHeight: '92%',
+    maxWidth: 520,
+    width: '100%',
+  },
+  deleteModalContent: { padding: 22 },
+  deleteTitle: {
+    color: '#111827',
+    fontSize: 24,
+    fontWeight: '900',
+    marginTop: 14,
+  },
+  disabled: { opacity: 0.48 },
+  input: {
+    borderColor: '#D8DDE4',
+    borderRadius: 14,
+    borderWidth: 1,
+    color: '#111827',
+    fontSize: 15,
+    minHeight: 50,
+    paddingHorizontal: 14,
+  },
+  inputLabel: {
+    color: '#303A48',
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 7,
+    marginTop: 15,
+  },
+  modalActions: { flexDirection: 'row', gap: 10, marginTop: 20 },
+  modalBackdrop: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(10, 17, 27, 0.52)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  warningBox: {
+    backgroundColor: '#FFF6E6',
+    borderRadius: 14,
+    marginTop: 14,
+    padding: 12,
+  },
+  warningText: { color: '#78541C', fontSize: 12, lineHeight: 18 },
   avatar: {
     alignItems: 'center',
     backgroundColor: '#EEEFF1',

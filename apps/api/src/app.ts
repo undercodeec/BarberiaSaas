@@ -1,10 +1,15 @@
 import cors from '@fastify/cors';
 import {
+  AppointmentStatus,
+  CashRegisterStatus,
   createDatabaseClient,
+  InvitationStatus,
   MembershipRole,
   MembershipStatus,
   OnboardingCollaboratorRole,
+  OrganizationStatus,
   RegistrationAccountType,
+  SubscriptionStatus,
   type DatabaseClient,
 } from '@barber-saas/database';
 import {
@@ -12,6 +17,7 @@ import {
   createSlug,
   createOnboardingCollaboratorSchema,
   createOnboardingServiceSchema,
+  deleteAccountSchema,
   recoverAccessSchema,
   registrationAvailabilitySchema,
   resendVerificationSchema,
@@ -457,6 +463,7 @@ async function authenticate(database: DatabaseClient, request: FastifyRequest) {
       },
       revokedAt: null,
       tokenHash: hashOpaqueToken(token),
+      user: { deletedAt: null },
     },
   });
   if (!session) {
@@ -661,6 +668,7 @@ export async function buildApi({
     });
     if (
       !user?.passwordHash ||
+      user.deletedAt ||
       !(await verifyPassword(input.password, user.passwordHash))
     ) {
       throw new ApiError(
@@ -844,6 +852,201 @@ export async function buildApi({
     await database.session.update({
       data: { revokedAt: new Date() },
       where: { id: session.id },
+    });
+    return reply.code(204).send();
+  });
+
+  app.delete('/v1/account', async (request, reply) => {
+    const { user } = await authenticate(database, request);
+    const input = deleteAccountSchema.parse(request.body);
+    if (
+      !user.passwordHash ||
+      !(await verifyPassword(input.password, user.passwordHash))
+    ) {
+      throw new ApiError(
+        401,
+        'INVALID_ACCOUNT_PASSWORD',
+        'La contraseña actual no es correcta.',
+      );
+    }
+
+    const memberships = await database.membership.findMany({
+      where: { userId: user.id },
+    });
+    const ownerOrganizationIds = memberships
+      .filter(
+        ({ role, status }) =>
+          role === MembershipRole.OWNER && status === MembershipStatus.ACTIVE,
+      )
+      .map(({ organizationId }) => organizationId);
+    const now = new Date();
+    if (ownerOrganizationIds.length > 0) {
+      const [activeCollaborators, openCashRegisters, futureAppointments] =
+        await Promise.all([
+          database.membership.count({
+            where: {
+              organizationId: { in: ownerOrganizationIds },
+              status: MembershipStatus.ACTIVE,
+              userId: { not: user.id },
+            },
+          }),
+          database.cashRegisterSession.count({
+            where: {
+              organizationId: { in: ownerOrganizationIds },
+              status: CashRegisterStatus.OPEN,
+            },
+          }),
+          database.appointment.count({
+            where: {
+              organizationId: { in: ownerOrganizationIds },
+              startsAt: { gte: now },
+              status: {
+                in: [
+                  AppointmentStatus.AWAITING_CONFIRMATION,
+                  AppointmentStatus.CHECKED_IN,
+                  AppointmentStatus.CONFIRMED,
+                  AppointmentStatus.IN_PROGRESS,
+                  AppointmentStatus.PENDING_VERIFICATION,
+                  AppointmentStatus.SCHEDULED,
+                  AppointmentStatus.WAITING,
+                ],
+              },
+            },
+          }),
+        ]);
+      if (activeCollaborators > 0) {
+        throw new ApiError(
+          409,
+          'ACCOUNT_HAS_ACTIVE_COLLABORATORS',
+          'Retira a los colaboradores activos antes de borrar la cuenta del propietario.',
+        );
+      }
+      if (openCashRegisters > 0) {
+        throw new ApiError(
+          409,
+          'ACCOUNT_HAS_OPEN_CASH_REGISTER',
+          'Cierra la caja abierta antes de borrar tu cuenta.',
+        );
+      }
+      if (futureAppointments > 0) {
+        throw new ApiError(
+          409,
+          'ACCOUNT_HAS_FUTURE_APPOINTMENTS',
+          'Cancela o completa las citas futuras antes de borrar tu cuenta.',
+        );
+      }
+    }
+
+    const anonymizedEmail = `deleted-${user.id}@deleted.invalid`;
+    const membershipIds = memberships.map(({ id }) => id);
+    await database.$transaction(async (transaction) => {
+      for (const membership of memberships) {
+        await transaction.auditLog.create({
+          data: {
+            action: 'account.deleted',
+            actorUserId: user.id,
+            afterData: {
+              deletedAt: now.toISOString(),
+              organizationClosed: ownerOrganizationIds.includes(
+                membership.organizationId,
+              ),
+              personalProfileAnonymized: true,
+            },
+            entityId: user.id,
+            entityType: 'user_account',
+            organizationId: membership.organizationId,
+          },
+        });
+      }
+      if (ownerOrganizationIds.length > 0) {
+        await transaction.teamInvitation.updateMany({
+          data: { status: InvitationStatus.REVOKED },
+          where: {
+            organizationId: { in: ownerOrganizationIds },
+            status: InvitationStatus.PENDING,
+          },
+        });
+        await transaction.location.updateMany({
+          data: { isActive: false },
+          where: { organizationId: { in: ownerOrganizationIds } },
+        });
+        await transaction.service.updateMany({
+          data: { isActive: false, onlineBooking: false },
+          where: { organizationId: { in: ownerOrganizationIds } },
+        });
+        await transaction.subscription.updateMany({
+          data: { status: SubscriptionStatus.CANCELLED },
+          where: { organizationId: { in: ownerOrganizationIds } },
+        });
+        await transaction.organization.updateMany({
+          data: { deletedAt: now, status: OrganizationStatus.CANCELLED },
+          where: { id: { in: ownerOrganizationIds } },
+        });
+        await transaction.membership.updateMany({
+          data: { status: MembershipStatus.SUSPENDED },
+          where: { organizationId: { in: ownerOrganizationIds } },
+        });
+      }
+      if (membershipIds.length > 0) {
+        await transaction.professionalService.deleteMany({
+          where: { membershipId: { in: membershipIds } },
+        });
+        await transaction.commissionRule.updateMany({
+          data: { effectiveTo: now, isActive: false },
+          where: {
+            isActive: true,
+            professionalMembershipId: { in: membershipIds },
+          },
+        });
+      }
+      await transaction.membership.updateMany({
+        data: { status: MembershipStatus.SUSPENDED },
+        where: { userId: user.id },
+      });
+      await transaction.teamInvitation.updateMany({
+        data: { email: anonymizedEmail },
+        where: { email: user.email },
+      });
+      await transaction.pendingRegistration.deleteMany({
+        where: { email: user.email },
+      });
+      await transaction.appNotification.deleteMany({
+        where: { userId: user.id },
+      });
+      await transaction.pushToken.deleteMany({ where: { userId: user.id } });
+      await transaction.userPortfolioItem.deleteMany({
+        where: { userId: user.id },
+      });
+      await transaction.onboardingCollaborator.deleteMany({
+        where: { ownerUserId: user.id },
+      });
+      await transaction.onboardingService.deleteMany({
+        where: { ownerUserId: user.id },
+      });
+      await transaction.userRegistrationProfile.deleteMany({
+        where: { userId: user.id },
+      });
+      await transaction.passwordResetToken.deleteMany({
+        where: { userId: user.id },
+      });
+      await transaction.emailVerificationCode.deleteMany({
+        where: { userId: user.id },
+      });
+      await transaction.session.deleteMany({ where: { userId: user.id } });
+      await transaction.user.update({
+        data: {
+          deletedAt: now,
+          email: anonymizedEmail,
+          emailVerifiedAt: null,
+          fullName: 'Cuenta eliminada',
+          locale: 'es',
+          passwordHash: null,
+          phone: null,
+          profileBio: null,
+          profilePhotoData: null,
+        },
+        where: { id: user.id },
+      });
     });
     return reply.code(204).send();
   });

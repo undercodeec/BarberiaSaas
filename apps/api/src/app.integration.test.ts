@@ -279,6 +279,155 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(await database.auditLog.count()).toBe(1);
   });
 
+  it('revoca la sesión y anonimiza una cuenta solo después de validar bloqueos', async () => {
+    const email = 'account-deletion@example.com';
+    const firstToken = await register(email);
+    const organization = await onboard(firstToken, 'account-deletion');
+    const originalUser = await database.user.findUniqueOrThrow({
+      where: { email },
+    });
+
+    const logout = await app.inject({
+      headers: { authorization: `Bearer ${firstToken}` },
+      method: 'POST',
+      url: '/v1/auth/logout',
+    });
+    expect(logout.statusCode).toBe(204);
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${firstToken}` },
+          method: 'GET',
+          url: '/v1/auth/session',
+        })
+      ).statusCode,
+    ).toBe(401);
+
+    const login = await app.inject({
+      method: 'POST',
+      payload: { email, password: 'Clave-segura-123' },
+      url: '/v1/auth/login',
+    });
+    expect(login.statusCode).toBe(200);
+    const token = login.json<{ session: { token: string } }>().session.token;
+    const wrongPassword = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'DELETE',
+      payload: { confirmation: 'ELIMINAR', password: 'Clave-incorrecta-123' },
+      url: '/v1/account',
+    });
+    expect(wrongPassword.statusCode).toBe(401);
+
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${token}` },
+          method: 'POST',
+          payload: { openingAmountCents: 0 },
+          url: '/v1/cash-register/open',
+        })
+      ).statusCode,
+    ).toBe(201);
+    const blockedByCash = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'DELETE',
+      payload: { confirmation: 'ELIMINAR', password: 'Clave-segura-123' },
+      url: '/v1/account',
+    });
+    expect(blockedByCash.statusCode).toBe(409);
+    expect(blockedByCash.json<{ code: string }>().code).toBe(
+      'ACCOUNT_HAS_OPEN_CASH_REGISTER',
+    );
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${token}` },
+          method: 'POST',
+          payload: { closingAmountCents: 0 },
+          url: '/v1/cash-register/close',
+        })
+      ).statusCode,
+    ).toBe(200);
+
+    await register('account-deletion-collaborator@example.com');
+    const collaborator = await database.user.findUniqueOrThrow({
+      where: { email: 'account-deletion-collaborator@example.com' },
+    });
+    const collaboratorMembership = await database.membership.create({
+      data: {
+        organizationId: organization.organizationId,
+        role: 'RECEPTIONIST',
+        status: 'ACTIVE',
+        userId: collaborator.id,
+      },
+    });
+    await database.memberLocation.create({
+      data: {
+        locationId: organization.locationId,
+        membershipId: collaboratorMembership.id,
+      },
+    });
+    const blockedByCollaborator = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'DELETE',
+      payload: { confirmation: 'ELIMINAR', password: 'Clave-segura-123' },
+      url: '/v1/account',
+    });
+    expect(blockedByCollaborator.statusCode).toBe(409);
+    expect(blockedByCollaborator.json<{ code: string }>().code).toBe(
+      'ACCOUNT_HAS_ACTIVE_COLLABORATORS',
+    );
+    await database.membership.update({
+      data: { status: 'SUSPENDED' },
+      where: { id: collaboratorMembership.id },
+    });
+
+    const deleted = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'DELETE',
+      payload: { confirmation: 'ELIMINAR', password: 'Clave-segura-123' },
+      url: '/v1/account',
+    });
+    expect(deleted.statusCode, deleted.body).toBe(204);
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${token}` },
+          method: 'GET',
+          url: '/v1/auth/session',
+        })
+      ).statusCode,
+    ).toBe(401);
+    expect(
+      await database.user.findUnique({ where: { id: originalUser.id } }),
+    ).toMatchObject({
+      deletedAt: expect.any(Date),
+      emailVerifiedAt: null,
+      fullName: 'Cuenta eliminada',
+      passwordHash: null,
+      phone: null,
+    });
+    expect(
+      await database.organization.findUnique({
+        where: { id: organization.organizationId },
+      }),
+    ).toMatchObject({ deletedAt: expect.any(Date), status: 'CANCELLED' });
+    expect(
+      await database.location.findUnique({
+        where: { id: organization.locationId },
+      }),
+    ).toMatchObject({ isActive: false });
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          payload: { email, password: 'Clave-segura-123' },
+          url: '/v1/auth/login',
+        })
+      ).statusCode,
+    ).toBe(401);
+  });
+
   it('materializa el onboarding moderno una sola vez', async () => {
     const token = await register('modern-onboarding@example.com');
     const serviceResponse = await app.inject({

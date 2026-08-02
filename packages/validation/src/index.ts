@@ -63,6 +63,11 @@ export const signInSchema = z.object({
   password: passwordSchema,
 });
 
+export const deleteAccountSchema = z.object({
+  confirmation: z.literal('ELIMINAR'),
+  password: passwordSchema,
+});
+
 export const signUpSchema = z
   .object({
     accountType: z.enum(['business', 'professional']),
@@ -551,6 +556,7 @@ export type RescheduleAppointmentInput = z.infer<
   typeof rescheduleAppointmentSchema
 >;
 export type SignInInput = z.infer<typeof signInSchema>;
+export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export type UpdateOnboardingCollaboratorInput = z.infer<
