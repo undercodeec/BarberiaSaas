@@ -2,6 +2,7 @@ export interface ApiRequestOptions {
   readonly body?: unknown;
   readonly headers?: Readonly<Record<string, string>>;
   readonly method?: 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT';
+  readonly responseType?: 'json' | 'text';
   readonly signal?: AbortSignal;
 }
 
@@ -197,9 +198,11 @@ export interface CommissionOverviewResponse {
   readonly entries: ReadonlyArray<{
     readonly amountCents: number;
     readonly baseAmountCents: number;
+    readonly calculationSnapshot: unknown;
     readonly id: string;
     readonly occurredAt: string;
     readonly professionalMembershipId: string;
+    readonly reversalOfEntryId: string | null;
     readonly settlementId: string | null;
     readonly status: 'approved' | 'pending' | 'reversed' | 'settled';
   }>;
@@ -263,6 +266,38 @@ export interface BusinessSummaryResponse {
     readonly uncategorizedCents: number;
   };
   readonly withdrawalsCents: number;
+}
+
+export interface MovementReportResponse {
+  readonly accessibleLocations: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+  }>;
+  readonly pagination: {
+    readonly page: number;
+    readonly pageSize: number;
+    readonly total: number;
+    readonly totalPages: number;
+  };
+  readonly period: {
+    readonly from: string;
+    readonly to: string;
+  };
+  readonly rows: ReadonlyArray<{
+    readonly amountCents: number;
+    readonly appointmentId: string | null;
+    readonly clientName: string | null;
+    readonly createdAt: string;
+    readonly createdByName: string;
+    readonly description: string;
+    readonly id: string;
+    readonly locationId: string | null;
+    readonly locationName: string;
+    readonly paymentMethod: 'card' | 'cash' | 'other' | 'transfer' | null;
+    readonly professionalName: string | null;
+    readonly serviceName: string | null;
+  }>;
+  readonly totalAmountCents: number;
 }
 
 export interface ApiMessageResponse {
@@ -676,6 +711,8 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
       }
 
       if (response.status === 204) return undefined as TResponse;
+      if (options.responseType === 'text')
+        return response.text() as Promise<TResponse>;
       return response.json() as Promise<TResponse>;
     },
   };

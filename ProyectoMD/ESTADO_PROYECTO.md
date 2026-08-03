@@ -2,7 +2,7 @@
 
 Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión posterior documentada en `docs/adr/0003-postgresql-prisma-y-api-en-vps.md`. Se marca `[x]` solo cuando la tarea está implementada y cuenta con la verificación indicada; `[ ]` significa pendiente o aún no demostrada.
 
-Última actualización: 2026-08-01
+Última actualización: 2026-08-03
 
 ## Decisión de infraestructura vigente
 
@@ -21,11 +21,11 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Fase 2 — Equipo, servicios y horarios
 - [ ] Fase 3 — Motor de agenda _(implementada y verificada contra PostgreSQL; aceptación manual móvil pendiente)_
 - [ ] Fase 4 — Reservas públicas _(implementada, verificada contra PostgreSQL y recorrida manualmente; quedan ajustes menores de UI/UX y configuración externa)_
-- [ ] Fase 5 — Clientes e historial _(directorio, creación, importación, historial vinculado y eliminación lógica implementados; edición, notas y fotografías privadas pendientes)_
+- [x] Fase 5 — Clientes e historial
 - [ ] Fase 6 — Caja y POS básico _(implementada técnicamente; validación manual en dispositivo físico diferida al cierre integral del MVP)_
-- [ ] Fase 7 — Comisiones _(cálculo automático, anticipos profesionales y liquidaciones implementados; reversos generales de comisiones pendientes)_
+- [x] Fase 7 — Comisiones
 - [ ] Fase 8 — Inventario básico
-- [ ] Fase 9 — Notificaciones
+- [x] Fase 9 — Notificaciones
 - [ ] Fase 10 — Reportes esenciales
 - [ ] Fase 11 — Planes y límites
 - [ ] Fase 12 — Panel interno del SaaS
@@ -237,7 +237,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Aislamiento por organización activa o, en su ausencia, por usuario propietario.
 - [x] Historial de citas vinculado por `clientId`, conservando compatibilidad con snapshots anteriores.
 - [x] Eliminación lógica de clientes sin perder el historial de citas.
-- [ ] Edición, notas operativas y fotografías privadas.
+- [x] Edición, notas operativas y fotografías privadas.
 
 ### Fase 6 — Caja y POS básico
 
@@ -245,7 +245,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 
 ### Fase 7 — Comisiones
 
-- [ ] Reglas, cálculo backend, snapshots, liquidaciones y reversión.
+- [x] Reglas, cálculo backend, snapshots, liquidaciones y reversión.
 
 Decisión de alcance para el MVP:
 
@@ -266,7 +266,7 @@ Decisión de alcance para el MVP:
 
 ### Fase 9 — Notificaciones
 
-- [ ] Plantillas, cola, proveedores mock/console, reintentos y recordatorios.
+- [x] Plantillas, cola durable sobre notificaciones internas, entrega SMTP/Expo Push, reintentos con backoff y recordatorios.
 
 ### Fase 10 — Reportes esenciales
 
@@ -499,11 +499,11 @@ Decisión de alcance para el MVP:
 
 ### Pendientes funcionales de clientes
 
-- [ ] Edicion y eliminacion logica de clientes.
-- [ ] Historial de citas por cliente.
-- [ ] Notas operativas y fotografias privadas.
+- [x] Edicion y eliminacion logica de clientes.
+- [x] Historial de citas por cliente.
+- [x] Notas operativas y fotografias privadas.
 - [ ] Importacion masiva con pantalla previa de seleccion, confirmacion y reporte individual de conflictos.
-- [ ] Vincular un cliente persistido con la creacion real de una nueva reserva.
+- [x] Vincular un cliente persistido con la creacion real de una nueva reserva.
 
 ## Actualizacion 2026-07-28 - Etiquetas de clientes y correcciones
 
@@ -2675,7 +2675,7 @@ Estado de este corte:
 - [x] Prisma validado y cliente regenerado; typecheck de API y móvil aprobado.
 - [x] Suite API/PostgreSQL: 23/23 pruebas aprobadas, incluyendo cobro antes/después de completar e idempotencia.
 - [x] ESLint de los archivos modificados, bundle de API y exportación Expo Web aprobados.
-- [ ] Implementar reversos auditables para anulaciones o devoluciones.
+- [x] Implementar reversos auditables para anulaciones o devoluciones.
 - [x] Implementar creación, aprobación y pago de liquidaciones.
 - [x] Añadir consulta y gestión móvil de comisiones y liquidaciones.
 
@@ -3161,7 +3161,60 @@ caja, comisiones y registros históricos.
       bloqueos por Caja y colaboradores, anonimización, cancelación del negocio
       e invalidación definitiva del token.
 - [x] Suite móvil: 3 archivos y 5/5 pruebas aprobadas.
-- [ ] La suite general conserva tres fallos ajenos a este cambio: la prueba de
-      doble reserva puede responder `500` en vez de `409` bajo concurrencia y
-      dos pruebas de liquidación calculan «hoy» en UTC, que cambia de fecha a
-      las 19:00 de Ecuador; deben estabilizarse por separado.
+- [ ] Las dos pruebas de liquidación que calculan «hoy» en UTC todavía deben
+      independizarse del cambio de fecha de Ecuador a las 19:00. El fallo de
+      doble reserva concurrente quedó corregido el 3 de agosto de 2026.
+
+## Cierre de funcionalidades parcialmente implementadas — 3 de agosto de 2026
+
+### Clientes
+
+- [x] Se confirmó que edición, notas operativas y fotografías privadas ya están
+      implementadas en Prisma, API y la ficha móvil autenticada.
+- [x] Las fotografías permanecen dentro del recurso privado autenticado del
+      cliente y no se publican mediante una URL abierta.
+
+### Comisiones y concurrencia
+
+- [x] Endpoint auditable `POST /v1/commissions/entries/:id/reverse` para crear
+      un ajuste compensatorio sin eliminar la entrada original.
+- [x] El reverso exige propietario o administrador, deriva la organización de
+      la sesión, conserva el snapshot original y es idempotente bajo concurrencia.
+- [x] Nava Wallet muestra entradas y reversos y solicita confirmación antes de
+      registrar el ajuste.
+- [x] Las creaciones y reprogramaciones de citas se serializan por profesional
+      con un bloqueo transaccional PostgreSQL; la doble reserva concurrente
+      devuelve de forma estable `409 APPOINTMENT_CONFLICT`.
+
+### Reportes de movimientos
+
+- [x] Historial paginado de gastos y ventas desde la pantalla de Reportes.
+- [x] Filtros por período, sucursal y método de pago.
+- [x] Ventas enriquecidas con cliente, servicio y profesional cuando existen.
+- [x] Exportación CSV autenticada con protección por organización y alcance de
+      sucursal.
+- [ ] Historial de depósitos continúa dependiendo de introducir el tipo
+      contable `DEPOSIT`/`OTHER_INCOME`; no se reutiliza `SALE`.
+
+### Notificaciones
+
+- [x] Las notificaciones de reservas se persisten antes de intentar SMTP o Expo
+      Push y conservan por canal su estado y número de intentos.
+- [x] Reintentos automáticos con backoff y máximo de cinco intentos; el proceso
+      se ejecuta cada minuto y evita ejecuciones simultáneas dentro de la instancia.
+- [x] La confirmación, cancelación o reprogramación de una cita no se revierte
+      si falla un proveedor externo.
+- [x] Los recordatorios configurables y sus plantillas continúan procesándose
+      mediante el ciclo de vida idempotente de reservas públicas.
+
+### Verificación
+
+- [x] Migraciones verificadas en `postgres-test`: 36 aplicadas, ninguna pendiente.
+- [x] Suite API/PostgreSQL: 28/28 pruebas aprobadas, incluidas concurrencia de
+      citas, concurrencia de reversos, autorización, auditoría, reportes y CSV.
+- [x] Typecheck de API, móvil y cliente compartido; ESLint de los archivos
+      modificados y bundle de API aprobados.
+- [x] Suite móvil: 3 archivos y 5/5 pruebas aprobadas; exportación Expo Web
+      completada.
+- [ ] Los textos legales definitivos y el dominio público de producción
+      requieren una decisión externa antes del despliegue.

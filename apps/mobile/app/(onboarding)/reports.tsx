@@ -1,18 +1,26 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import type { MovementReportResponse } from '@barber-saas/api-client';
+import { useQuery } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   Alert,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { appStyles, appTheme, goldButtonShadow } from '../../src/components/BottomNavigation';
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
+import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -20,6 +28,7 @@ type ReportMenuItem = {
   readonly description: string;
   readonly icon: IconName;
   readonly id: string;
+  readonly movementKind?: 'expenses' | 'sales';
   readonly planning?: string;
   readonly route?: string;
   readonly status: 'available' | 'planned';
@@ -65,9 +74,8 @@ const reportSections: readonly ReportSection[] = [
         description:
           'Movimientos de gasto por fecha, sucursal, categoría y responsable.',
         icon: 'trending-down-outline',
-        planning:
-          'Usará los movimientos EXPENSE de Caja con filtros y exportación CSV.',
-        status: 'planned',
+        movementKind: 'expenses',
+        status: 'available',
       },
       {
         id: 'deposit-history',
@@ -116,9 +124,8 @@ const reportSections: readonly ReportSection[] = [
         description:
           'Detalle paginado por fecha, método, servicio, profesional y cliente.',
         icon: 'pricetag-outline',
-        planning:
-          'Partirá de movimientos SALE y conservará el vínculo con cita, servicio y profesional.',
-        status: 'planned',
+        movementKind: 'sales',
+        status: 'available',
       },
       {
         id: 'customer-loans',
@@ -150,11 +157,18 @@ const reportSections: readonly ReportSection[] = [
 export default function ReportsScreen() {
   const { session } = useAuth();
   const router = useRouter();
+  const [movementReport, setMovementReport] = useState<
+    'expenses' | 'sales' | null
+  >(null);
   const isOpening = useRef(false);
   const openReport = useCallback(
     (item: ReportMenuItem) => {
       if (item.route) {
         router.push(item.route as never);
+        return;
+      }
+      if (item.movementKind) {
+        setMovementReport(item.movementKind);
         return;
       }
       if (isOpening.current) return;
@@ -182,6 +196,13 @@ export default function ReportsScreen() {
     router.replace('/settings');
   }, [router]);
   if (!session) return <Redirect href="/(auth)/login" />;
+  if (movementReport)
+    return (
+      <MovementReportView
+        kind={movementReport}
+        onBack={() => setMovementReport(null)}
+      />
+    );
   return (
     <SafeAreaView
       edges={['top', 'left', 'right', 'bottom']}
@@ -199,7 +220,11 @@ export default function ReportsScreen() {
               pressed && styles.pressed,
             ]}
           >
-            <Ionicons color={appTheme.colors.accentDark} name="arrow-back" size={25} />
+            <Ionicons
+              color={appTheme.colors.accentDark}
+              name="arrow-back"
+              size={25}
+            />
           </Pressable>
           <Text accessibilityRole="header" style={styles.headerTitle}>
             {'Estad\u00edsticas e informes'}
@@ -231,6 +256,272 @@ export default function ReportsScreen() {
   );
 }
 
+type MovementPreset = 'last_7_days' | 'last_30_days' | 'this_month' | 'today';
+type MovementPayment = 'card' | 'cash' | 'other' | 'transfer';
+
+const movementPresets: ReadonlyArray<{
+  label: string;
+  value: MovementPreset;
+}> = [
+  { label: 'Hoy', value: 'today' },
+  { label: '7 días', value: 'last_7_days' },
+  { label: 'Este mes', value: 'this_month' },
+  { label: '30 días', value: 'last_30_days' },
+];
+const movementPayments: ReadonlyArray<{
+  label: string;
+  value: MovementPayment | null;
+}> = [
+  { label: 'Todos', value: null },
+  { label: 'Efectivo', value: 'cash' },
+  { label: 'Tarjeta', value: 'card' },
+  { label: 'Transferencia', value: 'transfer' },
+  { label: 'Otro', value: 'other' },
+];
+
+function MovementReportView({
+  kind,
+  onBack,
+}: {
+  readonly kind: 'expenses' | 'sales';
+  readonly onBack: () => void;
+}) {
+  const [preset, setPreset] = useState<MovementPreset>('this_month');
+  const [payment, setPayment] = useState<MovementPayment | null>(null);
+  const [locationId, setLocationId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const queryString = useMemo(() => {
+    const search = new URLSearchParams({
+      kind,
+      page: String(page),
+      pageSize: '30',
+      range: preset,
+    });
+    if (payment) search.set('paymentMethod', payment);
+    if (locationId) search.set('locationId', locationId);
+    return search.toString();
+  }, [kind, locationId, page, payment, preset]);
+  const reportQuery = useQuery({
+    queryFn: () =>
+      requireApiClient().request<MovementReportResponse>(
+        `/v1/reports/movements?${queryString}`,
+      ),
+    queryKey: ['movement-report', queryString],
+  });
+  const report = reportQuery.data;
+  const title =
+    kind === 'expenses' ? 'Historial de gastos' : 'Historial de ventas';
+  const exportCsv = async () => {
+    try {
+      const search = new URLSearchParams(queryString);
+      search.set('format', 'csv');
+      const csv = await requireApiClient().request<string>(
+        `/v1/reports/movements?${search.toString()}`,
+        { responseType: 'text' },
+      );
+      await Share.share({ message: csv, title: `${title}.csv` });
+    } catch (error) {
+      Alert.alert(
+        'No pudimos exportar el reporte',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      );
+    }
+  };
+  const money = (value: number) =>
+    new Intl.NumberFormat('es-EC', {
+      currency: 'USD',
+      style: 'currency',
+    }).format(value / 100);
+
+  return (
+    <SafeAreaView style={styles.screen}>
+      <View style={styles.movementHeader}>
+        <Pressable
+          accessibilityLabel="Volver a reportes"
+          onPress={onBack}
+          style={styles.backButton}
+        >
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="arrow-back"
+            size={25}
+          />
+        </Pressable>
+        <Text style={styles.movementTitle}>{title}</Text>
+        <Pressable
+          accessibilityLabel="Exportar CSV"
+          disabled={!report?.rows.length}
+          onPress={() => void exportCsv()}
+          style={styles.backButton}
+        >
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="share-outline"
+            size={24}
+          />
+        </Pressable>
+      </View>
+      <ScrollView contentContainerStyle={styles.movementContent}>
+        <ReportFilter
+          items={movementPresets}
+          onSelect={(value) => {
+            setPreset(value);
+            setPage(1);
+          }}
+          selected={preset}
+        />
+        <ReportFilter
+          items={movementPayments}
+          onSelect={(value) => {
+            setPayment(value);
+            setPage(1);
+          }}
+          selected={payment}
+        />
+        {report && report.accessibleLocations.length > 1 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.reportFilters}>
+              <ReportChip
+                active={!locationId}
+                label="Todas"
+                onPress={() => {
+                  setLocationId(null);
+                  setPage(1);
+                }}
+              />
+              {report.accessibleLocations.map((location) => (
+                <ReportChip
+                  active={locationId === location.id}
+                  key={location.id}
+                  label={location.name}
+                  onPress={() => {
+                    setLocationId(location.id);
+                    setPage(1);
+                  }}
+                />
+              ))}
+            </View>
+          </ScrollView>
+        ) : null}
+        {reportQuery.isLoading ? (
+          <Text style={styles.reportMuted}>Preparando reporte…</Text>
+        ) : null}
+        {reportQuery.error ? (
+          <Pressable onPress={() => void reportQuery.refetch()}>
+            <Text style={styles.reportError}>
+              No pudimos cargar el reporte. Toca para reintentar.
+            </Text>
+          </Pressable>
+        ) : null}
+        {report ? (
+          <>
+            <View style={styles.reportTotal}>
+              <Text style={styles.reportMuted}>Total mostrado</Text>
+              <Text style={styles.reportTotalValue}>
+                {money(report.totalAmountCents)}
+              </Text>
+              <Text style={styles.reportMuted}>
+                {report.pagination.total} movimientos encontrados
+              </Text>
+            </View>
+            {report.rows.map((row) => (
+              <View key={row.id} style={styles.reportRow}>
+                <View style={styles.reportRowCopy}>
+                  <Text style={styles.reportRowTitle}>{row.description}</Text>
+                  <Text style={styles.reportMuted}>
+                    {new Date(row.createdAt).toLocaleString('es-EC')} ·{' '}
+                    {row.locationName}
+                  </Text>
+                  <Text style={styles.reportMuted}>
+                    {[row.clientName, row.serviceName, row.professionalName]
+                      .filter(Boolean)
+                      .join(' · ') || row.createdByName}
+                  </Text>
+                </View>
+                <Text style={styles.reportAmount}>
+                  {money(row.amountCents)}
+                </Text>
+              </View>
+            ))}
+            {!report.rows.length ? (
+              <Text style={styles.reportMuted}>
+                No hay movimientos para estos filtros.
+              </Text>
+            ) : null}
+            {report.pagination.totalPages > 1 ? (
+              <View style={styles.reportPagination}>
+                <Pressable
+                  disabled={page === 1}
+                  onPress={() => setPage((value) => Math.max(1, value - 1))}
+                >
+                  <Text style={styles.reportLink}>Anterior</Text>
+                </Pressable>
+                <Text style={styles.reportMuted}>
+                  {page} de {report.pagination.totalPages}
+                </Text>
+                <Pressable
+                  disabled={page === report.pagination.totalPages}
+                  onPress={() => setPage((value) => value + 1)}
+                >
+                  <Text style={styles.reportLink}>Siguiente</Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </>
+        ) : null}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function ReportFilter<T extends string | null>({
+  items,
+  onSelect,
+  selected,
+}: {
+  readonly items: ReadonlyArray<{ label: string; value: T }>;
+  readonly onSelect: (value: T) => void;
+  readonly selected: T;
+}) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <View style={styles.reportFilters}>
+        {items.map((item) => (
+          <ReportChip
+            active={selected === item.value}
+            key={item.label}
+            label={item.label}
+            onPress={() => onSelect(item.value)}
+          />
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+function ReportChip({
+  active,
+  label,
+  onPress,
+}: {
+  readonly active: boolean;
+  readonly label: string;
+  readonly onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.reportChip, active && styles.reportChipActive]}
+    >
+      <Text
+        style={[styles.reportChipText, active && styles.reportChipTextActive]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 function ReportNavigationCard({
   item,
   onPress,
@@ -247,7 +538,11 @@ function ReportNavigationCard({
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
       <View style={styles.iconContainer}>
-        <Ionicons color={appTheme.colors.accentDark} name={item.icon} size={28} />
+        <Ionicons
+          color={appTheme.colors.accentDark}
+          name={item.icon}
+          size={28}
+        />
       </View>
       <View style={styles.cardCopy}>
         <View style={styles.cardTitleRow}>
@@ -273,7 +568,11 @@ function ReportNavigationCard({
         <Text style={styles.cardDescription}>{item.description}</Text>
       </View>
       <View style={styles.chevron}>
-        <Ionicons color={appTheme.colors.accentDark} name="chevron-forward" size={24} />
+        <Ionicons
+          color={appTheme.colors.accentDark}
+          name="chevron-forward"
+          size={24}
+        />
       </View>
     </Pressable>
   );
@@ -365,6 +664,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 60,
   },
+  movementContent: { gap: 14, padding: 20, paddingBottom: 44 },
+  movementHeader: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.surface,
+    flexDirection: 'row',
+    gap: 12,
+    minHeight: 68,
+    paddingHorizontal: 20,
+  },
+  movementTitle: {
+    color: appTheme.colors.text,
+    flex: 1,
+    fontSize: 22,
+    fontWeight: '800',
+  },
   pressed: { opacity: 0.74, transform: [{ scale: 0.985 }] },
   plannedBadge: {
     backgroundColor: appTheme.colors.border,
@@ -372,7 +686,68 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  plannedLabel: { color: appTheme.colors.textMuted, fontSize: 10, fontWeight: '900' },
+  plannedLabel: {
+    color: appTheme.colors.textMuted,
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  reportAmount: {
+    color: appTheme.colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  reportChip: {
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: 99,
+    borderWidth: 1,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+  },
+  reportChipActive: { backgroundColor: appTheme.colors.accentDark },
+  reportChipText: {
+    color: appTheme.colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  reportChipTextActive: { color: '#FFFFFF' },
+  reportError: { color: '#B42318', fontSize: 14, fontWeight: '800' },
+  reportFilters: { flexDirection: 'row', gap: 8 },
+  reportLink: { color: appTheme.colors.accentDark, fontWeight: '900' },
+  reportMuted: { color: appTheme.colors.textMuted, fontSize: 13 },
+  reportPagination: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+  },
+  reportRow: {
+    alignItems: 'flex-start',
+    backgroundColor: appTheme.colors.surface,
+    borderRadius: 20,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 16,
+    ...goldButtonShadow,
+  },
+  reportRowCopy: { flex: 1, gap: 4 },
+  reportRowTitle: {
+    color: appTheme.colors.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  reportTotal: {
+    backgroundColor: appTheme.colors.surface,
+    borderRadius: 22,
+    padding: 20,
+    ...goldButtonShadow,
+  },
+  reportTotalValue: {
+    color: appTheme.colors.text,
+    fontSize: 30,
+    fontWeight: '900',
+    marginVertical: 4,
+  },
   screen: appStyles.screen,
   section: { marginBottom: 36 },
   sectionTitle: {

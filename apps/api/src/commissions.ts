@@ -393,6 +393,7 @@ async function auditCommissionEvent(
     action: string;
     actorUserId: string;
     afterData: Record<string, unknown>;
+    beforeData?: Record<string, unknown>;
     entityId: string;
     entityType: string;
     locationId?: string | null;
@@ -404,6 +405,7 @@ async function auditCommissionEvent(
       action: input.action,
       actorUserId: input.actorUserId,
       afterData: input.afterData as never,
+      beforeData: input.beforeData as never,
       entityId: input.entityId,
       entityType: input.entityType,
       locationId: input.locationId ?? null,
@@ -526,14 +528,122 @@ export function registerCommissionRoutes(
       entries: entries.map((entry) => ({
         amountCents: entry.commissionAmountCents,
         baseAmountCents: entry.baseAmountCents,
+        calculationSnapshot: entry.calculationSnapshot,
         id: entry.id,
         occurredAt: entry.occurredAt.toISOString(),
         professionalMembershipId: entry.professionalMembershipId,
+        reversalOfEntryId: entry.reversalOfEntryId,
         settlementId: entry.settlementId,
         status: entry.status.toLowerCase(),
       })),
       professionals: rows,
       settlements: settlements.map(settlementRecord),
+    };
+  });
+
+  app.post('/v1/commissions/entries/:id/reverse', async (request) => {
+    const { user } = await authenticate(database, request);
+    const current = await commissionContext(database, user.id);
+    requireFinancialPermission(current.role, 'commission.manage');
+    const { id } = recordParamsSchema.parse(request.params);
+    const { reason } = reasonSchema.parse(request.body);
+    const reversal = await database.$transaction(async (transaction) => {
+      const original = await transaction.commissionEntry.findFirst({
+        where: { id, organizationId: current.organizationId },
+      });
+      if (!original)
+        throw new ApiError(
+          404,
+          'COMMISSION_ENTRY_NOT_FOUND',
+          'La comisión no existe.',
+        );
+      if (original.reversalOfEntryId)
+        throw new ApiError(
+          409,
+          'COMMISSION_REVERSAL_NOT_REVERSIBLE',
+          'Una reversión no puede volver a revertirse.',
+        );
+      const existing = await transaction.commissionEntry.findUnique({
+        where: { reversalOfEntryId: original.id },
+      });
+      if (existing) return existing;
+      if (original.settlementId) {
+        const settlement = await transaction.commissionSettlement.findUnique({
+          where: { id: original.settlementId },
+        });
+        if (settlement && settlement.status !== CommissionSettlementStatus.PAID)
+          throw new ApiError(
+            409,
+            'COMMISSION_ENTRY_LOCKED',
+            'Cancela la liquidación en borrador o completa el pago antes de registrar el reverso.',
+          );
+      }
+      const claimed = await transaction.commissionEntry.updateMany({
+        data: { status: CommissionEntryStatus.REVERSED },
+        where: {
+          id: original.id,
+          status: { not: CommissionEntryStatus.REVERSED },
+        },
+      });
+      if (claimed.count !== 1) {
+        const concurrent = await transaction.commissionEntry.findUnique({
+          where: { reversalOfEntryId: original.id },
+        });
+        if (concurrent) return concurrent;
+        throw new ApiError(
+          409,
+          'COMMISSION_REVERSAL_CONFLICT',
+          'La comisión cambió mientras se registraba el reverso.',
+        );
+      }
+      const created = await transaction.commissionEntry.create({
+        data: {
+          appointmentId: original.appointmentId,
+          baseAmountCents: -original.baseAmountCents,
+          calculationSnapshot: {
+            originalEntryId: original.id,
+            originalSnapshot: original.calculationSnapshot,
+            reason,
+            source: 'reversal',
+          },
+          commissionAmountCents: -original.commissionAmountCents,
+          locationId: original.locationId,
+          occurredAt: new Date(),
+          organizationId: original.organizationId,
+          professionalMembershipId: original.professionalMembershipId,
+          reversalOfEntryId: original.id,
+          ruleId: original.ruleId,
+          status: CommissionEntryStatus.PENDING,
+        },
+      });
+      await auditCommissionEvent(transaction, {
+        action: 'commission_entry.reversed',
+        actorUserId: user.id,
+        afterData: {
+          reason,
+          reversalEntryId: created.id,
+          reversalAmountCents: created.commissionAmountCents,
+        },
+        beforeData: {
+          amountCents: original.commissionAmountCents,
+          settlementId: original.settlementId,
+          status: original.status,
+        },
+        entityId: original.id,
+        entityType: 'commission_entry',
+        locationId: original.locationId,
+        organizationId: current.organizationId,
+      });
+      return created;
+    });
+    return {
+      reversal: {
+        amountCents: reversal.commissionAmountCents,
+        id: reversal.id,
+        occurredAt: reversal.occurredAt.toISOString(),
+        originalEntryId: reversal.reversalOfEntryId,
+        status: reversal.status.toLowerCase(),
+      },
     };
   });
 

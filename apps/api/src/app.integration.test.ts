@@ -1487,7 +1487,7 @@ describeWithDatabase('API con PostgreSQL', () => {
       payload: { ...basePayload, startsAt: '2030-01-14T15:00:00.000Z' },
       url: '/v1/appointments',
     });
-    expect(createResponse.statusCode).toBe(201);
+    expect(createResponse.statusCode, createResponse.body).toBe(201);
     const appointmentId = createResponse.json<{
       appointment: { id: string };
     }>().appointment.id;
@@ -1847,6 +1847,86 @@ describeWithDatabase('API con PostgreSQL', () => {
     ).toBe(3);
   });
 
+  it('registra un único reverso de comisión bajo solicitudes concurrentes', async () => {
+    const agenda = await setupAgenda('reverso-comision');
+    await database.commissionRule.create({
+      data: {
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        organizationId: agenda.organizationId,
+        professionalMembershipId: agenda.membershipId,
+        type: 'SERVICE_PERCENTAGE',
+        value: 25,
+      },
+    });
+    await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: { openingAmountCents: 0 },
+      url: '/v1/cash-register/open',
+    });
+    const sale = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        amountCents: 4_000,
+        description: 'Venta posteriormente anulada',
+        paymentMethod: 'cash',
+        professionalMembershipId: agenda.membershipId,
+        serviceId: agenda.serviceId,
+        type: 'sale',
+      },
+      url: '/v1/cash-register/movements',
+    });
+    const movementId = sale.json<{ movement: { id: string } }>().movement.id;
+    const original = await database.commissionEntry.findUniqueOrThrow({
+      where: { cashMovementId: movementId },
+    });
+    const forbidden = await app.inject({
+      headers: { authorization: `Bearer ${agenda.barberToken}` },
+      method: 'POST',
+      payload: { reason: 'No autorizado' },
+      url: `/v1/commissions/entries/${original.id}/reverse`,
+    });
+    expect(forbidden.statusCode).toBe(403);
+    const responses = await Promise.all([
+      app.inject({
+        headers: { authorization: `Bearer ${agenda.ownerToken}` },
+        method: 'POST',
+        payload: { reason: 'Devolución al cliente' },
+        url: `/v1/commissions/entries/${original.id}/reverse`,
+      }),
+      app.inject({
+        headers: { authorization: `Bearer ${agenda.ownerToken}` },
+        method: 'POST',
+        payload: { reason: 'Devolución al cliente' },
+        url: `/v1/commissions/entries/${original.id}/reverse`,
+      }),
+    ]);
+    expect(responses.map(({ statusCode }) => statusCode)).toEqual([200, 200]);
+    expect(
+      await database.commissionEntry.count({
+        where: { reversalOfEntryId: original.id },
+      }),
+    ).toBe(1);
+    expect(
+      await database.commissionEntry.findUnique({ where: { id: original.id } }),
+    ).toMatchObject({ status: 'REVERSED' });
+    expect(
+      await database.commissionEntry.findUnique({
+        where: { reversalOfEntryId: original.id },
+      }),
+    ).toMatchObject({
+      baseAmountCents: -4_000,
+      commissionAmountCents: -1_000,
+      status: 'PENDING',
+    });
+    expect(
+      await database.auditLog.count({
+        where: { action: 'commission_entry.reversed', entityId: original.id },
+      }),
+    ).toBe(1);
+  });
+
   it('libera reservas al cancelar borradores y permite revertir anticipos sin descuentos', async () => {
     const agenda = await setupAgenda('cancelacion-anticipos');
     await database.commissionRule.create({
@@ -2011,6 +2091,30 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect((await movement('sale', 'cash', 2_000)).statusCode).toBe(201);
     expect((await movement('expense', 'transfer', 500)).statusCode).toBe(201);
     expect((await movement('withdrawal', 'cash', 300)).statusCode).toBe(201);
+
+    const expenseReport = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: '/v1/reports/movements?kind=expenses&range=today',
+    });
+    expect(expenseReport.statusCode).toBe(200);
+    expect(
+      expenseReport.json<{
+        pagination: { total: number };
+        rows: Array<{ amountCents: number; description: string }>;
+      }>(),
+    ).toMatchObject({
+      pagination: { total: 1 },
+      rows: [{ amountCents: 500, description: 'expense de prueba' }],
+    });
+    const salesCsv = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: '/v1/reports/movements?format=csv&kind=sales&range=today',
+    });
+    expect(salesCsv.statusCode).toBe(200);
+    expect(salesCsv.headers['content-type']).toContain('text/csv');
+    expect(salesCsv.body).toContain('sale de prueba');
 
     const businessSummary = await app.inject({
       headers: { authorization: `Bearer ${token}` },

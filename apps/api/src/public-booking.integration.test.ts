@@ -260,6 +260,19 @@ integrationDescribe('reservas públicas', () => {
       startsAt,
       `client-${suffix}@example.com`,
     );
+    const queuedNotification = await database.appNotification.findFirst({
+      orderBy: { createdAt: 'desc' },
+      where: { organizationId, type: 'APPOINTMENT_CREATED' },
+    });
+    expect(queuedNotification).not.toBeNull();
+    expect(queuedNotification?.data).toMatchObject({
+      delivery: {
+        email: { attempts: 0, state: 'skipped' },
+        push: { attempts: 1, state: 'skipped' },
+      },
+      route: '/agenda',
+      type: 'created',
+    });
     expect(management.managementToken.length).toBeGreaterThan(32);
 
     const managed = await app.inject({

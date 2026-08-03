@@ -1,5 +1,6 @@
 import cors from '@fastify/cors';
 import {
+  AppNotificationType,
   AppointmentStatus,
   CashRegisterStatus,
   createDatabaseClient,
@@ -31,6 +32,7 @@ import {
   verifyEmailSchema,
 } from '@barber-saas/validation';
 import Fastify, { type FastifyRequest } from 'fastify';
+import nodemailer from 'nodemailer';
 import { z, ZodError } from 'zod';
 
 import type { ApiConfig } from './config';
@@ -41,9 +43,10 @@ import { registerCashRegisterRoutes } from './cash-register';
 import { registerCommissionRoutes } from './commissions';
 import { registerClientRoutes } from './clients';
 import { registerOperationsRoutes } from './operations';
-import {
-  createAppointmentNotifier,
-  registerNotificationRoutes,
+import { registerNotificationRoutes } from './notifications';
+import type {
+  AppointmentNotificationKind,
+  AppointmentNotifier,
 } from './notifications';
 import { registerProfileRoutes } from './profile';
 import { registerReportRoutes } from './reports';
@@ -71,6 +74,247 @@ const RESET_DURATION_MS = 30 * 60 * 1000;
 const VERIFICATION_DURATION_MS = 10 * 60 * 1000;
 const VERIFICATION_LOCK_DURATION_MS = 15 * 60 * 1000;
 const MAX_VERIFICATION_ATTEMPTS = 5;
+
+type NotificationDeliveryState = 'failed' | 'pending' | 'sent' | 'skipped';
+interface NotificationDeliveryAttempt {
+  attempts: number;
+  nextAttemptAt?: string;
+  state: NotificationDeliveryState;
+}
+interface QueuedNotificationData {
+  appointmentId?: string;
+  details?: string;
+  delivery?: {
+    email: NotificationDeliveryAttempt;
+    push: NotificationDeliveryAttempt;
+  };
+  route?: string;
+  type?: string;
+}
+
+function appointmentNotificationCopy(
+  kind: AppointmentNotificationKind,
+  clientName: string,
+) {
+  if (kind === 'cancelled')
+    return {
+      body: `${clientName} canceló una reserva online.`,
+      title: 'Reserva cancelada',
+      type: AppNotificationType.APPOINTMENT_CANCELLED,
+    };
+  if (kind === 'rescheduled')
+    return {
+      body: `${clientName} reprogramó una reserva online.`,
+      title: 'Reserva reprogramada',
+      type: AppNotificationType.APPOINTMENT_RESCHEDULED,
+    };
+  return {
+    body: `${clientName} confirmó una nueva reserva online.`,
+    title: 'Nueva reserva online',
+    type: AppNotificationType.APPOINTMENT_CREATED,
+  };
+}
+
+function queuedNotificationData(value: unknown): QueuedNotificationData {
+  return value && typeof value === 'object'
+    ? (value as QueuedNotificationData)
+    : {};
+}
+
+function notificationDeliveryDue(
+  delivery: NotificationDeliveryAttempt | undefined,
+  now: Date,
+) {
+  return Boolean(
+    delivery &&
+    (delivery.state === 'pending' || delivery.state === 'failed') &&
+    delivery.attempts < 5 &&
+    (!delivery.nextAttemptAt || new Date(delivery.nextAttemptAt) <= now),
+  );
+}
+
+function failedNotificationAttempt(attempts: number) {
+  const delays = [60_000, 5 * 60_000, 30 * 60_000, 2 * 60 * 60_000];
+  return {
+    attempts,
+    nextAttemptAt: new Date(
+      Date.now() +
+        (delays[Math.min(attempts - 1, delays.length - 1)] ?? 60_000),
+    ).toISOString(),
+    state: 'failed' as const,
+  };
+}
+
+let notificationDeliveryRunning = false;
+
+async function processQueuedNotificationDeliveries(
+  database: DatabaseClient,
+  config: ApiConfig,
+) {
+  if (notificationDeliveryRunning) return;
+  notificationDeliveryRunning = true;
+  try {
+    const now = new Date();
+    const notifications = await database.appNotification.findMany({
+      include: { organization: true, user: true },
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+    });
+    const transporter =
+      config.SMTP_HOST && config.SMTP_FROM
+        ? nodemailer.createTransport({
+            auth:
+              config.SMTP_USER && config.SMTP_PASSWORD
+                ? { pass: config.SMTP_PASSWORD, user: config.SMTP_USER }
+                : undefined,
+            host: config.SMTP_HOST,
+            port: config.SMTP_PORT,
+            secure: config.SMTP_SECURE === 'true',
+          })
+        : null;
+    for (const notification of notifications) {
+      const data = queuedNotificationData(notification.data);
+      if (!data.delivery) continue;
+      let { email, push } = data.delivery;
+      if (notificationDeliveryDue(email, now)) {
+        const attempts = email.attempts + 1;
+        if (!transporter || !config.SMTP_FROM) {
+          email = { attempts, state: 'skipped' };
+        } else {
+          try {
+            await transporter.sendMail({
+              from: config.SMTP_FROM,
+              subject: `${notification.title} · ${notification.organization.name}`,
+              text: `${notification.body}${data.details ? `\n\n${data.details}` : ''}`,
+              to: notification.user.email,
+            });
+            email = { attempts, state: 'sent' };
+          } catch {
+            email = failedNotificationAttempt(attempts);
+          }
+        }
+      }
+      if (notificationDeliveryDue(push, now)) {
+        const attempts = push.attempts + 1;
+        const tokens = await database.pushToken.findMany({
+          where: { userId: notification.userId },
+        });
+        if (!tokens.length) {
+          push = { attempts, state: 'skipped' };
+        } else {
+          try {
+            const response = await fetch(
+              'https://exp.host/--/api/v2/push/send',
+              {
+                body: JSON.stringify(
+                  tokens.map((token) => ({
+                    body: notification.body,
+                    data: {
+                      appointmentId: data.appointmentId,
+                      route: data.route,
+                      type: data.type,
+                    },
+                    sound: 'default',
+                    title: notification.title,
+                    to: token.token,
+                  })),
+                ),
+                headers: { 'content-type': 'application/json' },
+                method: 'POST',
+              },
+            );
+            if (!response.ok) throw new Error('Expo Push rechazó el envío.');
+            push = { attempts, state: 'sent' };
+          } catch {
+            push = failedNotificationAttempt(attempts);
+          }
+        }
+      }
+      await database.appNotification.update({
+        data: { data: { ...data, delivery: { email, push } } as never },
+        where: { id: notification.id },
+      });
+    }
+  } finally {
+    notificationDeliveryRunning = false;
+  }
+}
+
+function createQueuedAppointmentNotifier(
+  database: DatabaseClient,
+  config: ApiConfig,
+): AppointmentNotifier {
+  return {
+    async notify(appointmentId, kind) {
+      try {
+        const appointment = await database.appointment.findUnique({
+          include: {
+            location: true,
+            organization: true,
+            professional: { include: { user: true } },
+          },
+          where: { id: appointmentId },
+        });
+        if (!appointment) return;
+        const memberships = await database.membership.findMany({
+          include: { user: { select: { id: true } } },
+          where: {
+            organizationId: appointment.organizationId,
+            status: MembershipStatus.ACTIVE,
+            OR: [
+              { id: appointment.professionalMembershipId },
+              { role: MembershipRole.OWNER },
+              { role: MembershipRole.MANAGER },
+            ],
+          },
+        });
+        const recipients = [
+          ...new Map(
+            memberships.map((member) => [member.userId, member.user]),
+          ).values(),
+        ];
+        const content = appointmentNotificationCopy(
+          kind,
+          appointment.clientName,
+        );
+        const startsAt = new Intl.DateTimeFormat('es-EC', {
+          dateStyle: 'full',
+          timeStyle: 'short',
+          timeZone: appointment.location.timezone,
+        }).format(appointment.startsAt);
+        await database.appNotification.createMany({
+          data: recipients.map((recipient) => ({
+            appointmentId: appointment.id,
+            body: content.body,
+            data: {
+              appointmentId: appointment.id,
+              delivery: {
+                email: {
+                  attempts: 0,
+                  state:
+                    config.SMTP_HOST && config.SMTP_FROM
+                      ? ('pending' as const)
+                      : ('skipped' as const),
+                },
+                push: { attempts: 0, state: 'pending' as const },
+              },
+              details: `${appointment.clientName} · ${appointment.professional.user.fullName}\n${startsAt}`,
+              route: '/agenda',
+              type: kind,
+            },
+            organizationId: appointment.organizationId,
+            title: content.title,
+            type: content.type,
+            userId: recipient.id,
+          })),
+        });
+        await processQueuedNotificationDeliveries(database, config);
+      } catch {
+        // La cita ya quedó confirmada; la cola reintentará entregas persistidas.
+      }
+    },
+  };
+}
 
 function minuteForRegistrationTime(
   value: string | null | undefined,
@@ -1791,7 +2035,7 @@ export async function buildApi({
     };
   });
 
-  const appointmentNotifier = createAppointmentNotifier(database, config);
+  const appointmentNotifier = createQueuedAppointmentNotifier(database, config);
 
   registerOperationsRoutes(
     app,
@@ -1827,8 +2071,15 @@ export async function buildApi({
     ).catch((error: unknown) => app.log.error(error));
   }, 60_000);
   publicBookingLifecycleTimer.unref();
+  const notificationDeliveryTimer = setInterval(() => {
+    void processQueuedNotificationDeliveries(database, config).catch(
+      (error: unknown) => app.log.error(error),
+    );
+  }, 60_000);
+  notificationDeliveryTimer.unref();
   app.addHook('onClose', async () => {
     clearInterval(publicBookingLifecycleTimer);
+    clearInterval(notificationDeliveryTimer);
   });
 
   app.setErrorHandler((error, _request, reply) => {

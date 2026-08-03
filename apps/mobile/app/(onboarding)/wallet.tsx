@@ -107,6 +107,9 @@ export default function WalletScreen() {
     (settlement) =>
       settlement.professionalMembershipId === effectiveProfessional?.id,
   );
+  const selectedEntries = (commissionsQuery.data?.entries ?? []).filter(
+    (entry) => entry.professionalMembershipId === effectiveProfessional?.id,
+  );
   const refreshCommissions = () =>
     queryClient.invalidateQueries({ queryKey: ['commission-overview'] });
   const createAdvance = useMutation({
@@ -192,6 +195,32 @@ export default function WalletScreen() {
       ]);
     },
   });
+  const reverseCommission = useMutation({
+    mutationFn: (id: string) =>
+      requireApiClient().request(`/v1/commissions/entries/${id}/reverse`, {
+        body: { reason: 'Anulación o devolución registrada desde Nava Wallet' },
+        method: 'POST',
+      }),
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos revertir la comisión',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: () => refreshCommissions(),
+  });
+  const confirmCommissionReversal = (id: string) =>
+    Alert.alert(
+      'Revertir comisión',
+      'Se creará un ajuste compensatorio auditable. La entrada original conservará su historial.',
+      [
+        { style: 'cancel', text: 'Cancelar' },
+        {
+          onPress: () => reverseCommission.mutate(id),
+          style: 'destructive',
+          text: 'Registrar reverso',
+        },
+      ],
+    );
   const totals = summaryQuery.data?.totals;
   const formatMoney = (amountCents: number) =>
     `$${(amountCents / 100).toFixed(2)}`;
@@ -203,7 +232,11 @@ export default function WalletScreen() {
           onPress={() => router.back()}
           style={styles.back}
         >
-          <Ionicons color={appTheme.colors.accentDark} name="chevron-back" size={24} />
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="chevron-back"
+            size={24}
+          />
         </Pressable>
         <View>
           <Text accessibilityRole="header" style={styles.title}>
@@ -258,7 +291,11 @@ export default function WalletScreen() {
               style={styles.card}
             >
               <View style={styles.icon}>
-                <Ionicons color={appTheme.colors.accentDark} name="cash-outline" size={25} />
+                <Ionicons
+                  color={appTheme.colors.accentDark}
+                  name="cash-outline"
+                  size={25}
+                />
               </View>
               <View style={styles.copy}>
                 <Text style={styles.cardTitle}>Caja física</Text>
@@ -267,7 +304,11 @@ export default function WalletScreen() {
                   cierre.
                 </Text>
               </View>
-              <Ionicons color={appTheme.colors.accentDark} name="chevron-forward" size={22} />
+              <Ionicons
+                color={appTheme.colors.accentDark}
+                name="chevron-forward"
+                size={22}
+              />
             </Pressable>
           </>
         ) : null}
@@ -437,6 +478,37 @@ export default function WalletScreen() {
                     No hay anticipos para este profesional.
                   </Text>
                 ) : null}
+                <Text style={styles.sectionTitle}>Movimientos de comisión</Text>
+                {selectedEntries.map((entry) => (
+                  <View key={entry.id} style={styles.financialRow}>
+                    <View style={styles.copy}>
+                      <Text style={styles.cardTitle}>
+                        {entry.reversalOfEntryId ? 'Reverso' : 'Comisión'} ·{' '}
+                        {formatMoney(entry.amountCents)}
+                      </Text>
+                      <Text style={styles.cardDescription}>
+                        {new Date(entry.occurredAt).toLocaleDateString()} ·{' '}
+                        {entry.status.replaceAll('_', ' ')}
+                      </Text>
+                    </View>
+                    {canManageCommissions &&
+                    !entry.reversalOfEntryId &&
+                    entry.status !== 'reversed' ? (
+                      <Pressable
+                        accessibilityLabel="Revertir comisión"
+                        disabled={reverseCommission.isPending}
+                        onPress={() => confirmCommissionReversal(entry.id)}
+                      >
+                        <Text style={styles.dangerText}>Revertir</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ))}
+                {!selectedEntries.length ? (
+                  <Text style={styles.cardDescription}>
+                    Aún no existen movimientos de comisión.
+                  </Text>
+                ) : null}
                 <Text style={styles.sectionTitle}>Liquidaciones</Text>
                 {selectedSettlements.map((settlement) => (
                   <View key={settlement.id} style={styles.settlementCard}>
@@ -516,7 +588,11 @@ export default function WalletScreen() {
         {tab === 'settings' ? (
           <View style={styles.card}>
             <View style={styles.icon}>
-              <Ionicons color={appTheme.colors.accentDark} name="card-outline" size={25} />
+              <Ionicons
+                color={appTheme.colors.accentDark}
+                name="card-outline"
+                size={25}
+              />
             </View>
             <View style={styles.copy}>
               <Text style={styles.cardTitle}>PayPhone</Text>
@@ -674,8 +750,16 @@ const styles = StyleSheet.create({
   subtitle: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 2 },
   content: { gap: 14, padding: 20 },
   history: { gap: 8 },
-  historyCaption: { color: appTheme.colors.textMuted, fontSize: 11, marginTop: 2 },
-  historyAmount: { color: appTheme.colors.text, fontSize: 14, fontWeight: '900' },
+  historyCaption: {
+    color: appTheme.colors.textMuted,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  historyAmount: {
+    color: appTheme.colors.text,
+    fontSize: 14,
+    fontWeight: '900',
+  },
   historyRow: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surface,
@@ -688,7 +772,13 @@ const styles = StyleSheet.create({
   historyValue: { alignItems: 'flex-end' },
   metric: { color: appTheme.colors.textMuted, fontSize: 12, fontWeight: '800' },
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  balance: { backgroundColor: appTheme.colors.surface, borderRadius: 24, padding: 22, transform: [{ translateY: -3 }], ...goldButtonShadow },
+  balance: {
+    backgroundColor: appTheme.colors.surface,
+    borderRadius: 24,
+    padding: 22,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
+  },
   balanceLabel: { color: appTheme.colors.textMuted, fontSize: 14 },
   balanceValue: {
     color: appTheme.colors.text,
@@ -709,7 +799,11 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  commissionMetric: { color: appTheme.colors.textMuted, fontSize: 12, fontWeight: '700' },
+  commissionMetric: {
+    color: appTheme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   commissionMetrics: { flexDirection: 'row', gap: 16, marginTop: 10 },
   commissionSection: { gap: 12 },
   confirmButton: {
@@ -721,8 +815,16 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  confirmButtonText: { color: appTheme.colors.accentDark, fontSize: 15, fontWeight: '900' },
-  dangerText: { color: appTheme.colors.danger, fontSize: 13, fontWeight: '900' },
+  confirmButtonText: {
+    color: appTheme.colors.accentDark,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  dangerText: {
+    color: appTheme.colors.danger,
+    fontSize: 13,
+    fontWeight: '900',
+  },
   dateField: { flex: 1 },
   dateRow: { flexDirection: 'row', gap: 10 },
   financialRow: {
@@ -756,10 +858,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 9,
   },
-  methodActive: { backgroundColor: appTheme.colors.accentWash, borderColor: appTheme.colors.accentWash },
+  methodActive: {
+    backgroundColor: appTheme.colors.accentWash,
+    borderColor: appTheme.colors.accentWash,
+  },
   methodRow: { flexDirection: 'row', gap: 8 },
-  methodText: { color: appTheme.colors.textMuted, fontSize: 12, fontWeight: '800' },
-  methodTextActive: { color: appTheme.colors.text, fontSize: 12, fontWeight: '900' },
+  methodText: {
+    color: appTheme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  methodTextActive: {
+    color: appTheme.colors.text,
+    fontSize: 12,
+    fontWeight: '900',
+  },
   modalBackdrop: { flex: 1 },
   modalRoot: { backgroundColor: 'rgba(0,0,0,0.35)', flex: 1 },
   notesInput: { minHeight: 70, textAlignVertical: 'top' },
@@ -772,7 +885,11 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  primaryActionText: { color: appTheme.colors.accentDark, fontSize: 12, fontWeight: '900' },
+  primaryActionText: {
+    color: appTheme.colors.accentDark,
+    fontSize: 12,
+    fontWeight: '900',
+  },
   professionalChip: {
     backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 16,
@@ -780,7 +897,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   professionalChipActive: { backgroundColor: appTheme.colors.accentWash },
-  professionalChipText: { color: appTheme.colors.textMuted, fontSize: 12, fontWeight: '800' },
+  professionalChipText: {
+    color: appTheme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
   professionalChipTextActive: { color: appTheme.colors.text },
   professionalFilters: { gap: 8 },
   rowButtons: {
@@ -798,9 +919,21 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  secondaryActionText: { color: appTheme.colors.accentDark, fontSize: 12, fontWeight: '900' },
-  sectionTitle: { color: appTheme.colors.text, fontSize: 16, fontWeight: '900' },
-  settlementAmount: { color: appTheme.colors.text, fontSize: 18, fontWeight: '900' },
+  secondaryActionText: {
+    color: appTheme.colors.accentDark,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  sectionTitle: {
+    color: appTheme.colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  settlementAmount: {
+    color: appTheme.colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
   settlementCard: {
     backgroundColor: appTheme.colors.surface,
     borderRadius: 16,
@@ -819,8 +952,16 @@ const styles = StyleSheet.create({
   },
   sheetCopy: { color: appTheme.colors.textMuted, fontSize: 13 },
   sheetTitle: { color: appTheme.colors.text, fontSize: 22, fontWeight: '900' },
-  statusText: { color: appTheme.colors.textMuted, fontSize: 11, textTransform: 'capitalize' },
-  warningCopy: { color: appTheme.colors.accentDark, fontSize: 12, lineHeight: 17 },
+  statusText: {
+    color: appTheme.colors.textMuted,
+    fontSize: 11,
+    textTransform: 'capitalize',
+  },
+  warningCopy: {
+    color: appTheme.colors.accentDark,
+    fontSize: 12,
+    lineHeight: 17,
+  },
   tabs: {
     borderBottomColor: appTheme.colors.surfaceMuted,
     borderBottomWidth: 1,
@@ -863,5 +1004,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 5,
   },
-  badgeText: { color: appTheme.colors.textMuted, fontSize: 10, fontWeight: '900' },
+  badgeText: {
+    color: appTheme.colors.textMuted,
+    fontSize: 10,
+    fontWeight: '900',
+  },
 });

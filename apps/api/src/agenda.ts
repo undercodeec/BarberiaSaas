@@ -6,6 +6,7 @@ import {
   MembershipStatus,
   type AppointmentPaymentStatus,
   type DatabaseClient,
+  type Prisma,
 } from '@barber-saas/database';
 import {
   hasPermission,
@@ -246,7 +247,7 @@ export async function loadBookingContext(
 }
 
 export async function assertBookable(
-  database: DatabaseClient,
+  database: DatabaseClient | Prisma.TransactionClient,
   input: {
     endsAt: Date;
     ignoreAppointmentId?: string;
@@ -661,6 +662,14 @@ export function registerAgendaRoutes(
     });
     try {
       const appointment = await database.$transaction(async (transaction) => {
+        await transaction.$queryRaw`WITH lock AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtext(${input.professionalMembershipId}))) SELECT 1 AS locked FROM lock`;
+        await assertBookable(transaction, {
+          endsAt,
+          locationId: input.locationId,
+          professionalMembershipId: input.professionalMembershipId,
+          startsAt,
+          timeZone: context.location.timezone,
+        });
         const created = await transaction.appointment.create({
           data: {
             clientEmail,
@@ -775,6 +784,15 @@ export function registerAgendaRoutes(
     });
     try {
       const updated = await database.$transaction(async (transaction) => {
+        await transaction.$queryRaw`WITH lock AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtext(${existing.professionalMembershipId}))) SELECT 1 AS locked FROM lock`;
+        await assertBookable(transaction, {
+          endsAt,
+          ignoreAppointmentId: existing.id,
+          locationId: existing.locationId,
+          professionalMembershipId: existing.professionalMembershipId,
+          startsAt,
+          timeZone: existing.location.timezone,
+        });
         const appointment = await transaction.appointment.update({
           data: { endsAt, startsAt, updatedByUserId: user.id },
           include: { services: { orderBy: { sortOrder: 'asc' } } },

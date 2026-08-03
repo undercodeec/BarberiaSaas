@@ -53,6 +53,36 @@ const summaryQuerySchema = z
       }
     }
   });
+const movementReportQuerySchema = z
+  .object({
+    format: z.enum(['csv', 'json']).default('json'),
+    from: localDateSchema.optional(),
+    kind: z.enum(['expenses', 'sales']),
+    locationId: z.uuid().optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(30),
+    paymentMethod: z.enum(['cash', 'card', 'transfer', 'other']).optional(),
+    range: z
+      .enum(['today', 'last_7_days', 'this_month', 'last_30_days'])
+      .default('this_month'),
+    to: localDateSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (Boolean(value.from) !== Boolean(value.to)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Debes indicar el inicio y fin del período.',
+        path: value.from ? ['to'] : ['from'],
+      });
+    }
+    if (value.from && value.to && value.from > value.to) {
+      context.addIssue({
+        code: 'custom',
+        message: 'El rango de fechas no es válido.',
+        path: ['from'],
+      });
+    }
+  });
 
 function localDateFor(value: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -87,6 +117,11 @@ function periodFor(
 
 function sum(values: readonly number[]) {
   return values.reduce((total, value) => total + value, 0);
+}
+
+function csvCell(value: string | number | null) {
+  const text = value === null ? '' : String(value);
+  return /[",\r\n]/u.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
 export function registerReportRoutes(
@@ -336,6 +371,210 @@ export function registerReportRoutes(
         uncategorizedCents: uncategorizedSalesCents,
       },
       withdrawalsCents,
+    };
+  });
+
+  app.get('/v1/reports/movements', async (request, reply) => {
+    const { user } = await authenticate(database, request);
+    const input = movementReportQuerySchema.parse(request.query);
+    const membership = await database.membership.findFirst({
+      include: {
+        memberLocations: {
+          include: { location: true },
+          where: { location: { isActive: true } },
+        },
+      },
+      where: { status: MembershipStatus.ACTIVE, userId: user.id },
+    });
+    if (!membership)
+      throw new ApiError(
+        403,
+        'ORGANIZATION_REQUIRED',
+        'Tu cuenta no pertenece a un negocio activo.',
+      );
+    if (
+      membership.role !== MembershipRole.OWNER &&
+      membership.role !== MembershipRole.MANAGER
+    )
+      throw new ApiError(
+        403,
+        'FORBIDDEN',
+        'No tienes permiso para consultar reportes financieros.',
+      );
+    const accessibleLocations =
+      membership.role === MembershipRole.OWNER
+        ? await database.location.findMany({
+            orderBy: { createdAt: 'asc' },
+            where: {
+              isActive: true,
+              organizationId: membership.organizationId,
+            },
+          })
+        : membership.memberLocations.map(({ location }) => location);
+    const reportLocations = input.locationId
+      ? accessibleLocations.filter(({ id }) => id === input.locationId)
+      : accessibleLocations;
+    if (!reportLocations.length)
+      throw new ApiError(
+        404,
+        'LOCATION_NOT_FOUND',
+        'La sucursal no existe o no está dentro de tu alcance.',
+      );
+    const windows = reportLocations.map((location) => {
+      const period = periodFor(new Date(), location.timezone, input);
+      return {
+        end: zonedDateTimeToUtc(shiftDate(period.to, 1), 0, location.timezone),
+        location,
+        period,
+        start: zonedDateTimeToUtc(period.from, 0, location.timezone),
+      };
+    });
+    const movementWhere = {
+      OR: windows.map(({ end, location, start }) => ({
+        cashRegisterSession: {
+          locationId: location.id,
+          organizationId: membership.organizationId,
+        },
+        createdAt: { gte: start, lt: end },
+      })),
+      ...(input.paymentMethod
+        ? { paymentMethod: input.paymentMethod.toUpperCase() as never }
+        : {}),
+      type:
+        input.kind === 'expenses'
+          ? CashMovementType.EXPENSE
+          : CashMovementType.SALE,
+    };
+    const take = input.format === 'csv' ? 5_000 : input.pageSize;
+    const [total, movements] = await Promise.all([
+      database.cashMovement.count({ where: movementWhere }),
+      database.cashMovement.findMany({
+        include: { cashRegisterSession: true },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: input.format === 'csv' ? 0 : (input.page - 1) * input.pageSize,
+        take,
+        where: movementWhere,
+      }),
+    ]);
+    const userIds = [
+      ...new Set(movements.map(({ createdByUserId }) => createdByUserId)),
+    ];
+    const appointmentIds = movements.flatMap(({ appointmentId }) =>
+      appointmentId ? [appointmentId] : [],
+    );
+    const serviceIds = movements.flatMap(({ serviceId }) =>
+      serviceId ? [serviceId] : [],
+    );
+    const professionalIds = movements.flatMap(({ professionalMembershipId }) =>
+      professionalMembershipId ? [professionalMembershipId] : [],
+    );
+    const [users, appointments, services, professionals] = await Promise.all([
+      database.user.findMany({
+        select: { fullName: true, id: true },
+        where: { id: { in: userIds } },
+      }),
+      database.appointment.findMany({
+        select: { clientName: true, id: true },
+        where: { id: { in: appointmentIds } },
+      }),
+      database.service.findMany({
+        select: { id: true, name: true },
+        where: { id: { in: serviceIds } },
+      }),
+      database.membership.findMany({
+        include: { user: { select: { fullName: true } } },
+        where: {
+          id: { in: professionalIds },
+          organizationId: membership.organizationId,
+        },
+      }),
+    ]);
+    const names = new Map(users.map((record) => [record.id, record.fullName]));
+    const clients = new Map(
+      appointments.map((record) => [record.id, record.clientName]),
+    );
+    const serviceNames = new Map(
+      services.map((record) => [record.id, record.name]),
+    );
+    const professionalNames = new Map(
+      professionals.map((record) => [record.id, record.user.fullName]),
+    );
+    const rows = movements.map((movement) => ({
+      amountCents: movement.amountCents,
+      appointmentId: movement.appointmentId,
+      clientName: movement.appointmentId
+        ? (clients.get(movement.appointmentId) ?? null)
+        : null,
+      createdAt: movement.createdAt.toISOString(),
+      createdByName: names.get(movement.createdByUserId) ?? 'Usuario eliminado',
+      description: movement.description,
+      id: movement.id,
+      locationId: movement.cashRegisterSession.locationId,
+      locationName:
+        reportLocations.find(
+          ({ id }) => id === movement.cashRegisterSession.locationId,
+        )?.name ?? 'Sin sucursal',
+      paymentMethod: movement.paymentMethod?.toLowerCase() ?? null,
+      professionalName: movement.professionalMembershipId
+        ? (professionalNames.get(movement.professionalMembershipId) ?? null)
+        : null,
+      serviceName: movement.serviceId
+        ? (serviceNames.get(movement.serviceId) ?? null)
+        : null,
+    }));
+    if (input.format === 'csv') {
+      const header = [
+        'Fecha',
+        'Sucursal',
+        'Descripción',
+        'Monto centavos',
+        'Método',
+        'Responsable',
+        'Cliente',
+        'Servicio',
+        'Profesional',
+      ];
+      const csv = [
+        header,
+        ...rows.map((row) => [
+          row.createdAt,
+          row.locationName,
+          row.description,
+          row.amountCents,
+          row.paymentMethod,
+          row.createdByName,
+          row.clientName,
+          row.serviceName,
+          row.professionalName,
+        ]),
+      ]
+        .map((row) => row.map(csvCell).join(','))
+        .join('\r\n');
+      return reply
+        .header(
+          'content-disposition',
+          `attachment; filename="${input.kind}-${windows[0]?.period.from}-${windows[0]?.period.to}.csv"`,
+        )
+        .type('text/csv; charset=utf-8')
+        .send(`\uFEFF${csv}`);
+    }
+    return {
+      accessibleLocations: accessibleLocations.map(({ id, name }) => ({
+        id,
+        name,
+      })),
+      pagination: {
+        page: input.page,
+        pageSize: input.pageSize,
+        total,
+        totalPages: Math.ceil(total / input.pageSize),
+      },
+      period: windows[0]?.period,
+      rows,
+      totalAmountCents: rows.reduce(
+        (amount, row) => amount + row.amountCents,
+        0,
+      ),
     };
   });
 }
