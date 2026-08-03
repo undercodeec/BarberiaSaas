@@ -20,15 +20,20 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const COLORS = {
-  border: '#d9dde3',
-  muted: '#667080',
-  screen: '#ffffff',
-  surface: '#f4f4f3',
-  text: '#101c2d',
+  border: appTheme.colors.border,
+  muted: appTheme.colors.textMuted,
+  screen: appTheme.colors.background,
+  surface: appTheme.colors.surface,
+  text: appTheme.colors.text,
 } as const;
 const ROLE_LABELS: Record<string, string> = {
   barber: 'Profesional',
@@ -221,7 +226,7 @@ export default function TeamManagementScreen() {
           }
           style={styles.backButton}
         >
-          <Ionicons color={COLORS.text} name="arrow-back" size={25} />
+          <Ionicons color={appTheme.colors.accentDark} name="arrow-back" size={25} />
         </Pressable>
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={styles.title}>
@@ -268,7 +273,7 @@ export default function TeamManagementScreen() {
               onPress={openInvite}
               style={styles.addButton}
             >
-              <Ionicons color="#ffffff" name="person-add-outline" size={21} />
+              <Ionicons color={appTheme.colors.accentDark} name="person-add-outline" size={21} />
               <Text style={styles.addButtonLabel}>Enviar invitación</Text>
             </Pressable>
           ) : (
@@ -549,7 +554,7 @@ export default function TeamManagementScreen() {
 const styles = StyleSheet.create({
   avatar: {
     alignItems: 'center',
-    backgroundColor: '#e5e7ea',
+    backgroundColor: appTheme.colors.border,
     borderRadius: 18,
     height: 48,
     justifyContent: 'center',
@@ -557,11 +562,14 @@ const styles = StyleSheet.create({
   },
   avatarLabel: { color: COLORS.text, fontSize: 19, fontWeight: '900' },
   backButton: {
+    backgroundColor: appTheme.colors.surface,
     alignItems: 'center',
     borderRadius: 22,
     height: 44,
     justifyContent: 'center',
     width: 44,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   content: {
     alignSelf: 'center',
@@ -575,18 +583,20 @@ const styles = StyleSheet.create({
   addButton: {
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: COLORS.text,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 14,
     flexDirection: 'row',
     gap: 8,
     marginTop: 16,
     minHeight: 48,
     paddingHorizontal: 16,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  addButtonLabel: { color: '#ffffff', fontSize: 14, fontWeight: '900' },
+  addButtonLabel: { color: appTheme.colors.accentDark, fontSize: 14, fontWeight: '900' },
   closeButton: {
     alignItems: 'center',
-    backgroundColor: '#eef0f2',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 18,
     height: 36,
     justifyContent: 'center',
@@ -604,7 +614,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     minHeight: 50,
   },
-  deleteButtonLabel: { color: '#bd2d2d', fontSize: 14, fontWeight: '900' },
+  deleteButtonLabel: { color: appTheme.colors.dangerBorder, fontSize: 14, fontWeight: '900' },
   disabled: { opacity: 0.6 },
   empty: { color: COLORS.muted, fontSize: 14, paddingVertical: 18 },
   header: {
@@ -641,21 +651,22 @@ const styles = StyleSheet.create({
     width: 38,
   },
   inviteError: {
-    backgroundColor: '#fff0ee',
+    backgroundColor: appTheme.colors.dangerSurface,
     borderRadius: 12,
-    color: '#a72d27',
+    color: appTheme.colors.danger,
     fontSize: 13,
     marginBottom: 14,
     padding: 12,
   },
   inviteSheet: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    backgroundColor: appTheme.colors.surfaceElevated,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
     padding: 22,
+    ...goldButtonShadow,
   },
   input: {
-    backgroundColor: '#f7f8fa',
+    backgroundColor: appTheme.colors.background,
     borderColor: COLORS.border,
     borderRadius: 14,
     borderWidth: 1,
@@ -674,15 +685,16 @@ const styles = StyleSheet.create({
   inputDisabled: { color: COLORS.muted, opacity: 0.72 },
   memberCard: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderColor: COLORS.border,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 17,
-    borderWidth: 1,
+    borderWidth: 0,
     flexDirection: 'row',
     gap: 12,
     marginTop: 12,
     minHeight: 72,
     padding: 12,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   memberCopy: { flex: 1 },
   memberMeta: { color: COLORS.muted, fontSize: 13, marginTop: 4 },
@@ -714,19 +726,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   roleOptionLabel: { color: COLORS.muted, fontSize: 12, fontWeight: '800' },
-  roleOptionLabelSelected: { color: '#ffffff' },
+  roleOptionLabelSelected: { color: appTheme.colors.text, fontWeight: '900' },
   roleOptionSelected: {
-    backgroundColor: COLORS.text,
-    borderColor: COLORS.text,
+    backgroundColor: appTheme.colors.accentWash,
+    borderColor: appTheme.colors.accentWash,
   },
   roleOptions: { flexDirection: 'row', gap: 7, marginBottom: 16 },
-  screen: { backgroundColor: COLORS.screen, flex: 1 },
+  screen: appStyles.screen,
   section: {
-    backgroundColor: COLORS.surface,
-    borderColor: COLORS.border,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 21,
-    borderWidth: 1,
+    borderWidth: 0,
     padding: 17,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   sectionDescription: {
     color: COLORS.muted,
@@ -743,13 +756,15 @@ const styles = StyleSheet.create({
   sectionTitle: { color: COLORS.text, fontSize: 20, fontWeight: '900' },
   sendButton: {
     alignItems: 'center',
-    backgroundColor: COLORS.text,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 15,
     justifyContent: 'center',
     marginTop: 20,
     minHeight: 54,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  sendButtonLabel: { color: '#ffffff', fontSize: 15, fontWeight: '900' },
+  sendButtonLabel: { color: appTheme.colors.accentDark, fontSize: 15, fontWeight: '900' },
   subtitle: { color: COLORS.muted, fontSize: 13, marginTop: 2 },
   sheetDescription: {
     color: COLORS.muted,
@@ -767,16 +782,18 @@ const styles = StyleSheet.create({
   sheetTitle: { color: COLORS.text, fontSize: 22, fontWeight: '900' },
   summary: {
     alignItems: 'center',
-    backgroundColor: COLORS.text,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 20,
     flexDirection: 'row',
     justifyContent: 'space-around',
     minHeight: 92,
     padding: 16,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  summaryDivider: { backgroundColor: '#536070', height: 48, width: 1 },
-  summaryLabel: { color: '#cbd1d9', fontSize: 12, marginTop: 3 },
-  summaryValue: { color: '#ffffff', fontSize: 25, fontWeight: '900' },
+  summaryDivider: { backgroundColor: appTheme.colors.border, height: 48, width: 1 },
+  summaryLabel: { color: appTheme.colors.textMuted, fontSize: 12, marginTop: 3 },
+  summaryValue: { color: appTheme.colors.text, fontSize: 25, fontWeight: '900' },
   title: {
     color: COLORS.text,
     fontSize: 24,

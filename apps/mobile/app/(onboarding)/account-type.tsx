@@ -6,6 +6,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InlineMessage } from '../../src/components/InlineMessage';
+import { appStyles, appTheme, goldButtonShadow } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -144,7 +145,7 @@ export default function AccountTypeScreen() {
                 <Text style={styles.optionCopy}>{option.description}</Text>
               </View>
               <Ionicons
-                color={selected ? '#287247' : '#a1a8b2'}
+                color={selected ? '#287247' : appTheme.colors.textMuted}
                 name={selected ? 'checkmark-circle' : 'ellipse-outline'}
                 size={25}
               />
@@ -159,6 +160,10 @@ export default function AccountTypeScreen() {
 const styles = StyleSheet.create({
   backButton: {
     alignItems: 'center',
+    backgroundColor: appTheme.colors.surface,
+    borderRadius: 22,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
     height: 44,
     justifyContent: 'center',
     width: 44,
@@ -183,7 +188,7 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   iconBox: {
     alignItems: 'center',
-    backgroundColor: '#e6e8eb',
+    backgroundColor: appTheme.colors.border,
     borderRadius: 16,
     height: 52,
     justifyContent: 'center',
@@ -191,28 +196,32 @@ const styles = StyleSheet.create({
   },
   notice: {
     alignItems: 'flex-start',
-    backgroundColor: '#eef0f2',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 18,
     flexDirection: 'row',
     gap: 10,
     padding: 15,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  noticeCopy: { color: '#4f5967', flex: 1, fontSize: 13, lineHeight: 19 },
+  noticeCopy: { color: appTheme.colors.textMuted, flex: 1, fontSize: 13, lineHeight: 19 },
   option: {
     alignItems: 'center',
-    borderColor: '#d9dde3',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 20,
-    borderWidth: 1,
+    borderWidth: 0,
     flexDirection: 'row',
     gap: 13,
     minHeight: 92,
     padding: 16,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  optionCopy: { color: '#667080', fontSize: 13, lineHeight: 18, marginTop: 4 },
-  optionSelected: { backgroundColor: '#f2f8f4', borderColor: '#69a77f' },
-  optionTitle: { color: '#101c2d', fontSize: 17, fontWeight: '900' },
+  optionCopy: { color: appTheme.colors.textMuted, fontSize: 13, lineHeight: 18, marginTop: 4 },
+  optionSelected: { backgroundColor: appTheme.colors.accentWash, borderColor: appTheme.colors.accentWash },
+  optionTitle: { color: appTheme.colors.text, fontSize: 17, fontWeight: '900' },
   pressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },
-  screen: { backgroundColor: '#ffffff', flex: 1 },
-  subtitle: { color: '#667080', fontSize: 13, marginTop: 2 },
-  title: { color: '#101c2d', fontSize: 25, fontWeight: '900' },
+  screen: appStyles.screen,
+  subtitle: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 2 },
+  title: { color: appTheme.colors.text, fontSize: 25, fontWeight: '900' },
 });

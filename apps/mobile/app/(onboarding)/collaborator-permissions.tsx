@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InlineMessage } from '../../src/components/InlineMessage';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
+import { appStyles, appTheme, goldButtonShadow } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -166,7 +167,7 @@ export default function CollaboratorPermissionsScreen() {
                   <View style={styles.profileHeading}>
                     <Text style={styles.profileLabel}>{profile.label}</Text>
                     <Ionicons
-                      color={selected ? '#287247' : '#a1a8b2'}
+                      color={selected ? '#287247' : appTheme.colors.textMuted}
                       name={selected ? 'checkmark-circle' : 'ellipse-outline'}
                       size={22}
                     />
@@ -194,20 +195,24 @@ export default function CollaboratorPermissionsScreen() {
 const styles = StyleSheet.create({
   avatar: {
     alignItems: 'center',
-    backgroundColor: '#e6e8eb',
+    backgroundColor: appTheme.colors.border,
     borderRadius: 24,
     height: 48,
     justifyContent: 'center',
     width: 48,
   },
-  avatarLabel: { color: '#101c2d', fontSize: 18, fontWeight: '900' },
+  avatarLabel: { color: appTheme.colors.text, fontSize: 18, fontWeight: '900' },
   backButton: {
     alignItems: 'center',
+    backgroundColor: appTheme.colors.surface,
+    borderRadius: 22,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
     height: 44,
     justifyContent: 'center',
     width: 44,
   },
-  capability: { color: '#667080', fontSize: 12, lineHeight: 18, marginTop: 2 },
+  capability: { color: appTheme.colors.textMuted, fontSize: 12, lineHeight: 18, marginTop: 2 },
   content: {
     alignSelf: 'center',
     gap: 14,
@@ -215,7 +220,7 @@ const styles = StyleSheet.create({
     padding: 20,
     width: '100%',
   },
-  empty: { color: '#667080', fontSize: 14, padding: 24, textAlign: 'center' },
+  empty: { color: appTheme.colors.textMuted, fontSize: 14, padding: 24, textAlign: 'center' },
   header: {
     alignItems: 'center',
     alignSelf: 'center',
@@ -228,44 +233,48 @@ const styles = StyleSheet.create({
   },
   headerCopy: { flex: 1 },
   memberCard: {
-    borderColor: '#d9dde3',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 20,
-    borderWidth: 1,
+    borderWidth: 0,
     gap: 10,
     padding: 16,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  memberEmail: { color: '#667080', fontSize: 12, marginTop: 3 },
+  memberEmail: { color: appTheme.colors.textMuted, fontSize: 12, marginTop: 3 },
   memberHeading: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 12,
     marginBottom: 4,
   },
-  memberName: { color: '#101c2d', fontSize: 17, fontWeight: '900' },
+  memberName: { color: appTheme.colors.text, fontSize: 17, fontWeight: '900' },
   notice: {
     alignItems: 'flex-start',
-    backgroundColor: '#eef0f2',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 18,
     flexDirection: 'row',
     gap: 10,
     padding: 15,
   },
-  noticeCopy: { color: '#4f5967', flex: 1, fontSize: 13, lineHeight: 19 },
+  noticeCopy: { color: appTheme.colors.textMuted, flex: 1, fontSize: 13, lineHeight: 19 },
   pressed: { opacity: 0.72 },
   profile: {
-    borderColor: '#d9dde3',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 16,
-    borderWidth: 1,
+    borderWidth: 0,
     padding: 13,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   profileHeading: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  profileLabel: { color: '#101c2d', fontSize: 14, fontWeight: '900' },
-  profileSelected: { backgroundColor: '#f2f8f4', borderColor: '#69a77f' },
-  screen: { backgroundColor: '#ffffff', flex: 1 },
-  subtitle: { color: '#667080', fontSize: 13, marginTop: 2 },
-  title: { color: '#101c2d', fontSize: 23, fontWeight: '900' },
+  profileLabel: { color: appTheme.colors.text, fontSize: 14, fontWeight: '900' },
+  profileSelected: { backgroundColor: appTheme.colors.accentWash, borderColor: appTheme.colors.accentWash },
+  screen: appStyles.screen,
+  subtitle: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 2 },
+  title: { color: appTheme.colors.text, fontSize: 23, fontWeight: '900' },
 });

@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { appTheme, goldShadow } from './BottomNavigation';
 import { requireApiClient } from '../lib/api';
 import { useAuth } from '../providers/AuthProvider';
 
@@ -304,15 +305,12 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   banner: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: appTheme.colors.surfaceElevated,
     bottom: 0,
-    elevation: 20,
     left: 0,
     paddingHorizontal: 18,
     position: 'absolute',
-    shadowColor: '#101c2d',
-    shadowOpacity: 0.26,
-    shadowRadius: 18,
+    ...goldShadow,
     top: 0,
     width: '88%',
   },

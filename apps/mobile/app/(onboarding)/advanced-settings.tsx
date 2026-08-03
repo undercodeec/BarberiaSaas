@@ -16,15 +16,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const COLORS = {
-  border: '#d9dde3',
-  muted: '#667080',
-  screen: '#ffffff',
-  surface: '#f4f4f3',
-  text: '#101c2d',
+  border: appTheme.colors.border,
+  muted: appTheme.colors.textMuted,
+  screen: appTheme.colors.surface,
+  surface: appTheme.colors.surfaceMuted,
+  text: appTheme.colors.text,
 } as const;
 
 export default function AdvancedSettingsScreen() {
@@ -72,7 +77,7 @@ export default function AdvancedSettingsScreen() {
           onPress={goBack}
           style={styles.backButton}
         >
-          <Ionicons color={COLORS.text} name="arrow-back" size={25} />
+          <Ionicons color={appTheme.colors.accentDark} name="arrow-back" size={25} />
         </Pressable>
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={styles.title}>
@@ -98,7 +103,7 @@ export default function AdvancedSettingsScreen() {
         >
           <View style={styles.cardIcon}>
             <Ionicons
-              color={COLORS.text}
+              color={appTheme.colors.accentDark}
               name={isBusiness ? 'storefront-outline' : 'person-outline'}
               size={26}
             />
@@ -109,7 +114,7 @@ export default function AdvancedSettingsScreen() {
               {isBusiness ? 'Tengo un negocio' : 'Solo yo'}
             </Text>
           </View>
-          <Ionicons color={COLORS.text} name="chevron-forward" size={23} />
+          <Ionicons color={appTheme.colors.accentDark} name="chevron-forward" size={23} />
         </Pressable>
 
         {isBusiness ? (
@@ -123,7 +128,7 @@ export default function AdvancedSettingsScreen() {
           >
             <View style={styles.cardIcon}>
               <Ionicons
-                color={COLORS.text}
+                color={appTheme.colors.accentDark}
                 name="shield-checkmark-outline"
                 size={26}
               />
@@ -134,14 +139,14 @@ export default function AdvancedSettingsScreen() {
                 Asigna perfiles de acceso y consulta sus capacidades.
               </Text>
             </View>
-            <Ionicons color={COLORS.text} name="chevron-forward" size={23} />
+            <Ionicons color={appTheme.colors.accentDark} name="chevron-forward" size={23} />
           </Pressable>
         ) : null}
 
         <View style={styles.linkCard}>
           <View style={styles.linkHeading}>
             <View style={styles.cardIcon}>
-              <Ionicons color={COLORS.text} name="link-outline" size={26} />
+              <Ionicons color={appTheme.colors.accentDark} name="link-outline" size={26} />
             </View>
             <View style={styles.cardCopy}>
               <Text style={styles.cardTitle}>Enlace de reserva</Text>
@@ -194,7 +199,7 @@ export default function AdvancedSettingsScreen() {
               Confirmación, cancelación y reprogramación.
             </Text>
           </View>
-          <Ionicons color={COLORS.text} name="chevron-forward" size={23} />
+          <Ionicons color={appTheme.colors.accentDark} name="chevron-forward" size={23} />
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -210,7 +215,7 @@ export default function AdvancedSettingsScreen() {
               Consulta, muestra u oculta reseñas verificadas.
             </Text>
           </View>
-          <Ionicons color={COLORS.text} name="chevron-forward" size={23} />
+          <Ionicons color={appTheme.colors.accentDark} name="chevron-forward" size={23} />
         </Pressable>
         <ComingSoonRow
           description="Contenido adicional para mejorar tu sitio de reservas."
@@ -239,7 +244,7 @@ function SmallAction({
         pressed ? styles.pressed : null,
       ]}
     >
-      <Ionicons color={COLORS.text} name={icon} size={20} />
+      <Ionicons color={appTheme.colors.accentDark} name={icon} size={20} />
       <Text style={styles.smallActionLabel}>{label}</Text>
     </Pressable>
   );
@@ -267,21 +272,25 @@ function ComingSoonRow({
 
 const styles = StyleSheet.create({
   backButton: {
+    backgroundColor: appTheme.colors.surface,
     alignItems: 'center',
     borderRadius: 22,
     height: 44,
     justifyContent: 'center',
     width: 44,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   card: {
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderColor: COLORS.border,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 20,
-    borderWidth: 1,
+    borderWidth: 0,
     flexDirection: 'row',
     minHeight: 88,
     padding: 16,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   cardCopy: { flex: 1 },
   cardDescription: {
@@ -292,7 +301,7 @@ const styles = StyleSheet.create({
   },
   cardIcon: {
     alignItems: 'center',
-    backgroundColor: '#e5e7ea',
+    backgroundColor: appTheme.colors.border,
     borderRadius: 16,
     height: 52,
     justifyContent: 'center',
@@ -329,7 +338,7 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   linkActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
   linkBox: {
-    backgroundColor: '#ffffff',
+    backgroundColor: appTheme.colors.surface,
     borderColor: COLORS.border,
     borderRadius: 14,
     borderWidth: 1,
@@ -337,11 +346,12 @@ const styles = StyleSheet.create({
     padding: 13,
   },
   linkCard: {
-    backgroundColor: COLORS.surface,
-    borderColor: COLORS.border,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 20,
-    borderWidth: 1,
+    borderWidth: 0,
     padding: 16,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   linkHeading: { alignItems: 'center', flexDirection: 'row' },
   linkValue: {
@@ -351,21 +361,22 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   pressed: { opacity: 0.72 },
-  screen: { backgroundColor: COLORS.screen, flex: 1 },
+  screen: appStyles.screen,
   smallAction: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderColor: COLORS.border,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 13,
-    borderWidth: 1,
+    borderWidth: 0,
     flex: 1,
     gap: 4,
     minHeight: 55,
     justifyContent: 'center',
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   smallActionLabel: { color: COLORS.text, fontSize: 11, fontWeight: '800' },
   soonBadge: {
-    backgroundColor: '#eceef1',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 99,
     paddingHorizontal: 9,
     paddingVertical: 6,
@@ -373,13 +384,15 @@ const styles = StyleSheet.create({
   soonLabel: { color: COLORS.muted, fontSize: 10, fontWeight: '800' },
   soonRow: {
     alignItems: 'center',
-    borderBottomColor: COLORS.border,
-    borderBottomWidth: 1,
+    backgroundColor: appTheme.colors.surface,
+    borderRadius: 20,
     flexDirection: 'row',
     gap: 10,
     minHeight: 82,
-    paddingHorizontal: 4,
+    paddingHorizontal: 16,
     paddingVertical: 12,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   subtitle: { color: COLORS.muted, fontSize: 13, marginTop: 2 },
   title: {

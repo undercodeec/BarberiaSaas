@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { appStyles, appTheme, goldButtonShadow } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -120,7 +121,7 @@ export default function ReviewsManagementScreen() {
 const styles = StyleSheet.create({
   back: {
     alignItems: 'center',
-    borderColor: '#E2E5EA',
+    borderColor: appTheme.colors.border,
     borderRadius: 20,
     borderWidth: 1,
     height: 40,
@@ -128,8 +129,8 @@ const styles = StyleSheet.create({
     width: 40,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E5E7EB',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
     borderRadius: 18,
     borderWidth: 1,
     marginBottom: 12,
@@ -137,7 +138,7 @@ const styles = StyleSheet.create({
   },
   cardFooter: {
     alignItems: 'center',
-    borderTopColor: '#EEF0F3',
+    borderTopColor: appTheme.colors.surfaceMuted,
     borderTopWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -148,50 +149,52 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  client: { color: '#111827', fontSize: 15, fontWeight: '900' },
-  comment: { color: '#4B5563', lineHeight: 21, marginTop: 13 },
+  client: { color: appTheme.colors.text, fontSize: 15, fontWeight: '900' },
+  comment: { color: appTheme.colors.textMuted, lineHeight: 21, marginTop: 13 },
   content: { padding: 20 },
   empty: {
-    color: '#687282',
+    color: appTheme.colors.textMuted,
     lineHeight: 21,
     padding: 30,
     textAlign: 'center',
   },
   header: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderBottomColor: '#ECEEF1',
+    backgroundColor: appTheme.colors.surface,
+    borderBottomColor: appTheme.colors.surfaceMuted,
     borderBottomWidth: 1,
     flexDirection: 'row',
     padding: 14,
   },
   headerCopy: { flex: 1 },
   headerSubtitle: {
-    color: '#687282',
+    color: appTheme.colors.textMuted,
     fontSize: 11,
     marginTop: 2,
     textAlign: 'center',
   },
   headerTitle: {
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 16,
     fontWeight: '900',
     textAlign: 'center',
   },
-  professional: { color: '#687282', fontSize: 12, marginTop: 3 },
-  screen: { backgroundColor: '#F7F8FA', flex: 1 },
+  professional: { color: appTheme.colors.textMuted, fontSize: 12, marginTop: 3 },
+  screen: appStyles.screen,
   spacer: { width: 40 },
-  stars: { color: '#111827', fontSize: 16, letterSpacing: 2 },
-  status: { color: '#687282', fontSize: 12 },
+  stars: { color: appTheme.colors.text, fontSize: 16, letterSpacing: 2 },
+  status: { color: appTheme.colors.textMuted, fontSize: 12 },
   toggle: {
     alignItems: 'center',
-    borderColor: '#DDE1E7',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 999,
-    borderWidth: 1,
+    borderWidth: 0,
     flexDirection: 'row',
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 8,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  toggleText: { color: '#111827', fontSize: 12, fontWeight: '800' },
+  toggleText: { color: appTheme.colors.text, fontSize: 12, fontWeight: '800' },
 });

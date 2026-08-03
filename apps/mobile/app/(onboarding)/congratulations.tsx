@@ -18,6 +18,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NavaButton } from '../../src/components/NavaButton';
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { BookingLinkSheet } from '../../src/components/BookingLinkSheet';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -126,11 +131,11 @@ export default function CongratulationsScreen() {
           <Text style={styles.helpLabel}>
             {'¿Como configurar el enlace en Instagram?'}
           </Text>
-          <Ionicons color="#101c2d" name="arrow-forward" size={21} />
+          <Ionicons color={appTheme.colors.text} name="arrow-forward" size={21} />
         </Pressable>
 
         <View style={styles.linkBox}>
-          <Ionicons color="#101c2d" name="link-outline" size={22} />
+          <Ionicons color={appTheme.colors.text} name="link-outline" size={22} />
           <Text numberOfLines={2} style={styles.linkValue}>
             {bookingUrl || 'Preparando tu enlace de reservas?'}
           </Text>
@@ -154,6 +159,7 @@ export default function CongratulationsScreen() {
       <View style={styles.footer}>
         <NavaButton
           disabled={!bookingUrl}
+          foregroundColor={appTheme.colors.accentDark}
           icon="share-social-outline"
           label="Compartir enlace"
           onPress={() => void shareBookingUrl()}
@@ -161,6 +167,7 @@ export default function CongratulationsScreen() {
           variant="outline"
         />
         <NavaButton
+          foregroundColor={appTheme.colors.accentDark}
           icon="home-outline"
           label="Ir al inicio"
           disabled={completeOnboardingMutation.isPending}
@@ -174,7 +181,7 @@ export default function CongratulationsScreen() {
             })
           }
           style={styles.homeButton}
-          variant="primary"
+          variant="outline"
         />
       </View>
     </SafeAreaView>
@@ -190,7 +197,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   copy: {
-    color: '#667080',
+    color: appTheme.colors.textMuted,
     fontSize: 16,
     lineHeight: 24,
     marginTop: 14,
@@ -198,24 +205,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   footer: {
-    backgroundColor: '#f9fbff',
-    borderTopColor: '#e1e8f4',
-    borderTopWidth: 1,
+    backgroundColor: appTheme.colors.surfaceElevated,
     flexDirection: 'row',
     gap: 12,
     paddingHorizontal: 24,
     paddingVertical: 14,
   },
   helpLabel: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     flex: 1,
     fontSize: 15,
     fontWeight: '800',
   },
   helpRow: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderColor: '#d9dde3',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
     borderRadius: 18,
     borderWidth: 1,
     flexDirection: 'row',
@@ -225,7 +230,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 17,
     width: '100%',
   },
-  homeButton: { flexBasis: 0, height: 58, minWidth: 0 },
+  homeButton: {
+    backgroundColor: appTheme.colors.surface,
+    borderWidth: 0,
+    flexBasis: 0,
+    height: 58,
+    minWidth: 0,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
+  },
   illustration: {
     aspectRatio: 1.45,
     marginBottom: 4,
@@ -234,8 +247,8 @@ const styles = StyleSheet.create({
   },
   linkBox: {
     alignItems: 'center',
-    backgroundColor: '#e8f0ff',
-    borderColor: '#d3e0f6',
+    backgroundColor: appTheme.colors.accentWash,
+    borderColor: appTheme.colors.border,
     borderRadius: 20,
     borderWidth: 1,
     flexDirection: 'row',
@@ -245,20 +258,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     width: '100%',
   },
-  linkValue: { color: '#101c2d', flex: 1, fontSize: 14, fontWeight: '700' },
+  linkValue: { color: appTheme.colors.text, flex: 1, fontSize: 14, fontWeight: '700' },
   openButton: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 13,
     justifyContent: 'center',
     minHeight: 42,
     paddingHorizontal: 12,
   },
-  openLabel: { color: '#101c2d', fontSize: 14, fontWeight: '900' },
-  screen: { backgroundColor: '#f9fbff', flex: 1 },
-  shareButton: { flexBasis: 0, height: 58, minWidth: 0 },
+  openLabel: { color: appTheme.colors.text, fontSize: 14, fontWeight: '900' },
+  screen: appStyles.screen,
+  shareButton: {
+    backgroundColor: appTheme.colors.surface,
+    borderWidth: 0,
+    flexBasis: 0,
+    height: 58,
+    minWidth: 0,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
+  },
   title: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 31,
     fontWeight: '900',
     letterSpacing: -0.8,

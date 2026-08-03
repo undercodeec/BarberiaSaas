@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { appStyles, appTheme, goldButtonShadow } from '../../src/components/BottomNavigation';
 import { InlineMessage } from '../../src/components/InlineMessage';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -86,7 +87,7 @@ export default function BusinessSummaryScreen() {
           }
           style={styles.headerButton}
         >
-          <Ionicons color="#101c2d" name="arrow-back" size={25} />
+          <Ionicons color={appTheme.colors.accentDark} name="arrow-back" size={25} />
         </Pressable>
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={styles.title}>
@@ -100,7 +101,7 @@ export default function BusinessSummaryScreen() {
           onPress={() => setIsFilterOpen(true)}
           style={styles.headerButton}
         >
-          <Ionicons color="#101c2d" name="options-outline" size={25} />
+          <Ionicons color={appTheme.colors.accentDark} name="options-outline" size={25} />
         </Pressable>
       </View>
 
@@ -110,7 +111,7 @@ export default function BusinessSummaryScreen() {
       >
         {summaryQuery.isLoading ? (
           <View style={styles.loadingCard}>
-            <ActivityIndicator color="#101c2d" size="large" />
+            <ActivityIndicator color={appTheme.colors.accentDark} size="large" />
             <Text style={styles.muted}>Preparando tu resumen…</Text>
           </View>
         ) : null}
@@ -339,7 +340,7 @@ function ReportCard({
           <Text style={styles.cardSubtitle}>{subtitle}</Text>
         </View>
         <View style={styles.sparkBadge}>
-          <Ionicons color="#ffffff" name="sparkles" size={20} />
+          <Ionicons color={appTheme.colors.white} name="sparkles" size={20} />
         </View>
       </View>
       {children}
@@ -519,23 +520,21 @@ function FilterOption({
 const styles = StyleSheet.create({
   applyButton: {
     alignItems: 'center',
-    backgroundColor: '#101c2d',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 16,
     marginTop: 22,
     paddingVertical: 15,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  applyLabel: { color: '#ffffff', fontSize: 15, fontWeight: '900' },
+  applyLabel: { color: appTheme.colors.accentDark, fontSize: 15, fontWeight: '900' },
   card: {
-    backgroundColor: '#ffffff',
-    borderColor: '#edf0f3',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 24,
-    borderWidth: 1,
-    elevation: 2,
+    borderWidth: 0,
     padding: 18,
-    shadowColor: '#101c2d',
-    shadowOffset: { height: 4, width: 0 },
-    shadowOpacity: 0.06,
-    shadowRadius: 14,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   cardHeading: {
     alignItems: 'flex-start',
@@ -603,9 +602,9 @@ const styles = StyleSheet.create({
   filterOptionActive: { backgroundColor: '#101c2d', borderColor: '#101c2d' },
   filterOptionLabel: { color: '#263344', fontSize: 14, fontWeight: '800' },
   filterSheet: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
+    backgroundColor: appTheme.colors.surfaceElevated,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
     maxHeight: '88%',
     paddingBottom: 28,
     paddingHorizontal: 20,

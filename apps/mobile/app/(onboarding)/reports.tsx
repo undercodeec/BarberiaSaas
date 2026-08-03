@@ -11,6 +11,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { appStyles, appTheme, goldButtonShadow } from '../../src/components/BottomNavigation';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -197,7 +199,7 @@ export default function ReportsScreen() {
               pressed && styles.pressed,
             ]}
           >
-            <Ionicons color="#101c2d" name="arrow-back" size={25} />
+            <Ionicons color={appTheme.colors.accentDark} name="arrow-back" size={25} />
           </Pressable>
           <Text accessibilityRole="header" style={styles.headerTitle}>
             {'Estad\u00edsticas e informes'}
@@ -245,7 +247,7 @@ function ReportNavigationCard({
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
       <View style={styles.iconContainer}>
-        <Ionicons color="#101c2d" name={item.icon} size={28} />
+        <Ionicons color={appTheme.colors.accentDark} name={item.icon} size={28} />
       </View>
       <View style={styles.cardCopy}>
         <View style={styles.cardTitleRow}>
@@ -271,7 +273,7 @@ function ReportNavigationCard({
         <Text style={styles.cardDescription}>{item.description}</Text>
       </View>
       <View style={styles.chevron}>
-        <Ionicons color="#101c2d" name="chevron-forward" size={24} />
+        <Ionicons color={appTheme.colors.accentDark} name="chevron-forward" size={24} />
       </View>
     </Pressable>
   );
@@ -287,6 +289,10 @@ const styles = StyleSheet.create({
   availableLabel: { color: '#287247', fontSize: 10, fontWeight: '900' },
   backButton: {
     alignItems: 'center',
+    backgroundColor: appTheme.colors.surface,
+    borderWidth: 0,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
     borderRadius: 22,
     height: 44,
     justifyContent: 'center',
@@ -295,24 +301,25 @@ const styles = StyleSheet.create({
   },
   card: {
     alignItems: 'center',
-    backgroundColor: '#f4f4f3',
-    borderColor: '#d2d4d8',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 22,
-    borderWidth: 1,
+    borderWidth: 0,
     flexDirection: 'row',
     minHeight: 88,
     padding: 16,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   cardCopy: { flex: 1, marginLeft: 14 },
   cardDescription: {
-    color: '#555a63',
+    color: appTheme.colors.textMuted,
     fontSize: 16,
     lineHeight: 22,
     marginTop: 5,
   },
   cardList: { gap: 16, marginTop: 14 },
   cardTitle: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     flex: 1,
     fontSize: 18,
     fontWeight: '700',
@@ -334,7 +341,7 @@ const styles = StyleSheet.create({
     paddingTop: 22,
     width: '100%',
   },
-  header: { backgroundColor: '#ffffff', paddingHorizontal: 22 },
+  header: { backgroundColor: appTheme.colors.surface, paddingHorizontal: 22 },
   headerContent: {
     alignItems: 'center',
     alignSelf: 'center',
@@ -344,7 +351,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   headerTitle: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     flex: 1,
     fontSize: 26,
     fontWeight: '700',
@@ -352,7 +359,7 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     alignItems: 'center',
-    backgroundColor: '#e1e2e4',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 18,
     height: 60,
     justifyContent: 'center',
@@ -360,16 +367,16 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.74, transform: [{ scale: 0.985 }] },
   plannedBadge: {
-    backgroundColor: '#e5e8ec',
+    backgroundColor: appTheme.colors.border,
     borderRadius: 99,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  plannedLabel: { color: '#667080', fontSize: 10, fontWeight: '900' },
-  screen: { backgroundColor: '#ffffff', flex: 1 },
+  plannedLabel: { color: appTheme.colors.textMuted, fontSize: 10, fontWeight: '900' },
+  screen: appStyles.screen,
   section: { marginBottom: 36 },
   sectionTitle: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 26,
     fontWeight: '800',
     letterSpacing: -0.45,

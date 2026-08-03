@@ -15,6 +15,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -33,12 +38,12 @@ type SettingsSection = {
 };
 
 const COLORS = {
-  border: '#d2d4d8',
-  iconBackground: '#e1e2e4',
-  muted: '#555a63',
-  screen: '#ffffff',
-  surface: '#f4f4f3',
-  text: '#101c2d',
+  border: appTheme.colors.border,
+  iconBackground: appTheme.colors.accentWash,
+  muted: appTheme.colors.textMuted,
+  screen: appTheme.colors.background,
+  surface: appTheme.colors.surface,
+  text: appTheme.colors.text,
 } as const;
 
 const settingsSections: readonly SettingsSection[] = [
@@ -194,7 +199,7 @@ export default function BusinessSettingsScreen() {
               pressed && styles.pressed,
             ]}
           >
-            <Ionicons color={COLORS.text} name="arrow-back" size={25} />
+            <Ionicons color={appTheme.colors.accentDark} name="arrow-back" size={25} />
           </Pressable>
           <Text accessibilityRole="header" style={styles.headerTitle}>
             {isSolo ? 'Mi actividad' : 'Ajustes'}
@@ -265,7 +270,7 @@ function SettingsNavigationCard({
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
       <View style={styles.iconContainer}>
-        <Ionicons color={COLORS.text} name={item.icon} size={27} />
+        <Ionicons color={appTheme.colors.accentDark} name={item.icon} size={27} />
       </View>
       <View style={styles.cardCopy}>
         <Text style={styles.cardTitle}>{item.title}</Text>
@@ -278,7 +283,7 @@ function SettingsNavigationCard({
         </Text>
       </View>
       <View style={styles.chevron}>
-        <Ionicons color={COLORS.text} name="chevron-forward" size={24} />
+        <Ionicons color={appTheme.colors.accentDark} name="chevron-forward" size={24} />
       </View>
     </Pressable>
   );
@@ -308,7 +313,7 @@ function SettingsAccordion({
       >
         <Text style={styles.accordionTitle}>{title}</Text>
         <Ionicons
-          color={COLORS.text}
+          color={appTheme.colors.accentDark}
           name={expanded ? 'chevron-up' : 'chevron-down'}
           size={24}
         />
@@ -346,21 +351,26 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: 'center',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 22,
+    borderWidth: 0,
     height: 44,
     justifyContent: 'center',
     marginRight: 8,
+    transform: [{ translateY: -3 }],
     width: 44,
+    ...goldButtonShadow,
   },
   card: {
     alignItems: 'center',
     backgroundColor: COLORS.surface,
-    borderColor: COLORS.border,
     borderRadius: 22,
-    borderWidth: 1,
+    borderWidth: 0,
     flexDirection: 'row',
     minHeight: 88,
     padding: 16,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   cardCopy: { flex: 1, marginLeft: 14 },
   cardDescription: {
@@ -416,7 +426,7 @@ const styles = StyleSheet.create({
     width: 60,
   },
   pressed: { opacity: 0.74, transform: [{ scale: 0.985 }] },
-  screen: { backgroundColor: COLORS.screen, flex: 1 },
+  screen: appStyles.screen,
   section: { marginBottom: 36 },
   sectionTitle: {
     color: COLORS.text,

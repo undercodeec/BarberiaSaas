@@ -1,4 +1,4 @@
-﻿import Ionicons from '@expo/vector-icons/Ionicons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
   CashRegisterHistoryResponse,
   CashRegisterSummaryResponse,
@@ -20,6 +20,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -198,7 +203,7 @@ export default function WalletScreen() {
           onPress={() => router.back()}
           style={styles.back}
         >
-          <Ionicons color="#101c2d" name="chevron-back" size={24} />
+          <Ionicons color={appTheme.colors.accentDark} name="chevron-back" size={24} />
         </Pressable>
         <View>
           <Text accessibilityRole="header" style={styles.title}>
@@ -253,7 +258,7 @@ export default function WalletScreen() {
               style={styles.card}
             >
               <View style={styles.icon}>
-                <Ionicons color="#101c2d" name="cash-outline" size={25} />
+                <Ionicons color={appTheme.colors.accentDark} name="cash-outline" size={25} />
               </View>
               <View style={styles.copy}>
                 <Text style={styles.cardTitle}>Caja física</Text>
@@ -262,7 +267,7 @@ export default function WalletScreen() {
                   cierre.
                 </Text>
               </View>
-              <Ionicons color="#101c2d" name="chevron-forward" size={22} />
+              <Ionicons color={appTheme.colors.accentDark} name="chevron-forward" size={22} />
             </Pressable>
           </>
         ) : null}
@@ -511,7 +516,7 @@ export default function WalletScreen() {
         {tab === 'settings' ? (
           <View style={styles.card}>
             <View style={styles.icon}>
-              <Ionicons color="#101c2d" name="card-outline" size={25} />
+              <Ionicons color={appTheme.colors.accentDark} name="card-outline" size={25} />
             </View>
             <View style={styles.copy}>
               <Text style={styles.cardTitle}>PayPhone</Text>
@@ -655,118 +660,128 @@ export default function WalletScreen() {
 }
 const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: 10 },
-  screen: { backgroundColor: '#fff', flex: 1 },
+  screen: appStyles.screen,
   header: { alignItems: 'center', flexDirection: 'row', gap: 12, padding: 20 },
   back: {
     alignItems: 'center',
-    backgroundColor: '#eef0f2',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 20,
     height: 40,
     justifyContent: 'center',
     width: 40,
   },
-  title: { color: '#101c2d', fontSize: 24, fontWeight: '900' },
-  subtitle: { color: '#69717c', fontSize: 13, marginTop: 2 },
+  title: { color: appTheme.colors.text, fontSize: 24, fontWeight: '900' },
+  subtitle: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 2 },
   content: { gap: 14, padding: 20 },
   history: { gap: 8 },
-  historyCaption: { color: '#69717c', fontSize: 11, marginTop: 2 },
-  historyAmount: { color: '#101c2d', fontSize: 14, fontWeight: '900' },
+  historyCaption: { color: appTheme.colors.textMuted, fontSize: 11, marginTop: 2 },
+  historyAmount: { color: appTheme.colors.text, fontSize: 14, fontWeight: '900' },
   historyRow: {
     alignItems: 'center',
-    backgroundColor: '#f7f7f6',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 14,
     flexDirection: 'row',
     padding: 14,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   historyValue: { alignItems: 'flex-end' },
-  metric: { color: '#3d4652', fontSize: 12, fontWeight: '800' },
+  metric: { color: appTheme.colors.textMuted, fontSize: 12, fontWeight: '800' },
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  balance: { backgroundColor: '#17191d', borderRadius: 24, padding: 22 },
-  balanceLabel: { color: '#c9cdd2', fontSize: 14 },
+  balance: { backgroundColor: appTheme.colors.surface, borderRadius: 24, padding: 22, transform: [{ translateY: -3 }], ...goldButtonShadow },
+  balanceLabel: { color: appTheme.colors.textMuted, fontSize: 14 },
   balanceValue: {
-    color: '#fff',
+    color: appTheme.colors.text,
     fontSize: 38,
     fontWeight: '900',
     marginTop: 8,
   },
   balanceCopy: {
-    color: '#d9dcdf',
+    color: appTheme.colors.textMuted,
     fontSize: 14,
     lineHeight: 20,
     marginTop: 10,
   },
   commissionBalance: {
-    backgroundColor: '#17191d',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 20,
     padding: 18,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  commissionMetric: { color: '#d9dcdf', fontSize: 12, fontWeight: '700' },
+  commissionMetric: { color: appTheme.colors.textMuted, fontSize: 12, fontWeight: '700' },
   commissionMetrics: { flexDirection: 'row', gap: 16, marginTop: 10 },
   commissionSection: { gap: 12 },
   confirmButton: {
     alignItems: 'center',
-    backgroundColor: '#111827',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 14,
     marginTop: 8,
     padding: 15,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  confirmButtonText: { color: '#fff', fontSize: 15, fontWeight: '900' },
-  dangerText: { color: '#B54747', fontSize: 13, fontWeight: '900' },
+  confirmButtonText: { color: appTheme.colors.accentDark, fontSize: 15, fontWeight: '900' },
+  dangerText: { color: appTheme.colors.danger, fontSize: 13, fontWeight: '900' },
   dateField: { flex: 1 },
   dateRow: { flexDirection: 'row', gap: 10 },
   financialRow: {
     alignItems: 'center',
-    backgroundColor: '#f7f7f6',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 14,
     flexDirection: 'row',
     padding: 14,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   financialRowHeader: { alignItems: 'center', flexDirection: 'row' },
   input: {
-    borderColor: '#d9dde2',
+    borderColor: appTheme.colors.border,
     borderRadius: 12,
     borderWidth: 1,
-    color: '#111827',
+    color: appTheme.colors.text,
     padding: 12,
   },
   inputLabel: {
-    color: '#374151',
+    color: appTheme.colors.textMuted,
     fontSize: 12,
     fontWeight: '800',
     marginTop: 8,
   },
-  linkText: { color: '#2464E8', fontSize: 13, fontWeight: '900' },
+  linkText: { color: appTheme.colors.accent, fontSize: 13, fontWeight: '900' },
   method: {
-    borderColor: '#d9dde2',
+    borderColor: appTheme.colors.border,
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 11,
     paddingVertical: 9,
   },
-  methodActive: { backgroundColor: '#111827', borderColor: '#111827' },
+  methodActive: { backgroundColor: appTheme.colors.accentWash, borderColor: appTheme.colors.accentWash },
   methodRow: { flexDirection: 'row', gap: 8 },
-  methodText: { color: '#59606a', fontSize: 12, fontWeight: '800' },
-  methodTextActive: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  methodText: { color: appTheme.colors.textMuted, fontSize: 12, fontWeight: '800' },
+  methodTextActive: { color: appTheme.colors.text, fontSize: 12, fontWeight: '900' },
   modalBackdrop: { flex: 1 },
   modalRoot: { backgroundColor: 'rgba(0,0,0,0.35)', flex: 1 },
   notesInput: { minHeight: 70, textAlignVertical: 'top' },
   primaryAction: {
     alignItems: 'center',
-    backgroundColor: '#111827',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 14,
     flex: 1,
     padding: 13,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  primaryActionText: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  primaryActionText: { color: appTheme.colors.accentDark, fontSize: 12, fontWeight: '900' },
   professionalChip: {
-    backgroundColor: '#eef0f2',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 16,
     paddingHorizontal: 13,
     paddingVertical: 8,
   },
-  professionalChipActive: { backgroundColor: '#111827' },
-  professionalChipText: { color: '#59606a', fontSize: 12, fontWeight: '800' },
-  professionalChipTextActive: { color: '#fff' },
+  professionalChipActive: { backgroundColor: appTheme.colors.accentWash },
+  professionalChipText: { color: appTheme.colors.textMuted, fontSize: 12, fontWeight: '800' },
+  professionalChipTextActive: { color: appTheme.colors.text },
   professionalFilters: { gap: 8 },
   rowButtons: {
     flexDirection: 'row',
@@ -774,74 +789,79 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   secondaryAction: {
+    backgroundColor: appTheme.colors.surface,
     alignItems: 'center',
-    borderColor: '#d5d9df',
     borderRadius: 14,
     borderWidth: 1,
     flex: 1,
     padding: 13,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  secondaryActionText: { color: '#111827', fontSize: 12, fontWeight: '900' },
-  sectionTitle: { color: '#111827', fontSize: 16, fontWeight: '900' },
-  settlementAmount: { color: '#111827', fontSize: 18, fontWeight: '900' },
+  secondaryActionText: { color: appTheme.colors.accentDark, fontSize: 12, fontWeight: '900' },
+  sectionTitle: { color: appTheme.colors.text, fontSize: 16, fontWeight: '900' },
+  settlementAmount: { color: appTheme.colors.text, fontSize: 18, fontWeight: '900' },
   settlementCard: {
-    backgroundColor: '#f7f7f6',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 16,
     gap: 9,
     padding: 14,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   sheet: {
-    backgroundColor: '#fff',
+    backgroundColor: appTheme.colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     gap: 8,
     padding: 22,
     paddingBottom: 30,
   },
-  sheetCopy: { color: '#69717c', fontSize: 13 },
-  sheetTitle: { color: '#111827', fontSize: 22, fontWeight: '900' },
-  statusText: { color: '#69717c', fontSize: 11, textTransform: 'capitalize' },
-  warningCopy: { color: '#8a5b0a', fontSize: 12, lineHeight: 17 },
+  sheetCopy: { color: appTheme.colors.textMuted, fontSize: 13 },
+  sheetTitle: { color: appTheme.colors.text, fontSize: 22, fontWeight: '900' },
+  statusText: { color: appTheme.colors.textMuted, fontSize: 11, textTransform: 'capitalize' },
+  warningCopy: { color: appTheme.colors.accentDark, fontSize: 12, lineHeight: 17 },
   tabs: {
-    borderBottomColor: '#e2e4e6',
+    borderBottomColor: appTheme.colors.surfaceMuted,
     borderBottomWidth: 1,
     flexDirection: 'row',
     gap: 25,
     paddingVertical: 12,
   },
-  tab: { color: '#747b85', fontSize: 14, fontWeight: '800' },
-  tabActive: { color: '#101c2d', fontSize: 14, fontWeight: '900' },
+  tab: { color: appTheme.colors.textMuted, fontSize: 14, fontWeight: '800' },
+  tabActive: { color: appTheme.colors.text, fontSize: 14, fontWeight: '900' },
   card: {
     alignItems: 'center',
-    backgroundColor: '#f7f7f6',
-    borderColor: '#e1e3e5',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 19,
-    borderWidth: 1,
+    borderWidth: 0,
     flexDirection: 'row',
     gap: 12,
     padding: 16,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   icon: {
     alignItems: 'center',
-    backgroundColor: '#e3e5e7',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 17,
     height: 50,
     justifyContent: 'center',
     width: 50,
   },
   copy: { flex: 1 },
-  cardTitle: { color: '#101c2d', fontSize: 16, fontWeight: '900' },
+  cardTitle: { color: appTheme.colors.text, fontSize: 16, fontWeight: '900' },
   cardDescription: {
-    color: '#667080',
+    color: appTheme.colors.textMuted,
     fontSize: 13,
     lineHeight: 19,
     marginTop: 4,
   },
   badge: {
-    backgroundColor: '#e6e8eb',
+    backgroundColor: appTheme.colors.border,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 5,
   },
-  badgeText: { color: '#59606a', fontSize: 10, fontWeight: '900' },
+  badgeText: { color: appTheme.colors.textMuted, fontSize: 10, fontWeight: '900' },
 });

@@ -21,18 +21,23 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TimeField } from '../../src/components/RegistrationSelectors';
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const COLORS = {
-  accent: '#101c2d',
-  border: '#d2d4d8',
-  danger: '#b42318',
-  muted: '#626872',
-  screen: '#ffffff',
-  surface: '#f4f4f3',
-  surfaceStrong: '#e1e2e4',
-  text: '#101c2d',
+  accent: appTheme.colors.accent,
+  border: appTheme.colors.border,
+  danger: appTheme.colors.danger,
+  muted: appTheme.colors.textMuted,
+  screen: appTheme.colors.background,
+  surface: appTheme.colors.surface,
+  surfaceStrong: appTheme.colors.accentWash,
+  text: appTheme.colors.text,
 } as const;
 
 const DAY_NAMES: Record<number, string> = {
@@ -194,7 +199,7 @@ export default function BusinessScheduleScreen() {
               pressed && styles.pressed,
             ]}
           >
-            <Ionicons color={COLORS.text} name="arrow-back" size={25} />
+            <Ionicons color={appTheme.colors.accentDark} name="arrow-back" size={25} />
           </Pressable>
           <Text accessibilityRole="header" style={styles.headerTitle}>
             Horario del negocio
@@ -208,7 +213,7 @@ export default function BusinessScheduleScreen() {
       >
         <View style={styles.intro}>
           <View style={styles.introIcon}>
-            <Ionicons color={COLORS.text} name="calendar-outline" size={28} />
+            <Ionicons color={appTheme.colors.accentDark} name="calendar-outline" size={28} />
           </View>
           <View style={styles.introCopy}>
             <Text style={styles.introTitle}>Horario general</Text>
@@ -274,10 +279,10 @@ export default function BusinessScheduleScreen() {
           ]}
         >
           {saveMutation.isPending ? (
-            <ActivityIndicator color="#ffffff" />
+            <ActivityIndicator color={appTheme.colors.accentDark} />
           ) : (
             <>
-              <Ionicons color="#ffffff" name="checkmark" size={22} />
+              <Ionicons color={appTheme.colors.accentDark} name="checkmark" size={22} />
               <Text style={styles.saveText}>Guardar cambios</Text>
             </>
           )}
@@ -317,7 +322,7 @@ function DayCard({
           style={[styles.checkbox, day.isOpen && styles.checkboxActive]}
         >
           {day.isOpen ? (
-            <Ionicons color="#ffffff" name="checkmark" size={18} />
+            <Ionicons color={appTheme.colors.white} name="checkmark" size={18} />
           ) : null}
         </Pressable>
         <Pressable
@@ -333,7 +338,7 @@ function DayCard({
           ]}
         >
           <Ionicons
-            color={day.isOpen ? COLORS.text : '#a7abb1'}
+            color={day.isOpen ? appTheme.colors.accentDark : appTheme.colors.textMuted}
             name="settings-outline"
             size={20}
           />
@@ -449,7 +454,7 @@ function ScheduleSheet({
               onPress={closeAnimated}
               style={styles.closeButton}
             >
-              <Ionicons color={COLORS.text} name="close" size={24} />
+              <Ionicons color={appTheme.colors.accentDark} name="close" size={24} />
             </Pressable>
           </View>
           <Text style={styles.sheetDescription}>
@@ -490,19 +495,21 @@ function ScheduleSheet({
 
 const styles = StyleSheet.create({
   cancelButton: {
+    backgroundColor: appTheme.colors.surface,
     alignItems: 'center',
-    borderColor: COLORS.border,
     borderRadius: 16,
     borderWidth: 1,
     flex: 1,
     justifyContent: 'center',
     minHeight: 52,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   cancelText: { color: COLORS.text, fontSize: 16, fontWeight: '700' },
   checkbox: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderColor: '#8d939c',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.textMuted,
     borderRadius: 7,
     borderWidth: 2,
     height: 27,
@@ -521,29 +528,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 40,
   },
-  closedDayCard: { backgroundColor: '#fafafa' },
+  closedDayCard: { backgroundColor: appTheme.colors.surfaceMuted },
   closedStatusPill: { backgroundColor: COLORS.surfaceStrong },
   closedStatusPillText: { color: COLORS.muted },
   closedText: { color: COLORS.muted },
   configureButton: {
     alignItems: 'center',
-    backgroundColor: COLORS.surfaceStrong,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 9,
     height: 34,
     justifyContent: 'center',
     marginTop: 8,
     width: 34,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  configureButtonDisabled: { backgroundColor: '#eeeeed' },
+  configureButtonDisabled: { backgroundColor: appTheme.colors.surfaceMuted },
   confirmButton: {
     alignItems: 'center',
-    backgroundColor: COLORS.accent,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 16,
     flex: 1.4,
     justifyContent: 'center',
     minHeight: 52,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  confirmText: { color: '#ffffff', fontSize: 16, fontWeight: '800' },
+  confirmText: { color: appTheme.colors.accentDark, fontSize: 16, fontWeight: '800' },
   content: {
     alignSelf: 'center',
     maxWidth: 720,
@@ -554,14 +565,15 @@ const styles = StyleSheet.create({
   },
   dayCard: {
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderColor: COLORS.border,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 20,
-    borderWidth: 1,
+    borderWidth: 0,
     flexDirection: 'row',
     minHeight: 92,
     paddingHorizontal: 14,
     paddingVertical: 13,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   dayControls: { alignItems: 'center', width: 44 },
   dayCopy: { flex: 1, marginLeft: 11 },
@@ -594,12 +606,15 @@ const styles = StyleSheet.create({
   errorTitle: { color: COLORS.text, fontSize: 16, fontWeight: '800' },
   header: { backgroundColor: COLORS.screen, paddingHorizontal: 22 },
   headerButton: {
+    backgroundColor: appTheme.colors.surface,
     alignItems: 'center',
     borderRadius: 22,
     height: 44,
     justifyContent: 'center',
     marginRight: 8,
     width: 44,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   headerContent: {
     alignItems: 'center',
@@ -618,10 +633,12 @@ const styles = StyleSheet.create({
   },
   intro: {
     alignItems: 'flex-start',
-    backgroundColor: COLORS.surface,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 22,
     flexDirection: 'row',
     padding: 17,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   introCopy: { flex: 1, marginLeft: 14 },
   introIcon: {
@@ -651,21 +668,23 @@ const styles = StyleSheet.create({
   retryText: { color: COLORS.text, fontSize: 15, fontWeight: '800' },
   saveButton: {
     alignItems: 'center',
-    backgroundColor: COLORS.accent,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 18,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
     marginTop: 24,
     minHeight: 56,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  saveText: { color: '#ffffff', fontSize: 17, fontWeight: '800' },
-  screen: { backgroundColor: COLORS.screen, flex: 1 },
+  saveText: { color: appTheme.colors.accentDark, fontSize: 17, fontWeight: '800' },
+  screen: appStyles.screen,
   sheet: {
     alignSelf: 'center',
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    backgroundColor: appTheme.colors.surfaceElevated,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
     maxWidth: 720,
     paddingBottom: 28,
     paddingHorizontal: 22,
@@ -699,7 +718,7 @@ const styles = StyleSheet.create({
     minHeight: 24,
   },
   sheetHandle: {
-    backgroundColor: '#c8cbd0',
+    backgroundColor: appTheme.colors.border,
     borderRadius: 3,
     height: 5,
     marginBottom: 15,

@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { appStyles, appTheme, goldButtonShadow } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -115,7 +116,7 @@ export default function BookingSettingsScreen() {
                 onValueChange={(confirmationEnabled) =>
                   setDraft({ ...current, confirmationEnabled })
                 }
-                trackColor={{ false: '#CBD0D8', true: '#111318' }}
+                trackColor={{ false: appTheme.colors.border, true: appTheme.colors.text }}
                 value={current.confirmationEnabled}
               />
             </View>
@@ -275,21 +276,23 @@ function OptionSection({
 const styles = StyleSheet.create({
   back: {
     alignItems: 'center',
-    borderColor: '#E2E5EA',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 20,
-    borderWidth: 1,
+    borderWidth: 0,
     height: 40,
     justifyContent: 'center',
     width: 40,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  cardDescription: { color: '#687282', fontSize: 13, marginTop: 4 },
-  cardTitle: { color: '#111827', fontSize: 15, fontWeight: '900' },
+  cardDescription: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 4 },
+  cardTitle: { color: appTheme.colors.text, fontSize: 15, fontWeight: '900' },
   content: { padding: 20, paddingBottom: 130 },
   disabled: { opacity: 0.35 },
-  empty: { color: '#687282', padding: 24, textAlign: 'center' },
+  empty: { color: appTheme.colors.textMuted, padding: 24, textAlign: 'center' },
   footer: {
-    backgroundColor: '#FFFFFF',
-    borderTopColor: '#E5E7EB',
+    backgroundColor: appTheme.colors.surface,
+    borderTopColor: appTheme.colors.border,
     borderTopWidth: 1,
     bottom: 0,
     left: 0,
@@ -299,43 +302,43 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderBottomColor: '#ECEEF1',
+    backgroundColor: appTheme.colors.surface,
+    borderBottomColor: appTheme.colors.surfaceMuted,
     borderBottomWidth: 1,
     flexDirection: 'row',
     padding: 14,
   },
   headerCopy: { flex: 1 },
   headerSubtitle: {
-    color: '#687282',
+    color: appTheme.colors.textMuted,
     fontSize: 11,
     marginTop: 2,
     textAlign: 'center',
   },
   headerTitle: {
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 16,
     fontWeight: '900',
     textAlign: 'center',
   },
   option: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#DDE1E7',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 13,
     paddingVertical: 10,
   },
   optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  optionSelected: { backgroundColor: '#111318', borderColor: '#111318' },
-  optionText: { color: '#344054', fontSize: 12, fontWeight: '800' },
-  optionTextSelected: { color: '#FFFFFF' },
+  optionSelected: { backgroundColor: appTheme.colors.accentWash, borderColor: appTheme.colors.accentWash },
+  optionText: { color: appTheme.colors.text, fontSize: 12, fontWeight: '800' },
+  optionTextSelected: { color: appTheme.colors.text },
   policyInput: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#DDE1E7',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
     borderRadius: 16,
     borderWidth: 1,
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 14,
     lineHeight: 21,
     minHeight: 130,
@@ -343,15 +346,17 @@ const styles = StyleSheet.create({
   },
   save: {
     alignItems: 'center',
-    backgroundColor: '#111318',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 16,
     justifyContent: 'center',
     minHeight: 54,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  saveText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
-  screen: { backgroundColor: '#F7F8FA', flex: 1 },
+  saveText: { color: appTheme.colors.accentDark, fontSize: 16, fontWeight: '900' },
+  screen: appStyles.screen,
   sectionTitle: {
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 14,
     fontWeight: '900',
     marginBottom: 10,
@@ -360,16 +365,17 @@ const styles = StyleSheet.create({
   spacer: { width: 40 },
   toggleCard: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E5E7EB',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 18,
-    borderWidth: 1,
+    borderWidth: 0,
     flexDirection: 'row',
     padding: 16,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   toggleCopy: { flex: 1, paddingRight: 12 },
   version: {
-    color: '#7A8492',
+    color: appTheme.colors.textMuted,
     fontSize: 11,
     lineHeight: 17,
     marginTop: 8,

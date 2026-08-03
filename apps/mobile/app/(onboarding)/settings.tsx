@@ -24,7 +24,7 @@ import {
   appStyles,
   appTheme,
   BottomNavigation,
-  goldShadow,
+  goldButtonShadow,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -219,9 +219,9 @@ export default function SettingsScreen() {
           ]}
         >
           {isSigningOut ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={appTheme.colors.accentDark} />
           ) : (
-            <Ionicons color="#FFFFFF" name="log-out-outline" size={21} />
+            <Ionicons color={appTheme.colors.accentDark} name="log-out-outline" size={21} />
           )}
           <Text style={styles.logoutLabel}>
             {isSigningOut ? 'Cerrando sesión…' : 'Cerrar sesión'}
@@ -232,11 +232,11 @@ export default function SettingsScreen() {
           onPress={() => setIsDeleteOpen(true)}
           style={styles.deleteAction}
         >
-          <Ionicons color="#5D6672" name="trash-outline" size={19} />
+          <Ionicons color={appTheme.colors.accentDark} name="trash-outline" size={19} />
           <Text style={styles.deleteLabel}>Borrar mi cuenta</Text>
         </Pressable>
         <View style={styles.version}>
-          <Ionicons color="#5D6672" name="refresh-outline" size={22} />
+          <Ionicons color={appTheme.colors.accentDark} name="refresh-outline" size={22} />
           <View>
             <Text style={styles.versionTitle}>Actualizacion</Text>
             <Text style={styles.versionCopy}>Version instalada {version}</Text>
@@ -320,7 +320,7 @@ export default function SettingsScreen() {
                 ]}
               >
                 {deleteAccountMutation.isPending ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <ActivityIndicator color={appTheme.colors.accentDark} size="small" />
                 ) : (
                   <Ionicons color="#FFFFFF" name="trash-outline" size={18} />
                 )}
@@ -349,7 +349,7 @@ function IconButton({
       onPress={onPress}
       style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
     >
-      <Ionicons color="#111827" name={icon} size={22} />
+      <Ionicons color={appTheme.colors.accentDark} name={icon} size={22} />
     </Pressable>
   );
 }
@@ -376,7 +376,7 @@ function SettingsCard({
         <Text style={styles.cardTitle}>{title}</Text>
         <Text style={styles.cardDescription}>{description}</Text>
       </View>
-      <Ionicons color="#7A8491" name="chevron-forward" size={21} />
+      <Ionicons color={appTheme.colors.accentDark} name="chevron-forward" size={21} />
     </Pressable>
   );
 }
@@ -574,19 +574,19 @@ const styles = StyleSheet.create({
   iconButton: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderColor: '#E0E5EC',
     borderRadius: 15,
-    borderWidth: 1,
+    borderWidth: 0,
     height: 46,
     justifyContent: 'center',
     width: 46,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   linkCard: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surface,
-    borderColor: appTheme.colors.border,
     borderRadius: 20,
-    borderWidth: 1,
+    borderWidth: 0,
     flexDirection: 'row',
     gap: 12,
     marginTop: 13,
@@ -595,32 +595,39 @@ const styles = StyleSheet.create({
   linkValue: { color: '#697483', fontSize: 13, lineHeight: 18, marginTop: 5 },
   logout: {
     alignItems: 'center',
-    backgroundColor: PRIMARY,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 17,
     flexDirection: 'row',
     gap: 9,
     justifyContent: 'center',
     marginTop: 26,
     minHeight: 55,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  logoutLabel: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
+  logoutLabel: { color: appTheme.colors.accentDark, fontSize: 15, fontWeight: '900' },
   openButton: {
-    backgroundColor: '#EEEFF1',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 13,
+    borderWidth: 0,
     paddingHorizontal: 15,
     paddingVertical: 10,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   openLabel: { color: PRIMARY, fontSize: 13, fontWeight: '900' },
   pressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },
   profile: { alignItems: 'center', marginTop: 30 },
   promoCard: {
     alignItems: 'center',
-    backgroundColor: appTheme.colors.surfaceMuted,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 22,
     flexDirection: 'row',
     gap: 15,
     marginTop: 13,
     padding: 19,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   promoDescription: {
     color: '#536174',
@@ -640,14 +647,14 @@ const styles = StyleSheet.create({
   settingsCard: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surface,
-    borderColor: appTheme.colors.border,
     borderRadius: 20,
-    borderWidth: 1,
+    borderWidth: 0,
     flexDirection: 'row',
     gap: 13,
     marginTop: 28,
     padding: 16,
-    ...goldShadow,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   skeleton: {
     backgroundColor: '#E9EDF2',

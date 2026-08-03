@@ -18,15 +18,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { InlineMessage } from '../../src/components/InlineMessage';
 import { NavaButton } from '../../src/components/NavaButton';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const COLORS = {
-  border: '#d9dde3',
-  muted: '#667080',
-  screen: '#ffffff',
-  surface: '#f4f4f3',
-  text: '#101c2d',
+  border: appTheme.colors.border,
+  muted: appTheme.colors.textMuted,
+  screen: appTheme.colors.background,
+  surface: appTheme.colors.surface,
+  text: appTheme.colors.text,
 } as const;
 
 export default function ServiceManagementScreen() {
@@ -194,7 +199,7 @@ export default function ServiceManagementScreen() {
           }
           style={styles.backButton}
         >
-          <Ionicons color={COLORS.text} name="arrow-back" size={25} />
+          <Ionicons color={appTheme.colors.accentDark} name="arrow-back" size={25} />
         </Pressable>
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={styles.title}>
@@ -264,7 +269,7 @@ export default function ServiceManagementScreen() {
                   styles.buttonMuted,
               ]}
             >
-              <Ionicons color="#ffffff" name="add" size={24} />
+              <Ionicons color={appTheme.colors.accentDark} name="add" size={24} />
             </Pressable>
           </View>
           <View style={styles.chips}>
@@ -422,7 +427,7 @@ export default function ServiceManagementScreen() {
               ]}
             >
               <View style={styles.serviceIcon}>
-                <Ionicons color={COLORS.text} name="cut-outline" size={23} />
+                <Ionicons color={appTheme.colors.accentDark} name="cut-outline" size={23} />
               </View>
               <View style={styles.serviceCopy}>
                 <Text style={styles.serviceName}>{service.name}</Text>
@@ -433,7 +438,7 @@ export default function ServiceManagementScreen() {
                   {(service.priceCents / 100).toFixed(2)}
                 </Text>
               </View>
-              <Ionicons color={COLORS.text} name="create-outline" size={22} />
+              <Ionicons color={appTheme.colors.accentDark} name="create-outline" size={22} />
             </Pressable>
           ))}
           {!servicesQuery.isLoading &&
@@ -449,32 +454,36 @@ export default function ServiceManagementScreen() {
 const styles = StyleSheet.create({
   addButton: {
     alignItems: 'center',
-    backgroundColor: COLORS.text,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 15,
     height: 54,
     justifyContent: 'center',
     width: 54,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   backButton: {
+    backgroundColor: appTheme.colors.surface,
     alignItems: 'center',
     borderRadius: 22,
     height: 44,
     justifyContent: 'center',
     width: 44,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   buttonMuted: { opacity: 0.45 },
   cardPressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },
   chip: {
-    backgroundColor: '#ffffff',
-    borderColor: COLORS.border,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 99,
-    borderWidth: 1,
+    borderWidth: 0,
     paddingHorizontal: 13,
     paddingVertical: 9,
   },
   chipLabel: { color: COLORS.text, fontSize: 13, fontWeight: '700' },
-  chipLabelSelected: { color: '#ffffff' },
-  chipSelected: { backgroundColor: COLORS.text, borderColor: COLORS.text },
+  chipLabelSelected: { color: appTheme.colors.text, fontWeight: '900' },
+  chipSelected: { backgroundColor: appTheme.colors.accentWash, borderColor: appTheme.colors.accentWash },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
   content: {
     alignSelf: 'center',
@@ -496,7 +505,7 @@ const styles = StyleSheet.create({
     minHeight: 46,
     paddingHorizontal: 14,
   },
-  dangerActionLabel: { color: '#b42318', fontSize: 14, fontWeight: '800' },
+  dangerActionLabel: { color: appTheme.colors.danger, fontSize: 14, fontWeight: '800' },
   descriptionInput: {
     height: 92,
     paddingTop: 14,
@@ -531,7 +540,7 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   inlineForm: { flexDirection: 'row', gap: 10, marginTop: 14 },
   inlineInput: {
-    backgroundColor: '#ffffff',
+    backgroundColor: appTheme.colors.surface,
     borderColor: COLORS.border,
     borderRadius: 15,
     borderWidth: 1,
@@ -542,7 +551,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   input: {
-    backgroundColor: '#ffffff',
+    backgroundColor: appTheme.colors.surface,
     borderColor: COLORS.border,
     borderRadius: 15,
     borderWidth: 1,
@@ -552,33 +561,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   primaryButton: {
+    backgroundColor: appTheme.colors.surface,
     flexBasis: 'auto',
     flexGrow: 0,
     height: 58,
     marginTop: 18,
     width: '100%',
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   secondaryAction: {
+    backgroundColor: appTheme.colors.surface,
     alignItems: 'center',
-    borderColor: COLORS.border,
     borderRadius: 14,
-    borderWidth: 1,
+    borderWidth: 0,
     justifyContent: 'center',
     minHeight: 46,
     paddingHorizontal: 17,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   secondaryActionLabel: {
     color: COLORS.text,
     fontSize: 14,
     fontWeight: '800',
   },
-  screen: { backgroundColor: COLORS.screen, flex: 1 },
+  screen: appStyles.screen,
   section: {
-    backgroundColor: COLORS.surface,
-    borderColor: COLORS.border,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 21,
-    borderWidth: 1,
+    borderWidth: 0,
     padding: 17,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   sectionDescription: {
     color: COLORS.muted,
@@ -589,20 +604,21 @@ const styles = StyleSheet.create({
   sectionTitle: { color: COLORS.text, fontSize: 20, fontWeight: '900' },
   serviceCard: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderColor: COLORS.border,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 17,
-    borderWidth: 1,
+    borderWidth: 0,
     flexDirection: 'row',
     gap: 12,
     marginTop: 12,
     minHeight: 72,
     padding: 12,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   serviceCopy: { flex: 1 },
   serviceIcon: {
     alignItems: 'center',
-    backgroundColor: '#e8e9eb',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 14,
     height: 46,
     justifyContent: 'center',
@@ -631,16 +647,18 @@ const styles = StyleSheet.create({
   switchTitle: { color: COLORS.text, fontSize: 14, fontWeight: '800' },
   summary: {
     alignItems: 'center',
-    backgroundColor: COLORS.text,
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 20,
     flexDirection: 'row',
     justifyContent: 'space-around',
     minHeight: 92,
     padding: 16,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  summaryDivider: { backgroundColor: '#536070', height: 48, width: 1 },
-  summaryLabel: { color: '#cbd1d9', fontSize: 12, marginTop: 3 },
-  summaryValue: { color: '#ffffff', fontSize: 25, fontWeight: '900' },
+  summaryDivider: { backgroundColor: appTheme.colors.border, height: 48, width: 1 },
+  summaryLabel: { color: appTheme.colors.textMuted, fontSize: 12, marginTop: 3 },
+  summaryValue: { color: appTheme.colors.text, fontSize: 25, fontWeight: '900' },
   title: {
     color: COLORS.text,
     fontSize: 24,

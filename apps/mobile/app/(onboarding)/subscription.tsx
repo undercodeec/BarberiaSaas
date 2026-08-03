@@ -6,6 +6,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InlineMessage } from '../../src/components/InlineMessage';
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -50,7 +55,7 @@ export default function SubscriptionScreen() {
           }
           style={styles.backButton}
         >
-          <Ionicons color="#101c2d" name="arrow-back" size={25} />
+          <Ionicons color={appTheme.colors.accentDark} name="arrow-back" size={25} />
         </Pressable>
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={styles.title}>
@@ -134,7 +139,7 @@ export default function SubscriptionScreen() {
             {plan.features.map((feature) => (
               <View key={feature} style={styles.featureRow}>
                 <Ionicons
-                  color={plan.available ? '#287247' : '#667080'}
+                  color={plan.available ? '#287247' : appTheme.colors.textMuted}
                   name="checkmark-circle-outline"
                   size={19}
                 />
@@ -144,7 +149,7 @@ export default function SubscriptionScreen() {
           </View>
         ))}
         <View style={styles.infoCard}>
-          <Ionicons color="#101c2d" name="card-outline" size={23} />
+          <Ionicons color={appTheme.colors.accentDark} name="card-outline" size={23} />
           <View style={styles.headerCopy}>
             <Text style={styles.infoTitle}>
               Facturación todavía no habilitada
@@ -169,10 +174,13 @@ const styles = StyleSheet.create({
   },
   availableLabel: { color: '#287247', fontSize: 11, fontWeight: '800' },
   backButton: {
+    backgroundColor: appTheme.colors.surface,
     alignItems: 'center',
     height: 44,
     justifyContent: 'center',
     width: 44,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   content: {
     alignSelf: 'center',
@@ -182,15 +190,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     width: '100%',
   },
-  currentCard: { backgroundColor: '#101c2d', borderRadius: 22, padding: 20 },
+  currentCard: {
+    backgroundColor: appTheme.colors.surface,
+    borderRadius: 22,
+    padding: 20,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
+  },
   currentHeading: {
     alignItems: 'flex-start',
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  currentPlan: { color: '#ffffff', fontSize: 28, fontWeight: '900' },
-  eyebrow: { color: '#aeb8c5', fontSize: 11, fontWeight: '900' },
-  featureLabel: { color: '#303a48', flex: 1, fontSize: 14 },
+  currentPlan: { color: appTheme.colors.text, fontSize: 28, fontWeight: '900' },
+  eyebrow: { color: appTheme.colors.textMuted, fontSize: 11, fontWeight: '900' },
+  featureLabel: { color: appTheme.colors.text, flex: 1, fontSize: 14 },
   featureRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -210,44 +224,48 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   infoCard: {
     alignItems: 'flex-start',
-    backgroundColor: '#eef0f2',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 18,
     flexDirection: 'row',
     gap: 12,
     padding: 16,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  infoCopy: { color: '#667080', fontSize: 13, lineHeight: 19, marginTop: 4 },
-  infoTitle: { color: '#101c2d', fontSize: 15, fontWeight: '800' },
-  periodCopy: { color: '#d6dce3', fontSize: 13, marginTop: 8 },
+  infoCopy: { color: appTheme.colors.textMuted, fontSize: 13, lineHeight: 19, marginTop: 4 },
+  infoTitle: { color: appTheme.colors.text, fontSize: 15, fontWeight: '800' },
+  periodCopy: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 8 },
   planCard: {
-    borderColor: '#d9dde3',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 20,
-    borderWidth: 1,
+    borderWidth: 0,
     padding: 17,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   planHeading: { alignItems: 'flex-start', flexDirection: 'row', gap: 12 },
-  planName: { color: '#101c2d', fontSize: 21, fontWeight: '900' },
-  planPrice: { color: '#667080', fontSize: 13, marginTop: 3 },
+  planName: { color: appTheme.colors.text, fontSize: 21, fontWeight: '900' },
+  planPrice: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 3 },
   priceLabel: {
-    color: '#ffffff',
+    color: appTheme.colors.surface,
     fontSize: 15,
     fontWeight: '800',
     marginTop: 16,
   },
-  screen: { backgroundColor: '#ffffff', flex: 1 },
+  screen: appStyles.screen,
   sectionTitle: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 20,
     fontWeight: '900',
     marginTop: 8,
   },
   soonBadge: {
-    backgroundColor: '#eceef1',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 99,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  soonLabel: { color: '#667080', fontSize: 11, fontWeight: '800' },
+  soonLabel: { color: appTheme.colors.textMuted, fontSize: 11, fontWeight: '800' },
   statusBadge: {
     backgroundColor: '#dff2e6',
     borderRadius: 99,
@@ -255,16 +273,16 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   statusLabel: { color: '#23663f', fontSize: 11, fontWeight: '900' },
-  subtitle: { color: '#667080', fontSize: 13, marginTop: 2 },
-  title: { color: '#101c2d', fontSize: 25, fontWeight: '900' },
-  usageDivider: { backgroundColor: '#536070', height: 42, width: 1 },
+  subtitle: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 2 },
+  title: { color: appTheme.colors.text, fontSize: 25, fontWeight: '900' },
+  usageDivider: { backgroundColor: appTheme.colors.border, height: 42, width: 1 },
   usageItem: { flex: 1 },
-  usageLabel: { color: '#aeb8c5', fontSize: 11, marginTop: 3 },
+  usageLabel: { color: appTheme.colors.textMuted, fontSize: 11, marginTop: 3 },
   usageRow: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 14,
     marginTop: 20,
   },
-  usageValue: { color: '#ffffff', fontSize: 18, fontWeight: '900' },
+  usageValue: { color: appTheme.colors.text, fontSize: 18, fontWeight: '900' },
 });

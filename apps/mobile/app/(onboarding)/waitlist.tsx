@@ -12,6 +12,8 @@ import {
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { appStyles, appTheme } from '../../src/components/BottomNavigation';
+
 import { useAuth } from '../../src/providers/AuthProvider';
 
 type WaitlistTab = 'pending' | 'accepted' | 'rejected';
@@ -122,8 +124,8 @@ export default function WaitlistScreen() {
 const styles = StyleSheet.create({
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E1E5EA',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
     borderRadius: 17,
     borderWidth: 1,
     height: 44,
@@ -132,7 +134,7 @@ const styles = StyleSheet.create({
   },
   content: { padding: 22 },
   emptyCopy: {
-    color: '#6E7785',
+    color: appTheme.colors.textMuted,
     fontSize: 15,
     lineHeight: 22,
     marginTop: 8,
@@ -140,7 +142,7 @@ const styles = StyleSheet.create({
   },
   emptyIcon: {
     alignItems: 'center',
-    backgroundColor: '#E5E7EB',
+    backgroundColor: appTheme.colors.border,
     borderRadius: 45,
     height: 90,
     justifyContent: 'center',
@@ -148,25 +150,25 @@ const styles = StyleSheet.create({
   },
   emptyState: { alignItems: 'center', marginTop: 72, paddingHorizontal: 30 },
   emptyTitle: {
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 20,
     fontWeight: '900',
     marginTop: 18,
   },
   header: {
     alignItems: 'center',
-    borderBottomColor: '#E1E5EA',
+    borderBottomColor: appTheme.colors.border,
     borderBottomWidth: 1,
     flexDirection: 'row',
     gap: 13,
     padding: 20,
   },
   headerCopy: { flex: 1 },
-  screen: { backgroundColor: '#FBFCFF', flex: 1 },
+  screen: appStyles.screen,
   searchBox: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E1E5EA',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
     borderRadius: 17,
     borderWidth: 1,
     flexDirection: 'row',
@@ -176,23 +178,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
   },
   searchHint: {
-    color: '#8B96A5',
+    color: appTheme.colors.textMuted,
     fontSize: 13,
     marginTop: 15,
     textAlign: 'center',
   },
-  searchInput: { color: '#111827', flex: 1, fontSize: 15 },
-  searchLabel: { color: '#111827', fontSize: 14, fontWeight: '800' },
-  subtitle: { color: '#6E7785', fontSize: 13, marginTop: 3 },
+  searchInput: { color: appTheme.colors.text, flex: 1, fontSize: 15 },
+  searchLabel: { color: appTheme.colors.text, fontSize: 14, fontWeight: '800' },
+  subtitle: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 3 },
   tab: {
     alignItems: 'center',
     borderBottomWidth: 2,
     flex: 1,
     paddingBottom: 12,
   },
-  tabActive: { borderBottomColor: '#111827' },
-  tabLabel: { color: '#8B96A5', fontSize: 13, fontWeight: '800' },
-  tabLabelActive: { color: '#111827' },
+  tabActive: { borderBottomColor: appTheme.colors.text },
+  tabLabel: { color: appTheme.colors.textMuted, fontSize: 13, fontWeight: '800' },
+  tabLabelActive: { color: appTheme.colors.text },
   tabs: { flexDirection: 'row', marginTop: 26 },
-  title: { color: '#111827', fontSize: 23, fontWeight: '900' },
+  title: { color: appTheme.colors.text, fontSize: 23, fontWeight: '900' },
 });
