@@ -26,6 +26,12 @@ import {
 import { type ReactNode, useEffect, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+  goldShadow,
+} from './BottomNavigation';
 import { NavaButton } from './NavaButton';
 import {
   COUNTRIES,
@@ -433,11 +439,7 @@ export function RegistrationFlow() {
             >
               <SafeAreaView edges={['bottom']} style={s.sheet}>
                 <View {...panResponder.panHandlers} style={s.handle} />
-                <ScrollView
-                  contentContainerStyle={s.content}
-                  keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={false}
-                >
+                <View style={s.content}>
                   {step === 'choice' ? (
                     <View style={s.roleContent}>
                       <Text accessibilityRole="header" style={s.title}>
@@ -454,16 +456,20 @@ export function RegistrationFlow() {
                       </Text>
                       <View style={s.roleButtons}>
                         <NavaButton
+                          foregroundColor={appTheme.colors.accentDark}
                           icon="storefront-outline"
                           label="Tengo un negocio"
                           onPress={() => choose('business')}
+                          style={s.choiceButton}
                           variant="outline"
                         />
                         <NavaButton
+                          foregroundColor={appTheme.colors.accentDark}
                           icon="person-outline"
                           label="Solo yo"
                           onPress={() => choose('professional')}
-                          variant="primary"
+                          style={s.choiceButton}
+                          variant="outline"
                         />
                       </View>
                     </View>
@@ -749,12 +755,13 @@ export function RegistrationFlow() {
                           />
                           <NavaButton
                             disabled={formState.isSubmitting}
+                            foregroundColor={appTheme.colors.accentDark}
                             icon="checkmark-outline"
                             label="Completar registro"
                             loading={formState.isSubmitting}
                             onPress={() => void submit()}
                             style={s.button}
-                            variant="primary"
+                            variant="outline"
                           />
                         </Section>
                       ) : null}
@@ -791,7 +798,7 @@ export function RegistrationFlow() {
                                 setVerificationCode(code.replace(/\D/g, ''))
                               }
                               placeholder="000000"
-                              placeholderTextColor="#98a0ab"
+                              placeholderTextColor={appTheme.colors.textMuted}
                               style={verificationStyles.codeInput}
                               value={verificationCode}
                             />
@@ -802,12 +809,13 @@ export function RegistrationFlow() {
                               verificationExpired ||
                               verifying
                             }
+                            foregroundColor={appTheme.colors.accentDark}
                             icon="shield-checkmark-outline"
                             label="Verificar cuenta"
                             loading={verifying}
                             onPress={() => void confirmVerification()}
                             style={s.button}
-                            variant="primary"
+                            variant="outline"
                           />
                           <Pressable
                             accessibilityRole="button"
@@ -823,7 +831,7 @@ export function RegistrationFlow() {
                       ) : null}
                     </View>
                   )}
-                </ScrollView>
+                </View>
               </SafeAreaView>
             </Animated.View>
           </KeyboardAvoidingView>
@@ -905,11 +913,12 @@ function Next({
     <View style={s.nextContainer}>
       <NavaButton
         disabled={disabled}
+        foregroundColor={appTheme.colors.accentDark}
         icon="arrow-forward-outline"
         label="Siguiente"
         onPress={onPress}
         style={s.nextButton}
-        variant="primary"
+        variant="outline"
       />
     </View>
   );
@@ -928,7 +937,7 @@ function Field({
       <TextInput
         accessibilityHint={error}
         accessibilityLabel={label}
-        placeholderTextColor="#98a0ab"
+        placeholderTextColor={appTheme.colors.textMuted}
         style={[s.input, error ? s.inputError : null]}
         {...props}
       />
@@ -970,9 +979,13 @@ const s = StyleSheet.create({
   back: { marginBottom: 14 },
   backdrop: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(5, 10, 16, 0.66)',
+    backgroundColor: appTheme.colors.overlay,
   },
-  backText: { color: '#101c2d', fontSize: 16, fontWeight: '700' },
+  backText: {
+    color: appTheme.colors.accentDark,
+    fontSize: 16,
+    fontWeight: '700',
+  },
   bottom: {
     bottom: -245,
     height: 460,
@@ -982,6 +995,8 @@ const s = StyleSheet.create({
     width: 620,
   },
   button: {
+    backgroundColor: appTheme.colors.surface,
+    borderWidth: 0,
     flexBasis: 'auto',
     flexGrow: 0,
     flexShrink: 0,
@@ -989,6 +1004,8 @@ const s = StyleSheet.create({
     marginTop: 22,
     paddingHorizontal: 18,
     width: '100%',
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   choice: { alignItems: 'center', paddingTop: 28, width: '100%' },
   choiceActions: {
@@ -997,28 +1014,47 @@ const s = StyleSheet.create({
     marginTop: 22,
     width: '100%',
   },
-  content: { paddingBottom: 18 },
-  description: { color: '#667080', fontSize: 16, lineHeight: 23, marginTop: 7 },
-  edit: { color: '#101c2d', fontSize: 14, fontWeight: '800' },
-  error: { color: '#bd2d2d', fontSize: 13, marginTop: 5 },
+  choiceButton: {
+    backgroundColor: appTheme.colors.surface,
+    borderWidth: 0,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
+  },
+  content: { paddingBottom: 0 },
+  description: {
+    color: appTheme.colors.textMuted,
+    fontSize: 16,
+    lineHeight: 23,
+    marginTop: 7,
+  },
+  edit: {
+    color: appTheme.colors.accentDark,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  error: {
+    color: appTheme.colors.dangerBorder,
+    fontSize: 13,
+    marginTop: 5,
+  },
   field: { marginBottom: 15 },
-  fields: { marginTop: 26 },
+  fields: { marginTop: 18 },
   formError: {
-    backgroundColor: '#fff0ee',
+    backgroundColor: appTheme.colors.dangerSurface,
     borderRadius: 12,
-    color: '#a72d27',
+    color: appTheme.colors.danger,
     marginBottom: 14,
     padding: 11,
   },
   fullBanner: {
-    backgroundColor: '#fff',
-    paddingBottom: 18,
+    backgroundColor: appTheme.colors.surfaceMuted,
+    paddingBottom: 8,
     paddingHorizontal: 24,
     width: '100%',
   },
   handle: {
     alignSelf: 'center',
-    backgroundColor: '#dfe2e5',
+    backgroundColor: appTheme.colors.border,
     borderRadius: 99,
     height: 6,
     marginBottom: 22,
@@ -1026,37 +1062,44 @@ const s = StyleSheet.create({
     width: 62,
   },
   heroDescription: {
-    color: '#667080',
+    color: appTheme.colors.textMuted,
     fontSize: 17,
     lineHeight: 25,
     marginTop: 10,
     textAlign: 'center',
   },
   heroTitle: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 25,
     fontWeight: '900',
     letterSpacing: -0.8,
     textAlign: 'center',
   },
   input: {
-    backgroundColor: '#f7f8fa',
-    borderColor: '#d9dde3',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
     borderRadius: 14,
     borderWidth: 1,
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 16,
     minHeight: 54,
     paddingHorizontal: 16,
   },
-  inputError: { borderColor: '#bd2d2d' },
+  inputError: { borderColor: appTheme.colors.dangerBorder },
   keyboard: { flex: 1 },
   keyboardArea: { flex: 1, justifyContent: 'flex-end' },
-  label: { color: '#101c2d', fontSize: 14, fontWeight: '700', marginBottom: 7 },
+  label: {
+    color: appTheme.colors.text,
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 7,
+  },
   layer: { flex: 1, justifyContent: 'flex-end' },
   logo: { alignSelf: 'center', height: 190, width: '76%' },
   inlineBrandLogo: { height: 28, width: 90 },
   nextButton: {
+    backgroundColor: appTheme.colors.surface,
+    borderWidth: 0,
     flexBasis: 'auto',
     flexGrow: 0,
     flexShrink: 0,
@@ -1064,47 +1107,61 @@ const s = StyleSheet.create({
     minHeight: 72,
     paddingHorizontal: 18,
     width: '100%',
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
-  nextContainer: { marginTop: 22, paddingBottom: 8, width: '100%' },
+  nextContainer: { marginTop: 18, paddingBottom: 4, width: '100%' },
   options: { gap: 13, marginTop: 28, width: '100%' },
-  reviewLabel: { color: '#667080', fontSize: 13, fontWeight: '700' },
+  reviewLabel: {
+    color: appTheme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   reviewRow: {
     alignItems: 'center',
-    borderBottomColor: '#e6e8eb',
+    borderBottomColor: appTheme.colors.border,
     borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 13,
+    paddingVertical: 8,
   },
   reviewText: { flex: 1, paddingRight: 12 },
-  reviewValue: { color: '#101c2d', fontSize: 16, marginTop: 3 },
+  reviewValue: { color: appTheme.colors.text, fontSize: 16, marginTop: 3 },
   roleButtons: { flexDirection: 'row', gap: 14, marginTop: 24 },
-  roleContent: { paddingBottom: 18, paddingHorizontal: 20 },
+  roleContent: { paddingBottom: 8, paddingHorizontal: 20 },
   scissors: {
-    color: '#a8ddd9',
+    color: appTheme.colors.accentDark,
     fontSize: 29,
     lineHeight: 32,
     marginHorizontal: 20,
     marginTop: -2,
   },
-  screen: { backgroundColor: '#fcfcfb', flex: 1 },
+  screen: appStyles.screen,
   section: { flex: 1 },
   separator: { alignItems: 'center', flexDirection: 'row', marginTop: 34 },
-  separatorLine: { backgroundColor: '#d9dedf', height: 1, width: 88 },
+  separatorLine: {
+    backgroundColor: appTheme.colors.border,
+    height: 1,
+    width: 88,
+  },
   sheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    maxHeight: '88%',
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderTopLeftRadius: appTheme.radii.sheet,
+    borderTopRightRadius: appTheme.radii.sheet,
     overflow: 'hidden',
+    ...goldShadow,
   },
   title: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 27,
     fontWeight: '900',
     letterSpacing: -0.7,
   },
-  tool: { backgroundColor: '#f1f3f3', borderRadius: 150, position: 'absolute' },
+  tool: {
+    backgroundColor: appTheme.colors.accentWash,
+    borderRadius: 150,
+    position: 'absolute',
+  },
   top: {
     height: 450,
     opacity: 0.46,
@@ -1127,7 +1184,7 @@ const s = StyleSheet.create({
     paddingTop: 34,
   },
   welcomeDescription: {
-    color: '#667080',
+    color: appTheme.colors.textMuted,
     fontSize: 18,
     lineHeight: 27,
     marginTop: 18,
@@ -1135,7 +1192,7 @@ const s = StyleSheet.create({
   },
   welcomeMessage: { alignItems: 'center', marginTop: 26 },
   welcomeTitle: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 30,
     fontWeight: '900',
     letterSpacing: -0.8,
@@ -1144,11 +1201,11 @@ const s = StyleSheet.create({
 
 const verificationStyles = StyleSheet.create({
   codeInput: {
-    backgroundColor: '#f7f8fa',
-    borderColor: '#d9dde3',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
     borderRadius: 14,
     borderWidth: 1,
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 30,
     fontWeight: '900',
     letterSpacing: 10,
@@ -1157,9 +1214,9 @@ const verificationStyles = StyleSheet.create({
     textAlign: 'center',
   },
   countdown: {
-    backgroundColor: '#f0f7ff',
+    backgroundColor: appTheme.colors.accentWash,
     borderRadius: 12,
-    color: '#1855a3',
+    color: appTheme.colors.accentDark,
     fontSize: 15,
     fontWeight: '800',
     marginBottom: 18,
@@ -1167,9 +1224,13 @@ const verificationStyles = StyleSheet.create({
     textAlign: 'center',
   },
   countdownExpired: {
-    backgroundColor: '#fff1f0',
-    color: '#b42318',
+    backgroundColor: appTheme.colors.dangerSurface,
+    color: appTheme.colors.danger,
   },
   resendButton: { alignItems: 'center', marginTop: 18, paddingVertical: 10 },
-  resendText: { color: '#101c2d', fontSize: 15, fontWeight: '800' },
+  resendText: {
+    color: appTheme.colors.accentDark,
+    fontSize: 15,
+    fontWeight: '800',
+  },
 });

@@ -23,16 +23,24 @@ export const appTheme = {
     accent: '#C79532',
     accentActive: '#956816',
     accentDark: '#B47D17',
+    accentGhost: 'rgba(180, 125, 23, 0.08)',
     accentLight: '#E1B85B',
+    accentSubtle: 'rgba(199, 149, 50, 0.06)',
+    accentWash: 'rgba(235, 216, 170, 0.24)',
     background: '#FAF9F6',
     border: '#E4E1DA',
+    danger: '#A72D27',
+    dangerBorder: '#BD2D2D',
+    dangerSurface: '#FFF0EE',
     icon: '#292929',
     overlay: 'rgba(16, 28, 45, 0.58)',
     surface: '#FFFFFF',
+    surfaceElevated: 'rgba(255, 255, 255, 0.96)',
     surfaceMuted: '#F4F4F3',
     text: '#1C1C1C',
     textMuted: '#555A63',
     white: '#FFFFFF',
+    whiteMuted: 'rgba(255, 255, 255, 0.82)',
   },
   radii: {
     card: 30,
@@ -56,6 +64,16 @@ export const goldShadow = {
   shadowColor: appTheme.colors.accentDark,
   shadowOffset: { height: 6, width: 0 },
   shadowOpacity: 0.1,
+  shadowRadius: 14,
+} as const;
+
+export const goldButtonShadow = {
+  boxShadow:
+    '0 12px 24px rgba(180, 125, 23, 0.07), 0 3px 8px rgba(225, 184, 91, 0.04)',
+  elevation: 5,
+  shadowColor: appTheme.colors.accentDark,
+  shadowOffset: { height: 8, width: 0 },
+  shadowOpacity: 0.07,
   shadowRadius: 14,
 } as const;
 

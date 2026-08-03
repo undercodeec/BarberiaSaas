@@ -20,6 +20,10 @@ import {
 import { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  appTheme,
+  goldShadow,
+} from './BottomNavigation';
 import { NavaButton } from './NavaButton';
 import { useAuth } from '../providers/AuthProvider';
 
@@ -84,7 +88,11 @@ export function LoginFullScreen() {
               onPress={() => router.replace('/')}
               style={styles.backButton}
             >
-              <Ionicons color="#ffffff" name="arrow-back" size={23} />
+              <Ionicons
+                color={appTheme.colors.white}
+                name="arrow-back"
+                size={23}
+              />
               <Text style={styles.backLabel}>Regresar al inicio</Text>
             </Pressable>
             <View style={[styles.brand, compact ? styles.brandCompact : null]}>
@@ -92,7 +100,7 @@ export function LoginFullScreen() {
                 accessibilityLabel="Nava"
                 resizeMode="contain"
                 source={logoImage}
-                style={[styles.brandName, { tintColor: '#ffffff' }]}
+                style={styles.brandName}
               />
               <Text style={styles.brandMessage}>Bienvenido de nuevo</Text>
             </View>
@@ -120,7 +128,11 @@ export function LoginFullScreen() {
                         fieldState.error ? styles.inputError : null,
                       ]}
                     >
-                      <Ionicons color="#667080" name="mail-outline" size={21} />
+                      <Ionicons
+                        color={appTheme.colors.accentDark}
+                        name="mail-outline"
+                        size={21}
+                      />
                       <TextInput
                         autoCapitalize="none"
                         autoComplete="email"
@@ -128,7 +140,7 @@ export function LoginFullScreen() {
                         onBlur={field.onBlur}
                         onChangeText={field.onChange}
                         placeholder="correo@ejemplo.com"
-                        placeholderTextColor="#98a0ab"
+                        placeholderTextColor={appTheme.colors.textMuted}
                         style={styles.input}
                         value={field.value}
                       />
@@ -154,7 +166,7 @@ export function LoginFullScreen() {
                       ]}
                     >
                       <Ionicons
-                        color="#667080"
+                        color={appTheme.colors.accentDark}
                         name="lock-closed-outline"
                         size={21}
                       />
@@ -163,7 +175,7 @@ export function LoginFullScreen() {
                         onBlur={field.onBlur}
                         onChangeText={field.onChange}
                         placeholder="Ingresa tu contraseña"
-                        placeholderTextColor="#98a0ab"
+                        placeholderTextColor={appTheme.colors.textMuted}
                         secureTextEntry={!showPassword}
                         style={styles.input}
                         value={field.value}
@@ -177,7 +189,7 @@ export function LoginFullScreen() {
                         onPress={() => setShowPassword((current) => !current)}
                       >
                         <Ionicons
-                          color="#667080"
+                          color={appTheme.colors.accentDark}
                           name={
                             showPassword ? 'eye-off-outline' : 'eye-outline'
                           }
@@ -207,7 +219,11 @@ export function LoginFullScreen() {
                 onPress={() => router.replace('/')}
                 style={styles.homeButton}
               >
-                <Ionicons color="#101c2d" name="home-outline" size={20} />
+                <Ionicons
+                  color={appTheme.colors.accentDark}
+                  name="home-outline"
+                  size={20}
+                />
                 <Text style={styles.homeLabel}>Regresar al inicio</Text>
               </Pressable>
             </View>
@@ -229,16 +245,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     paddingVertical: 10,
   },
-  backLabel: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  backLabel: {
+    color: appTheme.colors.white,
+    fontSize: 15,
+    fontWeight: '800',
+  },
   brand: { alignItems: 'center', minHeight: 220, paddingTop: 24 },
   brandCompact: { minHeight: 125, paddingTop: 8 },
   brandMessage: {
-    color: 'rgba(255,255,255,0.82)',
+    color: appTheme.colors.whiteMuted,
     fontSize: 16,
     fontWeight: '600',
     marginTop: 8,
   },
-  brandName: { height: 58, width: 178 },
+  brandName: {
+    height: 58,
+    tintColor: appTheme.colors.white,
+    width: 178,
+  },
   content: {
     alignSelf: 'center',
     flexGrow: 1,
@@ -249,10 +273,14 @@ const styles = StyleSheet.create({
     maxWidth: 480,
   },
   field: { marginBottom: 17 },
-  fieldError: { color: '#bd2d2d', fontSize: 13, marginTop: 6 },
+  fieldError: {
+    color: appTheme.colors.dangerBorder,
+    fontSize: 13,
+    marginTop: 6,
+  },
   forgot: {
     alignSelf: 'flex-end',
-    color: '#2464e8',
+    color: appTheme.colors.accentActive,
     fontSize: 14,
     fontWeight: '800',
     marginBottom: 20,
@@ -260,38 +288,47 @@ const styles = StyleSheet.create({
   },
   formCard: {
     alignSelf: 'center',
-    backgroundColor: 'rgba(255,255,255,0.96)',
-    borderRadius: 28,
+    backgroundColor: appTheme.colors.surfaceElevated,
+    borderRadius: appTheme.radii.card,
+    borderWidth: 0,
     maxWidth: 430,
     padding: 24,
-    shadowColor: '#071120',
-    shadowOffset: { height: 8, width: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 22,
     width: '100%',
+    ...goldShadow,
   },
   formError: {
-    backgroundColor: '#fff0ee',
+    backgroundColor: appTheme.colors.dangerSurface,
     borderRadius: 12,
-    color: '#a72d27',
+    color: appTheme.colors.danger,
     marginBottom: 17,
     padding: 12,
   },
   homeButton: {
     alignItems: 'center',
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderRadius: appTheme.radii.control,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
     marginTop: 22,
     paddingVertical: 8,
   },
-  homeLabel: { color: '#101c2d', fontSize: 15, fontWeight: '800' },
-  input: { color: '#101c2d', flex: 1, fontSize: 16, minHeight: 54 },
-  inputError: { borderColor: '#bd2d2d' },
+  homeLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  input: {
+    color: appTheme.colors.text,
+    flex: 1,
+    fontSize: 16,
+    minHeight: 54,
+  },
+  inputError: { borderColor: appTheme.colors.dangerBorder },
   inputShell: {
     alignItems: 'center',
-    backgroundColor: '#f7f8fa',
-    borderColor: '#d9dde3',
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderColor: appTheme.colors.border,
     borderRadius: 15,
     borderWidth: 1,
     flexDirection: 'row',
@@ -300,24 +337,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
   },
   keyboard: { flex: 1 },
-  label: { color: '#101c2d', fontSize: 14, fontWeight: '800', marginBottom: 8 },
+  label: {
+    color: appTheme.colors.text,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
   loginButton: {
+    backgroundColor: appTheme.colors.accent,
+    borderWidth: 0,
     flexBasis: 'auto',
     flexGrow: 0,
     flexShrink: 0,
     height: 66,
     width: '100%',
+    ...goldShadow,
   },
   safeArea: { flex: 1 },
   subtitle: {
-    color: '#667080',
+    color: appTheme.colors.textMuted,
     fontSize: 16,
     lineHeight: 23,
     marginBottom: 24,
     marginTop: 8,
   },
   title: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 30,
     fontWeight: '900',
     letterSpacing: -0.9,

@@ -19,6 +19,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 import { NavaButton } from '../../src/components/NavaButton';
 import { CountryCityFields } from '../../src/components/RegistrationSelectors';
 import { requireApiClient } from '../../src/lib/api';
@@ -202,7 +207,11 @@ export default function AccountDetailsScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Ionicons color="#101c2d" name="arrow-back" size={23} />
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="arrow-back"
+            size={23}
+          />
         </Pressable>
         <View style={styles.headerCopy}>
           <Text style={styles.eyebrow}>
@@ -249,7 +258,11 @@ export default function AccountDetailsScreen() {
             ) : null}
             <View style={styles.coverOverlay}>
               <View style={styles.camera}>
-                <Ionicons color="#101c2d" name="camera-outline" size={24} />
+                <Ionicons
+                  color={appTheme.colors.accentDark}
+                  name="camera-outline"
+                  size={24}
+                />
               </View>
               <Text style={styles.coverLabel}>Agregar imagen de portada</Text>
             </View>
@@ -257,7 +270,7 @@ export default function AccountDetailsScreen() {
 
           {profileQuery.isPending ? (
             <View style={styles.loading}>
-              <ActivityIndicator color="#101c2d" />
+              <ActivityIndicator color={appTheme.colors.accentDark} />
               <Text style={styles.loadingText}>
                 {'Cargando tu informaci\u00f3n\u2026'}
               </Text>
@@ -290,7 +303,7 @@ export default function AccountDetailsScreen() {
           >
             <Text style={styles.optionalLabel}>Campos opcionales</Text>
             <Ionicons
-              color="#101c2d"
+              color={appTheme.colors.accentDark}
               name={optionalOpen ? 'chevron-up' : 'chevron-down'}
               size={22}
             />
@@ -342,6 +355,7 @@ export default function AccountDetailsScreen() {
 
       <View style={styles.footer}>
         <NavaButton
+          foregroundColor={appTheme.colors.accentDark}
           icon="arrow-back-outline"
           label={'Atr\u00e1s'}
           onPress={() => router.back()}
@@ -350,6 +364,7 @@ export default function AccountDetailsScreen() {
         />
         <NavaButton
           disabled={profileQuery.isPending}
+          foregroundColor={appTheme.colors.accentDark}
           icon={
             isEditingCompletedAccount
               ? 'checkmark-outline'
@@ -359,7 +374,7 @@ export default function AccountDetailsScreen() {
           loading={saving}
           onPress={() => void save()}
           style={styles.nextButton}
-          variant="primary"
+          variant="outline"
         />
       </View>
     </SafeAreaView>
@@ -368,50 +383,57 @@ export default function AccountDetailsScreen() {
 
 const styles = StyleSheet.create({
   activeStep: {
-    backgroundColor: '#000000',
+    backgroundColor: appTheme.colors.accent,
     borderRadius: 6,
     height: 10,
     width: 31,
   },
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#f1f3f5',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 18,
     height: 44,
     justifyContent: 'center',
     width: 44,
   },
-  backFooterButton: { flexBasis: 0, height: 58, minWidth: 0 },
+  backFooterButton: {
+    backgroundColor: appTheme.colors.surface,
+    borderWidth: 0,
+    flexBasis: 0,
+    height: 58,
+    minWidth: 0,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
+  },
   body: { flex: 1 },
   camera: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 22,
     height: 44,
     justifyContent: 'center',
     width: 44,
   },
   completedStep: {
-    backgroundColor: '#88a9ee',
+    backgroundColor: appTheme.colors.accentLight,
     borderRadius: 6,
     height: 10,
     width: 10,
   },
   content: { paddingBottom: 24, paddingHorizontal: 24, paddingTop: 18 },
   cover: {
-    backgroundColor: '#e6efff',
-    borderColor: '#d3e0f6',
+    backgroundColor: appTheme.colors.accentSubtle,
     borderRadius: 24,
-    borderWidth: 1,
+    borderWidth: 0,
     height: 168,
     marginBottom: 26,
     overflow: 'hidden',
   },
   coverImage: { height: '100%', position: 'absolute', width: '100%' },
-  coverLabel: { color: '#101c2d', fontSize: 15, fontWeight: '800' },
+  coverLabel: { color: appTheme.colors.accentDark, fontSize: 15, fontWeight: '800' },
   coverOverlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(226, 237, 255, 0.78)',
+    backgroundColor: appTheme.colors.accentWash,
     flex: 1,
     gap: 10,
     justifyContent: 'center',
@@ -422,12 +444,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 18,
   },
-  eyebrow: { color: '#101c2d', fontSize: 16, fontWeight: '800' },
+  eyebrow: { color: appTheme.colors.accentDark, fontSize: 16, fontWeight: '800' },
   field: { marginBottom: 17 },
   footer: {
-    backgroundColor: '#f9fbff',
-    borderTopColor: '#e1e8f4',
-    borderTopWidth: 1,
+    backgroundColor: appTheme.colors.surfaceElevated,
+    borderTopWidth: 0,
     flexDirection: 'row',
     gap: 12,
     paddingHorizontal: 24,
@@ -435,7 +456,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    backgroundColor: '#f9fbff',
+    backgroundColor: appTheme.colors.background,
     flexDirection: 'row',
     gap: 14,
     paddingHorizontal: 24,
@@ -443,17 +464,16 @@ const styles = StyleSheet.create({
   },
   headerCopy: { flex: 1, gap: 10 },
   input: {
-    backgroundColor: '#ffffff',
-    borderColor: '#d9dde3',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 16,
-    borderWidth: 1,
-    color: '#101c2d',
+    borderWidth: 0,
+    color: appTheme.colors.text,
     fontSize: 16,
     minHeight: 56,
     paddingHorizontal: 15,
   },
   introduction: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 21,
     fontWeight: '800',
     letterSpacing: -0.35,
@@ -461,7 +481,7 @@ const styles = StyleSheet.create({
     marginBottom: 22,
     textAlign: 'center',
   },
-  label: { color: '#101c2d', fontSize: 14, fontWeight: '800', marginBottom: 8 },
+  label: { color: appTheme.colors.text, fontSize: 14, fontWeight: '800', marginBottom: 8 },
   loading: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -469,21 +489,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 18,
   },
-  loadingText: { color: '#667080', fontSize: 13, fontWeight: '600' },
+  loadingText: { color: appTheme.colors.textMuted, fontSize: 13, fontWeight: '600' },
   multilineInput: { minHeight: 108, paddingTop: 14 },
-  nextButton: { flexBasis: 0, height: 58, minWidth: 0 },
+  nextButton: {
+    backgroundColor: appTheme.colors.surface,
+    borderWidth: 0,
+    flexBasis: 0,
+    height: 58,
+    minWidth: 0,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
+  },
   optionalContent: {
-    borderBottomColor: '#e1e8f4',
-    borderBottomWidth: 1,
+    borderBottomWidth: 0,
     marginBottom: 4,
     paddingTop: 17,
   },
-  optionalLabel: { color: '#101c2d', fontSize: 16, fontWeight: '800' },
+  optionalLabel: { color: appTheme.colors.text, fontSize: 16, fontWeight: '800' },
   optionalToggle: {
     alignItems: 'center',
-    borderColor: '#d9dde3',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 17,
-    borderWidth: 1,
+    borderWidth: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 2,
@@ -491,7 +518,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   progress: { alignItems: 'center', flexDirection: 'row', gap: 8 },
-  readOnlyInput: { backgroundColor: '#eef2f6', color: '#667080' },
-  screen: { backgroundColor: '#f9fbff', flex: 1 },
-  step: { backgroundColor: '#dce7fb', borderRadius: 6, height: 10, width: 10 },
+  readOnlyInput: { backgroundColor: appTheme.colors.surfaceMuted, color: appTheme.colors.textMuted },
+  screen: appStyles.screen,
+  step: { backgroundColor: appTheme.colors.border, borderRadius: 6, height: 10, width: 10 },
 });

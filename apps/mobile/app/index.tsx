@@ -10,6 +10,11 @@ import {
 } from 'react-native';
 
 import { InlineMessage } from '../src/components/InlineMessage';
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../src/components/BottomNavigation';
 import { NavaWelcomeScreen } from '../src/components/NavaWelcomeScreen';
 import { requireApiClient } from '../src/lib/api';
 import { useCurrentOrganization } from '../src/features/organization/useCurrentOrganization';
@@ -43,7 +48,7 @@ export default function EntryScreen() {
   ) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#101c2d" size="large" />
+        <ActivityIndicator color={appTheme.colors.accent} size="large" />
         <Text style={styles.loading}>Preparando tu espacio…</Text>
       </View>
     );
@@ -77,24 +82,27 @@ export default function EntryScreen() {
 const styles = StyleSheet.create({
   centered: {
     alignItems: 'center',
-    backgroundColor: '#fcfcfb',
+    ...appStyles.screen,
     flex: 1,
     justifyContent: 'center',
     padding: 24,
   },
   loading: {
-    color: '#667080',
+    color: appTheme.colors.textMuted,
     marginTop: 14,
   },
   retryButton: {
-    backgroundColor: '#101c2d',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 18,
+    borderWidth: 0,
     marginTop: 18,
     paddingHorizontal: 28,
     paddingVertical: 15,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   retryLabel: {
-    color: '#ffffff',
+    color: appTheme.colors.accentDark,
     fontSize: 16,
     fontWeight: '800',
   },

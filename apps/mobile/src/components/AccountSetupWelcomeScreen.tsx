@@ -11,12 +11,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from './BottomNavigation';
 import { NavaButton } from './NavaButton';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const teamIllustration = require('../../assets/onboarding-team.png') as number;
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const logoImage = require('../../assets/nava-logo.png') as number;
 
 interface AccountSetupWelcomeScreenProps {
   readonly accountType: 'business' | 'professional';
@@ -46,7 +49,7 @@ export function AccountSetupWelcomeScreen({
         <View style={styles.topGlow} />
         <View style={styles.bottomGlow} />
         <Ionicons
-          color="rgba(16, 28, 45, 0.035)"
+          color={appTheme.colors.accentGhost}
           name="cut-outline"
           size={260}
           style={styles.backgroundScissors}
@@ -66,17 +69,15 @@ export function AccountSetupWelcomeScreen({
           onPress={onBack}
           style={styles.backButton}
         >
-          <Ionicons color="#101c2d" name="arrow-back" size={23} />
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="arrow-back"
+            size={23}
+          />
           <Text style={styles.backLabel}>Regresar al inicio</Text>
         </Pressable>
 
         <View style={styles.header}>
-          <Image
-            accessibilityLabel="Nava"
-            resizeMode="contain"
-            source={logoImage}
-            style={styles.brand}
-          />
           <View style={styles.badge}>
             <View style={styles.badgeDot} />
             <Text style={styles.badgeLabel}>CONFIGURACIÓN INICIAL</Text>
@@ -92,8 +93,8 @@ export function AccountSetupWelcomeScreen({
               styles.illustration,
               compact ? styles.illustrationCompact : null,
               {
-                height: Math.min(Math.max(height * 0.2, 135), 190),
-                maxWidth: Math.min(width - 36, 520),
+                height: Math.min(Math.max(height * 0.32, 210), 320),
+                maxWidth: Math.min(width - 12, 620),
               },
             ]}
           />
@@ -107,12 +108,7 @@ export function AccountSetupWelcomeScreen({
               {isSolo
                 ? 'Prepara tu espacio para gestionar tu actividad profesional con '
                 : 'Prepara tu espacio para empezar a gestionar tu negocio con '}
-              <Image
-                resizeMode="contain"
-                source={logoImage}
-                style={styles.inlineBrandLogo}
-              />
-              .
+              Nava.
             </Text>
           </View>
         </View>
@@ -121,7 +117,11 @@ export function AccountSetupWelcomeScreen({
           <View style={styles.benefits}>
             <View style={styles.benefit}>
               <View style={styles.iconShell}>
-                <Ionicons color="#000000" name="storefront-outline" size={19} />
+                <Ionicons
+                  color={appTheme.colors.accentDark}
+                  name="storefront-outline"
+                  size={19}
+                />
               </View>
               <Text style={styles.benefitLabel}>
                 {isSolo ? 'Tu actividad' : 'Tu negocio'}
@@ -130,7 +130,11 @@ export function AccountSetupWelcomeScreen({
             <View style={styles.divider} />
             <View style={styles.benefit}>
               <View style={styles.iconShell}>
-                <Ionicons color="#000000" name="location-outline" size={19} />
+                <Ionicons
+                  color={appTheme.colors.accentDark}
+                  name="location-outline"
+                  size={19}
+                />
               </View>
               <Text style={styles.benefitLabel}>
                 {isSolo ? 'Tus servicios' : 'Tu equipo'}
@@ -139,7 +143,11 @@ export function AccountSetupWelcomeScreen({
             <View style={styles.divider} />
             <View style={styles.benefit}>
               <View style={styles.iconShell}>
-                <Ionicons color="#000000" name="checkmark-outline" size={19} />
+                <Ionicons
+                  color={appTheme.colors.accentDark}
+                  name="checkmark-outline"
+                  size={19}
+                />
               </View>
               <Text style={styles.benefitLabel}>Todo listo</Text>
             </View>
@@ -150,11 +158,12 @@ export function AccountSetupWelcomeScreen({
       <View style={styles.actionFooter}>
         <NavaButton
           compact={width < 390}
+          foregroundColor={appTheme.colors.accentDark}
           icon="arrow-forward-outline"
           label="Comenzar configuración"
           onPress={onContinue}
           style={styles.continueButton}
-          variant="primary"
+          variant="outline"
         />
         <Text style={styles.helper}>Solo te tomará un par de minutos</Text>
       </View>
@@ -173,7 +182,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   backLabel: {
-    color: '#101c2d',
+    color: appTheme.colors.accentDark,
     fontSize: 15,
     fontWeight: '800',
   },
@@ -189,7 +198,7 @@ const styles = StyleSheet.create({
   },
   badge: {
     alignItems: 'center',
-    backgroundColor: '#eef3ff',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 99,
     flexDirection: 'row',
     gap: 7,
@@ -197,13 +206,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   badgeDot: {
-    backgroundColor: '#000000',
+    backgroundColor: appTheme.colors.accent,
     borderRadius: 5,
     height: 7,
     width: 7,
   },
   badgeLabel: {
-    color: '#000000',
+    color: appTheme.colors.accentDark,
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.8,
@@ -214,34 +223,29 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   benefitLabel: {
-    color: '#4f5d70',
+    color: appTheme.colors.textMuted,
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
   },
   benefits: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.88)',
-    borderColor: '#e6e9ed',
+    backgroundColor: appTheme.colors.surfaceElevated,
     borderRadius: 22,
-    borderWidth: 1,
+    borderWidth: 0,
     flexDirection: 'row',
     paddingHorizontal: 14,
     paddingVertical: 10,
     width: '100%',
   },
   bottomGlow: {
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    backgroundColor: appTheme.colors.accentSubtle,
     borderRadius: 250,
     bottom: -170,
     height: 360,
     position: 'absolute',
     right: -130,
     width: 360,
-  },
-  brand: {
-    height: 32,
-    width: 112,
   },
   content: {
     alignItems: 'center',
@@ -257,14 +261,18 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   continueButton: {
+    backgroundColor: appTheme.colors.surface,
+    borderWidth: 0,
     flexBasis: 'auto',
     flexGrow: 0,
     height: 56,
     minHeight: 56,
+    transform: [{ translateY: -3 }],
     width: '100%',
+    ...goldButtonShadow,
   },
   description: {
-    color: '#667080',
+    color: appTheme.colors.textMuted,
     fontSize: 15,
     lineHeight: 21,
     marginTop: 7,
@@ -272,7 +280,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   divider: {
-    backgroundColor: '#dfe4e9',
+    backgroundColor: appTheme.colors.border,
     height: 30,
     width: 1,
   },
@@ -283,15 +291,14 @@ const styles = StyleSheet.create({
   },
   actionFooter: {
     alignItems: 'center',
-    backgroundColor: 'rgba(252,252,251,0.98)',
-    borderTopColor: '#e6e9ed',
-    borderTopWidth: 1,
+    backgroundColor: appTheme.colors.surfaceElevated,
+    borderTopWidth: 0,
     paddingBottom: 8,
     paddingHorizontal: 22,
     paddingTop: 10,
   },
   greeting: {
-    color: '#000000',
+    color: appTheme.colors.accentDark,
     fontSize: 15,
     fontWeight: '800',
     marginBottom: 5,
@@ -303,7 +310,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   helper: {
-    color: '#7d8795',
+    color: appTheme.colors.textMuted,
     fontSize: 13,
     marginTop: 6,
   },
@@ -314,41 +321,34 @@ const styles = StyleSheet.create({
   },
   iconShell: {
     alignItems: 'center',
-    backgroundColor: '#edf3ff',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 12,
     height: 34,
     justifyContent: 'center',
     width: 34,
   },
-  inlineBrandLogo: {
-    height: 19,
-    width: 61,
-  },
   illustration: {
-    marginTop: 8,
+    marginTop: 12,
     width: '100%',
   },
   illustrationCompact: {
-    marginTop: 2,
-    maxHeight: 165,
+    marginTop: 4,
+    maxHeight: 250,
   },
   message: {
     alignItems: 'center',
     marginTop: 4,
   },
-  screen: {
-    backgroundColor: '#fcfcfb',
-    flex: 1,
-  },
+  screen: appStyles.screen,
   title: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 28,
     fontWeight: '900',
     letterSpacing: -0.9,
     textAlign: 'center',
   },
   topGlow: {
-    backgroundColor: 'rgba(36, 95, 223, 0.055)',
+    backgroundColor: appTheme.colors.accentWash,
     borderRadius: 260,
     height: 420,
     position: 'absolute',

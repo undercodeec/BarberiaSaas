@@ -4,6 +4,10 @@ import { Redirect, useRouter } from 'expo-router';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { AccountSetupWelcomeScreen } from '../../src/components/AccountSetupWelcomeScreen';
+import {
+  appStyles,
+  appTheme,
+} from '../../src/components/BottomNavigation';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -24,7 +28,7 @@ export default function AccountSetupScreen() {
   if (isLoadingSession || (session && organizationQuery.isLoading)) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#101c2d" size="large" />
+        <ActivityIndicator color={appTheme.colors.accent} size="large" />
         <Text style={styles.loading}>Comprobando tu configuración…</Text>
       </View>
     );
@@ -45,13 +49,13 @@ export default function AccountSetupScreen() {
 const styles = StyleSheet.create({
   centered: {
     alignItems: 'center',
-    backgroundColor: '#fcfcfb',
+    ...appStyles.screen,
     flex: 1,
     justifyContent: 'center',
     padding: 24,
   },
   loading: {
-    color: '#667080',
+    color: appTheme.colors.textMuted,
     marginTop: 14,
   },
 });

@@ -16,6 +16,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 import { NavaButton } from '../../src/components/NavaButton';
 import {
   type ServiceDraft,
@@ -115,7 +120,11 @@ export default function ServicesOnboardingScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Ionicons color="#101c2d" name="arrow-back" size={23} />
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="arrow-back"
+            size={23}
+          />
           <Text style={styles.backLabel}>Regresar</Text>
         </Pressable>
 
@@ -141,7 +150,10 @@ export default function ServicesOnboardingScreen() {
             style={[
               styles.illustration,
               compact ? styles.illustrationCompact : null,
-              { maxWidth: Math.min(width + 8, 560) },
+              {
+                height: Math.min(Math.max(height * 0.32, 210), 320),
+                maxWidth: Math.min(width - 12, 620),
+              },
             ]}
           />
 
@@ -160,6 +172,7 @@ export default function ServicesOnboardingScreen() {
 
           <NavaButton
             compact={width < 390}
+            foregroundColor={appTheme.colors.accentDark}
             icon="cut-outline"
             label={
               services.length > 0 ? 'Añadir otro servicio' : 'Añadir servicio'
@@ -247,11 +260,12 @@ export default function ServicesOnboardingScreen() {
       <View style={styles.footer}>
         <NavaButton
           disabled={services.length === 0}
+          foregroundColor={appTheme.colors.accentDark}
           icon="arrow-forward-outline"
           label="Siguiente"
           onPress={() => router.push('/(onboarding)/account-details')}
           style={styles.nextButton}
-          variant="primary"
+          variant="outline"
         />
       </View>
 
@@ -271,17 +285,21 @@ export default function ServicesOnboardingScreen() {
 
 const styles = StyleSheet.create({
   activeStep: {
-    backgroundColor: '#000000',
+    backgroundColor: appTheme.colors.accent,
     borderRadius: 6,
     height: 10,
     width: 31,
   },
   actionButton: {
+    backgroundColor: appTheme.colors.surface,
+    borderWidth: 0,
     flexBasis: 'auto',
     flexGrow: 0,
     height: 56,
     marginTop: 14,
+    transform: [{ translateY: -3 }],
     width: '100%',
+    ...goldButtonShadow,
   },
   backButton: {
     alignItems: 'center',
@@ -293,7 +311,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   backLabel: {
-    color: '#101c2d',
+    color: appTheme.colors.accentDark,
     fontSize: 15,
     fontWeight: '800',
   },
@@ -302,7 +320,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   bottomGlow: {
-    backgroundColor: 'rgba(59, 116, 232, 0.07)',
+    backgroundColor: appTheme.colors.accentSubtle,
     borderRadius: 260,
     bottom: -220,
     height: 430,
@@ -311,7 +329,7 @@ const styles = StyleSheet.create({
     width: 430,
   },
   completedStep: {
-    backgroundColor: '#88a9ee',
+    backgroundColor: appTheme.colors.accentLight,
     borderRadius: 6,
     height: 10,
     width: 10,
@@ -334,7 +352,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   description: {
-    color: '#667080',
+    color: appTheme.colors.textMuted,
     fontSize: 15,
     lineHeight: 21,
     marginTop: 7,
@@ -342,15 +360,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   eyebrow: {
-    color: '#101c2d',
+    color: appTheme.colors.accentDark,
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: -0.2,
   },
   footer: {
-    backgroundColor: 'rgba(249,251,255,0.98)',
-    borderTopColor: '#e1e8f4',
-    borderTopWidth: 1,
+    backgroundColor: appTheme.colors.surfaceElevated,
+    borderTopWidth: 0,
     paddingBottom: 12,
     paddingHorizontal: 24,
     paddingTop: 10,
@@ -362,11 +379,11 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   illustration: {
-    height: 190,
+    height: 320,
     width: '108%',
   },
   illustrationCompact: {
-    height: 145,
+    height: 250,
   },
   main: {
     alignItems: 'center',
@@ -374,10 +391,14 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   nextButton: {
+    backgroundColor: appTheme.colors.surface,
+    borderWidth: 0,
     flexBasis: 'auto',
     flexGrow: 0,
     height: 56,
+    transform: [{ translateY: -3 }],
     width: '100%',
+    ...goldButtonShadow,
   },
   progress: {
     alignItems: 'center',
@@ -385,14 +406,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   savedLabel: {
-    color: '#667080',
+    color: appTheme.colors.textMuted,
     fontSize: 13,
     fontWeight: '700',
     marginTop: 10,
   },
   deleteIconButton: {
     alignItems: 'center',
-    backgroundColor: '#fff0ee',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 12,
     height: 40,
     justifyContent: 'center',
@@ -400,7 +421,7 @@ const styles = StyleSheet.create({
   },
   editButton: {
     alignItems: 'center',
-    backgroundColor: '#f1f3f5',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 12,
     height: 40,
     justifyContent: 'center',
@@ -414,14 +435,21 @@ const styles = StyleSheet.create({
   },
   serviceColor: { borderRadius: 999, height: 14, width: 14 },
   serviceCopy: { flex: 1, gap: 2 },
-  serviceMeta: { color: '#667080', fontSize: 13, fontWeight: '600' },
-  serviceName: { color: '#101c2d', fontSize: 15, fontWeight: '800' },
+  serviceMeta: {
+    color: appTheme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  serviceName: {
+    color: appTheme.colors.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
   serviceRow: {
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderColor: '#dce7fb',
+    backgroundColor: appTheme.colors.surfaceElevated,
     borderRadius: 16,
-    borderWidth: 1,
+    borderWidth: 0,
     flexDirection: 'row',
     gap: 10,
     marginTop: 10,
@@ -429,18 +457,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  screen: {
-    backgroundColor: '#f9fbff',
-    flex: 1,
-  },
+  screen: appStyles.screen,
   step: {
-    backgroundColor: '#dce7fb',
+    backgroundColor: appTheme.colors.border,
     borderRadius: 6,
     height: 10,
     width: 10,
   },
   title: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 27,
     fontWeight: '900',
     letterSpacing: -0.9,
@@ -449,7 +474,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   topGlow: {
-    backgroundColor: 'rgba(46, 103, 224, 0.08)',
+    backgroundColor: appTheme.colors.accentWash,
     borderRadius: 260,
     height: 420,
     position: 'absolute',

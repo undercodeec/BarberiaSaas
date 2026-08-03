@@ -17,6 +17,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  appTheme,
+  goldButtonShadow,
+} from './BottomNavigation';
 import { NavaButton } from './NavaButton';
 
 export interface ServiceDraft {
@@ -412,12 +416,13 @@ export function ServiceFormSheet({
               ) : null}
 
               <NavaButton
+                foregroundColor={appTheme.colors.accentDark}
                 loading={saving}
                 icon="checkmark-outline"
                 label="Guardar servicio"
                 onPress={save}
                 style={styles.saveButton}
-                variant="primary"
+                variant="outline"
               />
               {saveError ? (
                 <Text accessibilityRole="alert" style={styles.error}>
@@ -463,23 +468,23 @@ function TaxDialog({ onClose, onSave, visible }: { readonly onClose: () => void;
 }
 
 const styles = StyleSheet.create({
-  additionalContent: { backgroundColor: '#f7f8fa', borderColor: '#e2e5e9', borderRadius: 18, borderWidth: 1, marginBottom: 17, marginTop: -8, padding: 14 },
+  additionalContent: { backgroundColor: appTheme.colors.surfaceMuted, borderRadius: 18, borderWidth: 0, marginBottom: 17, marginTop: -8, padding: 14 },
   additionalHeading: { alignItems: 'center', flexDirection: 'row', gap: 9 },
-  additionalTitle: { color: '#101c2d', fontSize: 15, fontWeight: '800' },
-  additionalToggle: { alignItems: 'center', borderBottomColor: '#e6e8eb', borderTopColor: '#e6e8eb', borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 17, minHeight: 56 },
+  additionalTitle: { color: appTheme.colors.text, fontSize: 15, fontWeight: '800' },
+  additionalToggle: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 17, minHeight: 56 },
   backdrop: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(5, 10, 16, 0.62)',
+    backgroundColor: appTheme.colors.overlay,
   },
   closeButton: {
     alignItems: 'center',
-    backgroundColor: '#f1f3f5',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 18,
     height: 36,
     justifyContent: 'center',
     width: 36,
   },
-  checkboxLabel: { color: '#101c2d', flex: 1, fontSize: 14, fontWeight: '700' },
+  checkboxLabel: { color: appTheme.colors.text, flex: 1, fontSize: 14, fontWeight: '700' },
   checkboxRow: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingVertical: 7 },
   colorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 },
   colorOption: { alignItems: 'center', borderColor: 'rgba(16, 28, 45, 0.18)', borderRadius: 16, borderWidth: 1, height: 32, justifyContent: 'center', width: 32 },
@@ -489,21 +494,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
   },
   currency: {
-    color: '#667080',
+    color: appTheme.colors.textMuted,
     fontSize: 18,
     fontWeight: '800',
   },
-  depositField: { backgroundColor: '#f7f8fa', borderColor: '#e2e5e9', borderRadius: 18, borderWidth: 1, marginBottom: 17, padding: 15 },
-  dialog: { backgroundColor: '#fff', borderRadius: 25, maxWidth: 540, padding: 22, width: '88%' },
-  dialogBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(5, 10, 16, 0.62)' },
-  dialogButton: { flexBasis: 'auto', flexGrow: 0, height: 58, marginTop: 20, width: '100%' },
-  dialogClose: { alignItems: 'center', alignSelf: 'flex-end', backgroundColor: '#f1f3f5', borderRadius: 16, height: 32, justifyContent: 'center', marginBottom: 8, width: 32 },
-  dialogCopy: { color: '#667080', fontSize: 15, lineHeight: 22, marginBottom: 20 },
-  dialogIcon: { alignItems: 'center', backgroundColor: '#e8f0ff', borderRadius: 24, height: 48, justifyContent: 'center', marginBottom: 14, width: 48 },
-  dialogInput: { backgroundColor: '#f7f8fa', borderColor: '#d9dde3', borderRadius: 14, borderWidth: 1, color: '#101c2d', fontSize: 16, marginBottom: 15, minHeight: 54, paddingHorizontal: 14, paddingVertical: 12 },
+  depositField: { backgroundColor: appTheme.colors.surfaceMuted, borderRadius: 18, borderWidth: 0, marginBottom: 17, padding: 15 },
+  dialog: { backgroundColor: appTheme.colors.surface, borderRadius: 25, maxWidth: 540, padding: 22, width: '88%' },
+  dialogBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: appTheme.colors.overlay },
+  dialogButton: { backgroundColor: appTheme.colors.surface, borderWidth: 0, flexBasis: 'auto', flexGrow: 0, height: 58, marginTop: 20, transform: [{ translateY: -3 }], width: '100%', ...goldButtonShadow },
+  dialogClose: { alignItems: 'center', alignSelf: 'flex-end', backgroundColor: appTheme.colors.surfaceMuted, borderRadius: 16, height: 32, justifyContent: 'center', marginBottom: 8, width: 32 },
+  dialogCopy: { color: appTheme.colors.textMuted, fontSize: 15, lineHeight: 22, marginBottom: 20 },
+  dialogIcon: { alignItems: 'center', backgroundColor: appTheme.colors.accentSubtle, borderRadius: 24, height: 48, justifyContent: 'center', marginBottom: 14, width: 48 },
+  dialogInput: { backgroundColor: appTheme.colors.surfaceMuted, borderRadius: 14, borderWidth: 0, color: appTheme.colors.text, fontSize: 16, marginBottom: 15, minHeight: 54, paddingHorizontal: 14, paddingVertical: 12 },
   dialogLayer: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   dialogTextArea: { minHeight: 84 },
-  dialogTitle: { color: '#101c2d', fontSize: 22, fontWeight: '900', marginBottom: 8 },
+  dialogTitle: { color: appTheme.colors.text, fontSize: 22, fontWeight: '900', marginBottom: 8 },
   error: {
     color: '#bd2d2d',
     fontSize: 13,
@@ -512,7 +517,7 @@ const styles = StyleSheet.create({
   field: {
     marginBottom: 17,
   },
-  fieldHint: { color: '#667080', fontSize: 13, lineHeight: 19 },
+  fieldHint: { color: appTheme.colors.textMuted, fontSize: 13, lineHeight: 19 },
   fieldRow: {
     flexDirection: 'row',
     gap: 12,
@@ -537,14 +542,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   imageCopy: { flex: 1 },
-  imageField: { alignItems: 'center', borderColor: '#d9dde3', borderRadius: 15, borderWidth: 1, flexDirection: 'row', gap: 13, minHeight: 76, padding: 10 },
-  imageHint: { color: '#101c2d', fontSize: 13, fontWeight: '700', marginTop: 3 },
-  imagePreview: { alignItems: 'center', backgroundColor: '#edf1f5', borderRadius: 12, height: 54, justifyContent: 'center', overflow: 'hidden', width: 66 },
+  imageField: { alignItems: 'center', backgroundColor: appTheme.colors.surfaceMuted, borderRadius: 15, borderWidth: 0, flexDirection: 'row', gap: 13, minHeight: 76, padding: 10 },
+  imageHint: { color: appTheme.colors.accentDark, fontSize: 13, fontWeight: '700', marginTop: 3 },
+  imagePreview: { alignItems: 'center', backgroundColor: appTheme.colors.surface, borderRadius: 12, height: 54, justifyContent: 'center', overflow: 'hidden', width: 66 },
   imagePreviewPhoto: { height: '100%', width: '100%' },
-  imageTitle: { color: '#101c2d', fontSize: 15, fontWeight: '800' },
+  imageTitle: { color: appTheme.colors.text, fontSize: 15, fontWeight: '800' },
   infoButton: { alignItems: 'center', height: 26, justifyContent: 'center', width: 26 },
   input: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     flex: 1,
     fontSize: 16,
     minHeight: 54,
@@ -554,10 +559,9 @@ const styles = StyleSheet.create({
   },
   inputShell: {
     alignItems: 'center',
-    backgroundColor: '#f7f8fa',
-    borderColor: '#d9dde3',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 15,
-    borderWidth: 1,
+    borderWidth: 0,
     flexDirection: 'row',
     gap: 11,
     minHeight: 56,
@@ -579,8 +583,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   option: { alignItems: 'center', borderBottomColor: '#eceef1', borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 50, paddingHorizontal: 15 },
-  optionMenu: { backgroundColor: '#fff', borderColor: '#d9dde3', borderRadius: 15, borderWidth: 1, marginTop: 8, overflow: 'hidden' },
-  optionText: { color: '#101c2d', fontSize: 15, fontWeight: '700' },
+  optionMenu: { backgroundColor: appTheme.colors.surface, borderRadius: 15, borderWidth: 0, marginTop: 8, overflow: 'hidden' },
+  optionText: { color: appTheme.colors.text, fontSize: 15, fontWeight: '700' },
   placeholder: { color: '#98a0ab' },
   required: {
     color: '#bd2d2d',
@@ -590,23 +594,27 @@ const styles = StyleSheet.create({
     marginBottom: 17,
   },
   saveButton: {
+    backgroundColor: appTheme.colors.surface,
+    borderWidth: 0,
     flexBasis: 'auto',
     flexGrow: 0,
     height: 66,
     marginTop: 12,
+    transform: [{ translateY: -3 }],
     width: '100%',
+    ...goldButtonShadow,
   },
-  select: { alignItems: 'center', backgroundColor: '#f7f8fa', borderColor: '#d9dde3', borderRadius: 15, borderWidth: 1, flexDirection: 'row', gap: 11, minHeight: 56, paddingHorizontal: 15 },
-  selectText: { color: '#101c2d', flex: 1, fontSize: 16 },
+  select: { alignItems: 'center', backgroundColor: appTheme.colors.surfaceMuted, borderRadius: 15, borderWidth: 0, flexDirection: 'row', gap: 11, minHeight: 56, paddingHorizontal: 15 },
+  selectText: { color: appTheme.colors.text, flex: 1, fontSize: 16 },
   sheet: {
-    backgroundColor: '#fff',
+    backgroundColor: appTheme.colors.surfaceElevated,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     maxHeight: '88%',
     overflow: 'hidden',
   },
   subtitle: {
-    color: '#667080',
+    color: appTheme.colors.textMuted,
     fontSize: 15,
     lineHeight: 22,
     marginTop: 6,
@@ -628,7 +636,7 @@ const styles = StyleSheet.create({
   taxInfo: { backgroundColor: '#e8f0ff', borderRadius: 10, color: '#274b89', fontSize: 13, lineHeight: 18, marginBottom: 7, padding: 10 },
   taxOptions: { marginTop: 20 },
   title: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 27,
     fontWeight: '900',
     letterSpacing: -0.7,

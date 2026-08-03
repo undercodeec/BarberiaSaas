@@ -14,6 +14,7 @@ const NAVY = '#101C2D';
 interface NavaButtonProps {
   readonly compact?: boolean;
   readonly disabled?: boolean;
+  readonly foregroundColor?: string;
   readonly icon: ComponentProps<typeof Ionicons>['name'];
   readonly label: string;
   readonly loading?: boolean;
@@ -25,6 +26,7 @@ interface NavaButtonProps {
 export function NavaButton({
   compact = false,
   disabled = false,
+  foregroundColor,
   icon,
   label,
   loading = false,
@@ -33,7 +35,8 @@ export function NavaButton({
   variant,
 }: NavaButtonProps) {
   const isDisabled = disabled || loading;
-  const foreground = variant === 'primary' ? '#FFFFFF' : NAVY;
+  const foreground =
+    foregroundColor ?? (variant === 'primary' ? '#FFFFFF' : NAVY);
 
   return (
     <Pressable

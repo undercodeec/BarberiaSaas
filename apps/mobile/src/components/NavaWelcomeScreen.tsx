@@ -10,6 +10,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from './BottomNavigation';
 import { NavaButton } from './NavaButton';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -41,7 +46,7 @@ export function NavaWelcomeScreen({
           <View style={[styles.poleStripe, styles.poleStripeThree]} />
         </View>
         <Ionicons
-          color="rgba(16, 28, 45, 0.035)"
+          color={appTheme.colors.accentGhost}
           name="cut-outline"
           size={340}
           style={styles.backgroundScissors}
@@ -74,7 +79,11 @@ export function NavaWelcomeScreen({
 
             <View accessibilityElementsHidden style={styles.separator}>
               <View style={styles.separatorLine} />
-              <Ionicons color="#000000" name="cut-outline" size={30} />
+              <Ionicons
+                color={appTheme.colors.accentDark}
+                name="cut-outline"
+                size={30}
+              />
               <View style={styles.separatorLine} />
             </View>
           </View>
@@ -85,25 +94,29 @@ export function NavaWelcomeScreen({
         >
           <NavaButton
             compact={width < 430}
+            foregroundColor={appTheme.colors.accentDark}
             icon="person-outline"
             label="Crear cuenta"
             onPress={onRegister}
             style={[
               styles.actionButton,
+              styles.raisedAction,
               stackActions ? styles.actionButtonStacked : null,
             ]}
             variant="outline"
           />
           <NavaButton
             compact={width < 430}
+            foregroundColor={appTheme.colors.accentDark}
             icon="log-in-outline"
             label="Iniciar sesión"
             onPress={onLogin}
             style={[
               styles.actionButton,
+              styles.raisedAction,
               stackActions ? styles.actionButtonStacked : null,
             ]}
-            variant="primary"
+            variant="outline"
           />
         </View>
       </ScrollView>
@@ -135,7 +148,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   backgroundCurve: {
-    backgroundColor: 'rgba(231, 236, 240, 0.34)',
+    backgroundColor: appTheme.colors.accentWash,
     borderRadius: 500,
     bottom: -330,
     height: 540,
@@ -151,7 +164,7 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '23deg' }],
   },
   barberPole: {
-    backgroundColor: 'rgba(16, 28, 45, 0.018)',
+    backgroundColor: appTheme.colors.accentSubtle,
     borderRadius: 80,
     height: 390,
     overflow: 'hidden',
@@ -176,7 +189,7 @@ const styles = StyleSheet.create({
     paddingTop: 32,
   },
   description: {
-    color: '#667080',
+    color: appTheme.colors.textMuted,
     fontSize: 18,
     lineHeight: 27,
     marginTop: 16,
@@ -205,7 +218,7 @@ const styles = StyleSheet.create({
     marginTop: 48,
   },
   poleStripe: {
-    backgroundColor: 'rgba(0, 0, 0, 0.12)',
+    backgroundColor: appTheme.colors.accentGhost,
     height: 48,
     left: -25,
     position: 'absolute',
@@ -221,10 +234,13 @@ const styles = StyleSheet.create({
   poleStripeTwo: {
     top: 156,
   },
-  screen: {
-    backgroundColor: '#fcfcfb',
-    flex: 1,
+  raisedAction: {
+    backgroundColor: appTheme.colors.surface,
+    borderWidth: 0,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
+  screen: appStyles.screen,
   separator: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -232,12 +248,12 @@ const styles = StyleSheet.create({
     marginTop: 34,
   },
   separatorLine: {
-    backgroundColor: '#d9dedf',
+    backgroundColor: appTheme.colors.border,
     height: 1,
     width: 74,
   },
   title: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 30,
     fontWeight: '900',
     letterSpacing: -0.8,
