@@ -103,6 +103,13 @@ const settingsSections: readonly SettingsSection[] = [
         title: 'Gesti\u00f3n de servicios',
       },
       {
+        description: 'Controla productos, existencias y alertas de stock.',
+        icon: 'cube-outline',
+        id: 'inventory',
+        route: '/inventory',
+        title: 'Inventario',
+      },
+      {
         description: '\u00a1Tu negocio est\u00e1 en buenas manos!',
         icon: 'sparkles-outline',
         id: 'subscription',
@@ -199,7 +206,11 @@ export default function BusinessSettingsScreen() {
               pressed && styles.pressed,
             ]}
           >
-            <Ionicons color={appTheme.colors.accentDark} name="arrow-back" size={25} />
+            <Ionicons
+              color={appTheme.colors.accentDark}
+              name="arrow-back"
+              size={25}
+            />
           </Pressable>
           <Text accessibilityRole="header" style={styles.headerTitle}>
             {isSolo ? 'Mi actividad' : 'Ajustes'}
@@ -270,7 +281,11 @@ function SettingsNavigationCard({
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
       <View style={styles.iconContainer}>
-        <Ionicons color={appTheme.colors.accentDark} name={item.icon} size={27} />
+        <Ionicons
+          color={appTheme.colors.accentDark}
+          name={item.icon}
+          size={27}
+        />
       </View>
       <View style={styles.cardCopy}>
         <Text style={styles.cardTitle}>{item.title}</Text>
@@ -283,7 +298,11 @@ function SettingsNavigationCard({
         </Text>
       </View>
       <View style={styles.chevron}>
-        <Ionicons color={appTheme.colors.accentDark} name="chevron-forward" size={24} />
+        <Ionicons
+          color={appTheme.colors.accentDark}
+          name="chevron-forward"
+          size={24}
+        />
       </View>
     </Pressable>
   );

@@ -42,6 +42,7 @@ import { registerBusinessScheduleRoutes } from './business-schedule';
 import { registerCashRegisterRoutes } from './cash-register';
 import { registerCommissionRoutes } from './commissions';
 import { registerClientRoutes } from './clients';
+import { registerInventoryRoutes } from './inventory';
 import { registerOperationsRoutes } from './operations';
 import { registerNotificationRoutes } from './notifications';
 import type {
@@ -57,6 +58,7 @@ import {
 } from './public-booking';
 import type {
   InvitationMailer,
+  PlatformAccessMailer,
   RecoveryMailer,
   VerificationMailer,
 } from './recovery-mailer';
@@ -67,6 +69,7 @@ import {
   hashPassword,
   verifyPassword,
 } from './security';
+import { ensureOrganizationSubscription } from './subscription-policy';
 
 const SESSION_IDLE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const SESSION_MAX_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -343,6 +346,7 @@ interface BuildApiOptions {
   readonly config: ApiConfig;
   readonly database?: DatabaseClient;
   readonly invitationMailer?: InvitationMailer | null;
+  readonly platformAccessMailer?: PlatformAccessMailer | null;
   readonly publicBookingMailer?: PublicBookingMailer | null;
   readonly recoveryMailer?: RecoveryMailer | null;
   readonly verificationMailer?: VerificationMailer | null;
@@ -728,6 +732,7 @@ export async function buildApi({
   config,
   database = createDatabaseClient({ connectionString: config.DATABASE_URL }),
   invitationMailer = null,
+  platformAccessMailer = null,
   publicBookingMailer = null,
   recoveryMailer = null,
   verificationMailer = null,
@@ -1998,6 +2003,7 @@ export async function buildApi({
             organizationId: organization.id,
           },
         });
+        await ensureOrganizationSubscription(transaction, organization.id);
         return { locationId: location.id, organizationId: organization.id };
       });
       return reply.code(201).send(result);
@@ -2043,6 +2049,7 @@ export async function buildApi({
     authenticate,
     invitationMailer,
     config,
+    platformAccessMailer,
   );
   registerAgendaRoutes(app, database, authenticate);
   registerPublicBookingRoutes(
@@ -2057,6 +2064,7 @@ export async function buildApi({
   registerNotificationRoutes(app, database, authenticate);
   registerBusinessScheduleRoutes(app, database, authenticate);
   registerClientRoutes(app, database, authenticate);
+  registerInventoryRoutes(app, database, authenticate);
   registerCashRegisterRoutes(app, database, authenticate);
   registerCommissionRoutes(app, database, authenticate);
   registerProfileRoutes(app, database, authenticate);

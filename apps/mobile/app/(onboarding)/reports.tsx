@@ -28,7 +28,7 @@ type ReportMenuItem = {
   readonly description: string;
   readonly icon: IconName;
   readonly id: string;
-  readonly movementKind?: 'expenses' | 'sales';
+  readonly movementKind?: 'deposits' | 'expenses' | 'sales';
   readonly planning?: string;
   readonly route?: string;
   readonly status: 'available' | 'planned';
@@ -44,6 +44,15 @@ const reportSections: readonly ReportSection[] = [
     id: 'business-summary',
     title: 'Resumen de negocio',
     items: [
+      {
+        id: 'daily-control',
+        title: 'Control diario',
+        description:
+          'Citas, cobros, ventas por profesional, productos y cierres de Caja.',
+        icon: 'today-outline',
+        route: '/daily-report',
+        status: 'available',
+      },
       {
         id: 'business-overview',
         title: 'Resumen del negocio',
@@ -82,9 +91,8 @@ const reportSections: readonly ReportSection[] = [
         title: 'Historial de dep\u00f3sitos',
         description: 'Entradas de dinero que no corresponden a una venta.',
         icon: 'trending-up-outline',
-        planning:
-          'Requiere crear el movimiento DEPOSIT/OTHER_INCOME antes de mostrar datos reales.',
-        status: 'planned',
+        movementKind: 'deposits',
+        status: 'available',
       },
       {
         id: 'pay-collaborators',
@@ -108,9 +116,8 @@ const reportSections: readonly ReportSection[] = [
         title: 'Alerta de inventario',
         description: 'Descubre los productos que est\u00e1n agotados.',
         icon: 'shield-outline',
-        planning:
-          'Depende de Inventario: productos, existencias por sucursal y umbral mínimo.',
-        status: 'planned',
+        route: '/inventory?filter=low-stock',
+        status: 'available',
       },
     ],
   },
@@ -158,7 +165,7 @@ export default function ReportsScreen() {
   const { session } = useAuth();
   const router = useRouter();
   const [movementReport, setMovementReport] = useState<
-    'expenses' | 'sales' | null
+    'deposits' | 'expenses' | 'sales' | null
   >(null);
   const isOpening = useRef(false);
   const openReport = useCallback(
@@ -283,7 +290,7 @@ function MovementReportView({
   kind,
   onBack,
 }: {
-  readonly kind: 'expenses' | 'sales';
+  readonly kind: 'deposits' | 'expenses' | 'sales';
   readonly onBack: () => void;
 }) {
   const [preset, setPreset] = useState<MovementPreset>('this_month');
@@ -310,7 +317,11 @@ function MovementReportView({
   });
   const report = reportQuery.data;
   const title =
-    kind === 'expenses' ? 'Historial de gastos' : 'Historial de ventas';
+    kind === 'expenses'
+      ? 'Historial de gastos'
+      : kind === 'sales'
+        ? 'Historial de ventas'
+        : 'Historial de depósitos';
   const exportCsv = async () => {
     try {
       const search = new URLSearchParams(queryString);
@@ -432,8 +443,20 @@ function MovementReportView({
                     {new Date(row.createdAt).toLocaleString('es-EC')} ·{' '}
                     {row.locationName}
                   </Text>
+                  {kind === 'deposits' ? (
+                    <Text style={styles.reportMuted}>
+                      {row.type === 'deposit'
+                        ? 'Depósito manual'
+                        : 'Otro ingreso'}
+                    </Text>
+                  ) : null}
                   <Text style={styles.reportMuted}>
-                    {[row.clientName, row.serviceName, row.professionalName]
+                    {[
+                      row.clientName,
+                      row.serviceName,
+                      row.productName,
+                      row.professionalName,
+                    ]
                       .filter(Boolean)
                       .join(' · ') || row.createdByName}
                   </Text>

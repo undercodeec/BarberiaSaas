@@ -19,6 +19,7 @@ const environmentSchema = z
       .min(1)
       .default('barbersaas://accept-invitation'),
     MOBILE_RESET_URL: z.string().min(1).default('barbersaas://reset-password'),
+    PLATFORM_ADMIN_EMAILS: z.string().default(''),
     PUBLIC_WEB_URL: z.url().default('https://book.nava.app'),
     SMTP_FROM: optionalText,
     SMTP_HOST: optionalText,
@@ -47,6 +48,8 @@ export function readConfig(
 ): ApiConfig {
   return environmentSchema.parse({
     ...environment,
+    PLATFORM_ADMIN_EMAILS:
+      environment.PLATFORM_ADMIN_EMAILS ?? environment.ADMIN_EMAIL,
     SMTP_FROM:
       environment.SMTP_FROM ??
       environment.EMAIL_BUSINESS ??

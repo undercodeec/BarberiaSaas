@@ -4,6 +4,8 @@ import {
   PaymentMethod,
   AppointmentPaymentStatus,
   MembershipStatus,
+  StockDirection,
+  StockMovementType,
   type DatabaseClient,
 } from '@barber-saas/database';
 import { z } from 'zod';
@@ -27,9 +29,11 @@ const createMovementSchema = z.object({
   appointmentId: z.uuid().optional(),
   description: z.string().trim().min(2).max(240),
   paymentMethod: z.enum(['cash', 'card', 'transfer', 'other']).optional(),
+  productId: z.uuid().optional(),
+  productQuantity: z.number().int().min(1).max(10_000).optional(),
   professionalMembershipId: z.uuid().optional(),
   serviceId: z.uuid().optional(),
-  type: z.enum(['sale', 'expense', 'withdrawal']),
+  type: z.enum(['sale', 'deposit', 'other_income', 'expense', 'withdrawal']),
 });
 const closeCashRegisterSchema = z.object({
   closingAmountCents: z.number().int().min(0).max(100_000_000),
@@ -82,16 +86,28 @@ function totalsFor(
   movements: ReadonlyArray<{
     amountCents: number;
     paymentMethod: PaymentMethod | null;
+    reversedAt: Date | null;
     type: CashMovementType;
   }>,
 ) {
   return movements.reduce(
     (totals, movement) => {
+      if (movement.reversedAt) return totals;
       const isCash = movement.paymentMethod === PaymentMethod.CASH;
-      if (movement.type === CashMovementType.SALE) {
-        totals.sales += movement.amountCents;
+      const isIncome =
+        movement.type === CashMovementType.SALE ||
+        movement.type === CashMovementType.DEPOSIT ||
+        movement.type === CashMovementType.OTHER_INCOME;
+      if (isIncome) {
+        if (movement.type === CashMovementType.SALE)
+          totals.sales += movement.amountCents;
+        if (movement.type === CashMovementType.DEPOSIT)
+          totals.deposits += movement.amountCents;
+        if (movement.type === CashMovementType.OTHER_INCOME)
+          totals.otherIncome += movement.amountCents;
         if (isCash) totals.cash += movement.amountCents;
-        if (isCash) totals.cashSales += movement.amountCents;
+        if (isCash && movement.type === CashMovementType.SALE)
+          totals.cashSales += movement.amountCents;
         if (movement.paymentMethod === PaymentMethod.CARD)
           totals.card += movement.amountCents;
         if (movement.paymentMethod === PaymentMethod.TRANSFER)
@@ -124,8 +140,10 @@ function totalsFor(
       cash: openingAmountCents,
       cashSales: 0,
       commissionSettlements: 0,
+      deposits: 0,
       expenses: 0,
       other: 0,
+      otherIncome: 0,
       professionalAdvances: 0,
       sales: 0,
       transfers: 0,
@@ -141,7 +159,11 @@ function publicMovement(movement: {
   description: string;
   id: string;
   paymentMethod: PaymentMethod | null;
+  productId: string | null;
+  productQuantity: number | null;
   professionalMembershipId: string | null;
+  reversalReason: string | null;
+  reversedAt: Date | null;
   serviceId: string | null;
   type: CashMovementType;
 }) {
@@ -152,7 +174,11 @@ function publicMovement(movement: {
     description: movement.description,
     id: movement.id,
     paymentMethod: movement.paymentMethod?.toLowerCase() ?? null,
+    productId: movement.productId,
+    productQuantity: movement.productQuantity,
     professionalMembershipId: movement.professionalMembershipId,
+    reversalReason: movement.reversalReason,
+    reversedAt: movement.reversedAt?.toISOString() ?? null,
     serviceId: movement.serviceId,
     type: movement.type.toLowerCase(),
   };
@@ -355,6 +381,29 @@ export function registerCashRegisterRoutes(
       );
     const hasCommissionService = Boolean(input.serviceId);
     const hasCommissionProfessional = Boolean(input.professionalMembershipId);
+    const hasProduct = Boolean(input.productId);
+    const hasProductQuantity = input.productQuantity !== undefined;
+    if (hasProduct !== hasProductQuantity)
+      throw new ApiError(
+        400,
+        'PRODUCT_SOURCE_INCOMPLETE',
+        'Selecciona el producto y su cantidad para registrar la venta.',
+      );
+    if (hasProduct && input.type !== 'sale')
+      throw new ApiError(
+        400,
+        'PRODUCT_REQUIRES_SALE',
+        'Solo una venta puede descontar existencias de producto.',
+      );
+    if (
+      hasProduct &&
+      (input.appointmentId || hasCommissionService || hasCommissionProfessional)
+    )
+      throw new ApiError(
+        400,
+        'DUPLICATE_SALE_SOURCE',
+        'Una venta de producto no puede vincularse a una cita o servicio.',
+      );
     if (hasCommissionService !== hasCommissionProfessional)
       throw new ApiError(
         400,
@@ -376,11 +425,14 @@ export function registerCashRegisterRoutes(
         'DUPLICATE_COMMISSION_SOURCE',
         'La cita ya define el servicio y el profesional de la comisiÃ³n.',
       );
-    if (input.type === 'sale' && !input.paymentMethod)
+    if (
+      ['sale', 'deposit', 'other_income'].includes(input.type) &&
+      !input.paymentMethod
+    )
       throw new ApiError(
         400,
         'PAYMENT_METHOD_REQUIRED',
-        'Selecciona el método de pago de la venta.',
+        'Selecciona el método de pago del ingreso.',
       );
     const currentScope = await scope(database, user.id);
     const session = await database.cashRegisterSession.findFirst({
@@ -473,6 +525,88 @@ export function registerCashRegisterRoutes(
         commissionableService = assignment.service;
       }
 
+      let productSale: {
+        costCents: number;
+        id: string;
+        name: string;
+        quantity: number;
+        resultingQuantity: number | null;
+      } | null = null;
+      if (input.productId && input.productQuantity) {
+        if (!currentScope.organizationId || !session.locationId)
+          throw new ApiError(
+            400,
+            'INVENTORY_CONTEXT_REQUIRED',
+            'Configura una organización y sucursal para vender productos.',
+          );
+        await transaction.$queryRaw`
+          WITH lock AS MATERIALIZED (
+            SELECT pg_advisory_xact_lock(hashtext(${`${session.locationId}:${input.productId}`}))
+          )
+          SELECT 1 AS locked FROM lock
+        `;
+        const product = await transaction.product.findFirst({
+          where: {
+            id: input.productId,
+            isActive: true,
+            organizationId: currentScope.organizationId,
+          },
+        });
+        if (!product)
+          throw new ApiError(
+            404,
+            'PRODUCT_NOT_FOUND',
+            'El producto no existe o está inactivo.',
+          );
+        const expectedAmount = product.salePriceCents * input.productQuantity;
+        if (input.amountCents !== expectedAmount)
+          throw new ApiError(
+            400,
+            'PRODUCT_TOTAL_MISMATCH',
+            'El cobro debe coincidir con el precio y cantidad del producto.',
+          );
+        let resultingQuantity: number | null = null;
+        if (product.stockTrackingEnabled) {
+          const inventory = await transaction.locationInventory.upsert({
+            create: {
+              locationId: session.locationId,
+              productId: product.id,
+              quantityOnHand: 0,
+            },
+            update: {},
+            where: {
+              locationId_productId: {
+                locationId: session.locationId,
+                productId: product.id,
+              },
+            },
+          });
+          if (inventory.quantityOnHand < input.productQuantity)
+            throw new ApiError(
+              409,
+              'INSUFFICIENT_STOCK',
+              `Solo quedan ${inventory.quantityOnHand} unidades disponibles.`,
+            );
+          resultingQuantity = inventory.quantityOnHand - input.productQuantity;
+          await transaction.locationInventory.update({
+            data: { quantityOnHand: resultingQuantity },
+            where: {
+              locationId_productId: {
+                locationId: session.locationId,
+                productId: product.id,
+              },
+            },
+          });
+        }
+        productSale = {
+          costCents: product.costCents,
+          id: product.id,
+          name: product.name,
+          quantity: input.productQuantity,
+          resultingQuantity,
+        };
+      }
+
       const created = await transaction.cashMovement.create({
         data: {
           amountCents: input.amountCents,
@@ -483,11 +617,35 @@ export function registerCashRegisterRoutes(
           paymentMethod: input.paymentMethod
             ? (input.paymentMethod.toUpperCase() as PaymentMethod)
             : null,
+          productId: productSale?.id ?? null,
+          productQuantity: productSale?.quantity ?? null,
           professionalMembershipId: input.professionalMembershipId ?? null,
           serviceId: input.serviceId ?? null,
           type: input.type.toUpperCase() as CashMovementType,
         },
       });
+      if (
+        productSale &&
+        productSale.resultingQuantity !== null &&
+        currentScope.organizationId &&
+        session.locationId
+      ) {
+        await transaction.stockMovement.create({
+          data: {
+            cashMovementId: created.id,
+            createdByUserId: user.id,
+            direction: StockDirection.OUT,
+            locationId: session.locationId,
+            notes: `Venta: ${productSale.name}`,
+            organizationId: currentScope.organizationId,
+            productId: productSale.id,
+            quantity: productSale.quantity,
+            resultingQuantity: productSale.resultingQuantity,
+            type: StockMovementType.SALE,
+            unitCostCents: productSale.costCents,
+          },
+        });
+      }
       if (input.appointmentId) {
         await reconcileAppointmentCommissions(transaction, input.appointmentId);
       } else if (
@@ -527,6 +685,8 @@ export function registerCashRegisterRoutes(
         appointmentId: movement.appointmentId,
         cashRegisterSessionId: session.id,
         paymentMethod: movement.paymentMethod,
+        productId: movement.productId,
+        productQuantity: movement.productQuantity,
         professionalMembershipId: movement.professionalMembershipId,
         serviceId: movement.serviceId,
         type: movement.type,

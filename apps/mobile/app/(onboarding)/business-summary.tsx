@@ -14,7 +14,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { appStyles, appTheme, goldButtonShadow } from '../../src/components/BottomNavigation';
+import {
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 import { InlineMessage } from '../../src/components/InlineMessage';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -87,7 +90,11 @@ export default function BusinessSummaryScreen() {
           }
           style={styles.headerButton}
         >
-          <Ionicons color={appTheme.colors.accentDark} name="arrow-back" size={25} />
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="arrow-back"
+            size={25}
+          />
         </Pressable>
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={styles.title}>
@@ -101,7 +108,11 @@ export default function BusinessSummaryScreen() {
           onPress={() => setIsFilterOpen(true)}
           style={styles.headerButton}
         >
-          <Ionicons color={appTheme.colors.accentDark} name="options-outline" size={25} />
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="options-outline"
+            size={25}
+          />
         </Pressable>
       </View>
 
@@ -111,7 +122,10 @@ export default function BusinessSummaryScreen() {
       >
         {summaryQuery.isLoading ? (
           <View style={styles.loadingCard}>
-            <ActivityIndicator color={appTheme.colors.accentDark} size="large" />
+            <ActivityIndicator
+              color={appTheme.colors.accentDark}
+              size="large"
+            />
             <Text style={styles.muted}>Preparando tu resumen…</Text>
           </View>
         ) : null}
@@ -147,7 +161,7 @@ export default function BusinessSummaryScreen() {
                 {money(report.netResultCents, currency)}
               </Text>
               <Text style={styles.resultCaption}>
-                Ventas menos gastos y pagos a colaboradores ·{' '}
+                Ingresos menos gastos y pagos a colaboradores ·{' '}
                 {report.period.locationName}
               </Text>
             </View>
@@ -167,6 +181,12 @@ export default function BusinessSummaryScreen() {
                   icon="arrow-up-outline"
                   label="Ventas cobradas"
                   value={money(report.income.salesCents, currency)}
+                />
+                <MetricTile
+                  color="#e7f7ee"
+                  icon="add-circle-outline"
+                  label="Otros ingresos"
+                  value={money(report.income.otherIncomeCents, currency)}
                 />
                 <MetricTile
                   color="#fdecec"
@@ -192,8 +212,8 @@ export default function BusinessSummaryScreen() {
               </View>
               <Text style={styles.footnote}>
                 Los retiros mueven efectivo, pero no se consideran un gasto del
-                negocio. Otros ingresos tendrán una categoría propia cuando se
-                habiliten depósitos manuales.
+                negocio. Los depósitos manuales y otros ingresos se muestran
+                separados de las ventas cobradas.
               </Text>
             </ReportCard>
 
@@ -213,7 +233,6 @@ export default function BusinessSummaryScreen() {
               <ProgressMetric
                 color="#61cadc"
                 label="Productos"
-                note="Inventario pendiente"
                 percent={percentage(
                   report.sales.productsCents,
                   report.sales.grossCents,
@@ -527,7 +546,11 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  applyLabel: { color: appTheme.colors.accentDark, fontSize: 15, fontWeight: '900' },
+  applyLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 15,
+    fontWeight: '900',
+  },
   card: {
     backgroundColor: appTheme.colors.surface,
     borderRadius: 24,

@@ -120,11 +120,17 @@ export interface CashMovementRecord {
   readonly description: string;
   readonly id: string;
   readonly paymentMethod: 'card' | 'cash' | 'other' | 'transfer' | null;
+  readonly productId: string | null;
+  readonly productQuantity: number | null;
   readonly professionalMembershipId: string | null;
+  readonly reversalReason: string | null;
+  readonly reversedAt: string | null;
   readonly serviceId: string | null;
   readonly type:
     | 'commission_settlement'
+    | 'deposit'
     | 'expense'
+    | 'other_income'
     | 'professional_advance'
     | 'professional_advance_reversal'
     | 'sale'
@@ -137,9 +143,11 @@ export interface CashRegisterTotals {
   readonly cash: number;
   readonly cashSales: number;
   readonly commissionSettlements: number;
+  readonly deposits: number;
   readonly expectedCash: number;
   readonly expenses: number;
   readonly other: number;
+  readonly otherIncome: number;
   readonly professionalAdvances: number;
   readonly sales: number;
   readonly transfers: number;
@@ -228,6 +236,120 @@ export interface CashRegisterDetailResponse {
   readonly totals: CashRegisterTotals;
 }
 
+export interface InventoryProduct {
+  readonly barcode: string | null;
+  readonly costCents: number;
+  readonly createdAt: string;
+  readonly currencyCode: string;
+  readonly id: string;
+  readonly isActive: boolean;
+  readonly isLowStock: boolean;
+  readonly minimumStock: number;
+  readonly name: string;
+  readonly quantityOnHand: number;
+  readonly salePriceCents: number;
+  readonly sku: string | null;
+  readonly stockTrackingEnabled: boolean;
+  readonly updatedAt: string;
+}
+
+export interface InventoryResponse {
+  readonly accessibleLocations: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+  }>;
+  readonly currencyCode: string;
+  readonly locationId: string;
+  readonly products: readonly InventoryProduct[];
+  readonly summary: {
+    readonly activeProducts: number;
+    readonly inventoryCostCents: number;
+    readonly lowStockProducts: number;
+    readonly totalUnits: number;
+  };
+}
+
+export interface StockMovementRecord {
+  readonly cashMovementId: string | null;
+  readonly cashMovementReversedAt: string | null;
+  readonly createdAt: string;
+  readonly direction: 'in' | 'out';
+  readonly id: string;
+  readonly notes: string | null;
+  readonly productId: string;
+  readonly productName: string;
+  readonly quantity: number;
+  readonly resultingQuantity: number;
+  readonly type:
+    'adjustment' | 'loss' | 'opening' | 'purchase' | 'return' | 'sale';
+  readonly unitCostCents: number | null;
+}
+
+export interface StockMovementHistoryResponse {
+  readonly pagination: {
+    readonly page: number;
+    readonly pageSize: number;
+    readonly total: number;
+    readonly totalPages: number;
+  };
+  readonly rows: readonly StockMovementRecord[];
+}
+
+export interface DailyReportResponse {
+  readonly accessibleLocations: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+  }>;
+  readonly appointments: {
+    readonly attended: number;
+    readonly cancelled: number;
+    readonly noShow: number;
+    readonly paid: number;
+    readonly paidScheduledValueCents: number;
+    readonly total: number;
+  };
+  readonly cashClosures: {
+    readonly closingAmountCents: number;
+    readonly count: number;
+    readonly differenceCents: number;
+    readonly expectedAmountCents: number;
+  };
+  readonly collections: {
+    readonly cardCents: number;
+    readonly cashCents: number;
+    readonly otherCents: number;
+    readonly totalCents: number;
+    readonly transferCents: number;
+  };
+  readonly currencyCode: string;
+  readonly period: {
+    readonly from: string;
+    readonly locationId: string | null;
+    readonly locationName: string;
+    readonly preset: 'last_7_days' | 'last_30_days' | 'this_month' | 'today';
+    readonly to: string;
+  };
+  readonly products: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+    readonly quantity: number;
+    readonly revenueCents: number;
+  }>;
+  readonly professionals: ReadonlyArray<{
+    readonly commissionCents: number;
+    readonly completedAppointments: number;
+    readonly id: string;
+    readonly name: string;
+    readonly saleCount: number;
+    readonly salesCents: number;
+  }>;
+  readonly sales: {
+    readonly averageTicketCents: number;
+    readonly grossCents: number;
+    readonly transactionCount: number;
+  };
+}
+
 export interface BusinessSummaryResponse {
   readonly accessibleLocations: ReadonlyArray<{
     readonly id: string;
@@ -294,8 +416,10 @@ export interface MovementReportResponse {
     readonly locationId: string | null;
     readonly locationName: string;
     readonly paymentMethod: 'card' | 'cash' | 'other' | 'transfer' | null;
+    readonly productName: string | null;
     readonly professionalName: string | null;
     readonly serviceName: string | null;
+    readonly type: 'deposit' | 'expense' | 'other_income' | 'sale';
   }>;
   readonly totalAmountCents: number;
 }
@@ -390,10 +514,21 @@ export interface ServicesResponse {
   readonly services: readonly ServiceRecord[];
 }
 
+export interface SubscriptionFeatureFlags {
+  readonly commissions: boolean;
+  readonly inventory: boolean;
+  readonly multiLocation: boolean;
+  readonly publicBooking: boolean;
+  readonly reports: boolean;
+  readonly team: boolean;
+  readonly wallet: boolean;
+}
+
 export interface SubscriptionPlanRecord {
   readonly available: boolean;
   readonly code: 'essential' | 'multi';
   readonly currencyCode: string;
+  readonly featureFlags: SubscriptionFeatureFlags;
   readonly features: readonly string[];
   readonly limits: {
     readonly locations: number;
@@ -405,10 +540,13 @@ export interface SubscriptionPlanRecord {
 
 export interface SubscriptionResponse {
   readonly current: {
+    readonly canManage: boolean;
     readonly currentPeriodEnd: string;
+    readonly featureFlags: SubscriptionFeatureFlags;
     readonly graceEndsAt: string | null;
     readonly planCode: 'essential' | 'multi';
     readonly readOnly: boolean;
+    readonly simulationAvailable: boolean;
     readonly status:
       'active' | 'cancelled' | 'past_due' | 'suspended' | 'trial';
     readonly trialEndsAt: string | null;

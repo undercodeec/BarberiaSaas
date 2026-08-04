@@ -24,11 +24,11 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Fase 5 — Clientes e historial
 - [ ] Fase 6 — Caja y POS básico _(implementada técnicamente; validación manual en dispositivo físico diferida al cierre integral del MVP)_
 - [x] Fase 7 — Comisiones
-- [ ] Fase 8 — Inventario básico
+- [x] Fase 8 — Inventario básico
 - [x] Fase 9 — Notificaciones
-- [ ] Fase 10 — Reportes esenciales
-- [ ] Fase 11 — Planes y límites
-- [ ] Fase 12 — Panel interno del SaaS
+- [x] Fase 10 — Reportes esenciales
+- [x] Fase 11 — Planes y límites
+- [x] Fase 12 — Panel interno del SaaS
 - [ ] Fase 13 — Estabilización del MVP
 
 ## Fase 0 — Inicialización del repositorio
@@ -241,7 +241,8 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 
 ### Fase 6 — Caja y POS básico
 
-- [x] Apertura, ventas, pagos, gastos, retiros, cierre y auditoría.
+- [x] Apertura, ventas, depósitos, otros ingresos, pagos, gastos, retiros,
+      cierre y auditoría.
 
 ### Fase 7 — Comisiones
 
@@ -262,7 +263,7 @@ Decisión de alcance para el MVP:
 
 ### Fase 8 — Inventario básico
 
-- [ ] Productos, stock por sucursal, movimientos, ajustes y alertas.
+- [x] Productos, stock por sucursal, movimientos, ajustes y alertas.
 
 ### Fase 9 — Notificaciones
 
@@ -270,15 +271,17 @@ Decisión de alcance para el MVP:
 
 ### Fase 10 — Reportes esenciales
 
-- [ ] Reportes diarios, filtros, permisos, zona horaria y CSV.
+- [x] Reportes diarios, filtros, permisos, zona horaria y CSV.
 
 ### Fase 11 — Planes y límites
 
-- [ ] Trial, planes, límites backend, feature flags y suspensión simulada.
+- [x] Trial, planes, límites backend, feature flags y suspensión simulada.
 
 ### Fase 12 — Panel interno del SaaS
 
 - [ ] Operación de organizaciones, planes, uso, errores y soporte seguro.
+      Backend implementado y verificado; la sustitución del placeholder de
+      `apps/admin` quedó bloqueada por permisos de escritura del entorno actual.
 
 ### Fase 13 — Estabilización del MVP
 
@@ -1390,23 +1393,23 @@ reales. No debe venderse ni activarse un plan basado en funciones simuladas.
 
 ### Flujo de suscripcion para el MVP
 
-- [ ] Crear la ruta movil `/subscription`.
-- [ ] Mostrar plan actual y estado.
-- [ ] Estados previstos: `trial`, `active`, `past_due`, `suspended`,
+- [x] Crear la ruta movil `/subscription`.
+- [x] Mostrar plan actual y estado.
+- [x] Estados previstos: `trial`, `active`, `past_due`, `suspended`,
       `cancelled`.
-- [ ] Mostrar funciones y consumo frente a limites aplicables.
-- [ ] Mostrar Esencial como plan disponible.
-- [ ] Mostrar Multi como `Proximamente`.
-- [ ] Prueba de 14 dias sin tarjeta.
-- [ ] Periodo de gracia de siete dias.
-- [ ] Despues de la gracia, pasar a modo lectura sin eliminar informacion.
-- [ ] Explicar con precision que accion esta bloqueada y como reactivar.
-- [ ] No bloquear acceso a exportacion/consulta de informacion propia por un
+- [x] Mostrar funciones y consumo frente a limites aplicables.
+- [x] Mostrar Esencial como plan disponible.
+- [x] Mostrar Multi como `Proximamente`.
+- [x] Prueba de 14 dias sin tarjeta.
+- [x] Periodo de gracia de siete dias.
+- [x] Despues de la gracia, pasar a modo lectura sin eliminar informacion.
+- [x] Explicar con precision que accion esta bloqueada y como reactivar.
+- [x] No bloquear acceso a exportacion/consulta de informacion propia por un
       cambio de plan sin una politica comercial y legal revisada.
-- [ ] Durante el MVP la suscripcion sera simulada; no se integrara cobro real.
-- [ ] El metodo de pago de la suscripcion se mostrara `Proximamente` o se
+- [x] Durante el MVP la suscripcion sera simulada; no se integrara cobro real.
+- [x] El metodo de pago de la suscripcion se mostrara `Proximamente` o se
       omitira mientras no exista facturacion del SaaS.
-- [ ] Las definiciones de planes y limites viviran en backend.
+- [x] Las definiciones de planes y limites viviran en backend.
 
 ### Fuera de alcance comercial
 
@@ -3082,28 +3085,29 @@ caja, comisiones y registros históricos.
 
 ### Definiciones contables del resumen MVP
 
-| Indicador            | Fuente actual                            | Regla                                                                                                                           |
-| -------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Ventas cobradas      | `CashMovement.SALE`                      | Incluye únicamente cobros registrados en Caja.                                                                                  |
-| Venta de servicios   | Venta vinculada a cita o servicio        | Usa `appointmentId` o `serviceId`; una venta sin ambos queda como venta libre.                                                  |
-| Productos            | Inventario/POS futuro                    | Permanece en cero y se muestra como pendiente; no se simulan datos.                                                             |
-| Gastos operativos    | `CashMovement.EXPENSE`                   | Reduce el resultado neto del período.                                                                                           |
-| Pago a colaboradores | Liquidaciones y anticipos menos reversos | Refleja salida neta de efectivo; conserva la trazabilidad de descuentos posteriores.                                            |
-| Retiros              | `CashMovement.WITHDRAWAL`                | Se informa, pero no reduce el resultado porque mover efectivo no constituye un gasto.                                           |
-| Comisiones           | `CommissionEntry` no revertida           | Muestra comisión generada, no necesariamente pagada en el mismo período.                                                        |
-| Resultado neto       | Ventas − gastos − pagos a colaboradores  | Es un resultado operativo de Caja, no utilidad contable: todavía no incorpora impuestos, costo de inventario ni depreciaciones. |
+| Indicador            | Fuente actual                             | Regla                                                                                                                           |
+| -------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Ventas cobradas      | `CashMovement.SALE`                       | Incluye únicamente cobros registrados en Caja.                                                                                  |
+| Otros ingresos       | `DEPOSIT` y `OTHER_INCOME`                | Incluye depósitos manuales y otros ingresos registrados en Caja; nunca se reutiliza `SALE`.                                     |
+| Venta de servicios   | Venta vinculada a cita o servicio         | Usa `appointmentId` o `serviceId`; una venta sin ambos queda como venta libre.                                                  |
+| Productos            | `CashMovement.SALE` con `productId`       | Las ventas de productos registradas en Caja se separan de servicios y ventas libres; una reversión deja de sumarlas.            |
+| Gastos operativos    | `CashMovement.EXPENSE`                    | Reduce el resultado neto del período.                                                                                           |
+| Pago a colaboradores | Liquidaciones y anticipos menos reversos  | Refleja salida neta de efectivo; conserva la trazabilidad de descuentos posteriores.                                            |
+| Retiros              | `CashMovement.WITHDRAWAL`                 | Se informa, pero no reduce el resultado porque mover efectivo no constituye un gasto.                                           |
+| Comisiones           | `CommissionEntry` no revertida            | Muestra comisión generada, no necesariamente pagada en el mismo período.                                                        |
+| Resultado neto       | Ingresos − gastos − pagos a colaboradores | Es un resultado operativo de Caja, no utilidad contable: todavía no incorpora impuestos, costo de inventario ni depreciaciones. |
 
 ### Plan de las demás opciones de Reportes
 
 | Opción                             | Estado e integración definida                                                                                                                                  |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Historial de caja                  | Disponible mediante la pestaña Historial de Wallet: cierres, efectivo esperado, contado y diferencia.                                                          |
-| Historial de gastos                | Pendiente: listado paginado de movimientos `EXPENSE`, filtros por fecha/sucursal/categoría/responsable y CSV.                                                  |
-| Historial de depósitos             | Pendiente: primero debe existir un tipo auditable `DEPOSIT`/`OTHER_INCOME`; no se reutilizará `SALE`.                                                          |
+| Historial de gastos                | Disponible: listado paginado de movimientos `EXPENSE`, filtros por fecha/sucursal/método y CSV.                                                                |
+| Historial de depósitos             | Disponible: `DEPOSIT` y `OTHER_INCOME` paginados, con filtros por fecha/sucursal/método y CSV; no reutiliza `SALE`.                                            |
 | Pagar a colaboradores              | Disponible mediante Wallet/Comisiones y sus liquidaciones auditables.                                                                                          |
 | Historial de pagos a colaboradores | Disponible inicialmente en Wallet/Comisiones; luego tendrá filtros y exportación propios.                                                                      |
-| Alerta de inventario               | Pendiente de Fase 8: producto, stock por sucursal, movimientos y umbral mínimo.                                                                                |
-| Historial de ventas                | Pendiente: detalle paginado de `SALE` por método, servicio, profesional, cita y cliente.                                                                       |
+| Alerta de inventario               | Disponible: catálogo, stock por sucursal, movimientos auditables, ajustes y filtro por umbral mínimo.                                                          |
+| Historial de ventas                | Disponible: detalle paginado de `SALE` por método, servicio, profesional, cita y cliente.                                                                      |
 | Préstamos a clientes               | Pendiente de definición. No se desarrollará hasta validar una funcionalidad y reglas adecuadas para el MVP; no debe confundirse con anticipos a colaboradores. |
 | Reseñas de clientes                | Disponible mediante Gestión de reseñas.                                                                                                                        |
 
@@ -3161,9 +3165,9 @@ caja, comisiones y registros históricos.
       bloqueos por Caja y colaboradores, anonimización, cancelación del negocio
       e invalidación definitiva del token.
 - [x] Suite móvil: 3 archivos y 5/5 pruebas aprobadas.
-- [ ] Las dos pruebas de liquidación que calculan «hoy» en UTC todavía deben
-      independizarse del cambio de fecha de Ecuador a las 19:00. El fallo de
-      doble reserva concurrente quedó corregido el 3 de agosto de 2026.
+- [x] Las dos pruebas de liquidación calculan «hoy» en `America/Guayaquil` y ya
+      no dependen del cambio de fecha UTC de las 19:00 en Ecuador. La suite
+      completa de API/PostgreSQL aprobó 31/31 pruebas después del ajuste.
 
 ## Cierre de funcionalidades parcialmente implementadas — 3 de agosto de 2026
 
@@ -3193,8 +3197,13 @@ caja, comisiones y registros históricos.
 - [x] Ventas enriquecidas con cliente, servicio y profesional cuando existen.
 - [x] Exportación CSV autenticada con protección por organización y alcance de
       sucursal.
-- [ ] Historial de depósitos continúa dependiendo de introducir el tipo
-      contable `DEPOSIT`/`OTHER_INCOME`; no se reutiliza `SALE`.
+- [x] Tipos contables auditables `DEPOSIT` y `OTHER_INCOME`, separados de
+      `SALE`, disponibles para registro desde Caja.
+- [x] Historial paginado de depósitos y otros ingresos con filtros por período,
+      sucursal y método de pago, además de exportación CSV autenticada.
+- [x] Depósitos y otros ingresos actualizan el efectivo esperado cuando el
+      método es efectivo y alimentan `Otros ingresos` y el resultado neto del
+      resumen del negocio.
 
 ### Notificaciones
 
@@ -3209,7 +3218,8 @@ caja, comisiones y registros históricos.
 
 ### Verificación
 
-- [x] Migraciones verificadas en `postgres-test`: 36 aplicadas, ninguna pendiente.
+- [x] Migraciones verificadas en desarrollo y `postgres-test`: 37 aplicadas,
+      ninguna pendiente.
 - [x] Suite API/PostgreSQL: 28/28 pruebas aprobadas, incluidas concurrencia de
       citas, concurrencia de reversos, autorización, auditoría, reportes y CSV.
 - [x] Typecheck de API, móvil y cliente compartido; ESLint de los archivos
@@ -3218,3 +3228,199 @@ caja, comisiones y registros históricos.
       completada.
 - [ ] Los textos legales definitivos y el dominio público de producción
       requieren una decisión externa antes del despliegue.
+
+## Inventario básico — 3 de agosto de 2026
+
+### Modelo y reglas de stock
+
+- [x] Catálogo de productos por organización con SKU, código de barras, costo,
+      precio de venta, moneda, activación, control de stock y umbral mínimo.
+- [x] Existencias independientes por sucursal y libro inmutable de movimientos
+      `OPENING`, `PURCHASE`, `SALE`, `ADJUSTMENT`, `RETURN` y `LOSS`.
+- [x] Altas, ediciones y ajustes limitados a propietario o administrador, con
+      alcance por sucursal y eventos en `AuditLog`.
+- [x] Ajustes y ventas se serializan mediante bloqueo transaccional PostgreSQL;
+      no se admite inventario negativo ni sobreventa concurrente.
+- [x] Migración `20260803220000_basic_inventory` aplicada en desarrollo y
+      `postgres-test`; existen 38 migraciones y ninguna está pendiente.
+
+### Caja, reportes y aplicación móvil
+
+- [x] Caja permite elegir un producto y cantidad, calcula el importe desde el
+      precio persistido y descuenta stock en la misma transacción que la venta.
+- [x] La reversión conserva la venta original, la marca como revertida, repone
+      las unidades, crea un movimiento `RETURN` y deja auditoría; solo se admite
+      mientras la sesión de Caja siga abierta.
+- [x] El resumen del negocio separa ventas de productos y omite ventas
+      revertidas; el historial de ventas y su CSV incluyen el producto.
+- [x] Nueva pantalla de Inventario con filtros por sucursal y stock bajo,
+      creación y edición de productos, ajustes y consulta del historial.
+- [x] La opción Alerta de inventario en Reportes abre directamente el catálogo
+      filtrado por productos cuyo stock alcanzó o bajó del mínimo.
+
+### Verificación
+
+- [x] Esquema Prisma válido; typecheck de base de datos, cliente compartido,
+      API y móvil, además de ESLint sobre los archivos modificados.
+- [x] Suite API/PostgreSQL: 29/29 pruebas aprobadas, incluida una prueba de dos
+      ventas concurrentes que confirma un solo descuento, bloqueo de sobreventa,
+      alerta de stock bajo, separación en reportes y reposición por reversión.
+- [ ] Las comisiones específicas sobre productos no forman parte de los
+      criterios de aceptación de Fase 8 y permanecen como ampliación de la Fase 7.
+- [ ] Validación visual final en dispositivo físico pendiente del cierre
+      integral del MVP.
+
+## Panel interno del SaaS — 3 de agosto de 2026
+
+### Frontera segura de plataforma
+
+- [x] Nuevas rutas `/v1/platform/*` protegidas por sesión opaca y una allowlist
+      exclusiva del servidor. `PLATFORM_ADMIN_EMAILS` admite varios operadores
+      y `ADMIN_EMAIL` funciona como bootstrap compatible con el entorno actual.
+- [x] Una cuenta autenticada que no está en la allowlist recibe
+      `403 PLATFORM_ADMIN_REQUIRED`; no basta con ser propietario de un negocio.
+- [x] El operador autorizado debe superar una segunda verificación por correo:
+      el OTP de seis dígitos se vincula a la sesión opaca, vence en cinco minutos,
+      se consume una sola vez y no se devuelve nunca por HTTP.
+- [x] Los códigos del panel se almacenan únicamente como hash; cinco intentos
+      erróneos los invalidan y las rutas operativas devuelven
+      `403 PLATFORM_ACCESS_CODE_REQUIRED` hasta confirmar el código.
+- [x] Listado paginado con búsqueda y filtro por estado, plan, fin de trial y
+      contadores de sucursales, equipo, servicios y citas.
+- [x] Métricas de activación para servicio configurado, primera cita y primera
+      atención, además de trials próximos a vencer y fallos de notificación.
+- [x] Consulta de fallos por canal sin exponer cuerpo del mensaje, payload de
+      entrega, contraseñas, tokens ni correo completo del propietario.
+
+### Operación y soporte
+
+- [x] Suspensión, reactivación y cambio de plan ejecutados transaccionalmente
+      por backend, con motivo obligatorio y evento `platform.*` en `AuditLog`.
+- [x] La suspensión activa el mismo modo de solo lectura de Fase 11 y la
+      reactivación restaura las operaciones y un período de 30 días.
+- [x] Diagnóstico de soporte limitado a contadores operativos y contacto
+      enmascarado. Cada acceso exige motivo, queda auditado y no crea una sesión
+      del negocio ni suplanta al propietario.
+- [x] No existe acceso a contraseñas, `service_role`, cliente Prisma ni secretos
+      desde el navegador; todas las capacidades viven detrás de la API.
+
+### Consola administrativa
+
+- [x] El placeholder de `apps/admin` fue reemplazado por una consola responsive
+      con inicio de sesión propio. La sesión opaca se conserva únicamente durante
+      la pestaña del navegador y se valida contra `/v1/platform/session` antes de
+      habilitar el panel.
+- [x] Tras la contraseña, el panel solicita y valida el OTP por correo, muestra
+      su cuenta regresiva de cinco minutos, permite reemplazar un código vencido
+      y revoca la sesión temporal si se cancela el acceso.
+- [x] La consola reutiliza el lenguaje visual de Nava: fondo marfil, texto
+      oscuro, controles redondeados, acciones azul marino, acentos dorados y
+      sombras suaves consistentes con la aplicación móvil.
+- [x] Resumen operativo con distribución de suscripciones, trials próximos a
+      vencer, fallos de notificación y embudo de activación.
+- [x] Directorio paginado de organizaciones con búsqueda, filtro por estado,
+      plan, trial, propietario enmascarado y contadores de uso.
+- [x] Suspensión, reactivación y cambio de plan disponibles desde la consola con
+      motivo obligatorio, confirmación explícita y actualización de los datos.
+- [x] Diagnóstico de soporte sin suplantación, fallos de notificación minimizados
+      y bitácora de auditoría accesibles desde secciones independientes.
+- [x] La interfaz no incorpora controles para contraseñas, tokens, payloads de
+      entrega, acceso directo a Prisma ni secretos de servidor.
+
+### Verificación
+
+- [x] Migración `20260803235900_platform_admin_email_otp` aplicada en desarrollo
+      y `postgres-test`: 40 migraciones, ninguna pendiente.
+- [x] Suite API/PostgreSQL: 31/31 pruebas aprobadas. El caso de plataforma
+      comprueba denegación a usuarios normales, minimización de datos, filtros,
+      errores de notificación, cambio de plan, suspensión, bloqueo de escritura,
+      soporte auditado, reactivación, OTP vencido, rechazo de código incorrecto,
+      uso único y recuperación del acceso tras la verificación.
+- [x] Esquema Prisma válido y typecheck de base de datos, API y aplicación
+      administrativa aprobados.
+- [x] Typecheck y ESLint de la consola aprobados; pruebas unitarias del cliente
+      HTTP 4/4 y build optimizado de Next.js completados.
+
+## Planes y límites — 3 de agosto de 2026
+
+### Trial, capacidades y límites
+
+- [x] Toda organización crea su suscripción `TRIAL` junto con el onboarding;
+      la prueba dura 14 días y la gracia posterior siete días.
+- [x] El ciclo de vida actualiza `TRIAL → PAST_DUE → SUSPENDED` al consultar o
+      intentar una operación, sin depender de que la persona abra la pantalla.
+- [x] Definiciones Esencial y Multi centralizadas en backend con límites,
+      funciones descriptivas y `featureFlags` de máquina persistidos en `Plan`.
+- [x] Esencial limita a una sucursal y Multi queda definido para cinco, pero se
+      mantiene no disponible y visible como **Próximamente**.
+- [x] Nuevo `POST /v1/locations` valida el límite dentro de la transacción; una
+      llamada directa devuelve `409 PLAN_LIMIT_REACHED`, por lo que modificar
+      la interfaz no permite eludir el plan.
+
+### Modo lectura y simulación
+
+- [x] Las suscripciones `SUSPENDED` o `CANCELLED` bloquean mutaciones
+      operativas con `423 SUBSCRIPTION_READ_ONLY` desde una política central.
+- [x] Consultas y exportaciones permanecen disponibles y no se eliminan datos.
+      Cerrar una Caja ya abierta también se permite para conservar integridad.
+- [x] `POST /v1/subscription/simulate`, disponible fuera de producción y solo
+      para el propietario, permite suspender y reactivar con auditoría.
+- [x] La reactivación restaura inmediatamente las operaciones sin recrear ni
+      migrar información del negocio.
+- [x] La pantalla `/subscription` muestra uso frente a límites, capacidades,
+      estado de solo lectura y controles de simulación cuando corresponden.
+- [x] No existe integración de cobro, tarjeta ni reutilización de las
+      credenciales PayPhone del negocio.
+
+### Verificación
+
+- [x] Migración `20260803233000_subscription_feature_flags` aplicada en
+      desarrollo y `postgres-test`: 39 migraciones, ninguna pendiente.
+- [x] Suite API/PostgreSQL: 30/30 pruebas aprobadas; el caso de suscripción
+      comprueba trial automático, límite directo, suspensión, lectura con datos
+      conservados, bloqueo de escritura, auditoría y reactivación.
+- [x] Esquema Prisma válido; typecheck de base de datos, API, cliente compartido
+      y móvil; ESLint de los archivos modificados.
+- [ ] El panel seguro para operadores de plataforma se implementará en Fase 12;
+      la Fase 11 solo expone simulación no productiva al propietario.
+- [ ] Validación visual final en dispositivo físico pendiente del cierre
+      integral del MVP.
+
+## Reportes esenciales — 3 de agosto de 2026
+
+### Control operativo diario
+
+- [x] Nuevo endpoint `GET /v1/reports/daily` con períodos Hoy, últimos 7 días,
+      este mes, últimos 30 días y rangos personalizados de hasta 366 días.
+- [x] El reporte consolida citas del período, atendidas, canceladas, no-show,
+      citas pagadas, ventas cobradas, ticket promedio y cobros por método.
+- [x] Desglose de ventas y comisiones por profesional, productos vendidos con
+      unidades e ingreso, y cierres de Caja con esperado, contado y diferencia.
+- [x] Las ventas revertidas y reservas expiradas o pendientes de verificación
+      no alteran los indicadores operativos.
+- [x] Filtro por sucursal con alcance de propietario o administrador; un
+      profesional recibe `403` y no puede consultar datos globales.
+- [x] Cada sucursal convierte su día local a UTC con su zona horaria antes de
+      consultar; no se consolidan monedas diferentes sin elegir una sucursal.
+- [x] Exportación CSV autenticada con citas, ventas, cobros, profesionales,
+      comisiones, productos y cierres de Caja.
+
+### Aplicación móvil
+
+- [x] Nueva opción **Control diario** en Estadísticas e informes.
+- [x] Pantalla con filtros de período y sucursal, indicadores de citas, ventas,
+      métodos de cobro, profesionales, productos y cierre de Caja.
+- [x] El CSV puede compartirse desde la pantalla mediante el diálogo nativo.
+
+### Verificación
+
+- [x] Suite API/PostgreSQL: 30/30 pruebas aprobadas.
+- [x] Prueba específica con corte `America/Guayaquil`: un registro de las
+      04:30 UTC queda fuera del 3 de agosto local, mientras los registros desde
+      las 05:00 UTC se agregan correctamente.
+- [x] La misma prueba valida totales, venta revertida, método de pago,
+      profesional, comisión, producto, cierre de Caja, CSV y denegación al
+      profesional.
+- [x] Typecheck y ESLint de API, cliente compartido y aplicación móvil.
+- [ ] Validación visual final en dispositivo físico pendiente del cierre
+      integral del MVP.

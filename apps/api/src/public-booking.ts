@@ -32,6 +32,7 @@ import {
   createVerificationCode,
   hashOpaqueToken,
 } from './security';
+import { organizationSubscriptionIsReadOnly } from './subscription-policy';
 
 const PUBLIC_VERIFICATION_DURATION_MS = 10 * 60 * 1000;
 const MANAGEMENT_AFTER_END_MS = 30 * 24 * 60 * 60 * 1000;
@@ -808,6 +809,17 @@ export function registerPublicBookingRoutes(
             existing.status === AppointmentStatus.PENDING_VERIFICATION,
         };
       }
+      if (
+        await organizationSubscriptionIsReadOnly(
+          database,
+          location.organizationId,
+        )
+      )
+        throw new ApiError(
+          423,
+          'PUBLIC_BOOKING_UNAVAILABLE',
+          'Este negocio no está aceptando nuevas reservas por el momento.',
+        );
       const context = await loadBookingContext(
         database,
         location.organizationId,
@@ -1147,6 +1159,17 @@ export function registerPublicBookingRoutes(
     const input = rescheduleAppointmentSchema.parse(request.body);
     const access = await requireManagedAppointment(database, token);
     assertActivePublicAppointment(access.appointment.status);
+    if (
+      await organizationSubscriptionIsReadOnly(
+        database,
+        access.appointment.organizationId,
+      )
+    )
+      throw new ApiError(
+        423,
+        'PUBLIC_BOOKING_UNAVAILABLE',
+        'Este negocio no está aceptando reprogramaciones por el momento.',
+      );
     const cutoff = new Date(
       access.appointment.startsAt.getTime() -
         access.appointment.organization.bookingRescheduleLeadMinutes * 60_000,

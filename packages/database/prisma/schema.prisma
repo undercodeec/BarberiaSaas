@@ -79,6 +79,8 @@ enum CashRegisterStatus {
 
 enum CashMovementType {
   SALE
+  DEPOSIT
+  OTHER_INCOME
   EXPENSE
   WITHDRAWAL
   PROFESSIONAL_ADVANCE
@@ -125,6 +127,20 @@ enum SettlementAdvanceStatus {
   RELEASED
 }
 
+enum StockMovementType {
+  OPENING
+  PURCHASE
+  SALE
+  ADJUSTMENT
+  RETURN
+  LOSS
+}
+
+enum StockDirection {
+  IN
+  OUT
+}
+
 enum AppointmentEventType {
   CREATED
   RESCHEDULED
@@ -163,6 +179,7 @@ model User {
   createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
   sessions                Session[]
+  platformAccessChallenges PlatformAdminAccessChallenge[]
   passwordResetTokens     PasswordResetToken[]
   emailVerificationCodes  EmailVerificationCode[]
   memberships             Membership[]
@@ -321,10 +338,29 @@ model Session {
   revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(3)
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platformAccessChallenges PlatformAdminAccessChallenge[]
 
   @@index([userId, expiresAt])
   @@index([lastActiveAt])
   @@map("sessions")
+}
+
+model PlatformAdminAccessChallenge {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  sessionId      String   @map("session_id") @db.Uuid
+  codeHash       String   @map("code_hash") @db.Char(64)
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(3)
+  usedAt         DateTime? @map("used_at") @db.Timestamptz(3)
+  verifiedAt     DateTime? @map("verified_at") @db.Timestamptz(3)
+  failedAttempts Int      @default(0) @map("failed_attempts")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session        Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, verifiedAt])
+  @@index([userId, expiresAt])
+  @@map("platform_admin_access_challenges")
 }
 
 model PasswordResetToken {
@@ -374,6 +410,8 @@ model Organization {
   clientNotes                        ClientNote[]
   appNotifications                   AppNotification[]
   subscription                       Subscription?
+  products                           Product[]
+  stockMovements                     StockMovement[]
 
   @@map("organizations")
 }
@@ -386,6 +424,7 @@ model Plan {
   currencyCode      String         @default("USD") @map("currency_code") @db.Char(3)
   limits            Json           @default("{}")
   features          Json           @default("[]")
+  featureFlags      Json           @default("{}") @map("feature_flags")
   isActive          Boolean        @default(true) @map("is_active")
   isPublic          Boolean        @default(false) @map("is_public")
   sortOrder         Int            @default(0) @map("sort_order")
@@ -520,6 +559,8 @@ model Location {
   appointments            Appointment[]
   appointmentEvents       AppointmentEvent[]
   appointmentReviews      AppointmentReview[]
+  inventory               LocationInventory[]
+  stockMovements          StockMovement[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -725,15 +766,88 @@ model CashMovement {
   description              String              @db.VarChar(240)
   appointmentId            String?             @unique @map("appointment_id") @db.Uuid
   serviceId                String?             @map("service_id") @db.Uuid
+  productId                String?             @map("product_id") @db.Uuid
+  productQuantity          Int?                @map("product_quantity")
   professionalMembershipId String?             @map("professional_membership_id") @db.Uuid
+  reversedAt               DateTime?           @map("reversed_at") @db.Timestamptz(3)
+  reversedByUserId         String?             @map("reversed_by_user_id") @db.Uuid
+  reversalReason           String?             @map("reversal_reason") @db.VarChar(240)
   createdByUserId          String              @map("created_by_user_id") @db.Uuid
   createdAt                DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
   cashRegisterSession      CashRegisterSession @relation(fields: [cashRegisterSessionId], references: [id], onDelete: Cascade)
+  product                  Product?            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  stockMovements           StockMovement[]
 
   @@index([cashRegisterSessionId, createdAt])
   @@index([appointmentId])
   @@index([professionalMembershipId, serviceId])
+  @@index([productId, createdAt])
+  @@index([reversedAt])
   @@map("cash_movements")
+}
+
+model Product {
+  id                   String              @id @default(uuid()) @db.Uuid
+  organizationId       String              @map("organization_id") @db.Uuid
+  name                 String              @db.VarChar(120)
+  sku                  String?             @db.VarChar(80)
+  barcode              String?             @db.VarChar(80)
+  costCents            Int                 @default(0) @map("cost_cents")
+  salePriceCents       Int                 @map("sale_price_cents")
+  currencyCode         String              @default("USD") @map("currency_code") @db.Char(3)
+  stockTrackingEnabled Boolean             @default(true) @map("stock_tracking_enabled")
+  minimumStock         Int                 @default(0) @map("minimum_stock")
+  isActive             Boolean             @default(true) @map("is_active")
+  createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization         Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inventory            LocationInventory[]
+  stockMovements       StockMovement[]
+  cashMovements        CashMovement[]
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, sku])
+  @@unique([organizationId, barcode])
+  @@index([organizationId, isActive])
+  @@map("products")
+}
+
+model LocationInventory {
+  locationId     String   @map("location_id") @db.Uuid
+  productId      String   @map("product_id") @db.Uuid
+  quantityOnHand Int      @default(0) @map("quantity_on_hand")
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  location       Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([locationId, productId])
+  @@index([productId, quantityOnHand])
+  @@map("location_inventory")
+}
+
+model StockMovement {
+  id                    String            @id @default(uuid()) @db.Uuid
+  organizationId        String            @map("organization_id") @db.Uuid
+  locationId            String            @map("location_id") @db.Uuid
+  productId             String            @map("product_id") @db.Uuid
+  cashMovementId        String?           @map("cash_movement_id") @db.Uuid
+  type                  StockMovementType
+  direction             StockDirection
+  quantity              Int
+  resultingQuantity     Int               @map("resulting_quantity")
+  unitCostCents         Int?              @map("unit_cost_cents")
+  notes                 String?           @db.VarChar(500)
+  createdByUserId       String            @map("created_by_user_id") @db.Uuid
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization          Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location              Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  product               Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  cashMovement          CashMovement?     @relation(fields: [cashMovementId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([locationId, productId, createdAt])
+  @@index([cashMovementId])
+  @@map("stock_movements")
 }
 
 model CommissionRule {

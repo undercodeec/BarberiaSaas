@@ -5,6 +5,7 @@ import { readConfig } from './config';
 import { createPublicBookingMailer } from './public-booking-mailer';
 import {
   createInvitationMailer,
+  createPlatformAccessMailer,
   createRecoveryMailer,
   createVerificationMailer,
 } from './recovery-mailer';
@@ -16,6 +17,7 @@ async function main(): Promise<void> {
   const app = await buildApi({
     config,
     invitationMailer: createInvitationMailer(config),
+    platformAccessMailer: createPlatformAccessMailer(config),
     publicBookingMailer: createPublicBookingMailer(config),
     recoveryMailer: createRecoveryMailer(config),
     verificationMailer: createVerificationMailer(config),

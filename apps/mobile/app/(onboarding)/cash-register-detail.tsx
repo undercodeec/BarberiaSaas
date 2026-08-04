@@ -14,6 +14,8 @@ import { useAuth } from '../../src/providers/AuthProvider';
 
 function movementLabel(type: CashMovementRecord['type']) {
   if (type === 'sale') return 'Venta';
+  if (type === 'deposit') return 'Depósito';
+  if (type === 'other_income') return 'Otro ingreso';
   if (type === 'expense') return 'Gasto';
   if (type === 'withdrawal') return 'Retiro';
   if (type === 'professional_advance') return 'Anticipo a colaborador';
@@ -22,7 +24,12 @@ function movementLabel(type: CashMovementRecord['type']) {
 }
 
 function movementIsIncome(type: CashMovementRecord['type']) {
-  return type === 'sale' || type === 'professional_advance_reversal';
+  return (
+    type === 'sale' ||
+    type === 'deposit' ||
+    type === 'other_income' ||
+    type === 'professional_advance_reversal'
+  );
 }
 
 export default function CashRegisterDetailScreen() {
@@ -114,7 +121,7 @@ export default function CashRegisterDetailScreen() {
           <View style={styles.summaryCard}>
             <Text style={styles.sectionTitle}>Movimientos</Text>
             <Text style={styles.sectionCopy}>
-              Resumen de ventas, gastos y retiros de esta caja.
+              Resumen de ventas, ingresos, gastos y retiros de esta caja.
             </Text>
             <View style={styles.summaryMetrics}>
               <Metric
@@ -159,6 +166,14 @@ export default function CashRegisterDetailScreen() {
             <DetailRow
               label="Ventas registradas"
               value={formatMoney(totals.sales)}
+            />
+            <DetailRow
+              label="Depósitos manuales"
+              value={formatMoney(totals.deposits)}
+            />
+            <DetailRow
+              label="Otros ingresos"
+              value={formatMoney(totals.otherIncome)}
             />
             <DetailRow
               label="Gastos"
@@ -268,20 +283,29 @@ export default function CashRegisterDetailScreen() {
                     </Text>
                     <Text style={styles.movementMeta}>
                       {movementLabel(movement.type)}
+                      {movement.productId
+                        ? ` · Producto x${movement.productQuantity ?? 1}`
+                        : ''}
                       {' · '}
                       {paymentLabel(movement.paymentMethod)}
                       {movement.appointmentId ? ' · Cita vinculada' : ''}
+                      {movement.reversedAt ? ' · Revertida' : ''}
                     </Text>
                   </View>
                   <View style={styles.movementValue}>
                     <Text
                       style={[
                         styles.movementAmount,
-                        !movementIsIncome(movement.type) &&
+                        (!movementIsIncome(movement.type) ||
+                          Boolean(movement.reversedAt)) &&
                           styles.negativeValue,
                       ]}
                     >
-                      {movementIsIncome(movement.type) ? '+' : '-'}
+                      {movement.reversedAt
+                        ? '↶ '
+                        : movementIsIncome(movement.type)
+                          ? '+'
+                          : '-'}
                       {formatMoney(movement.amountCents)}
                     </Text>
                     <Text style={styles.movementMeta}>

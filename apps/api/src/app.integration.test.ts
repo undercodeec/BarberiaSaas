@@ -3,7 +3,10 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildApi } from './app';
 import { readConfig } from './config';
-import type { InvitationMessage } from './recovery-mailer';
+import type {
+  InvitationMessage,
+  PlatformAccessMessage,
+} from './recovery-mailer';
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 if (testDatabaseUrl) {
@@ -68,6 +71,18 @@ function registrationProfilePayload() {
   } as const;
 }
 
+function localDateForTest(value: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone,
+    year: 'numeric',
+  }).formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((entry) => entry.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
 describeWithDatabase('API con PostgreSQL', () => {
   const connectionString = testDatabaseUrl ?? 'postgresql://unused/unused';
   const database = createDatabaseClient({ connectionString });
@@ -79,8 +94,10 @@ describeWithDatabase('API con PostgreSQL', () => {
     DATABASE_URL: connectionString,
     MOBILE_INVITATION_URL: 'barbersaas://accept-invitation',
     MOBILE_RESET_URL: 'barbersaas://reset-password',
+    PLATFORM_ADMIN_EMAILS: 'platform@example.com',
   });
   const invitationMessages: InvitationMessage[] = [];
+  const platformAccessMessages: PlatformAccessMessage[] = [];
   let app: Awaited<ReturnType<typeof buildApi>>;
 
   beforeEach(async () => {
@@ -93,8 +110,15 @@ describeWithDatabase('API con PostgreSQL', () => {
           return Promise.resolve();
         },
       },
+      platformAccessMailer: {
+        send: (message) => {
+          platformAccessMessages.push(message);
+          return Promise.resolve();
+        },
+      },
     });
     invitationMessages.length = 0;
+    platformAccessMessages.length = 0;
     await database.onboardingCollaborator.deleteMany();
     await database.commissionSettlementAdvance.deleteMany();
     await database.professionalAdvance.deleteMany();
@@ -109,6 +133,9 @@ describeWithDatabase('API con PostgreSQL', () => {
     await database.clientLabel.deleteMany();
     await database.client.deleteMany();
     await database.cashRegisterSession.deleteMany();
+    await database.stockMovement.deleteMany();
+    await database.locationInventory.deleteMany();
+    await database.product.deleteMany();
     await database.scheduleBlock.deleteMany();
     await database.weeklySchedule.deleteMany();
     await database.businessWeeklySchedule.deleteMany();
@@ -123,6 +150,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     await database.organization.deleteMany();
     await database.passwordResetToken.deleteMany();
     await database.emailVerificationCode.deleteMany();
+    await database.platformAdminAccessChallenge.deleteMany();
     await database.pendingRegistration.deleteMany();
     await database.session.deleteMany();
     await database.userPortfolioItem.deleteMany();
@@ -903,6 +931,11 @@ describeWithDatabase('API con PostgreSQL', () => {
   it('expone suscripción simulada y protege el cambio a cuenta individual', async () => {
     const ownerToken = await register('settings-owner@example.com');
     const organization = await onboard(ownerToken, 'settings-account');
+    expect(
+      await database.subscription.findUnique({
+        where: { organizationId: organization.organizationId },
+      }),
+    ).toMatchObject({ status: 'TRIAL' });
 
     const subscriptionResponse = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },
@@ -912,18 +945,167 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(subscriptionResponse.statusCode).toBe(200);
     expect(
       subscriptionResponse.json<{
-        current: { planCode: string; status: string };
+        current: {
+          featureFlags: { inventory: boolean; multiLocation: boolean };
+          planCode: string;
+          status: string;
+        };
         plans: Array<{ available: boolean; code: string }>;
         usage: { locations: number; teamMembers: number };
       }>(),
     ).toMatchObject({
-      current: { planCode: 'essential', status: 'trial' },
+      current: {
+        featureFlags: { inventory: true, multiLocation: false },
+        planCode: 'essential',
+        status: 'trial',
+      },
       plans: expect.arrayContaining([
         expect.objectContaining({ available: true, code: 'essential' }),
         expect.objectContaining({ available: false, code: 'multi' }),
       ]),
       usage: { locations: 1, teamMembers: 1 },
     });
+
+    await database.subscription.update({
+      data: {
+        graceEndsAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        trialEndsAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      },
+      where: { organizationId: organization.organizationId },
+    });
+    const graceResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      url: '/v1/subscription',
+    });
+    expect(
+      graceResponse.json<{ current: { readOnly: boolean; status: string } }>()
+        .current,
+    ).toMatchObject({ readOnly: false, status: 'past_due' });
+    await database.subscription.update({
+      data: { graceEndsAt: new Date(Date.now() - 1_000) },
+      where: { organizationId: organization.organizationId },
+    });
+    const automaticSuspension = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      url: '/v1/subscription',
+    });
+    expect(
+      automaticSuspension.json<{
+        current: { readOnly: boolean; status: string };
+      }>().current,
+    ).toMatchObject({ readOnly: true, status: 'suspended' });
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${ownerToken}` },
+          method: 'POST',
+          payload: { status: 'active' },
+          url: '/v1/subscription/simulate',
+        })
+      ).statusCode,
+    ).toBe(200);
+
+    const limitResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        city: 'Quito',
+        countryCode: 'EC',
+        currencyCode: 'USD',
+        name: 'Segunda sucursal',
+        phone: '0999999999',
+        slug: 'segunda-sucursal',
+        timezone: 'America/Guayaquil',
+      },
+      url: '/v1/locations',
+    });
+    expect(limitResponse.statusCode).toBe(409);
+    expect(limitResponse.json<{ code: string }>().code).toBe(
+      'PLAN_LIMIT_REACHED',
+    );
+    expect(
+      await database.location.count({
+        where: { organizationId: organization.organizationId },
+      }),
+    ).toBe(1);
+
+    const serviceBeforeSuspension = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        durationMinutes: 30,
+        name: 'Servicio conservado',
+        priceCents: 1_200,
+      },
+      url: '/v1/services',
+    });
+    expect(serviceBeforeSuspension.statusCode).toBe(201);
+    const suspended = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: { status: 'suspended' },
+      url: '/v1/subscription/simulate',
+    });
+    expect(suspended.statusCode).toBe(200);
+    expect(
+      suspended.json<{ current: { readOnly: boolean } }>().current.readOnly,
+    ).toBe(true);
+
+    const servicesInReadOnly = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      url: '/v1/services',
+    });
+    expect(servicesInReadOnly.statusCode).toBe(200);
+    expect(servicesInReadOnly.body).toContain('Servicio conservado');
+    const blockedWrite = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        durationMinutes: 30,
+        name: 'Servicio bloqueado',
+        priceCents: 1_400,
+      },
+      url: '/v1/services',
+    });
+    expect(blockedWrite.statusCode).toBe(423);
+    expect(blockedWrite.json<{ code: string }>().code).toBe(
+      'SUBSCRIPTION_READ_ONLY',
+    );
+
+    const reactivated = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: { status: 'active' },
+      url: '/v1/subscription/simulate',
+    });
+    expect(reactivated.statusCode).toBe(200);
+    const serviceAfterReactivation = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        durationMinutes: 30,
+        name: 'Servicio reactivado',
+        priceCents: 1_400,
+      },
+      url: '/v1/services',
+    });
+    expect(serviceAfterReactivation.statusCode).toBe(201);
+    expect(
+      (
+        await database.auditLog.findMany({
+          select: { action: true },
+          where: { organizationId: organization.organizationId },
+        })
+      ).map(({ action }) => action),
+    ).toEqual(
+      expect.arrayContaining([
+        'subscription.reactivated_simulation',
+        'subscription.suspended_simulation',
+      ]),
+    );
 
     const professionalResponse = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },
@@ -1770,7 +1952,7 @@ describeWithDatabase('API con PostgreSQL', () => {
       sales: { servicesCents: 10_000 },
     });
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateForTest(new Date(), 'America/Guayaquil');
     const settlementResponse = await app.inject({
       headers: { authorization: `Bearer ${agenda.ownerToken}` },
       method: 'POST',
@@ -1995,7 +2177,7 @@ describeWithDatabase('API con PostgreSQL', () => {
       expenses: { collaboratorPaymentsCents: 1_500 },
       sales: { servicesCents: 8_000 },
     });
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateForTest(new Date(), 'America/Guayaquil');
     const settlementResponse = await app.inject({
       headers: { authorization: `Bearer ${agenda.ownerToken}` },
       method: 'POST',
@@ -2061,6 +2243,499 @@ describeWithDatabase('API con PostgreSQL', () => {
     ).toBe(0);
   });
 
+  it('consolida el control diario con zona horaria, permisos y CSV', async () => {
+    const agenda = await setupAgenda('reporte-diario');
+    const ownerMembership = await database.membership.findFirstOrThrow({
+      where: {
+        organizationId: agenda.organizationId,
+        role: 'OWNER',
+      },
+    });
+    const completedAppointment = await database.appointment.create({
+      data: {
+        clientName: 'Cliente atendido',
+        endsAt: new Date('2026-08-03T06:00:00.000Z'),
+        locationId: agenda.locationId,
+        organizationId: agenda.organizationId,
+        paymentStatus: 'PAID',
+        professionalMembershipId: agenda.membershipId,
+        reservesSlot: false,
+        services: {
+          create: {
+            durationMinutes: 30,
+            priceCents: 1_200,
+            serviceId: agenda.serviceId,
+            serviceName: 'Corte agenda',
+          },
+        },
+        startsAt: new Date('2026-08-03T05:30:00.000Z'),
+        status: 'COMPLETED',
+      },
+    });
+    await database.appointment.createMany({
+      data: [
+        {
+          clientName: 'Cliente cancelado',
+          endsAt: new Date('2026-08-03T07:00:00.000Z'),
+          locationId: agenda.locationId,
+          organizationId: agenda.organizationId,
+          professionalMembershipId: agenda.membershipId,
+          reservesSlot: false,
+          startsAt: new Date('2026-08-03T06:30:00.000Z'),
+          status: 'CANCELLED',
+        },
+        {
+          clientName: 'Cliente ausente',
+          endsAt: new Date('2026-08-03T08:00:00.000Z'),
+          locationId: agenda.locationId,
+          organizationId: agenda.organizationId,
+          professionalMembershipId: agenda.membershipId,
+          reservesSlot: false,
+          startsAt: new Date('2026-08-03T07:30:00.000Z'),
+          status: 'NO_SHOW',
+        },
+        {
+          clientName: 'Fuera por zona horaria',
+          endsAt: new Date('2026-08-03T05:00:00.000Z'),
+          locationId: agenda.locationId,
+          organizationId: agenda.organizationId,
+          professionalMembershipId: agenda.membershipId,
+          reservesSlot: false,
+          startsAt: new Date('2026-08-03T04:30:00.000Z'),
+          status: 'COMPLETED',
+        },
+      ],
+    });
+    const product = await database.product.create({
+      data: {
+        name: 'Cera de reporte',
+        organizationId: agenda.organizationId,
+        salePriceCents: 1_500,
+        stockTrackingEnabled: false,
+      },
+    });
+    const cashSession = await database.cashRegisterSession.create({
+      data: {
+        closedAt: new Date('2026-08-03T09:00:00.000Z'),
+        closingAmountCents: 6_200,
+        differenceCents: 200,
+        expectedAmountCents: 6_000,
+        locationId: agenda.locationId,
+        openedAt: new Date('2026-08-03T05:00:00.000Z'),
+        openingAmountCents: 1_000,
+        organizationId: agenda.organizationId,
+        ownerUserId: ownerMembership.userId,
+        responsibleMembershipId: ownerMembership.id,
+        responsibleName: 'Propietario de prueba',
+        status: 'CLOSED',
+      },
+    });
+    await database.cashMovement.createMany({
+      data: [
+        {
+          amountCents: 2_000,
+          appointmentId: completedAppointment.id,
+          cashRegisterSessionId: cashSession.id,
+          createdAt: new Date('2026-08-03T06:00:00.000Z'),
+          createdByUserId: ownerMembership.userId,
+          description: 'Corte cobrado',
+          paymentMethod: 'CASH',
+          professionalMembershipId: agenda.membershipId,
+          serviceId: agenda.serviceId,
+          type: 'SALE',
+        },
+        {
+          amountCents: 3_000,
+          cashRegisterSessionId: cashSession.id,
+          createdAt: new Date('2026-08-03T07:00:00.000Z'),
+          createdByUserId: ownerMembership.userId,
+          description: 'Dos ceras',
+          paymentMethod: 'CARD',
+          productId: product.id,
+          productQuantity: 2,
+          type: 'SALE',
+        },
+        {
+          amountCents: 4_000,
+          cashRegisterSessionId: cashSession.id,
+          createdAt: new Date('2026-08-03T04:30:00.000Z'),
+          createdByUserId: ownerMembership.userId,
+          description: 'Venta del día local anterior',
+          paymentMethod: 'TRANSFER',
+          type: 'SALE',
+        },
+        {
+          amountCents: 900,
+          cashRegisterSessionId: cashSession.id,
+          createdAt: new Date('2026-08-03T08:00:00.000Z'),
+          createdByUserId: ownerMembership.userId,
+          description: 'Venta revertida',
+          paymentMethod: 'CASH',
+          reversalReason: 'Error de registro',
+          reversedAt: new Date('2026-08-03T08:30:00.000Z'),
+          reversedByUserId: ownerMembership.userId,
+          type: 'SALE',
+        },
+      ],
+    });
+    const commissionCashMovement = await database.cashMovement.findFirstOrThrow(
+      {
+        where: {
+          cashRegisterSessionId: cashSession.id,
+          description: 'Corte cobrado',
+        },
+      },
+    );
+    await database.commissionEntry.create({
+      data: {
+        baseAmountCents: 2_000,
+        cashMovementId: commissionCashMovement.id,
+        calculationSnapshot: { source: 'daily-report-test' },
+        commissionAmountCents: 500,
+        locationId: agenda.locationId,
+        occurredAt: new Date('2026-08-03T06:30:00.000Z'),
+        organizationId: agenda.organizationId,
+        professionalMembershipId: agenda.membershipId,
+      },
+    });
+
+    const reportResponse = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'GET',
+      url: `/v1/reports/daily?from=2026-08-03&to=2026-08-03&locationId=${agenda.locationId}`,
+    });
+    expect(reportResponse.statusCode).toBe(200);
+    const report = reportResponse.json<{
+      appointments: {
+        attended: number;
+        cancelled: number;
+        noShow: number;
+        paid: number;
+        paidScheduledValueCents: number;
+        total: number;
+      };
+      cashClosures: {
+        closingAmountCents: number;
+        count: number;
+        differenceCents: number;
+        expectedAmountCents: number;
+      };
+      collections: {
+        cardCents: number;
+        cashCents: number;
+        totalCents: number;
+        transferCents: number;
+      };
+      products: Array<{ name: string; quantity: number; revenueCents: number }>;
+      professionals: Array<{
+        commissionCents: number;
+        completedAppointments: number;
+        saleCount: number;
+        salesCents: number;
+      }>;
+      sales: {
+        averageTicketCents: number;
+        grossCents: number;
+        transactionCount: number;
+      };
+    }>();
+    expect(report.appointments).toEqual({
+      attended: 1,
+      cancelled: 1,
+      noShow: 1,
+      paid: 1,
+      paidScheduledValueCents: 1_200,
+      total: 3,
+    });
+    expect(report.sales).toEqual({
+      averageTicketCents: 2_500,
+      grossCents: 5_000,
+      transactionCount: 2,
+    });
+    expect(report.collections).toMatchObject({
+      cardCents: 3_000,
+      cashCents: 2_000,
+      totalCents: 5_000,
+      transferCents: 0,
+    });
+    expect(report.professionals).toEqual([
+      expect.objectContaining({
+        commissionCents: 500,
+        completedAppointments: 1,
+        saleCount: 1,
+        salesCents: 2_000,
+      }),
+    ]);
+    expect(report.products).toEqual([
+      expect.objectContaining({
+        name: 'Cera de reporte',
+        quantity: 2,
+        revenueCents: 3_000,
+      }),
+    ]);
+    expect(report.cashClosures).toEqual({
+      closingAmountCents: 6_200,
+      count: 1,
+      differenceCents: 200,
+      expectedAmountCents: 6_000,
+    });
+
+    const csvResponse = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'GET',
+      url: `/v1/reports/daily?from=2026-08-03&to=2026-08-03&locationId=${agenda.locationId}&format=csv`,
+    });
+    expect(csvResponse.statusCode).toBe(200);
+    expect(csvResponse.headers['content-type']).toContain('text/csv');
+    expect(csvResponse.body).toContain('Cera de reporte');
+    expect(csvResponse.body).toContain('Propietario de prueba');
+
+    const forbiddenResponse = await app.inject({
+      headers: { authorization: `Bearer ${agenda.barberToken}` },
+      method: 'GET',
+      url: '/v1/reports/daily?range=today',
+    });
+    expect(forbiddenResponse.statusCode).toBe(403);
+  });
+
+  it('controla inventario, descuenta ventas concurrentes y repone una reversión', async () => {
+    const token = await register('inventory-owner@example.com');
+    const organization = await onboard(token, 'inventario-prueba');
+    const created = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'POST',
+      payload: {
+        costCents: 400,
+        initialStock: 3,
+        locationId: organization.locationId,
+        minimumStock: 2,
+        name: 'Pomada mate',
+        salePriceCents: 1_000,
+        sku: 'POM-MATE',
+        stockTrackingEnabled: true,
+      },
+      url: '/v1/inventory/products',
+    });
+    expect(created.statusCode).toBe(201);
+    const productId = created.json<{ product: { id: string } }>().product.id;
+
+    const purchased = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'POST',
+      payload: {
+        locationId: organization.locationId,
+        notes: 'Compra a proveedor',
+        productId,
+        quantityDelta: 2,
+        type: 'purchase',
+        unitCostCents: 400,
+      },
+      url: '/v1/inventory/adjustments',
+    });
+    expect(purchased.statusCode).toBe(201);
+    expect(
+      purchased.json<{ movement: { resultingQuantity: number } }>().movement
+        .resultingQuantity,
+    ).toBe(5);
+
+    const secondToken = await register('inventory-other@example.com');
+    await onboard(secondToken, 'inventario-aislado');
+    const forbiddenProduct = await app.inject({
+      headers: { authorization: `Bearer ${secondToken}` },
+      method: 'PATCH',
+      payload: { minimumStock: 20 },
+      url: `/v1/inventory/products/${productId}`,
+    });
+    expect(forbiddenProduct.statusCode).toBe(404);
+
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${token}` },
+          method: 'POST',
+          payload: { openingAmountCents: 1_000 },
+          url: '/v1/cash-register/open',
+        })
+      ).statusCode,
+    ).toBe(201);
+    const saleRequest = () =>
+      app.inject({
+        headers: { authorization: `Bearer ${token}` },
+        method: 'POST',
+        payload: {
+          amountCents: 3_000,
+          description: 'Venta de tres pomadas',
+          paymentMethod: 'cash',
+          productId,
+          productQuantity: 3,
+          type: 'sale',
+        },
+        url: '/v1/cash-register/movements',
+      });
+    const concurrentSales = await Promise.all([saleRequest(), saleRequest()]);
+    expect(concurrentSales.map(({ statusCode }) => statusCode).sort()).toEqual([
+      201, 409,
+    ]);
+    const successfulSale = concurrentSales.find(
+      ({ statusCode }) => statusCode === 201,
+    );
+    const cashMovementId = successfulSale!.json<{
+      movement: { id: string };
+    }>().movement.id;
+
+    const lowStock = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: `/v1/inventory?locationId=${organization.locationId}&lowStockOnly=true`,
+    });
+    expect(lowStock.statusCode).toBe(200);
+    expect(
+      lowStock.json<{
+        products: Array<{
+          id: string;
+          isLowStock: boolean;
+          quantityOnHand: number;
+        }>;
+      }>().products,
+    ).toEqual([
+      expect.objectContaining({
+        id: productId,
+        isLowStock: true,
+        quantityOnHand: 2,
+      }),
+    ]);
+
+    const report = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: '/v1/reports/business-summary?range=today',
+    });
+    expect(report.statusCode).toBe(200);
+    expect(
+      report.json<{
+        sales: { grossCents: number; productsCents: number };
+      }>().sales,
+    ).toMatchObject({ grossCents: 3_000, productsCents: 3_000 });
+
+    const reversed = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'POST',
+      payload: { reason: 'Venta registrada por duplicado' },
+      url: `/v1/inventory/product-sales/${cashMovementId}/reverse`,
+    });
+    expect(reversed.statusCode).toBe(200);
+    expect(
+      reversed.json<{ resultingQuantity: number }>().resultingQuantity,
+    ).toBe(5);
+    const repeatedReversal = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'POST',
+      payload: { reason: 'Segundo intento de reversión' },
+      url: `/v1/inventory/product-sales/${cashMovementId}/reverse`,
+    });
+    expect(repeatedReversal.statusCode).toBe(409);
+
+    const cashSummary = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: '/v1/cash-register/summary',
+    });
+    expect(
+      cashSummary.json<{ totals: { expectedCash: number; sales: number } }>()
+        .totals,
+    ).toMatchObject({ expectedCash: 1_000, sales: 0 });
+    const reportAfterReversal = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: '/v1/reports/business-summary?range=today',
+    });
+    expect(
+      reportAfterReversal.json<{
+        sales: { grossCents: number; productsCents: number };
+      }>().sales,
+    ).toMatchObject({ grossCents: 0, productsCents: 0 });
+    const movementHistory = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: `/v1/inventory/movements?locationId=${organization.locationId}&productId=${productId}`,
+    });
+    expect(movementHistory.statusCode).toBe(200);
+    const movementRows = movementHistory.json<{
+      rows: Array<{ cashMovementReversedAt: string | null; type: string }>;
+    }>().rows;
+    expect(movementRows.map(({ type }) => type)).toEqual([
+      'return',
+      'sale',
+      'purchase',
+      'opening',
+    ]);
+    expect(movementRows[1]?.cashMovementReversedAt).toBeTruthy();
+
+    const untrackedProductResponse = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'POST',
+      payload: {
+        costCents: 200,
+        initialStock: 0,
+        locationId: organization.locationId,
+        minimumStock: 0,
+        name: 'Servicio de aplicación',
+        salePriceCents: 500,
+        stockTrackingEnabled: false,
+      },
+      url: '/v1/inventory/products',
+    });
+    expect(untrackedProductResponse.statusCode).toBe(201);
+    const untrackedProductId = untrackedProductResponse.json<{
+      product: { id: string };
+    }>().product.id;
+    const untrackedSaleResponse = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'POST',
+      payload: {
+        amountCents: 1_000,
+        description: 'Dos aplicaciones de producto',
+        paymentMethod: 'cash',
+        productId: untrackedProductId,
+        productQuantity: 2,
+        type: 'sale',
+      },
+      url: '/v1/cash-register/movements',
+    });
+    expect(untrackedSaleResponse.statusCode).toBe(201);
+    const untrackedCashMovementId = untrackedSaleResponse.json<{
+      movement: { id: string };
+    }>().movement.id;
+    const untrackedReversal = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'POST',
+      payload: { reason: 'Anulación sin control de existencias' },
+      url: `/v1/inventory/product-sales/${untrackedCashMovementId}/reverse`,
+    });
+    expect(untrackedReversal.statusCode).toBe(200);
+    expect(
+      untrackedReversal.json<{ resultingQuantity: number | null }>()
+        .resultingQuantity,
+    ).toBeNull();
+    expect(
+      await database.stockMovement.count({
+        where: { productId: untrackedProductId },
+      }),
+    ).toBe(0);
+
+    const actions = await database.auditLog.findMany({
+      select: { action: true },
+      where: { organizationId: organization.organizationId },
+    });
+    expect(actions.map(({ action }) => action)).toEqual(
+      expect.arrayContaining([
+        'inventory.product_created',
+        'inventory.stock_adjusted',
+        'inventory.product_sale_reversed',
+      ]),
+    );
+  });
+
   it('audita caja, conserva el efectivo esperado y expone cierres en historial', async () => {
     const token = await register('cash-register@example.com');
     const organization = await onboard(token, 'caja-prueba');
@@ -2073,7 +2748,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(opened.statusCode).toBe(201);
 
     const movement = async (
-      type: 'expense' | 'sale' | 'withdrawal',
+      type: 'deposit' | 'expense' | 'other_income' | 'sale' | 'withdrawal',
       paymentMethod: 'card' | 'cash' | 'transfer',
       amountCents: number,
     ) =>
@@ -2089,6 +2764,10 @@ describeWithDatabase('API con PostgreSQL', () => {
         url: '/v1/cash-register/movements',
       });
     expect((await movement('sale', 'cash', 2_000)).statusCode).toBe(201);
+    expect((await movement('deposit', 'cash', 800)).statusCode).toBe(201);
+    expect((await movement('other_income', 'transfer', 200)).statusCode).toBe(
+      201,
+    );
     expect((await movement('expense', 'transfer', 500)).statusCode).toBe(201);
     expect((await movement('withdrawal', 'cash', 300)).statusCode).toBe(201);
 
@@ -2107,6 +2786,35 @@ describeWithDatabase('API con PostgreSQL', () => {
       pagination: { total: 1 },
       rows: [{ amountCents: 500, description: 'expense de prueba' }],
     });
+    const depositReport = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: '/v1/reports/movements?kind=deposits&range=today',
+    });
+    expect(depositReport.statusCode).toBe(200);
+    expect(
+      depositReport.json<{
+        pagination: { total: number };
+        rows: Array<{ amountCents: number; type: string }>;
+        totalAmountCents: number;
+      }>(),
+    ).toMatchObject({
+      pagination: { total: 2 },
+      rows: expect.arrayContaining([
+        expect.objectContaining({ amountCents: 800, type: 'deposit' }),
+        expect.objectContaining({ amountCents: 200, type: 'other_income' }),
+      ]),
+      totalAmountCents: 1_000,
+    });
+    const depositsCsv = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: '/v1/reports/movements?format=csv&kind=deposits&range=today',
+    });
+    expect(depositsCsv.statusCode).toBe(200);
+    expect(depositsCsv.headers['content-type']).toContain('text/csv');
+    expect(depositsCsv.body).toContain('deposit de prueba');
+    expect(depositsCsv.body).toContain('other_income de prueba');
     const salesCsv = await app.inject({
       headers: { authorization: `Bearer ${token}` },
       method: 'GET',
@@ -2125,6 +2833,11 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(
       businessSummary.json<{
         expenses: { operatingCents: number; totalCents: number };
+        income: {
+          otherIncomeCents: number;
+          salesCents: number;
+          totalCents: number;
+        };
         netResultCents: number;
         sales: {
           grossCents: number;
@@ -2135,7 +2848,12 @@ describeWithDatabase('API con PostgreSQL', () => {
       }>(),
     ).toMatchObject({
       expenses: { operatingCents: 500, totalCents: 500 },
-      netResultCents: 1_500,
+      income: {
+        otherIncomeCents: 1_000,
+        salesCents: 2_000,
+        totalCents: 3_000,
+      },
+      netResultCents: 2_500,
       sales: {
         grossCents: 2_000,
         transactionCount: 1,
@@ -2152,12 +2870,12 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(summary.statusCode).toBe(200);
     expect(
       summary.json<{ totals: { expectedCash: number } }>().totals.expectedCash,
-    ).toBe(2_700);
+    ).toBe(3_500);
 
     const closed = await app.inject({
       headers: { authorization: `Bearer ${token}` },
       method: 'POST',
-      payload: { closingAmountCents: 2_600, note: 'Faltante comprobado' },
+      payload: { closingAmountCents: 3_400, note: 'Faltante comprobado' },
       url: '/v1/cash-register/close',
     });
     expect(closed.statusCode).toBe(200);
@@ -2186,15 +2904,27 @@ describeWithDatabase('API con PostgreSQL', () => {
           closingAmountCents: number | null;
           closingNote: string | null;
         };
-        totals: { cashSales: number; expectedCash: number; sales: number };
+        totals: {
+          cashSales: number;
+          deposits: number;
+          expectedCash: number;
+          otherIncome: number;
+          sales: number;
+        };
       }>(),
     ).toMatchObject({
       movements: expect.any(Array),
       session: {
-        closingAmountCents: 2_600,
+        closingAmountCents: 3_400,
         closingNote: 'Faltante comprobado',
       },
-      totals: { cashSales: 2_000, expectedCash: 2_700, sales: 2_000 },
+      totals: {
+        cashSales: 2_000,
+        deposits: 800,
+        expectedCash: 3_500,
+        otherIncome: 200,
+        sales: 2_000,
+      },
     });
     const actions = await database.auditLog.findMany({
       select: { action: true },
@@ -2205,6 +2935,273 @@ describeWithDatabase('API con PostgreSQL', () => {
         'cash_register.opened',
         'cash_movement.created',
         'cash_register.closed',
+      ]),
+    );
+  });
+
+  it('opera pilotos desde el panel interno con acceso exclusivo y soporte sin suplantación', async () => {
+    const ownerToken = await register('pilot-owner@example.com');
+    const pilot = await onboard(ownerToken, 'piloto-plataforma');
+    const platformToken = await register('platform@example.com');
+    const outsiderToken = await register('not-platform@example.com');
+
+    const denied = await app.inject({
+      headers: { authorization: `Bearer ${outsiderToken}` },
+      method: 'GET',
+      url: '/v1/platform/session',
+    });
+    expect(denied.statusCode).toBe(403);
+    expect(denied.json<{ code: string }>().code).toBe(
+      'PLATFORM_ADMIN_REQUIRED',
+    );
+
+    const session = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'GET',
+      url: '/v1/platform/session',
+    });
+    expect(session.statusCode).toBe(403);
+    expect(session.json<{ code: string }>().code).toBe(
+      'PLATFORM_ACCESS_CODE_REQUIRED',
+    );
+
+    const requestedCode = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'POST',
+      url: '/v1/platform/access-code',
+    });
+    expect(requestedCode.statusCode).toBe(200);
+    expect(requestedCode.body).not.toContain('code');
+    expect(platformAccessMessages).toHaveLength(1);
+    expect(platformAccessMessages[0]?.email).toBe('platform@example.com');
+    expect(
+      new Date(
+        requestedCode.json<{ expiresAt: string }>().expiresAt,
+      ).getTime() - Date.now(),
+    ).toBeLessThanOrEqual(5 * 60 * 1000);
+
+    const expiredChallenge =
+      await database.platformAdminAccessChallenge.findFirstOrThrow({
+        orderBy: { createdAt: 'desc' },
+      });
+    await database.platformAdminAccessChallenge.update({
+      data: { expiresAt: new Date(Date.now() - 1_000) },
+      where: { id: expiredChallenge.id },
+    });
+    const expiredCode = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'POST',
+      payload: { code: platformAccessMessages[0]?.code },
+      url: '/v1/platform/verify-access-code',
+    });
+    expect(expiredCode.statusCode).toBe(400);
+    expect(expiredCode.json<{ code: string }>().code).toBe(
+      'PLATFORM_ACCESS_CODE_EXPIRED',
+    );
+
+    const requestedReplacement = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'POST',
+      url: '/v1/platform/access-code',
+    });
+    expect(requestedReplacement.statusCode).toBe(200);
+    const accessCode = platformAccessMessages[1]?.code;
+    expect(accessCode).toMatch(/^\d{6}$/u);
+    const invalidCode = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'POST',
+      payload: { code: accessCode === '000000' ? '000001' : '000000' },
+      url: '/v1/platform/verify-access-code',
+    });
+    expect(invalidCode.statusCode).toBe(400);
+    expect(invalidCode.json<{ code: string }>().code).toBe(
+      'INVALID_PLATFORM_ACCESS_CODE',
+    );
+    const verifiedSession = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'POST',
+      payload: { code: accessCode },
+      url: '/v1/platform/verify-access-code',
+    });
+    expect(verifiedSession.statusCode).toBe(200);
+    const replayedCode = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'POST',
+      payload: { code: accessCode },
+      url: '/v1/platform/verify-access-code',
+    });
+    expect(replayedCode.statusCode).toBe(400);
+    expect(replayedCode.json<{ code: string }>().code).toBe(
+      'PLATFORM_ACCESS_CODE_USED',
+    );
+
+    const verifiedPlatformSession = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'GET',
+      url: '/v1/platform/session',
+    });
+    expect(verifiedPlatformSession.statusCode).toBe(200);
+
+    const owner = await database.user.findUniqueOrThrow({
+      where: { email: 'pilot-owner@example.com' },
+    });
+    await database.appNotification.create({
+      data: {
+        body: 'No se expone en el panel.',
+        data: {
+          delivery: {
+            email: { attempts: 3, state: 'failed' },
+            push: { attempts: 0, state: 'pending' },
+          },
+        },
+        organizationId: pilot.organizationId,
+        title: 'Aviso de prueba',
+        type: 'APPOINTMENT_CREATED',
+        userId: owner.id,
+      },
+    });
+
+    const overview = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'GET',
+      url: '/v1/platform/overview',
+    });
+    expect(overview.statusCode).toBe(200);
+    expect(
+      overview.json<{
+        activation: { organizations: number };
+        notificationFailures: number;
+      }>(),
+    ).toMatchObject({
+      activation: { organizations: 1 },
+      notificationFailures: 1,
+    });
+
+    const organizations = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'GET',
+      url: '/v1/platform/organizations?status=trial&search=piloto',
+    });
+    expect(organizations.statusCode).toBe(200);
+    const organizationsBody = organizations.json<{
+      organizations: Array<{
+        id: string;
+        owner: { email: string };
+        plan: string;
+      }>;
+    }>();
+    expect(organizationsBody.organizations).toHaveLength(1);
+    expect(organizationsBody.organizations[0]?.owner.email).toContain('***');
+    expect(JSON.stringify(organizationsBody)).not.toContain('password');
+
+    const notificationErrors = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'GET',
+      url: `/v1/platform/notification-errors?organizationId=${pilot.organizationId}`,
+    });
+    expect(notificationErrors.statusCode).toBe(200);
+    expect(
+      notificationErrors.json<{ errors: Array<{ channel: string }> }>().errors,
+    ).toEqual([expect.objectContaining({ channel: 'email' })]);
+    expect(notificationErrors.body).not.toContain('No se expone en el panel.');
+
+    const changePlan = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'PATCH',
+      payload: {
+        action: 'change_plan',
+        planCode: 'multi',
+        reason: 'Piloto autorizado para validar múltiples sucursales.',
+      },
+      url: `/v1/platform/organizations/${pilot.organizationId}`,
+    });
+    expect(changePlan.statusCode).toBe(200);
+    expect(
+      (
+        await database.subscription.findUniqueOrThrow({
+          include: { plan: true },
+          where: { organizationId: pilot.organizationId },
+        })
+      ).plan.code,
+    ).toBe('multi');
+
+    const suspended = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'PATCH',
+      payload: {
+        action: 'suspend',
+        reason: 'Suspensión controlada durante soporte del piloto.',
+      },
+      url: `/v1/platform/organizations/${pilot.organizationId}`,
+    });
+    expect(suspended.statusCode).toBe(200);
+    const blockedWrite = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        durationMinutes: 30,
+        name: 'Servicio bloqueado',
+        priceCents: 900,
+      },
+      url: '/v1/services',
+    });
+    expect(blockedWrite.statusCode).toBe(423);
+
+    const diagnostics = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'POST',
+      payload: {
+        reason: 'Diagnóstico solicitado por el propietario del piloto.',
+      },
+      url: `/v1/platform/organizations/${pilot.organizationId}/support`,
+    });
+    expect(diagnostics.statusCode).toBe(200);
+    expect(diagnostics.body).toContain('No se creó una sesión');
+    expect(diagnostics.body).not.toContain('pilot-owner@example.com');
+    expect(diagnostics.body).not.toContain('token');
+    expect(diagnostics.body).not.toContain('password');
+
+    const reactivated = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'PATCH',
+      payload: {
+        action: 'reactivate',
+        reason: 'Incidencia resuelta y acceso restaurado al piloto.',
+      },
+      url: `/v1/platform/organizations/${pilot.organizationId}`,
+    });
+    expect(reactivated.statusCode).toBe(200);
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${ownerToken}` },
+          method: 'POST',
+          payload: {
+            durationMinutes: 30,
+            name: 'Servicio restaurado',
+            priceCents: 900,
+          },
+          url: '/v1/services',
+        })
+      ).statusCode,
+    ).toBe(201);
+
+    const audit = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'GET',
+      url: `/v1/platform/audit?organizationId=${pilot.organizationId}`,
+    });
+    expect(audit.statusCode).toBe(200);
+    expect(
+      audit
+        .json<{ logs: Array<{ action: string }> }>()
+        .logs.map(({ action }) => action),
+    ).toEqual(
+      expect.arrayContaining([
+        'platform.organization.change_plan',
+        'platform.organization.reactivate',
+        'platform.organization.support_accessed',
+        'platform.organization.suspend',
       ]),
     );
   });

@@ -32,6 +32,15 @@ export interface VerificationMailer {
   send(message: VerificationMessage): Promise<void>;
 }
 
+export interface PlatformAccessMessage {
+  readonly code: string;
+  readonly email: string;
+}
+
+export interface PlatformAccessMailer {
+  send(message: PlatformAccessMessage): Promise<void>;
+}
+
 function createTransporter(config: ApiConfig) {
   if (!config.SMTP_HOST || !config.SMTP_FROM) return null;
 
@@ -130,6 +139,39 @@ export function createVerificationMailer(
           503,
           'VERIFICATION_DELIVERY_UNAVAILABLE',
           'No fue posible enviar el código de verificación. Inténtalo nuevamente.',
+        );
+      }
+    },
+  };
+}
+
+export function createPlatformAccessMailer(
+  config: ApiConfig,
+): PlatformAccessMailer | null {
+  const transporter = createTransporter(config);
+  if (!transporter || !config.SMTP_FROM) return null;
+
+  return {
+    async send({ code, email }) {
+      try {
+        await transporter.sendMail({
+          from: config.SMTP_FROM,
+          subject: 'Código de acceso al panel de Nava',
+          text: [
+            'Tu código de acceso al panel interno de Nava es:',
+            '',
+            code,
+            '',
+            'El código vence en 5 minutos y solo puede utilizarse una vez.',
+            'Si no intentaste acceder al panel, ignora este mensaje.',
+          ].join('\n'),
+          to: email,
+        });
+      } catch {
+        throw new ApiError(
+          503,
+          'PLATFORM_ACCESS_DELIVERY_UNAVAILABLE',
+          'No fue posible enviar el código de acceso. Inténtalo nuevamente.',
         );
       }
     },

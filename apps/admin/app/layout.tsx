@@ -3,7 +3,11 @@ import type { ReactNode } from 'react';
 
 import './globals.css';
 
-export const metadata: Metadata = { title: 'Operación de plataforma' };
+export const metadata: Metadata = {
+  description: 'Consola segura para la operación interna de Nava.',
+  robots: { follow: false, index: false },
+  title: 'Operación de plataforma | Nava',
+};
 
 export default function AdminLayout({
   children,

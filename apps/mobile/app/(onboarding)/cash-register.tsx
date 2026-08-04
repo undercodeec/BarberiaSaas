@@ -3,6 +3,7 @@ import type {
   CashMovementRecord,
   CashRegisterSummaryResponse,
   CurrentCashRegisterResponse,
+  InventoryResponse,
   ServicesResponse,
   TeamResponse,
 } from '@barber-saas/api-client';
@@ -32,6 +33,8 @@ import { useAuth } from '../../src/providers/AuthProvider';
 
 function movementLabel(type: CashMovementRecord['type']) {
   if (type === 'sale') return 'Venta';
+  if (type === 'deposit') return 'Depósito';
+  if (type === 'other_income') return 'Otro ingreso';
   if (type === 'expense') return 'Gasto';
   if (type === 'withdrawal') return 'Retiro';
   if (type === 'professional_advance') return 'Anticipo a colaborador';
@@ -40,7 +43,12 @@ function movementLabel(type: CashMovementRecord['type']) {
 }
 
 function movementIsIncome(type: CashMovementRecord['type']) {
-  return type === 'sale' || type === 'professional_advance_reversal';
+  return (
+    type === 'sale' ||
+    type === 'deposit' ||
+    type === 'other_income' ||
+    type === 'professional_advance_reversal'
+  );
 }
 
 export default function CashRegisterScreen() {
@@ -59,15 +67,21 @@ export default function CashRegisterScreen() {
     'card' | 'cash' | 'transfer' | 'other'
   >('cash');
   const [movementType, setMovementType] = useState<
-    'expense' | 'sale' | 'withdrawal'
+    'deposit' | 'expense' | 'other_income' | 'sale' | 'withdrawal'
   >('sale');
-  const [isCommissionableSale, setIsCommissionableSale] = useState(false);
+  const [saleKind, setSaleKind] = useState<'free' | 'product' | 'service'>(
+    'free',
+  );
   const [movementServiceId, setMovementServiceId] = useState<string | null>(
     null,
   );
   const [movementProfessionalId, setMovementProfessionalId] = useState<
     string | null
   >(null);
+  const [movementProductId, setMovementProductId] = useState<string | null>(
+    null,
+  );
+  const [movementProductQuantity, setMovementProductQuantity] = useState('1');
   const [closingAmount, setClosingAmount] = useState('');
   const [closingNote, setClosingNote] = useState('');
   const [isBaseInfoVisible, setIsBaseInfoVisible] = useState(false);
@@ -88,6 +102,12 @@ export default function CashRegisterScreen() {
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<ServicesResponse>('/v1/services'),
     queryKey: ['services'],
+  });
+  const inventoryQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<InventoryResponse>('/v1/inventory'),
+    queryKey: ['inventory'],
   });
   const summaryQuery = useQuery({
     enabled: Boolean(session),
@@ -136,21 +156,49 @@ export default function CashRegisterScreen() {
         throw new Error('Describe el movimiento.');
       if (
         movementType === 'sale' &&
-        isCommissionableSale &&
+        saleKind === 'service' &&
         (!movementServiceId || !movementProfessionalId)
       )
         throw new Error('Selecciona el servicio y el profesional.');
+      const productQuantity = Number(movementProductQuantity);
+      if (
+        movementType === 'sale' &&
+        saleKind === 'product' &&
+        (!movementProductId ||
+          !Number.isInteger(productQuantity) ||
+          productQuantity < 1)
+      )
+        throw new Error('Selecciona el producto y una cantidad válida.');
+      const selectedProduct = inventoryQuery.data?.products.find(
+        (product) => product.id === movementProductId,
+      );
+      if (
+        saleKind === 'product' &&
+        selectedProduct?.stockTrackingEnabled &&
+        productQuantity > selectedProduct.quantityOnHand
+      )
+        throw new Error(
+          `Solo quedan ${selectedProduct.quantityOnHand} unidades disponibles.`,
+        );
       return requireApiClient().request('/v1/cash-register/movements', {
         body: {
           amountCents: Math.round(amount * 100),
           description: movementDescription.trim(),
           paymentMethod: movementPayment,
+          productId:
+            movementType === 'sale' && saleKind === 'product'
+              ? movementProductId
+              : undefined,
+          productQuantity:
+            movementType === 'sale' && saleKind === 'product'
+              ? productQuantity
+              : undefined,
           professionalMembershipId:
-            movementType === 'sale' && isCommissionableSale
+            movementType === 'sale' && saleKind === 'service'
               ? movementProfessionalId
               : undefined,
           serviceId:
-            movementType === 'sale' && isCommissionableSale
+            movementType === 'sale' && saleKind === 'service'
               ? movementServiceId
               : undefined,
           type: movementType,
@@ -167,12 +215,20 @@ export default function CashRegisterScreen() {
       setIsSheetOpen(false);
       setMovementAmount('');
       setMovementDescription('');
-      setIsCommissionableSale(false);
+      setSaleKind('free');
+      setMovementProductId(null);
+      setMovementProductQuantity('1');
       setMovementProfessionalId(null);
       setMovementServiceId(null);
       await queryClient.invalidateQueries({
         queryKey: ['cash-register-summary'],
       });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['business-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['movement-report'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-movements'] }),
+      ]);
     },
   });
   const closeCash = useMutation({
@@ -210,6 +266,9 @@ export default function CashRegisterScreen() {
   );
   const selectedMovementService = servicesQuery.data?.services.find(
     (service) => service.id === movementServiceId,
+  );
+  const selectedMovementProduct = inventoryQuery.data?.products.find(
+    (product) => product.id === movementProductId,
   );
   const commissionableProfessionals = (teamQuery.data?.members ?? []).filter(
     (member) =>
@@ -268,7 +327,7 @@ export default function CashRegisterScreen() {
             <Text style={styles.dayCopy}>
               {totals?.sales
                 ? 'Sigue registrando cada cobro para mantener tu caja al día.'
-                : 'Registra tu primera venta o salida de dinero.'}
+                : 'Registra tu primera venta, ingreso o salida de dinero.'}
             </Text>
           </View>
           <Text style={styles.movementsTitle}>Movimientos recientes</Text>
@@ -277,7 +336,11 @@ export default function CashRegisterScreen() {
               <View style={styles.movementIcon}>
                 <Ionicons
                   color={
-                    movementIsIncome(movement.type) ? '#288B52' : '#B54747'
+                    movement.reversedAt
+                      ? '#6B7480'
+                      : movementIsIncome(movement.type)
+                        ? '#288B52'
+                        : '#B54747'
                   }
                   name={
                     movementIsIncome(movement.type)
@@ -291,17 +354,25 @@ export default function CashRegisterScreen() {
                 <Text style={styles.movementName}>{movement.description}</Text>
                 <Text style={styles.movementMeta}>
                   {movementLabel(movement.type)}
+                  {movement.productId
+                    ? ` · Producto x${movement.productQuantity ?? 1}`
+                    : ''}
+                  {movement.reversedAt ? ' · Revertida' : ''}
                 </Text>
               </View>
               <Text
                 style={[
                   styles.movementAmount,
-                  movementIsIncome(movement.type)
+                  movementIsIncome(movement.type) && !movement.reversedAt
                     ? styles.movementIncome
                     : styles.movementExpense,
                 ]}
               >
-                {movementIsIncome(movement.type) ? '+' : '-'}
+                {movement.reversedAt
+                  ? '↶ '
+                  : movementIsIncome(movement.type)
+                    ? '+'
+                    : '-'}
                 {formatMoney(movement.amountCents)}
               </Text>
             </View>
@@ -315,12 +386,26 @@ export default function CashRegisterScreen() {
             <Pressable
               onPress={() => {
                 setMovementType('sale');
+                setSaleKind('free');
+                setMovementProductId(null);
+                setMovementProfessionalId(null);
+                setMovementServiceId(null);
                 setSheetMode('movement');
                 setIsSheetOpen(true);
               }}
               style={styles.primary}
             >
               <Text style={styles.primaryText}>Registrar venta</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setMovementType('deposit');
+                setSheetMode('movement');
+                setIsSheetOpen(true);
+              }}
+              style={styles.secondary}
+            >
+              <Text style={styles.secondaryText}>Registrar ingreso</Text>
             </Pressable>
             <Pressable
               onPress={() => {
@@ -477,17 +562,29 @@ export default function CashRegisterScreen() {
                 <Text style={styles.sheetTitle}>
                   {movementType === 'sale'
                     ? 'Registrar venta'
-                    : 'Registrar salida'}
+                    : movementType === 'deposit' ||
+                        movementType === 'other_income'
+                      ? 'Registrar ingreso'
+                      : 'Registrar salida'}
                 </Text>
                 <Text style={styles.label}>Tipo</Text>
                 <View style={styles.members}>
-                  {(['sale', 'expense', 'withdrawal'] as const).map((type) => (
+                  {(
+                    [
+                      'sale',
+                      'deposit',
+                      'other_income',
+                      'expense',
+                      'withdrawal',
+                    ] as const
+                  ).map((type) => (
                     <Pressable
                       key={type}
                       onPress={() => {
                         setMovementType(type);
                         if (type !== 'sale') {
-                          setIsCommissionableSale(false);
+                          setSaleKind('free');
+                          setMovementProductId(null);
                           setMovementProfessionalId(null);
                           setMovementServiceId(null);
                         }
@@ -503,11 +600,7 @@ export default function CashRegisterScreen() {
                           movementType === type && styles.selectedText,
                         ]}
                       >
-                        {type === 'sale'
-                          ? 'Venta'
-                          : type === 'expense'
-                            ? 'Gasto'
-                            : 'Retiro'}
+                        {movementLabel(type)}
                       </Text>
                     </Pressable>
                   ))}
@@ -518,42 +611,66 @@ export default function CashRegisterScreen() {
                     <View style={styles.members}>
                       <Pressable
                         onPress={() => {
-                          setIsCommissionableSale(false);
+                          setSaleKind('free');
+                          setMovementProductId(null);
                           setMovementProfessionalId(null);
                           setMovementServiceId(null);
                         }}
                         style={[
                           styles.member,
-                          !isCommissionableSale && styles.selected,
+                          saleKind === 'free' && styles.selected,
                         ]}
                       >
                         <Text
                           style={[
                             styles.memberText,
-                            !isCommissionableSale && styles.selectedText,
+                            saleKind === 'free' && styles.selectedText,
                           ]}
                         >
                           Venta libre
                         </Text>
                       </Pressable>
                       <Pressable
-                        onPress={() => setIsCommissionableSale(true)}
+                        onPress={() => {
+                          setSaleKind('service');
+                          setMovementProductId(null);
+                        }}
                         style={[
                           styles.member,
-                          isCommissionableSale && styles.selected,
+                          saleKind === 'service' && styles.selected,
                         ]}
                       >
                         <Text
                           style={[
                             styles.memberText,
-                            isCommissionableSale && styles.selectedText,
+                            saleKind === 'service' && styles.selectedText,
                           ]}
                         >
                           Servicio comisionable
                         </Text>
                       </Pressable>
+                      <Pressable
+                        onPress={() => {
+                          setSaleKind('product');
+                          setMovementProfessionalId(null);
+                          setMovementServiceId(null);
+                        }}
+                        style={[
+                          styles.member,
+                          saleKind === 'product' && styles.selected,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.memberText,
+                            saleKind === 'product' && styles.selectedText,
+                          ]}
+                        >
+                          Producto
+                        </Text>
+                      </Pressable>
                     </View>
-                    {isCommissionableSale ? (
+                    {saleKind === 'service' ? (
                       <>
                         <Text style={styles.label}>Servicio</Text>
                         <View style={styles.members}>
@@ -622,6 +739,77 @@ export default function CashRegisterScreen() {
                         </View>
                       </>
                     ) : null}
+                    {saleKind === 'product' ? (
+                      <>
+                        <Text style={styles.label}>Producto</Text>
+                        <View style={styles.members}>
+                          {(inventoryQuery.data?.products ?? []).map(
+                            (product) => (
+                              <Pressable
+                                disabled={
+                                  product.stockTrackingEnabled &&
+                                  product.quantityOnHand < 1
+                                }
+                                key={product.id}
+                                onPress={() => {
+                                  setMovementProductId(product.id);
+                                  setMovementProductQuantity('1');
+                                  setMovementAmount(
+                                    (product.salePriceCents / 100).toFixed(2),
+                                  );
+                                  setMovementDescription(product.name);
+                                }}
+                                style={[
+                                  styles.member,
+                                  movementProductId === product.id &&
+                                    styles.selected,
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.memberText,
+                                    movementProductId === product.id &&
+                                      styles.selectedText,
+                                  ]}
+                                >
+                                  {product.name} ({product.quantityOnHand})
+                                </Text>
+                              </Pressable>
+                            ),
+                          )}
+                          {!inventoryQuery.data?.products.length ? (
+                            <Text style={styles.inlineEmpty}>
+                              Crea productos con existencias desde Inventario.
+                            </Text>
+                          ) : null}
+                        </View>
+                        <Text style={styles.label}>Cantidad</Text>
+                        <TextInput
+                          accessibilityLabel="Cantidad de producto"
+                          keyboardType="number-pad"
+                          onChangeText={(value) => {
+                            setMovementProductQuantity(value);
+                            const quantity = Number(value);
+                            if (
+                              selectedMovementProduct &&
+                              Number.isInteger(quantity) &&
+                              quantity > 0
+                            )
+                              setMovementAmount(
+                                (
+                                  (selectedMovementProduct.salePriceCents *
+                                    quantity) /
+                                  100
+                                ).toFixed(2),
+                              );
+                          }}
+                          placeholder="1"
+                          placeholderTextColor="#8B96A5"
+                          style={styles.input}
+                          value={movementProductQuantity}
+                        />
+                      </>
+                    ) : null}
                   </>
                 ) : null}
                 <Text style={styles.label}>Descripción</Text>
@@ -637,6 +825,7 @@ export default function CashRegisterScreen() {
                 <TextInput
                   accessibilityLabel="Monto del movimiento"
                   keyboardType="decimal-pad"
+                  editable={saleKind !== 'product'}
                   onChangeText={setMovementAmount}
                   placeholder="0.00"
                   placeholderTextColor="#8B96A5"

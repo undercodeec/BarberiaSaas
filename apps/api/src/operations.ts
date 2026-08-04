@@ -1,7 +1,10 @@
 import {
+  AppointmentStatus,
+  CashRegisterStatus,
   InvitationStatus,
   MembershipRole,
   MembershipStatus,
+  OrganizationStatus,
   SubscriptionStatus,
   type DatabaseClient,
 } from '@barber-saas/database';
@@ -25,49 +28,102 @@ import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import type { ApiConfig } from './config';
-import { ApiError } from './errors';
-import type { InvitationMailer } from './recovery-mailer';
-import { createOpaqueToken, hashOpaqueToken } from './security';
+import { ApiError, isUniqueConstraintError } from './errors';
+import type { InvitationMailer, PlatformAccessMailer } from './recovery-mailer';
+import {
+  createOpaqueToken,
+  createVerificationCode,
+  hashOpaqueToken,
+} from './security';
+import {
+  ensureOrganizationSubscription,
+  planDefinition,
+  SUBSCRIPTION_PLANS,
+} from './subscription-policy';
 
 const INVITATION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
-const DAY_MS = 24 * 60 * 60 * 1000;
-const TRIAL_DAYS = 14;
-const GRACE_DAYS = 7;
 const teamRecordParamsSchema = z.object({ id: z.uuid() });
-const SUBSCRIPTION_PLANS = [
-  {
-    available: true,
-    code: 'essential',
-    features: [
-      'Una sucursal',
-      'Colaboradores ilimitados',
-      'Agenda, clientes, servicios y reservas',
-      'Página pública y enlace de reservas',
-      'Caja, Nava Wallet y comisiones',
-      'Permisos por perfil de acceso',
-      'Reportes esenciales',
-    ],
-    limits: { locations: 1, teamMembers: null },
-    name: 'Esencial',
-    sortOrder: 10,
-  },
-  {
-    available: false,
-    code: 'multi',
-    features: [
-      'Hasta cinco sucursales',
-      'Agenda y reportes consolidados',
-      'Caja y configuración por sucursal',
-      'Permisos con alcance por sucursal',
-      'Soporte prioritario',
-    ],
-    limits: { locations: 5, teamMembers: null },
-    name: 'Multi',
-    sortOrder: 20,
-  },
+const subscriptionSimulationSchema = z.object({
+  status: z.enum(['active', 'suspended']),
+});
+const createLocationSchema = z.object({
+  city: z.string().trim().max(120).optional(),
+  countryCode: z
+    .string()
+    .trim()
+    .length(2)
+    .transform((value) => value.toUpperCase()),
+  currencyCode: z
+    .string()
+    .trim()
+    .length(3)
+    .transform((value) => value.toUpperCase()),
+  name: z.string().trim().min(2).max(120),
+  phone: z.string().trim().min(7).max(24),
+  slug: z
+    .string()
+    .trim()
+    .min(3)
+    .max(80)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u),
+  timezone: z.string().trim().min(3).max(80),
+});
+const platformOrganizationParamsSchema = z.object({ id: z.uuid() });
+const platformOrganizationListSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  search: z.string().trim().max(120).optional(),
+  status: z
+    .enum(['all', 'trial', 'active', 'past_due', 'suspended', 'cancelled'])
+    .default('all'),
+});
+const platformOrganizationActionSchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('suspend'),
+    reason: z.string().trim().min(10).max(500),
+  }),
+  z.object({
+    action: z.literal('reactivate'),
+    reason: z.string().trim().min(10).max(500),
+  }),
+  z.object({
+    action: z.literal('change_plan'),
+    planCode: z.string().trim().min(1).max(40),
+    reason: z.string().trim().min(10).max(500),
+  }),
+]);
+const platformSupportSchema = z.object({
+  reason: z.string().trim().min(10).max(500),
+});
+const platformOrganizationFilterSchema = z.object({
+  organizationId: z.uuid().optional(),
+});
+const platformAccessCodeSchema = z.object({
+  code: z.string().regex(/^\d{6}$/u),
+});
+const PLATFORM_ACCESS_CODE_DURATION_MS = 5 * 60 * 1000;
+const PLATFORM_ACCESS_MAX_FAILED_ATTEMPTS = 5;
+const SUBSCRIPTION_CONTROLLED_PREFIXES = [
+  '/v1/appointments',
+  '/v1/booking-settings',
+  '/v1/business-schedule',
+  '/v1/cash-register',
+  '/v1/clients',
+  '/v1/commissions',
+  '/v1/inventory',
+  '/v1/locations',
+  '/v1/reviews',
+  '/v1/schedule-blocks',
+  '/v1/schedules',
+  '/v1/service-categories',
+  '/v1/services',
+  '/v1/team',
 ] as const;
 
 interface AuthenticatedIdentity {
+  readonly session: {
+    readonly id: string;
+  };
   readonly user: {
     readonly email: string;
     readonly fullName: string;
@@ -79,6 +135,87 @@ type Authenticate = (
   database: DatabaseClient,
   request: FastifyRequest,
 ) => Promise<AuthenticatedIdentity>;
+
+function configuredPlatformEmails(config: ApiConfig) {
+  return new Set(
+    config.PLATFORM_ADMIN_EMAILS.split(',')
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+async function requirePlatformOperator(
+  database: DatabaseClient,
+  authenticate: Authenticate,
+  request: FastifyRequest,
+  config: ApiConfig,
+) {
+  const identity = await authenticate(database, request);
+  const { user } = identity;
+  if (!configuredPlatformEmails(config).has(user.email.trim().toLowerCase())) {
+    throw new ApiError(
+      403,
+      'PLATFORM_ADMIN_REQUIRED',
+      'Esta sección está reservada para operadores de plataforma.',
+    );
+  }
+  return identity;
+}
+
+async function requirePlatformAdmin(
+  database: DatabaseClient,
+  authenticate: Authenticate,
+  request: FastifyRequest,
+  config: ApiConfig,
+) {
+  const identity = await requirePlatformOperator(
+    database,
+    authenticate,
+    request,
+    config,
+  );
+  const verifiedAccess = await database.platformAdminAccessChallenge.findFirst({
+    where: {
+      sessionId: identity.session.id,
+      userId: identity.user.id,
+      verifiedAt: { not: null },
+    },
+  });
+  if (!verifiedAccess) {
+    throw new ApiError(
+      403,
+      'PLATFORM_ACCESS_CODE_REQUIRED',
+      'Confirma el código enviado a tu correo para acceder al panel.',
+    );
+  }
+  return identity.user;
+}
+
+function notificationDeliveryFailures(value: unknown) {
+  if (!value || typeof value !== 'object') return [];
+  const delivery = (value as { delivery?: unknown }).delivery;
+  if (!delivery || typeof delivery !== 'object') return [];
+  return Object.entries(delivery as Record<string, unknown>).flatMap(
+    ([channel, attempt]) => {
+      if (!attempt || typeof attempt !== 'object') return [];
+      const record = attempt as { attempts?: unknown; state?: unknown };
+      return record.state === 'failed'
+        ? [
+            {
+              attempts:
+                typeof record.attempts === 'number' ? record.attempts : 0,
+              channel,
+            },
+          ]
+        : [];
+    },
+  );
+}
+
+function maskedEmail(email: string) {
+  const [name = '', domain = ''] = email.split('@');
+  return `${name.slice(0, 2)}${'*'.repeat(Math.max(2, name.length - 2))}@${domain}`;
+}
 
 function permissionRole(role: MembershipRole): PermissionRole {
   return role.toLowerCase() as PermissionRole;
@@ -180,82 +317,608 @@ function assertNoScheduleOverlaps(
   }
 }
 
+function registerPlatformRoutes(
+  app: FastifyInstance,
+  database: DatabaseClient,
+  authenticate: Authenticate,
+  config: ApiConfig,
+  platformAccessMailer: PlatformAccessMailer | null,
+) {
+  app.post('/v1/platform/access-code', async (request) => {
+    const identity = await requirePlatformOperator(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    if (!platformAccessMailer) {
+      throw new ApiError(
+        503,
+        'PLATFORM_ACCESS_DELIVERY_UNAVAILABLE',
+        'El envío de códigos de acceso no está disponible.',
+      );
+    }
+    const now = new Date();
+    const expiresAt = new Date(
+      now.getTime() + PLATFORM_ACCESS_CODE_DURATION_MS,
+    );
+    const code = createVerificationCode();
+    await database.$transaction(async (transaction) => {
+      await transaction.platformAdminAccessChallenge.updateMany({
+        data: { usedAt: now },
+        where: {
+          sessionId: identity.session.id,
+          usedAt: null,
+          verifiedAt: null,
+        },
+      });
+      await transaction.platformAdminAccessChallenge.create({
+        data: {
+          codeHash: hashOpaqueToken(code),
+          expiresAt,
+          sessionId: identity.session.id,
+          userId: identity.user.id,
+        },
+      });
+    });
+    await platformAccessMailer.send({ code, email: identity.user.email });
+    return {
+      expiresAt: expiresAt.toISOString(),
+      message: 'Enviamos un código de acceso a tu correo registrado.',
+    };
+  });
+
+  app.post('/v1/platform/verify-access-code', async (request) => {
+    const identity = await requirePlatformOperator(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    const { code } = platformAccessCodeSchema.parse(request.body);
+    const now = new Date();
+    await database.$transaction(async (transaction) => {
+      const challenge =
+        await transaction.platformAdminAccessChallenge.findFirst({
+          orderBy: { createdAt: 'desc' },
+          where: { sessionId: identity.session.id, userId: identity.user.id },
+        });
+      if (!challenge) {
+        throw new ApiError(
+          400,
+          'PLATFORM_ACCESS_CODE_REQUIRED',
+          'Solicita un código antes de continuar.',
+        );
+      }
+      if (challenge.usedAt) {
+        throw new ApiError(
+          400,
+          'PLATFORM_ACCESS_CODE_USED',
+          'Ese código ya no puede utilizarse. Solicita uno nuevo.',
+        );
+      }
+      if (challenge.expiresAt <= now) {
+        await transaction.platformAdminAccessChallenge.update({
+          data: { usedAt: now },
+          where: { id: challenge.id },
+        });
+        throw new ApiError(
+          400,
+          'PLATFORM_ACCESS_CODE_EXPIRED',
+          'El código venció después de 5 minutos. Solicita uno nuevo.',
+        );
+      }
+      if (challenge.codeHash !== hashOpaqueToken(code)) {
+        const failedAttempts = challenge.failedAttempts + 1;
+        await transaction.platformAdminAccessChallenge.update({
+          data: {
+            failedAttempts,
+            ...(failedAttempts >= PLATFORM_ACCESS_MAX_FAILED_ATTEMPTS
+              ? { usedAt: now }
+              : {}),
+          },
+          where: { id: challenge.id },
+        });
+        if (failedAttempts >= PLATFORM_ACCESS_MAX_FAILED_ATTEMPTS) {
+          throw new ApiError(
+            429,
+            'PLATFORM_ACCESS_CODE_RATE_LIMITED',
+            'Demasiados intentos. Solicita un nuevo código.',
+          );
+        }
+        throw new ApiError(
+          400,
+          'INVALID_PLATFORM_ACCESS_CODE',
+          'El código no es válido.',
+        );
+      }
+      await transaction.platformAdminAccessChallenge.update({
+        data: { usedAt: now, verifiedAt: now },
+        where: { id: challenge.id },
+      });
+    });
+    return {
+      operator: {
+        email: identity.user.email,
+        fullName: identity.user.fullName,
+        id: identity.user.id,
+      },
+    };
+  });
+
+  app.get('/v1/platform/session', async (request) => {
+    const user = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    return {
+      operator: { email: user.email, fullName: user.fullName, id: user.id },
+    };
+  });
+
+  app.get('/v1/platform/overview', async (request) => {
+    await requirePlatformAdmin(database, authenticate, request, config);
+    const now = new Date();
+    const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const [
+      organizations,
+      subscriptionsByStatus,
+      trialsEndingSoon,
+      withService,
+      withAppointment,
+      withCompletedAppointment,
+      notificationRows,
+    ] = await Promise.all([
+      database.organization.count({ where: { deletedAt: null } }),
+      database.subscription.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+      }),
+      database.subscription.count({
+        where: {
+          status: SubscriptionStatus.TRIAL,
+          trialEndsAt: { gt: now, lte: nextWeek },
+        },
+      }),
+      database.organization.count({
+        where: { deletedAt: null, services: { some: { isActive: true } } },
+      }),
+      database.organization.count({
+        where: { appointments: { some: {} }, deletedAt: null },
+      }),
+      database.organization.count({
+        where: {
+          appointments: { some: { status: AppointmentStatus.COMPLETED } },
+          deletedAt: null,
+        },
+      }),
+      database.appNotification.findMany({
+        orderBy: { createdAt: 'desc' },
+        select: { data: true },
+        take: 500,
+      }),
+    ]);
+    return {
+      activation: {
+        completedFirstAppointment: withCompletedAppointment,
+        createdFirstAppointment: withAppointment,
+        createdService: withService,
+        organizations,
+      },
+      notificationFailures: notificationRows.reduce(
+        (total, row) => total + notificationDeliveryFailures(row.data).length,
+        0,
+      ),
+      subscriptions: Object.fromEntries(
+        subscriptionsByStatus.map((entry) => [
+          entry.status.toLowerCase(),
+          entry._count._all,
+        ]),
+      ),
+      trialsEndingSoon,
+    };
+  });
+
+  app.get('/v1/platform/organizations', async (request) => {
+    await requirePlatformAdmin(database, authenticate, request, config);
+    const query = platformOrganizationListSchema.parse(request.query);
+    const subscriptionStatus =
+      query.status === 'all'
+        ? undefined
+        : (query.status.toUpperCase() as SubscriptionStatus);
+    const where = {
+      deletedAt: null,
+      ...(query.search
+        ? {
+            OR: [
+              {
+                name: { contains: query.search, mode: 'insensitive' as const },
+              },
+              {
+                slug: { contains: query.search, mode: 'insensitive' as const },
+              },
+            ],
+          }
+        : {}),
+      ...(subscriptionStatus
+        ? { subscription: { is: { status: subscriptionStatus } } }
+        : {}),
+    };
+    const [total, organizations] = await Promise.all([
+      database.organization.count({ where }),
+      database.organization.findMany({
+        include: {
+          _count: {
+            select: {
+              appointments: true,
+              locations: true,
+              memberships: true,
+              services: true,
+            },
+          },
+          memberships: {
+            include: {
+              user: { select: { email: true, fullName: true } },
+            },
+            take: 1,
+            where: { role: MembershipRole.OWNER },
+          },
+          subscription: { include: { plan: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+      }),
+    ]);
+    return {
+      organizations: organizations.map((organization) => ({
+        counts: organization._count,
+        createdAt: organization.createdAt.toISOString(),
+        id: organization.id,
+        name: organization.name,
+        owner: organization.memberships[0]
+          ? {
+              email: maskedEmail(organization.memberships[0].user.email),
+              fullName: organization.memberships[0].user.fullName,
+            }
+          : null,
+        plan: organization.subscription?.plan.code ?? null,
+        slug: organization.slug,
+        status:
+          organization.subscription?.status.toLowerCase() ??
+          organization.status.toLowerCase(),
+        trialEndsAt:
+          organization.subscription?.trialEndsAt?.toISOString() ?? null,
+      })),
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+      },
+    };
+  });
+
+  app.get('/v1/platform/notification-errors', async (request) => {
+    await requirePlatformAdmin(database, authenticate, request, config);
+    const query = platformOrganizationFilterSchema.parse(request.query);
+    const notifications = await database.appNotification.findMany({
+      include: { organization: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+      ...(query.organizationId
+        ? { where: { organizationId: query.organizationId } }
+        : {}),
+    });
+    return {
+      errors: notifications
+        .flatMap((notification) =>
+          notificationDeliveryFailures(notification.data).map((failure) => ({
+            ...failure,
+            createdAt: notification.createdAt.toISOString(),
+            id: `${notification.id}:${failure.channel}`,
+            notificationId: notification.id,
+            organization: notification.organization,
+            title: notification.title,
+          })),
+        )
+        .slice(0, 100),
+    };
+  });
+
+  app.get('/v1/platform/audit', async (request) => {
+    await requirePlatformAdmin(database, authenticate, request, config);
+    const query = platformOrganizationFilterSchema.parse(request.query);
+    const logs = await database.auditLog.findMany({
+      include: {
+        actor: { select: { email: true, fullName: true } },
+        organization: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      where: {
+        action: { startsWith: 'platform.' },
+        ...(query.organizationId
+          ? { organizationId: query.organizationId }
+          : {}),
+      },
+    });
+    return {
+      logs: logs.map((log) => ({
+        action: log.action,
+        actor: log.actor
+          ? { email: log.actor.email, fullName: log.actor.fullName }
+          : null,
+        createdAt: log.createdAt.toISOString(),
+        id: log.id,
+        organization: log.organization.name,
+        reason:
+          log.metadata && typeof log.metadata === 'object'
+            ? ((log.metadata as { reason?: unknown }).reason ?? null)
+            : null,
+      })),
+    };
+  });
+
+  app.patch('/v1/platform/organizations/:id', async (request) => {
+    const user = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    const { id } = platformOrganizationParamsSchema.parse(request.params);
+    const input = platformOrganizationActionSchema.parse(request.body);
+    return database.$transaction(async (transaction) => {
+      const organization = await transaction.organization.findFirst({
+        where: { deletedAt: null, id },
+      });
+      if (!organization)
+        throw new ApiError(
+          404,
+          'ORGANIZATION_NOT_FOUND',
+          'La organización no existe.',
+        );
+      const { subscription } = await ensureOrganizationSubscription(
+        transaction,
+        organization.id,
+      );
+      const before = {
+        organizationStatus: organization.status,
+        planId: subscription.planId,
+        subscriptionStatus: subscription.status,
+      };
+      let updated = subscription;
+      if (input.action === 'suspend') {
+        updated = await transaction.subscription.update({
+          data: { status: SubscriptionStatus.SUSPENDED },
+          where: { id: subscription.id },
+        });
+        await transaction.organization.update({
+          data: { status: OrganizationStatus.SUSPENDED },
+          where: { id: organization.id },
+        });
+      } else if (input.action === 'reactivate') {
+        const periodStart = new Date();
+        updated = await transaction.subscription.update({
+          data: {
+            currentPeriodEnd: new Date(
+              periodStart.getTime() + 30 * 24 * 60 * 60 * 1000,
+            ),
+            currentPeriodStart: periodStart,
+            graceEndsAt: null,
+            status: SubscriptionStatus.ACTIVE,
+            trialEndsAt: null,
+          },
+          where: { id: subscription.id },
+        });
+        await transaction.organization.update({
+          data: { status: OrganizationStatus.ACTIVE },
+          where: { id: organization.id },
+        });
+      } else {
+        const plan = await transaction.plan.findFirst({
+          where: { code: input.planCode, isActive: true },
+        });
+        if (!plan)
+          throw new ApiError(404, 'PLAN_NOT_FOUND', 'El plan no existe.');
+        updated = await transaction.subscription.update({
+          data: { planId: plan.id },
+          where: { id: subscription.id },
+        });
+      }
+      const organizationStatus =
+        input.action === 'suspend'
+          ? OrganizationStatus.SUSPENDED
+          : input.action === 'reactivate'
+            ? OrganizationStatus.ACTIVE
+            : organization.status;
+      await transaction.auditLog.create({
+        data: {
+          action: `platform.organization.${input.action}`,
+          actorUserId: user.id,
+          afterData: {
+            organizationStatus,
+            planId: updated.planId,
+            subscriptionStatus: updated.status,
+          },
+          beforeData: before,
+          entityId: organization.id,
+          entityType: 'organization',
+          metadata: { reason: input.reason, source: 'platform_admin' },
+          organizationId: organization.id,
+        },
+      });
+      return {
+        organization: {
+          id: organization.id,
+          planId: updated.planId,
+          status: updated.status.toLowerCase(),
+        },
+      };
+    });
+  });
+
+  app.post('/v1/platform/organizations/:id/support', async (request) => {
+    const user = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    const { id } = platformOrganizationParamsSchema.parse(request.params);
+    const input = platformSupportSchema.parse(request.body);
+    const organization = await database.organization.findFirst({
+      include: {
+        memberships: {
+          include: { user: { select: { email: true, fullName: true } } },
+          take: 1,
+          where: { role: MembershipRole.OWNER },
+        },
+        subscription: { include: { plan: true } },
+      },
+      where: { deletedAt: null, id },
+    });
+    if (!organization)
+      throw new ApiError(
+        404,
+        'ORGANIZATION_NOT_FOUND',
+        'La organización no existe.',
+      );
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const [locations, members, services, appointments, openCash, rows] =
+      await Promise.all([
+        database.location.count({
+          where: { isActive: true, organizationId: organization.id },
+        }),
+        database.membership.count({
+          where: {
+            organizationId: organization.id,
+            status: MembershipStatus.ACTIVE,
+          },
+        }),
+        database.service.count({
+          where: { isActive: true, organizationId: organization.id },
+        }),
+        database.appointment.count({
+          where: {
+            createdAt: { gte: thirtyDaysAgo },
+            organizationId: organization.id,
+          },
+        }),
+        database.cashRegisterSession.count({
+          where: {
+            organizationId: organization.id,
+            status: CashRegisterStatus.OPEN,
+          },
+        }),
+        database.appNotification.findMany({
+          orderBy: { createdAt: 'desc' },
+          select: { data: true },
+          take: 200,
+          where: { organizationId: organization.id },
+        }),
+      ]);
+    await database.auditLog.create({
+      data: {
+        action: 'platform.organization.support_accessed',
+        actorUserId: user.id,
+        entityId: organization.id,
+        entityType: 'organization',
+        metadata: {
+          reason: input.reason,
+          scope: 'operational_diagnostics',
+          source: 'platform_admin',
+        },
+        organizationId: organization.id,
+      },
+    });
+    const owner = organization.memberships[0]?.user;
+    return {
+      diagnostics: {
+        counts: {
+          activeMembers: members,
+          activeServices: services,
+          locations,
+          notificationFailures: rows.reduce(
+            (total, row) =>
+              total + notificationDeliveryFailures(row.data).length,
+            0,
+          ),
+          openCashRegisters: openCash,
+          recentAppointments: appointments,
+        },
+        organization: {
+          id: organization.id,
+          name: organization.name,
+          plan: organization.subscription?.plan.code ?? null,
+          status:
+            organization.subscription?.status.toLowerCase() ??
+            organization.status.toLowerCase(),
+        },
+        owner: owner
+          ? { email: maskedEmail(owner.email), fullName: owner.fullName }
+          : null,
+      },
+      notice:
+        'Acceso registrado. No se creó una sesión del negocio ni se suplantó a ningún usuario.',
+    };
+  });
+}
+
 export function registerOperationsRoutes(
   app: FastifyInstance,
   database: DatabaseClient,
   authenticate: Authenticate,
   invitationMailer: InvitationMailer | null,
   config: ApiConfig,
+  platformAccessMailer: PlatformAccessMailer | null,
 ) {
+  registerPlatformRoutes(
+    app,
+    database,
+    authenticate,
+    config,
+    platformAccessMailer,
+  );
+  app.addHook('preHandler', async (request) => {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(request.method)) return;
+    const path = request.url.split('?')[0] ?? request.url;
+    if (path === '/v1/cash-register/close') return;
+    if (
+      !SUBSCRIPTION_CONTROLLED_PREFIXES.some((prefix) =>
+        path.startsWith(prefix),
+      )
+    )
+      return;
+    const { user } = await authenticate(database, request);
+    const membership = await database.membership.findFirst({
+      where: { status: MembershipStatus.ACTIVE, userId: user.id },
+    });
+    if (!membership) return;
+    const { subscription } = await database.$transaction((transaction) =>
+      ensureOrganizationSubscription(transaction, membership.organizationId),
+    );
+    if (
+      subscription.status === SubscriptionStatus.SUSPENDED ||
+      subscription.status === SubscriptionStatus.CANCELLED
+    )
+      throw new ApiError(
+        423,
+        'SUBSCRIPTION_READ_ONLY',
+        'Tu suscripción está en modo de solo lectura. Reactívala para realizar cambios.',
+      );
+  });
+
   app.get('/v1/subscription', async (request) => {
     const { user } = await authenticate(database, request);
     const current = await requireMembership(database, user.id);
     const now = new Date();
-    const trialEndsAt = new Date(now.getTime() + TRIAL_DAYS * DAY_MS);
-    const graceEndsAt = new Date(trialEndsAt.getTime() + GRACE_DAYS * DAY_MS);
-    const { plans, subscription } = await database.$transaction(
-      async (transaction) => {
-        const storedPlans = [];
-        for (const definition of SUBSCRIPTION_PLANS) {
-          storedPlans.push(
-            await transaction.plan.upsert({
-              create: {
-                code: definition.code,
-                features: [...definition.features],
-                isPublic: definition.available,
-                limits: definition.limits,
-                name: definition.name,
-                sortOrder: definition.sortOrder,
-              },
-              update: {
-                features: [...definition.features],
-                isActive: true,
-                isPublic: definition.available,
-                limits: definition.limits,
-                name: definition.name,
-                sortOrder: definition.sortOrder,
-              },
-              where: { code: definition.code },
-            }),
-          );
-        }
-        const essential = storedPlans.find(({ code }) => code === 'essential');
-        if (!essential) throw new Error('El plan Esencial no está disponible.');
-        let activeSubscription = await transaction.subscription.upsert({
-          create: {
-            currentPeriodEnd: trialEndsAt,
-            currentPeriodStart: now,
-            graceEndsAt,
-            organizationId: current.organizationId,
-            planId: essential.id,
-            status: SubscriptionStatus.TRIAL,
-            trialEndsAt,
-          },
-          update: {},
-          where: { organizationId: current.organizationId },
-        });
-        if (
-          activeSubscription.status === SubscriptionStatus.TRIAL &&
-          activeSubscription.trialEndsAt &&
-          activeSubscription.trialEndsAt <= now
-        ) {
-          activeSubscription = await transaction.subscription.update({
-            data: { status: SubscriptionStatus.PAST_DUE },
-            where: { id: activeSubscription.id },
-          });
-        }
-        if (
-          activeSubscription.status === SubscriptionStatus.PAST_DUE &&
-          activeSubscription.graceEndsAt &&
-          activeSubscription.graceEndsAt <= now
-        ) {
-          activeSubscription = await transaction.subscription.update({
-            data: { status: SubscriptionStatus.SUSPENDED },
-            where: { id: activeSubscription.id },
-          });
-        }
-        return { plans: storedPlans, subscription: activeSubscription };
-      },
+    const { plans, subscription } = await database.$transaction((transaction) =>
+      ensureOrganizationSubscription(transaction, current.organizationId, now),
     );
     const [locations, teamMembers] = await Promise.all([
       database.location.count({
@@ -273,13 +936,18 @@ export function registerOperationsRoutes(
       throw new Error('La suscripción no tiene un plan válido.');
     return {
       current: {
+        canManage: current.role === MembershipRole.OWNER,
         currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
+        featureFlags:
+          planDefinition(currentPlan.code)?.featureFlags ??
+          SUBSCRIPTION_PLANS[0].featureFlags,
         graceEndsAt: subscription.graceEndsAt?.toISOString() ?? null,
         planCode: currentPlan.code,
         readOnly:
           subscription.status === SubscriptionStatus.CANCELLED ||
           subscription.status === SubscriptionStatus.SUSPENDED,
         status: subscription.status.toLowerCase(),
+        simulationAvailable: config.APP_ENV !== 'production',
         trialEndsAt: subscription.trialEndsAt?.toISOString() ?? null,
       },
       plans: plans.map((plan) => {
@@ -290,6 +958,9 @@ export function registerOperationsRoutes(
           available: definition?.available ?? false,
           code: plan.code,
           currencyCode: plan.currencyCode,
+          featureFlags:
+            planDefinition(plan.code)?.featureFlags ??
+            SUBSCRIPTION_PLANS[0].featureFlags,
           features: plan.features,
           limits: plan.limits,
           monthlyPriceCents: plan.monthlyPriceCents,
@@ -298,6 +969,163 @@ export function registerOperationsRoutes(
       }),
       usage: { locations, teamMembers },
     };
+  });
+
+  app.post('/v1/subscription/simulate', async (request) => {
+    if (config.APP_ENV === 'production')
+      throw new ApiError(
+        404,
+        'SIMULATION_NOT_AVAILABLE',
+        'La simulación de suscripción no está disponible.',
+      );
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(database, user.id);
+    if (current.role !== MembershipRole.OWNER)
+      throw new ApiError(
+        403,
+        'FORBIDDEN',
+        'Solo el propietario puede simular el estado de la suscripción.',
+      );
+    const input = subscriptionSimulationSchema.parse(request.body);
+    const result = await database.$transaction(async (transaction) => {
+      const { subscription } = await ensureOrganizationSubscription(
+        transaction,
+        current.organizationId,
+      );
+      const status =
+        input.status === 'active'
+          ? SubscriptionStatus.ACTIVE
+          : SubscriptionStatus.SUSPENDED;
+      const updated = await transaction.subscription.update({
+        data: {
+          ...(status === SubscriptionStatus.ACTIVE
+            ? {
+                currentPeriodEnd: new Date(
+                  Date.now() + 30 * 24 * 60 * 60 * 1000,
+                ),
+                currentPeriodStart: new Date(),
+              }
+            : {}),
+          status,
+        },
+        where: { id: subscription.id },
+      });
+      await transaction.auditLog.create({
+        data: {
+          action:
+            status === SubscriptionStatus.ACTIVE
+              ? 'subscription.reactivated_simulation'
+              : 'subscription.suspended_simulation',
+          actorUserId: user.id,
+          afterData: { status: updated.status },
+          beforeData: { status: subscription.status },
+          entityId: subscription.id,
+          entityType: 'subscription',
+          organizationId: current.organizationId,
+        },
+      });
+      return updated;
+    });
+    return {
+      current: {
+        readOnly:
+          result.status === SubscriptionStatus.SUSPENDED ||
+          result.status === SubscriptionStatus.CANCELLED,
+        status: result.status.toLowerCase(),
+      },
+    };
+  });
+
+  app.post('/v1/locations', async (request, reply) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(database, user.id);
+    if (current.role !== MembershipRole.OWNER)
+      throw new ApiError(
+        403,
+        'FORBIDDEN',
+        'Solo el propietario puede agregar sucursales.',
+      );
+    const input = createLocationSchema.parse(request.body);
+    try {
+      const location = await database.$transaction(async (transaction) => {
+        const { plans, subscription } = await ensureOrganizationSubscription(
+          transaction,
+          current.organizationId,
+        );
+        const plan = plans.find(({ id }) => id === subscription.planId);
+        const definition = plan ? planDefinition(plan.code) : null;
+        const maximumLocations = definition?.limits.locations ?? 1;
+        const usedLocations = await transaction.location.count({
+          where: {
+            isActive: true,
+            organizationId: current.organizationId,
+          },
+        });
+        if (usedLocations >= maximumLocations)
+          throw new ApiError(
+            409,
+            'PLAN_LIMIT_REACHED',
+            `El plan ${definition?.name ?? 'actual'} permite ${maximumLocations} sucursal${maximumLocations === 1 ? '' : 'es'}.`,
+          );
+        const created = await transaction.location.create({
+          data: {
+            city: input.city || null,
+            countryCode: input.countryCode,
+            currencyCode: input.currencyCode,
+            name: input.name,
+            organizationId: current.organizationId,
+            phone: input.phone,
+            slug: input.slug,
+            timezone: input.timezone,
+            whatsappPhone: input.phone,
+          },
+        });
+        await transaction.memberLocation.upsert({
+          create: { locationId: created.id, membershipId: current.id },
+          update: {},
+          where: {
+            membershipId_locationId: {
+              locationId: created.id,
+              membershipId: current.id,
+            },
+          },
+        });
+        await transaction.businessWeeklySchedule.createMany({
+          data: Array.from({ length: 7 }, (_, weekday) => ({
+            endMinute: 1080,
+            isOpen: true,
+            locationId: created.id,
+            organizationId: current.organizationId,
+            startMinute: 540,
+            weekday,
+          })),
+        });
+        await transaction.auditLog.create({
+          data: {
+            action: 'location.created',
+            actorUserId: user.id,
+            afterData: {
+              planCode: plan?.code,
+              usedLocations: usedLocations + 1,
+            },
+            entityId: created.id,
+            entityType: 'location',
+            locationId: created.id,
+            organizationId: current.organizationId,
+          },
+        });
+        return created;
+      });
+      return reply.code(201).send({ location });
+    } catch (error) {
+      if (isUniqueConstraintError(error))
+        throw new ApiError(
+          409,
+          'LOCATION_ALREADY_EXISTS',
+          'Ya existe una sucursal con ese enlace.',
+        );
+      throw error;
+    }
   });
 
   app.get('/v1/team', async (request) => {
