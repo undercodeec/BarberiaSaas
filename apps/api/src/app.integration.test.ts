@@ -58,6 +58,95 @@ describe('CORS', () => {
   });
 });
 
+describe('limitación de autenticación por IP', () => {
+  it('limita registro y reenvío por separado y publica Retry-After', async () => {
+    const app = await buildApi({
+      config: readConfig({
+        API_HOST: '127.0.0.1',
+        API_PORT: '4000',
+        API_TRUST_PROXY: 'true',
+        APP_ENV: 'local',
+        AUTH_IP_RATE_LIMIT_WINDOW_SECONDS: '60',
+        AUTH_REGISTER_RATE_LIMIT_MAX: '2',
+        AUTH_RESEND_RATE_LIMIT_MAX: '2',
+        CORS_ORIGIN: 'http://localhost:8081',
+        DATABASE_URL: 'postgresql://unused/unused',
+        MOBILE_INVITATION_URL: 'barbersaas://accept-invitation',
+        MOBILE_RESET_URL: 'barbersaas://reset-password',
+      }),
+    });
+    const headers = { 'x-forwarded-for': '203.0.113.10' };
+
+    try {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const response = await app.inject({
+          headers,
+          method: 'POST',
+          payload: {},
+          url: '/v1/auth/register',
+        });
+        expect(response.statusCode).toBe(400);
+        expect(response.headers['x-ratelimit-limit']).toBe('2');
+        expect(response.headers['x-ratelimit-remaining']).toBe(
+          String(1 - attempt),
+        );
+      }
+
+      const blockedRegister = await app.inject({
+        headers,
+        method: 'POST',
+        payload: {},
+        url: '/v1/auth/register',
+      });
+      expect(blockedRegister.statusCode).toBe(429);
+      expect(blockedRegister.json()).toMatchObject({
+        code: 'AUTH_REGISTER_RATE_LIMITED',
+      });
+      expect(Number(blockedRegister.headers['retry-after'])).toBeGreaterThan(0);
+
+      const firstResend = await app.inject({
+        headers,
+        method: 'POST',
+        payload: {},
+        url: '/v1/auth/resend-verification',
+      });
+      expect(firstResend.statusCode).toBe(400);
+      expect(firstResend.headers['x-ratelimit-remaining']).toBe('1');
+
+      const secondResend = await app.inject({
+        headers,
+        method: 'POST',
+        payload: {},
+        url: '/v1/auth/resend-verification',
+      });
+      expect(secondResend.statusCode).toBe(400);
+
+      const blockedResend = await app.inject({
+        headers,
+        method: 'POST',
+        payload: {},
+        url: '/v1/auth/resend-verification',
+      });
+      expect(blockedResend.statusCode).toBe(429);
+      expect(blockedResend.json()).toMatchObject({
+        code: 'AUTH_RESEND_RATE_LIMITED',
+      });
+      expect(Number(blockedResend.headers['retry-after'])).toBeGreaterThan(0);
+
+      const otherIp = await app.inject({
+        headers: { 'x-forwarded-for': '203.0.113.11' },
+        method: 'POST',
+        payload: {},
+        url: '/v1/auth/register',
+      });
+      expect(otherIp.statusCode).toBe(400);
+      expect(otherIp.headers['x-ratelimit-remaining']).toBe('1');
+    } finally {
+      await app.close();
+    }
+  });
+});
+
 function registrationProfilePayload() {
   registrationProfileSequence += 1;
   return {
@@ -90,6 +179,8 @@ describeWithDatabase('API con PostgreSQL', () => {
     API_HOST: '127.0.0.1',
     API_PORT: '4000',
     APP_ENV: 'local',
+    AUTH_REGISTER_RATE_LIMIT_MAX: '1000',
+    AUTH_RESEND_RATE_LIMIT_MAX: '1000',
     CORS_ORIGIN: 'http://localhost:3000',
     DATABASE_URL: connectionString,
     MOBILE_INVITATION_URL: 'barbersaas://accept-invitation',
@@ -3204,5 +3295,184 @@ describeWithDatabase('API con PostgreSQL', () => {
         'platform.organization.suspend',
       ]),
     );
+  });
+
+  it('recorre autenticación, onboarding, reserva pública y cierre de sesión de extremo a extremo', async () => {
+    const suffix = `${Date.now()}-${registrationProfileSequence + 1}`;
+    const email = `critical-journey-${suffix}@example.com`;
+    const password = 'Clave-segura-123';
+    const profile = registrationProfilePayload();
+    const registration = await app.inject({
+      method: 'POST',
+      payload: {
+        ...profile,
+        confirmPassword: password,
+        email,
+        fullName: 'Propietario E2E',
+        password,
+      },
+      url: '/v1/auth/register',
+    });
+    expect(registration.statusCode).toBe(201);
+    const registrationBody = registration.json<{
+      developmentVerificationCode: string;
+    }>();
+
+    const loginBeforeVerification = await app.inject({
+      method: 'POST',
+      payload: { email, password },
+      url: '/v1/auth/login',
+    });
+    expect(loginBeforeVerification.statusCode).toBe(401);
+
+    const verified = await app.inject({
+      method: 'POST',
+      payload: {
+        code: registrationBody.developmentVerificationCode,
+        email,
+      },
+      url: '/v1/auth/verify-email',
+    });
+    expect(verified.statusCode).toBe(200);
+    let accessToken = verified.json<{ session: { token: string } }>().session
+      .token;
+
+    const onboardingService = await app.inject({
+      headers: { authorization: `Bearer ${accessToken}` },
+      method: 'POST',
+      payload: {
+        agendaColor: '#2464E8',
+        category: {
+          description: 'Servicios de la prueba crítica',
+          name: 'Barbería',
+        },
+        description: 'Servicio creado por el recorrido automatizado.',
+        downPaymentPercentage: 0,
+        durationMinutes: 30,
+        imageUri: null,
+        name: 'Corte E2E',
+        onlineBooking: true,
+        price: 15,
+        priceType: 'fixed',
+        showServiceTime: true,
+        tax: null,
+      },
+      url: '/v1/onboarding/services',
+    });
+    expect(onboardingService.statusCode).toBe(201);
+
+    const completed = await app.inject({
+      headers: { authorization: `Bearer ${accessToken}` },
+      method: 'POST',
+      url: '/v1/onboarding/complete-account-setup',
+    });
+    expect(completed.statusCode).toBe(200);
+    const bookingUrl = completed.json<{ bookingUrl: string }>().bookingUrl;
+    const organizationSlug = new URL(bookingUrl).pathname.split('/').at(-1)!;
+
+    const redirect = await app.inject({
+      method: 'GET',
+      url: `/v1/public/${organizationSlug}`,
+    });
+    expect(redirect.statusCode).toBe(200);
+    const redirectPath = redirect.json<{ redirectPath: string }>().redirectPath;
+    const catalog = await app.inject({
+      method: 'GET',
+      url: `/v1/public${redirectPath}`,
+    });
+    expect(catalog.statusCode).toBe(200);
+    const catalogBody = catalog.json<{
+      location: { slug: string; timezone: string };
+      professionals: Array<{ id: string }>;
+      services: Array<{ id: string; name: string }>;
+    }>();
+    expect(catalogBody.professionals).toHaveLength(1);
+    expect(catalogBody.services).toEqual([
+      expect.objectContaining({ name: 'Corte E2E' }),
+    ]);
+
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const localDate = localDateForTest(tomorrow, catalogBody.location.timezone);
+    const membershipId = catalogBody.professionals[0]!.id;
+    const serviceId = catalogBody.services[0]!.id;
+    const availability = await app.inject({
+      method: 'GET',
+      url: `/v1/public/${organizationSlug}/${catalogBody.location.slug}/availability?date=${localDate}&membershipId=${membershipId}&serviceIds=${serviceId}`,
+    });
+    expect(availability.statusCode).toBe(200);
+    const slots = availability.json<{
+      slots: Array<{ startsAt: string }>;
+    }>().slots;
+    expect(slots.length).toBeGreaterThan(0);
+
+    const booking = await app.inject({
+      headers: { 'idempotency-key': `critical-journey-${suffix}` },
+      method: 'POST',
+      payload: {
+        email: `client-${suffix}@example.com`,
+        fullName: 'Cliente E2E',
+        membershipId,
+        phone: '+593999999999',
+        policyAccepted: true,
+        serviceIds: [serviceId],
+        startsAt: slots[0]!.startsAt,
+      },
+      url: `/v1/public/${organizationSlug}/${catalogBody.location.slug}/bookings`,
+    });
+    expect(booking.statusCode).toBe(201);
+    const bookingBody = booking.json<{
+      bookingId: string;
+      developmentVerificationCode: string;
+    }>();
+
+    const bookingVerification = await app.inject({
+      method: 'POST',
+      payload: { code: bookingBody.developmentVerificationCode },
+      url: `/v1/public/bookings/${bookingBody.bookingId}/verify`,
+    });
+    expect(bookingVerification.statusCode).toBe(200);
+    const managementToken = bookingVerification.json<{
+      managementToken: string;
+    }>().managementToken;
+
+    const cancelled = await app.inject({
+      method: 'POST',
+      payload: { reason: 'Limpieza del recorrido E2E.' },
+      url: `/v1/public/booking/${managementToken}/cancel`,
+    });
+    expect(cancelled.statusCode).toBe(200);
+    expect(cancelled.json().appointment.status).toBe('cancelled');
+
+    const logout = await app.inject({
+      headers: { authorization: `Bearer ${accessToken}` },
+      method: 'POST',
+      url: '/v1/auth/logout',
+    });
+    expect(logout.statusCode).toBe(204);
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${accessToken}` },
+          method: 'GET',
+          url: '/v1/auth/session',
+        })
+      ).statusCode,
+    ).toBe(401);
+
+    const loginAgain = await app.inject({
+      method: 'POST',
+      payload: { email, password },
+      url: '/v1/auth/login',
+    });
+    expect(loginAgain.statusCode).toBe(200);
+    accessToken = loginAgain.json<{ session: { token: string } }>().session
+      .token;
+    const accountDeletion = await app.inject({
+      headers: { authorization: `Bearer ${accessToken}` },
+      method: 'DELETE',
+      payload: { confirmation: 'ELIMINAR', password },
+      url: '/v1/account',
+    });
+    expect(accountDeletion.statusCode).toBe(204);
   });
 });

@@ -31,7 +31,7 @@ import {
   updateAccountTypeSchema,
   verifyEmailSchema,
 } from '@barber-saas/validation';
-import Fastify, { type FastifyRequest } from 'fastify';
+import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import nodemailer from 'nodemailer';
 import { z, ZodError } from 'zod';
 
@@ -77,6 +77,73 @@ const RESET_DURATION_MS = 30 * 60 * 1000;
 const VERIFICATION_DURATION_MS = 10 * 60 * 1000;
 const VERIFICATION_LOCK_DURATION_MS = 15 * 60 * 1000;
 const MAX_VERIFICATION_ATTEMPTS = 5;
+const MAX_AUTH_RATE_LIMIT_BUCKETS = 10_000;
+
+interface AuthRateLimitBucket {
+  count: number;
+  resetAt: number;
+}
+
+type AuthRateLimitScope = 'register' | 'resend-verification';
+
+function enforceAuthIpRateLimit({
+  buckets,
+  limit,
+  reply,
+  request,
+  scope,
+  windowMs,
+}: {
+  readonly buckets: Map<string, AuthRateLimitBucket>;
+  readonly limit: number;
+  readonly reply: FastifyReply;
+  readonly request: FastifyRequest;
+  readonly scope: AuthRateLimitScope;
+  readonly windowMs: number;
+}): void {
+  const now = Date.now();
+  const key = `${scope}:${request.ip}`;
+  if (!buckets.has(key) && buckets.size >= MAX_AUTH_RATE_LIMIT_BUCKETS) {
+    for (const [bucketKey, bucket] of buckets) {
+      if (bucket.resetAt <= now) buckets.delete(bucketKey);
+    }
+    if (buckets.size >= MAX_AUTH_RATE_LIMIT_BUCKETS) {
+      const oldestKey = buckets.keys().next().value as string | undefined;
+      if (oldestKey) buckets.delete(oldestKey);
+    }
+  }
+  const current = buckets.get(key);
+  const bucket =
+    !current || current.resetAt <= now
+      ? { count: 0, resetAt: now + windowMs }
+      : current;
+
+  if (!current || current.resetAt <= now) buckets.set(key, bucket);
+
+  const allowed = bucket.count < limit;
+  if (allowed) bucket.count += 1;
+
+  const remaining = Math.max(0, limit - bucket.count);
+  const retryAfterSeconds = Math.max(
+    1,
+    Math.ceil((bucket.resetAt - now) / 1000),
+  );
+  reply
+    .header('x-ratelimit-limit', String(limit))
+    .header('x-ratelimit-remaining', String(remaining))
+    .header('x-ratelimit-reset', String(Math.ceil(bucket.resetAt / 1000)));
+
+  if (allowed) return;
+
+  reply.header('retry-after', String(retryAfterSeconds));
+  throw new ApiError(
+    429,
+    scope === 'register'
+      ? 'AUTH_REGISTER_RATE_LIMITED'
+      : 'AUTH_RESEND_RATE_LIMITED',
+    'Has realizado demasiadas solicitudes. Espera unos minutos antes de intentarlo nuevamente.',
+  );
+}
 
 type NotificationDeliveryState = 'failed' | 'pending' | 'sent' | 'skipped';
 interface NotificationDeliveryAttempt {
@@ -737,7 +804,12 @@ export async function buildApi({
   recoveryMailer = null,
   verificationMailer = null,
 }: BuildApiOptions) {
-  const app = Fastify({ logger: config.APP_ENV === 'production' });
+  const app = Fastify({
+    logger: config.APP_ENV === 'production',
+    trustProxy: config.API_TRUST_PROXY === 'true',
+  });
+  const authRateLimitBuckets = new Map<string, AuthRateLimitBucket>();
+  const authRateLimitWindowMs = config.AUTH_IP_RATE_LIMIT_WINDOW_SECONDS * 1000;
   await app.register(cors, {
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     origin: config.CORS_ORIGIN.split(',').map((origin) => origin.trim()),
@@ -816,6 +888,14 @@ export async function buildApi({
   });
 
   app.post('/v1/auth/register', async (request, reply) => {
+    enforceAuthIpRateLimit({
+      buckets: authRateLimitBuckets,
+      limit: config.AUTH_REGISTER_RATE_LIMIT_MAX,
+      reply,
+      request,
+      scope: 'register',
+      windowMs: authRateLimitWindowMs,
+    });
     const input = signUpSchema.parse(request.body);
     const email = normalizeEmail(input.email);
     const businessNameKey = normalizeBusinessName(input.businessName);
@@ -1055,7 +1135,15 @@ export async function buildApi({
     };
   });
 
-  app.post('/v1/auth/resend-verification', async (request) => {
+  app.post('/v1/auth/resend-verification', async (request, reply) => {
+    enforceAuthIpRateLimit({
+      buckets: authRateLimitBuckets,
+      limit: config.AUTH_RESEND_RATE_LIMIT_MAX,
+      reply,
+      request,
+      scope: 'resend-verification',
+      windowMs: authRateLimitWindowMs,
+    });
     const { email: rawEmail } = resendVerificationSchema.parse(request.body);
     const email = normalizeEmail(rawEmail);
     const pendingRegistration = await database.pendingRegistration.findUnique({

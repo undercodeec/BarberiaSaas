@@ -2,7 +2,38 @@
 
 Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión posterior documentada en `docs/adr/0003-postgresql-prisma-y-api-en-vps.md`. Se marca `[x]` solo cuando la tarea está implementada y cuenta con la verificación indicada; `[ ]` significa pendiente o aún no demostrada.
 
-Última actualización: 2026-08-03
+Última actualización: 2026-08-04
+
+## Estado operativo actual
+
+Este es el único bloque que debe usarse para priorizar trabajo pendiente. Las
+secciones posteriores conservan evidencia, decisiones y cortes cronológicos;
+sus marcas `[ ]` pueden describir trabajo que ya fue completado después o una
+lista de aceptación/planificación, por lo que no constituyen por sí solas un
+backlog vigente.
+
+### Bloqueadores para producción
+
+- [ ] Completar la Fase 13: pruebas E2E, seguridad, rendimiento, accesibilidad,
+      backups/restauración y checklist de producción.
+- [x] Limitación general por IP para registro y reenvío de OTP, con límites y
+      ventana configurables, cabecera `Retry-After` y soporte explícito para un
+      proxy confiable.
+- [ ] Definir textos legales, políticas y valores iniciales de cancelación,
+      reprogramación y no confirmación.
+- [ ] Adquirir y configurar el dominio público HTTPS de producción; validar los
+      enlaces de reserva e invitación en Android, iOS y Web.
+- [ ] Realizar la validación visual y funcional final en dispositivos físicos
+      para agenda, Caja/POS, inventario, planes y reportes.
+- [ ] Si la API se desplegará en más de una instancia, reemplazar el rate
+      limiting en memoria por una solución compartida.
+
+### Pendientes no bloqueantes o fuera de alcance actual
+
+- [ ] Afinar detalles menores de UI/UX de reservas públicas.
+- [ ] Evaluar comisiones específicas sobre productos como ampliación de Fase 7.
+- [ ] Definir la funcionalidad y las reglas de préstamos a clientes antes de
+      incluirla en el MVP.
 
 ## Decisión de infraestructura vigente
 
@@ -17,7 +48,7 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 ## Resumen por fases
 
 - [x] Fase 0 — Inicialización del repositorio
-- [ ] Fase 1 — Autenticación, organización y onboarding _(implementada y verificada localmente; autenticación SMTP y entrega a bandeja externa aprobadas)_
+- [x] Fase 1 — Autenticación, organización y onboarding
 - [x] Fase 2 — Equipo, servicios y horarios
 - [ ] Fase 3 — Motor de agenda _(implementada y verificada contra PostgreSQL; aceptación manual móvil pendiente)_
 - [ ] Fase 4 — Reservas públicas _(implementada, verificada contra PostgreSQL y recorrida manualmente; quedan ajustes menores de UI/UX y configuración externa)_
@@ -139,7 +170,8 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Migraciones OTP y solicitudes pendientes aplicadas a PostgreSQL local (`5434`) y a la base aislada de pruebas (`5433`).
 - [x] Entrega del OTP comprobada con el proveedor SMTP real en una bandeja externa.
 - [x] Los datos ampliados del registro (tipo de cuenta, negocio, teléfono, país, ciudad y horario) se conservan temporalmente en `pending_registrations` y, tras verificar el correo, se trasladan a `users` y `user_registration_profiles`, relacionados mediante el `user_id` único.
-- [ ] Añadir limitación general de frecuencia por IP para registro y reenvío antes de producción; la limitación de intentos OTP por correo ya está implementada.
+- [x] Limitación general de frecuencia por IP para registro y reenvío; la
+      limitación de intentos OTP por correo se mantiene como segunda barrera.
 
 ### Persistencia de perfil, continuidad del onboarding y unicidad
 
@@ -279,15 +311,20 @@ Decisión de alcance para el MVP:
 
 ### Fase 12 — Panel interno del SaaS
 
-- [ ] Operación de organizaciones, planes, uso, errores y soporte seguro.
-      Backend implementado y verificado; la sustitución del placeholder de
-      `apps/admin` quedó bloqueada por permisos de escritura del entorno actual.
+- [x] Operación segura de organizaciones, planes, uso, errores y soporte.
+      Backend y consola `apps/admin` implementados y verificados. El detalle del
+      corte está documentado en «Panel interno del SaaS — 3 de agosto de 2026».
 
 ### Fase 13 — Estabilización del MVP
 
 - [ ] Seguridad, E2E, rendimiento, accesibilidad, backups y checklist de producción.
 
-## Evidencia histórica y verificación actual
+## Historial de implementación y evidencia
+
+Las entradas siguientes se mantienen como trazabilidad cronológica. Para el
+estado vigente y el backlog real, consultar exclusivamente «Estado operativo
+actual». No actualizar aquí una marca histórica para representar una decisión
+o implementación posterior.
 
 - Commit base de Fase 0: `45080b7`.
 - Prisma Client 7.8.0: generado correctamente.
@@ -341,7 +378,7 @@ Decisión de alcance para el MVP:
 - [x] Cliente Prisma regenerado y typecheck de API y móvil aprobados tras el cambio.
 - [ ] Aplicar `20260726110000_onboarding_services` en PostgreSQL de desarrollo, pruebas y despliegue mediante `prisma migrate deploy`; la migración fue creada pero no se aplicó durante este cambio.
 
-## Funcionalidad reciente
+## Historial de funcionalidades recientes
 
 ### Configuracion final de cuenta y cierre de onboarding
 
@@ -364,14 +401,12 @@ Decisión de alcance para el MVP:
 - [x] `Abrir` muestra un panel interno compatible con Expo Web con QR, copia de enlace y website; no abre el enlace provisional de reservas. QR y website quedan visibles como próximas integraciones hasta contar con reservas públicas.
 - [ ] Estadisticas de ventas, notificaciones, agenda, caja, equipo y ajustes del dashboard siguen como UI de referencia hasta implementar sus APIs y permisos.
 
-## Siguiente tarea recomendada
+## Siguiente tarea recomendada (histórica)
 
-- [ ] Aplicar y verificar las migraciones 20260726110000_onboarding_services y 20260726130000_onboarding_account_details en PostgreSQL de pruebas y despliegue.
-- [ ] Implementar reservas publicas reales: slug publico unico, pagina web de reservas, disponibilidad publica, creacion idempotente y rate limiting.
-- [ ] Servir el enlace de reservas desde la API con dominio configurado y HTTPS; no construirlo en el cliente.
-- [ ] Conectar las opciones QR y ver mi website del panel existente al enlace público real, y permitir descargar o compartir el QR.
-
-- [ ] Aplicar y verificar la migración de servicios de onboarding en PostgreSQL, incluyendo pruebas de CRUD y aislamiento por usuario. Luego verificar el flujo móvil completo y continuar con la Fase 4 — Reservas públicas.
+Esta recomendación fue válida el 26 de julio de 2026 y ya fue superada por
+cortes posteriores. El orden vigente está en «Estado operativo actual»:
+primero Fase 13 y limitación por IP; después dominio, legales y aceptación en
+dispositivos físicos.
 
 ## Actualización 2026-07-27 — banners de dashboard
 
@@ -634,7 +669,10 @@ Decisión de alcance para el MVP:
 - [x] Se conservan los datos locales existentes: un registro invalido o sin fecha permite volver a mostrar el banner.
 - [x] Verificado: `pnpm --filter @barber-saas/mobile typecheck` aprobado.
 
-## Planificacion 2026-07-29 - Desarrollo funcional de Ajustes del negocio
+## Planificación histórica 2026-07-29 — Desarrollo funcional de Ajustes del negocio
+
+Esta sección es una especificación conservada como referencia. Sus elementos
+pendientes no reemplazan el backlog de «Estado operativo actual».
 
 > Estado de esta seccion: especificacion funcional, tecnica y comercial aprobada
 > para desarrollo posterior. Los elementos marcados con `[ ]` no estan
@@ -3381,8 +3419,8 @@ caja, comisiones y registros históricos.
       conservados, bloqueo de escritura, auditoría y reactivación.
 - [x] Esquema Prisma válido; typecheck de base de datos, API, cliente compartido
       y móvil; ESLint de los archivos modificados.
-- [ ] El panel seguro para operadores de plataforma se implementará en Fase 12;
-      la Fase 11 solo expone simulación no productiva al propietario.
+- [x] El panel seguro para operadores de plataforma fue implementado en Fase 12;
+      la Fase 11 conserva la simulación no productiva para el propietario.
 - [ ] Validación visual final en dispositivo físico pendiente del cierre
       integral del MVP.
 
@@ -3424,3 +3462,53 @@ caja, comisiones y registros históricos.
 - [x] Typecheck y ESLint de API, cliente compartido y aplicación móvil.
 - [ ] Validación visual final en dispositivo físico pendiente del cierre
       integral del MVP.
+
+## Endurecimiento de autenticación por IP — 4 de agosto de 2026
+
+### Protección aplicada
+
+- [x] `POST /v1/auth/register` y `POST /v1/auth/resend-verification` usan
+      contadores independientes por IP y ventana fija.
+- [x] Límites configurables mediante `AUTH_REGISTER_RATE_LIMIT_MAX`,
+      `AUTH_RESEND_RATE_LIMIT_MAX` y `AUTH_IP_RATE_LIMIT_WINDOW_SECONDS`; los
+      valores predeterminados son cinco solicitudes por ruta cada 15 minutos.
+- [x] Las respuestas incluyen `X-RateLimit-Limit`, `X-RateLimit-Remaining` y
+      `X-RateLimit-Reset`; al bloquear incluyen `Retry-After` y códigos de error
+      específicos para registro y reenvío.
+- [x] `API_TRUST_PROXY` permite usar la IP reenviada únicamente cuando la API se
+      encuentra detrás de un proxy confiable configurado para reemplazar
+      `X-Forwarded-For`.
+- [x] Los contadores tienen un máximo de 10.000 buckets para impedir crecimiento
+      indefinido de memoria en una sola instancia.
+
+### Verificación
+
+- [x] Pruebas de ruta para límites independientes, cambio de IP, cabeceras y
+      códigos `AUTH_REGISTER_RATE_LIMITED` y `AUTH_RESEND_RATE_LIMITED`.
+- [x] Suite API/PostgreSQL completa: 32/32 pruebas aprobadas.
+- [x] Typecheck, ESLint de archivos modificados y bundle de la API aprobados.
+- [ ] Si la API se escala horizontalmente, sustituir los contadores en memoria
+      por un almacén compartido antes de habilitar varias instancias.
+
+## Recorrido crítico automatizado — 4 de agosto de 2026
+
+### Autenticación y reserva pública
+
+- [x] Prueba integral contra PostgreSQL aislado que registra una cuenta y
+      confirma que el inicio de sesión se rechaza antes de verificar el correo.
+- [x] Verificación OTP real, creación de sesión y materialización completa del
+      onboarding con organización, sucursal, horarios, servicio y asignación.
+- [x] Publicación del catálogo y consulta de disponibilidad usando los datos
+      creados durante el mismo recorrido.
+- [x] Creación y verificación de una reserva pública real, seguida de
+      cancelación mediante el token privado de gestión.
+- [x] Cierre de sesión, rechazo del token revocado, nuevo inicio de sesión y
+      eliminación segura de la cuenta para terminar el ciclo.
+
+### Verificación
+
+- [x] Suite API/PostgreSQL completa: 33/33 pruebas aprobadas.
+- [x] Typecheck de API y ESLint de la prueba modificada aprobados.
+- [ ] El recorrido visual mediante Playwright en Chrome móvil y escritorio
+      continúa pendiente; no debe confundirse con este recorrido integral de
+      API y persistencia.

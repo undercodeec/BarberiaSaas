@@ -9,9 +9,28 @@ const environmentSchema = z
   .object({
     API_HOST: z.string().min(1).default('0.0.0.0'),
     API_PORT: z.coerce.number().int().min(1).max(65_535).default(4000),
+    API_TRUST_PROXY: z.enum(['true', 'false']).default('false'),
     APP_ENV: z
       .enum(['local', 'preview', 'staging', 'production'])
       .default('local'),
+    AUTH_IP_RATE_LIMIT_WINDOW_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(86_400)
+      .default(900),
+    AUTH_REGISTER_RATE_LIMIT_MAX: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(10_000)
+      .default(5),
+    AUTH_RESEND_RATE_LIMIT_MAX: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(10_000)
+      .default(5),
     CORS_ORIGIN: z.string().min(1).default('http://localhost:3000'),
     DATABASE_URL: z.url().startsWith('postgresql://'),
     MOBILE_INVITATION_URL: z
