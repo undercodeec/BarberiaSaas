@@ -3,17 +3,15 @@ import * as Contacts from 'expo-contacts';
 import type {
   ClientLabelRecord,
   ClientLabelsResponse,
+  ClientRecord,
   ClientsResponse,
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
-  Animated,
-  Easing,
   Modal,
-  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -40,49 +38,7 @@ export default function ClientsScreen() {
   const [search, setSearch] = useState('');
   const [activeLabelId, setActiveLabelId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [fullName, setFullName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [birthDate, setBirthDate] = useState('');
-  const [addressLine, setAddressLine] = useState('');
-  const [documentNumber, setDocumentNumber] = useState('');
-  const [email, setEmail] = useState('');
-  const [showAdditionalFields, setShowAdditionalFields] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const sheetTranslateY = useRef(new Animated.Value(0)).current;
-  const dismissCreateSheet = useCallback(() => {
-    Animated.timing(sheetTranslateY, {
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
-      toValue: 480,
-      useNativeDriver: true,
-    }).start(() => {
-      setIsCreateOpen(false);
-      sheetTranslateY.setValue(0);
-    });
-  }, [sheetTranslateY]);
-  const sheetPanResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) =>
-          gesture.dy > 8 && gesture.dy > Math.abs(gesture.dx),
-        onPanResponderMove: (_, gesture) =>
-          sheetTranslateY.setValue(Math.max(0, gesture.dy)),
-        onPanResponderRelease: (_, gesture) => {
-          if (gesture.dy > 90 || gesture.vy > 0.8) {
-            dismissCreateSheet();
-            return;
-          }
-          Animated.spring(sheetTranslateY, {
-            bounciness: 0,
-            speed: 18,
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
-        },
-      }),
-    [dismissCreateSheet, sheetTranslateY],
-  );
   const importContacts = useCallback(async () => {
     if (Platform.OS === 'web') {
       Alert.alert(
@@ -179,43 +135,6 @@ export default function ClientsScreen() {
       return matchesLabel && matchesSearch;
     });
   }, [activeLabelId, clientsQuery.data?.clients, search]);
-  const createClient = useMutation({
-    mutationFn: () => {
-      if (!fullName.trim() || !phone.trim()) {
-        throw new Error('Ingresa el nombre y tel?fono del cliente.');
-      }
-      return requireApiClient().request('/v1/clients', {
-        body: {
-          addressLine: addressLine.trim() || undefined,
-          birthDate: birthDate.trim() || undefined,
-          documentNumber: documentNumber.trim() || undefined,
-          email: email.trim() || undefined,
-          fullName: fullName.trim(),
-          lastName: lastName.trim() || undefined,
-          phone: phone.trim(),
-        },
-        method: 'POST',
-      });
-    },
-    onError: (error) =>
-      Alert.alert(
-        'No pudimos guardar el cliente',
-        error instanceof Error ? error.message : 'Int?ntalo nuevamente.',
-      ),
-    onSuccess: async () => {
-      setFullName('');
-      setLastName('');
-      setPhone('');
-      setBirthDate('');
-      setAddressLine('');
-      setDocumentNumber('');
-      setEmail('');
-      setShowAdditionalFields(false);
-      setIsCreateOpen(false);
-      await queryClient.invalidateQueries({ queryKey: ['clients'] });
-    },
-  });
-
   if (!session) return <Redirect href="/(auth)/login" />;
 
   return (
@@ -372,142 +291,157 @@ export default function ClientsScreen() {
       </Pressable>
 
       <BottomNavigation active="clients" />
-      <Modal
-        animationType="none"
-        onRequestClose={dismissCreateSheet}
-        transparent
+      <ClientFormSheet
+        onClose={() => setIsCreateOpen(false)}
         visible={isCreateOpen}
-      >
-        <View style={styles.overlay}>
-          <Pressable
-            accessibilityLabel="Cerrar formulario"
-            accessibilityRole="button"
-            onPress={dismissCreateSheet}
-            style={styles.backdrop}
-          />
-          <Animated.View
-            style={[
-              styles.sheet,
-              { transform: [{ translateY: sheetTranslateY }] },
-            ]}
+      />
+    </SafeAreaView>
+  );
+}
+
+export function ClientFormSheet({
+  onClose,
+  onCreated,
+  visible,
+}: {
+  readonly onClose: () => void;
+  readonly onCreated?: (client: ClientRecord) => void | Promise<void>;
+  readonly visible: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [fullName, setFullName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [addressLine, setAddressLine] = useState('');
+  const [documentNumber, setDocumentNumber] = useState('');
+  const [email, setEmail] = useState('');
+  const [showAdditionalFields, setShowAdditionalFields] = useState(false);
+  const reset = () => {
+    setFullName('');
+    setLastName('');
+    setPhone('');
+    setBirthDate('');
+    setAddressLine('');
+    setDocumentNumber('');
+    setEmail('');
+    setShowAdditionalFields(false);
+  };
+  const createClient = useMutation({
+    mutationFn: () => {
+      if (!fullName.trim() || !phone.trim())
+        throw new Error('Ingresa el nombre y teléfono del cliente.');
+      return requireApiClient().request<{ client: ClientRecord }>('/v1/clients', {
+        body: {
+          addressLine: addressLine.trim() || undefined,
+          birthDate: birthDate.trim() || undefined,
+          documentNumber: documentNumber.trim() || undefined,
+          email: email.trim() || undefined,
+          fullName: fullName.trim(),
+          lastName: lastName.trim() || undefined,
+          phone: phone.trim(),
+        },
+        method: 'POST',
+      });
+    },
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos guardar el cliente',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: async ({ client }) => {
+      await queryClient.invalidateQueries({ queryKey: ['clients'] });
+      await onCreated?.(client);
+      reset();
+      onClose();
+    },
+  });
+  const close = () => {
+    if (createClient.isPending) return;
+    reset();
+    onClose();
+  };
+
+  return (
+    <Modal animationType="slide" onRequestClose={close} transparent visible={visible}>
+      <View style={styles.overlay}>
+        <Pressable
+          accessibilityLabel="Cerrar formulario"
+          accessibilityRole="button"
+          onPress={close}
+          style={styles.backdrop}
+        />
+        <View style={styles.sheet}>
+          <View style={styles.sheetDragArea}>
+            <View style={styles.handle} />
+          </View>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <View
-              {...sheetPanResponder.panHandlers}
-              style={styles.sheetDragArea}
-            >
-              <View style={styles.handle} />
-            </View>
-            <ScrollView
-              bounces={false}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              <Text style={styles.sheetTitle}>Nuevo cliente</Text>
-              <Text style={styles.sheetCopy}>
-                Guarda sus datos para encontrarlo al crear una reserva.
-              </Text>
-              <TextInput
-                autoFocus
-                accessibilityLabel="Nombre del cliente"
-                onChangeText={setFullName}
-                placeholder="Nombre"
-                placeholderTextColor="#7b838d"
-                style={styles.field}
-                value={fullName}
-              />
-              <TextInput
-                accessibilityLabel="Apellido del cliente"
-                onChangeText={setLastName}
-                placeholder="Apellido (opcional)"
-                placeholderTextColor="#7b838d"
-                style={styles.field}
-                value={lastName}
-              />
-              <TextInput
-                accessibilityLabel="Tel?fono del cliente"
-                keyboardType="phone-pad"
-                onChangeText={setPhone}
-                placeholder="Tel?fono"
-                placeholderTextColor="#7b838d"
-                style={styles.field}
-                value={phone}
-              />
-              {!showAdditionalFields ? (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => setShowAdditionalFields(true)}
-                  style={styles.additionalTrigger}
-                >
-                  <Ionicons
-                    color="#101c2d"
-                    name="add-circle-outline"
-                    size={20}
-                  />
-                  <Text style={styles.additionalLabel}>
-                    Agregar campos adicionales
-                  </Text>
-                  <Ionicons color="#69717d" name="chevron-down" size={19} />
-                </Pressable>
-              ) : (
-                <View style={styles.additionalFields}>
-                  <Text style={styles.additionalHeading}>
-                    Informaci?n adicional
-                  </Text>
-                  <TextInput
-                    accessibilityLabel="Fecha de nacimiento"
-                    onChangeText={setBirthDate}
-                    placeholder="Fecha de nacimiento (AAAA-MM-DD)"
-                    placeholderTextColor="#7b838d"
-                    style={styles.field}
-                    value={birthDate}
-                  />
-                  <TextInput
-                    accessibilityLabel="Direcci?n"
-                    onChangeText={setAddressLine}
-                    placeholder="Direcci?n"
-                    placeholderTextColor="#7b838d"
-                    style={styles.field}
-                    value={addressLine}
-                  />
-                  <TextInput
-                    accessibilityLabel="Documento"
-                    onChangeText={setDocumentNumber}
-                    placeholder="Documento de identidad"
-                    placeholderTextColor="#7b838d"
-                    style={styles.field}
-                    value={documentNumber}
-                  />
-                  <TextInput
-                    accessibilityLabel="Email"
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                    onChangeText={setEmail}
-                    placeholder="Correo electr?nico"
-                    placeholderTextColor="#7b838d"
-                    style={styles.field}
-                    value={email}
-                  />
-                </View>
-              )}
+            <Text style={styles.sheetTitle}>Nuevo cliente</Text>
+            <Text style={styles.sheetCopy}>
+              Guarda sus datos para encontrarlo al crear una reserva.
+            </Text>
+            <TextInput
+              autoFocus
+              accessibilityLabel="Nombre del cliente"
+              onChangeText={setFullName}
+              placeholder="Nombre"
+              placeholderTextColor="#7b838d"
+              style={styles.field}
+              value={fullName}
+            />
+            <TextInput
+              accessibilityLabel="Apellido del cliente"
+              onChangeText={setLastName}
+              placeholder="Apellido (opcional)"
+              placeholderTextColor="#7b838d"
+              style={styles.field}
+              value={lastName}
+            />
+            <TextInput
+              accessibilityLabel="Teléfono del cliente"
+              keyboardType="phone-pad"
+              onChangeText={setPhone}
+              placeholder="Teléfono"
+              placeholderTextColor="#7b838d"
+              style={styles.field}
+              value={phone}
+            />
+            {!showAdditionalFields ? (
               <Pressable
                 accessibilityRole="button"
-                disabled={createClient.isPending}
-                onPress={() => createClient.mutate()}
-                style={[
-                  styles.saveButton,
-                  (!fullName.trim() || !phone.trim()) &&
-                    styles.saveButtonDisabled,
-                ]}
+                onPress={() => setShowAdditionalFields(true)}
+                style={styles.additionalTrigger}
               >
-                <Text style={styles.saveLabel}>
-                  {createClient.isPending ? 'Guardando...' : 'Guardar cliente'}
-                </Text>
+                <Ionicons color="#101c2d" name="add-circle-outline" size={20} />
+                <Text style={styles.additionalLabel}>Agregar campos adicionales</Text>
+                <Ionicons color="#69717d" name="chevron-down" size={19} />
               </Pressable>
-            </ScrollView>
-          </Animated.View>
+            ) : (
+              <View style={styles.additionalFields}>
+                <Text style={styles.additionalHeading}>Información adicional</Text>
+                <TextInput accessibilityLabel="Fecha de nacimiento" onChangeText={setBirthDate} placeholder="Fecha de nacimiento (AAAA-MM-DD)" placeholderTextColor="#7b838d" style={styles.field} value={birthDate} />
+                <TextInput accessibilityLabel="Dirección" onChangeText={setAddressLine} placeholder="Dirección" placeholderTextColor="#7b838d" style={styles.field} value={addressLine} />
+                <TextInput accessibilityLabel="Documento" onChangeText={setDocumentNumber} placeholder="Documento de identidad" placeholderTextColor="#7b838d" style={styles.field} value={documentNumber} />
+                <TextInput accessibilityLabel="Email" autoCapitalize="none" keyboardType="email-address" onChangeText={setEmail} placeholder="Correo electrónico" placeholderTextColor="#7b838d" style={styles.field} value={email} />
+              </View>
+            )}
+            <Pressable
+              accessibilityRole="button"
+              disabled={createClient.isPending || !fullName.trim() || !phone.trim()}
+              onPress={() => createClient.mutate()}
+              style={[styles.saveButton, (!fullName.trim() || !phone.trim() || createClient.isPending) && styles.saveButtonDisabled]}
+            >
+              <Text style={styles.saveLabel}>
+                {createClient.isPending ? 'Guardando...' : 'Guardar cliente'}
+              </Text>
+            </Pressable>
+          </ScrollView>
         </View>
-      </Modal>
-    </SafeAreaView>
+      </View>
+    </Modal>
   );
 }
 

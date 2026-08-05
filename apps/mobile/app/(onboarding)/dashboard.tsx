@@ -8,10 +8,9 @@ import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect, useRef, useState } from 'react';
-import { Redirect } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
-  Alert,
   AccessibilityInfo,
   Animated,
   Easing,
@@ -53,6 +52,7 @@ const MONTH_PROGRESS = 84;
 const NOTIFICATION_BANNER_DELAY_MS = 5000;
 const WELCOME_SURVEY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 const WELCOME_SURVEY_RESPONSE_KEY = 'barber-saas.welcome-survey-response';
+const QUICK_ACTIONS_STORAGE_KEY = 'barber-saas.dashboard-quick-actions';
 let notificationPromptSessionKey: string | null = null;
 const WELCOME_SURVEY_OPTIONS = [
   'Publicidad',
@@ -63,9 +63,66 @@ const WELCOME_SURVEY_OPTIONS = [
 ] as const;
 
 type WelcomeSurveyOption = (typeof WELCOME_SURVEY_OPTIONS)[number];
+type ExtraQuickActionId =
+  | 'agenda'
+  | 'booking-settings'
+  | 'cash-register'
+  | 'clients'
+  | 'notifications'
+  | 'reviews-management';
+
+const EXTRA_QUICK_ACTIONS: ReadonlyArray<{
+  readonly icon: React.ComponentProps<typeof Ionicons>['name'];
+  readonly id: ExtraQuickActionId;
+  readonly label: string;
+  readonly route: string;
+}> = [
+  { icon: 'calendar-outline', id: 'agenda', label: 'Agenda', route: '/agenda' },
+  { icon: 'receipt-outline', id: 'cash-register', label: 'Caja', route: '/cash-register' },
+  { icon: 'people-outline', id: 'clients', label: 'Clientes', route: '/clients' },
+  { icon: 'options-outline', id: 'booking-settings', label: 'Reservas', route: '/booking-settings' },
+  { icon: 'notifications-outline', id: 'notifications', label: 'Avisos', route: '/notifications' },
+  { icon: 'star-outline', id: 'reviews-management', label: 'Reseñas', route: '/reviews-management' },
+];
 
 function welcomeSurveyStorageKey(userId: string) {
   return `${WELCOME_SURVEY_RESPONSE_KEY}.${userId}`;
+}
+
+function quickActionsStorageKey(userId: string) {
+  return `${QUICK_ACTIONS_STORAGE_KEY}.${userId}`;
+}
+
+async function getExtraQuickActionIds(userId: string) {
+  const key = quickActionsStorageKey(userId);
+  const value =
+    Platform.OS === 'web'
+      ? globalThis.localStorage.getItem(key)
+      : await SecureStore.getItemAsync(key);
+  if (!value) return [] as ExtraQuickActionId[];
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is ExtraQuickActionId =>
+      EXTRA_QUICK_ACTIONS.some((action) => action.id === item),
+    );
+  } catch {
+    return [];
+  }
+}
+
+async function storeExtraQuickActionIds(
+  userId: string,
+  actionIds: readonly ExtraQuickActionId[],
+) {
+  const key = quickActionsStorageKey(userId);
+  const value = JSON.stringify(actionIds);
+  if (Platform.OS === 'web') {
+    globalThis.localStorage.setItem(key, value);
+    return;
+  }
+  await SecureStore.setItemAsync(key, value);
 }
 
 async function getWelcomeSurveyResponse(
@@ -537,6 +594,70 @@ function QuickAction({
       </View>
       <Text style={styles.quickLabel}>{label}</Text>
     </Pressable>
+  );
+}
+
+function ExtraQuickActionsSheet({
+  selectedIds,
+  onClose,
+  onSelect,
+  visible,
+}: {
+  readonly selectedIds: readonly ExtraQuickActionId[];
+  readonly onClose: () => void;
+  readonly onSelect: (id: ExtraQuickActionId) => void;
+  readonly visible: boolean;
+}) {
+  const availableActions = EXTRA_QUICK_ACTIONS.filter(
+    (action) => !selectedIds.includes(action.id),
+  );
+
+  return (
+    <Modal
+      animationType="fade"
+      onRequestClose={onClose}
+      transparent
+      visible={visible}
+    >
+      <View style={styles.quickActionsPickerOverlay}>
+        <Pressable
+          accessibilityLabel="Cerrar accesos rápidos"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={styles.quickActionsPickerBackdrop}
+        />
+        <View accessibilityViewIsModal style={styles.quickActionsPicker}>
+          <View style={styles.quickActionsPickerHandle} />
+          <Text accessibilityRole="header" style={styles.quickActionsPickerTitle}>
+            Agrega un acceso rápido
+          </Text>
+          <Text style={styles.quickActionsPickerCopy}>
+            Elige una herramienta para tenerla siempre a la vista.
+          </Text>
+          <View style={styles.quickActionsPickerList}>
+            {availableActions.map((action) => (
+              <Pressable
+                accessibilityRole="button"
+                key={action.id}
+                onPress={() => onSelect(action.id)}
+                style={styles.quickActionsPickerOption}
+              >
+                <View style={styles.quickActionsPickerIcon}>
+                  <Ionicons color="#B47D17" name={action.icon} size={21} />
+                </View>
+                <Text style={styles.quickActionsPickerLabel}>{action.label}</Text>
+                <Ionicons color="#69717d" name="add" size={23} />
+              </Pressable>
+            ))}
+            {!availableActions.length ? (
+              <Text style={styles.quickActionsPickerEmpty}>
+                Ya agregaste todos los accesos disponibles.
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -1162,6 +1283,7 @@ export function LegacyLocationBannerSheet({
 }
 
 export default function DashboardScreen() {
+  const router = useRouter();
   const { session, user } = useAuth();
   const currentNotificationSessionKey =
     session && user ? `${user.id}:${session.expiresAt}` : null;
@@ -1188,18 +1310,41 @@ export default function DashboardScreen() {
     boolean | null
   >(null);
   const [isLocationBannerOpen, setIsLocationBannerOpen] = useState(false);
+  const [extraQuickActionIds, setExtraQuickActionIds] = useState<
+    ExtraQuickActionId[]
+  >([]);
+  const [isQuickActionsPickerOpen, setIsQuickActionsPickerOpen] =
+    useState(false);
   const rawBookingUrl = accountQuery.data?.bookingUrl?.trim() ?? '';
   const bookingUrl = /^https?:\/\/\S+$/i.test(rawBookingUrl)
     ? rawBookingUrl
     : '';
   const shouldShowWelcome =
     accountQuery.isSuccess && !accountQuery.data?.onboardingCompletedAt;
-  const unavailable = (title: string) =>
-    Alert.alert(
-      title,
-      'Esta funcionalidad estar\u00e1 disponible pr\u00f3ximamente.',
-    );
+  const extraQuickActions = EXTRA_QUICK_ACTIONS.filter((action) =>
+    extraQuickActionIds.includes(action.id),
+  );
 
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!user) {
+      void Promise.resolve().then(() => {
+        if (isMounted) setExtraQuickActionIds([]);
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    void getExtraQuickActionIds(user.id).then((actionIds) => {
+      if (isMounted) setExtraQuickActionIds(actionIds);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
   useEffect(() => {
     let isMounted = true;
     let notificationPromptTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1353,6 +1498,14 @@ export default function DashboardScreen() {
     setNeedsLocationBanner(false);
   };
 
+  const addExtraQuickAction = (id: ExtraQuickActionId) => {
+    if (!user || extraQuickActionIds.includes(id)) return;
+    const nextIds = [...extraQuickActionIds, id];
+    setExtraQuickActionIds(nextIds);
+    setIsQuickActionsPickerOpen(false);
+    void storeExtraQuickActionIds(user.id, nextIds);
+  };
+
   const saveLocation = async (location: GoogleMapsLocationCandidate) => {
     const account = accountQuery.data;
     if (!user || !account) {
@@ -1405,7 +1558,7 @@ export default function DashboardScreen() {
             </Text>
             <Pressable
               accessibilityRole="button"
-              onPress={() => unavailable('Resumen')}
+              onPress={() => router.push('/business-summary')}
               style={styles.summaryButton}
             >
               <Text style={styles.summaryLabel}>Resumen</Text>
@@ -1421,25 +1574,49 @@ export default function DashboardScreen() {
 
         <View style={styles.quickActions}>
           <QuickAction
-            icon="people-outline"
-            label="Referidos"
-            onPress={() => unavailable('Referidos')}
+            icon="add-circle-outline"
+            label="Nueva cita"
+            onPress={() => router.push('/new-booking')}
           />
           <QuickAction
-            icon="flash-outline"
-            label="Crece"
-            onPress={() => unavailable('Crece')}
+            icon="cut-outline"
+            label="Servicios"
+            onPress={() => router.push('/service-management')}
           />
           <QuickAction
-            icon="sparkles-outline"
-            label={'Suscripci\u00f3n'}
-            onPress={() => unavailable('Suscripci\u00f3n')}
+            icon="cube-outline"
+            label="Inventario"
+            onPress={() => router.push('/inventory')}
           />
           <QuickAction
-            icon="grid-outline"
-            label="Ver todas"
-            onPress={() => unavailable('Funciones')}
+            icon="wallet-outline"
+            label="Nava Wallet"
+            onPress={() => router.push('/wallet')}
           />
+        </View>
+        {extraQuickActions.length ? (
+          <View style={styles.extraQuickActions}>
+            {extraQuickActions.map((action) => (
+              <View key={action.id} style={styles.extraQuickActionSlot}>
+                <QuickAction
+                  icon={action.icon}
+                  label={action.label}
+                  onPress={() => router.push(action.route as never)}
+                />
+              </View>
+            ))}
+          </View>
+        ) : null}
+        <View style={styles.addQuickActionRow}>
+          <Pressable
+            accessibilityLabel="Agregar acceso rápido"
+            accessibilityRole="button"
+            onPress={() => setIsQuickActionsPickerOpen(true)}
+            style={styles.addQuickAction}
+          >
+            <Ionicons color="#B47D17" name="add" size={25} />
+            <Text style={styles.addQuickActionLabel}>Agregar acceso</Text>
+          </Pressable>
         </View>
 
         {shouldShowWelcome ? (
@@ -1506,6 +1683,12 @@ export default function DashboardScreen() {
         url={bookingUrl}
         visible={isBookingSheetOpen}
       />
+      <ExtraQuickActionsSheet
+        onClose={() => setIsQuickActionsPickerOpen(false)}
+        onSelect={addExtraQuickAction}
+        selectedIds={extraQuickActionIds}
+        visible={isQuickActionsPickerOpen}
+      />
       <NotificationPermissionSheet
         onAccept={() => void requestNotificationPermission()}
         onClose={completeNotificationFlow}
@@ -1533,6 +1716,24 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
+  addQuickAction: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(199, 149, 50, 0.28)',
+    borderRadius: 22,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 7,
+    minHeight: 46,
+    paddingHorizontal: 16,
+  },
+  addQuickActionLabel: {
+    color: '#B47D17',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  addQuickActionRow: { alignItems: 'center', marginTop: 14 },
   businessName: {
     color: '#111111',
     fontSize: 35,
@@ -1936,6 +2137,84 @@ const styles = StyleSheet.create({
     gap: 8,
     justifyContent: 'space-between',
     marginTop: 22,
+  },
+  extraQuickActionSlot: { width: '25%' },
+  extraQuickActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 16,
+    rowGap: 14,
+  },
+  quickActionsPicker: {
+    backgroundColor: appTheme.colors.surfaceElevated,
+    borderRadius: 28,
+    marginHorizontal: 24,
+    maxHeight: '72%',
+    paddingBottom: 20,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+  },
+  quickActionsPickerBackdrop: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  quickActionsPickerCopy: {
+    color: '#555A63',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  quickActionsPickerEmpty: {
+    color: '#555A63',
+    fontSize: 14,
+    paddingVertical: 18,
+    textAlign: 'center',
+  },
+  quickActionsPickerHandle: {
+    alignSelf: 'center',
+    backgroundColor: '#C8C9CB',
+    borderRadius: 4,
+    height: 5,
+    width: 42,
+  },
+  quickActionsPickerIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(235, 216, 170, 0.34)',
+    borderRadius: 16,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  quickActionsPickerLabel: {
+    color: '#1C1C1C',
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  quickActionsPickerList: { marginTop: 17 },
+  quickActionsPickerOption: {
+    alignItems: 'center',
+    borderTopColor: 'rgba(228, 225, 218, 0.8)',
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    minHeight: 62,
+  },
+  quickActionsPickerOverlay: {
+    backgroundColor: 'rgba(16, 28, 45, 0.38)',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  quickActionsPickerTitle: {
+    color: '#1C1C1C',
+    fontSize: 20,
+    fontWeight: '900',
+    marginTop: 15,
+    textAlign: 'center',
   },
   quickIcon: {
     alignItems: 'center',
