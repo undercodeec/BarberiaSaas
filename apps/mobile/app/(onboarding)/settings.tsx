@@ -10,6 +10,7 @@ import {
   Alert,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -81,27 +82,35 @@ export default function SettingsScreen() {
       return Alert.alert(title, 'No pudimos abrir este enlace.');
     await Linking.openURL(url);
   };
-  const logout = () =>
-    Alert.alert(
-      'Cerrar sesión',
-      '¿Estás seguro de que deseas cerrar sesión en este dispositivo?',
-      [
-        { style: 'cancel', text: 'Cancelar' },
-        {
-          onPress: () => {
-            setIsSigningOut(true);
-            void signOut()
-              .catch(() => undefined)
-              .finally(() => {
-                queryClient.clear();
-                setIsSigningOut(false);
-              });
-          },
-          style: 'destructive',
-          text: 'Cerrar sesión',
-        },
-      ],
-    );
+  const performLogout = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    try {
+      await signOut();
+    } catch {
+      // signOut elimina la sesión local incluso si la API no responde.
+    } finally {
+      queryClient.clear();
+      router.replace('/(auth)/login');
+      setIsSigningOut(false);
+    }
+  };
+  const logout = () => {
+    const message =
+      '¿Estás seguro de que deseas cerrar sesión en este dispositivo?';
+    if (Platform.OS === 'web') {
+      if (globalThis.confirm(message)) void performLogout();
+      return;
+    }
+    Alert.alert('Cerrar sesión', message, [
+      { style: 'cancel', text: 'Cancelar' },
+      {
+        onPress: () => void performLogout(),
+        style: 'destructive',
+        text: 'Cerrar sesión',
+      },
+    ]);
+  };
   const closeDeleteModal = () => {
     if (deleteAccountMutation.isPending) return;
     setIsDeleteOpen(false);
@@ -126,15 +135,6 @@ export default function SettingsScreen() {
             <Text accessibilityRole="header" style={styles.title}>
               Ajustes
             </Text>
-          </View>
-          <View style={styles.headerActions}>
-            <IconButton
-              icon="headset-outline"
-              label="Soporte"
-              onPress={() =>
-                void openExternal('mailto:soporte@nava.app', 'Soporte')
-              }
-            />
           </View>
         </View>
 
@@ -334,25 +334,6 @@ export default function SettingsScreen() {
   );
 }
 
-function IconButton({
-  icon,
-  label,
-  onPress,
-}: {
-  readonly icon: IconName;
-  readonly label: string;
-  readonly onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
-    >
-      <Ionicons color={appTheme.colors.accentDark} name={icon} size={22} />
-    </Pressable>
-  );
-}
 function SettingsCard({
   description,
   icon,
@@ -569,18 +550,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingTop: 18,
-  },
-  headerActions: { flexDirection: 'row', gap: 9 },
-  iconButton: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 15,
-    borderWidth: 0,
-    height: 46,
-    justifyContent: 'center',
-    width: 46,
-    transform: [{ translateY: -3 }],
-    ...goldButtonShadow,
   },
   linkCard: {
     alignItems: 'center',

@@ -256,13 +256,6 @@ export default function InventoryScreen() {
             Productos y existencias auditables
           </Text>
         </View>
-        <Pressable
-          accessibilityLabel="Crear producto"
-          onPress={() => resetProductForm()}
-          style={styles.headerButton}
-        >
-          <Ionicons color="#111827" name="add" size={26} />
-        </Pressable>
       </View>
       <View style={styles.tabs}>
         <TabButton
@@ -482,6 +475,19 @@ export default function InventoryScreen() {
           </View>
         )}
       </ScrollView>
+      {tab === 'products' ? (
+        <Pressable
+          accessibilityLabel="Agregar producto"
+          accessibilityRole="button"
+          onPress={() => resetProductForm()}
+          style={({ pressed }) => [
+            styles.floatingAddButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Ionicons color="#FFFFFF" name="add" size={30} />
+        </Pressable>
+      ) : null}
       <Modal
         animationType="slide"
         onRequestClose={() => setIsSheetOpen(false)}
@@ -770,6 +776,19 @@ const styles = StyleSheet.create({
   filterButtonActive: { backgroundColor: '#805E21' },
   filterText: { color: '#805E21', fontSize: 13, fontWeight: '800' },
   filterTextActive: { color: '#FFFFFF' },
+  floatingAddButton: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.accent,
+    borderRadius: 30,
+    bottom: 24,
+    height: 60,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 22,
+    width: 60,
+    zIndex: 10,
+    ...goldButtonShadow,
+  },
   handle: {
     alignSelf: 'center',
     backgroundColor: '#D2D7DD',
@@ -852,6 +871,7 @@ const styles = StyleSheet.create({
   },
   productIconAlert: { backgroundColor: '#FDECEC' },
   productName: { color: '#18202B', fontSize: 16, fontWeight: '800' },
+  pressed: { opacity: 0.74, transform: [{ scale: 0.98 }] },
   reverseButton: { alignSelf: 'flex-start', marginTop: 8 },
   reverseText: { color: '#B54747', fontSize: 13, fontWeight: '800' },
   reversedText: {

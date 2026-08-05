@@ -64,6 +64,7 @@ export interface RecoverAccessResponse {
 export interface OnboardingAccountDetailsResponse {
   readonly accountType: 'business' | 'professional' | null;
   readonly addressLine: string | null;
+  readonly businessLocation: BusinessLocation | null;
   readonly bookingUrl: string | null;
   readonly coverImageUri: string | null;
   readonly description: string | null;
@@ -78,6 +79,33 @@ export interface OnboardingAccountDetailsResponse {
   readonly closingTime: string | null;
   readonly onboardingCompletedAt: string | null;
   readonly phone: string | null;
+}
+
+export interface BusinessLocation {
+  readonly addressLine: string | null;
+  readonly city: string | null;
+  readonly countryCode: string;
+  readonly formattedAddress: string | null;
+  readonly googlePlaceId: string | null;
+  readonly latitude: number | null;
+  readonly longitude: number | null;
+}
+
+export interface GoogleMapsLocationCandidate {
+  readonly city: string | null;
+  readonly countryCode: string | null;
+  readonly displayName: string | null;
+  readonly formattedAddress: string;
+  readonly latitude: number;
+  readonly longitude: number;
+  readonly placeId: string;
+}
+
+export interface GoogleMapsSuggestion {
+  readonly mainText: string;
+  readonly placeId: string;
+  readonly secondaryText: string;
+  readonly text: string;
 }
 
 export interface UserPortfolioItem {

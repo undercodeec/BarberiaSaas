@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { OnboardingAccountDetailsResponse } from '@barber-saas/api-client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
@@ -123,9 +123,9 @@ const settingsSections: readonly SettingsSection[] = [
 export default function BusinessSettingsScreen() {
   const { session, user } = useAuth();
   const router = useRouter();
-  const [isFlexExpanded, setIsFlexExpanded] = useState(true);
   const [isMoreExpanded, setIsMoreExpanded] = useState(false);
   const isOpening = useRef(false);
+  const queryClient = useQueryClient();
   const accountQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -186,6 +186,13 @@ export default function BusinessSettingsScreen() {
     }
     router.replace('/settings');
   }, [router]);
+  const clearCache = useCallback(() => {
+    queryClient.removeQueries({ type: 'inactive' });
+    Alert.alert(
+      'Caché limpiada',
+      'Se eliminaron los datos temporales de la app. Tu sesión permanece activa.',
+    );
+  }, [queryClient]);
 
   if (!session) return <Redirect href="/(auth)/login" />;
 
@@ -240,25 +247,34 @@ export default function BusinessSettingsScreen() {
         ))}
 
         <SettingsAccordion
-          expanded={isFlexExpanded}
-          onPress={() => toggle(setIsFlexExpanded, isFlexExpanded)}
-          title="Nava Flex"
-        >
-          <Text style={styles.accordionCopy}>
-            En Nava, estamos emocionados de lanzar Nava Flex, un conjunto de
-            potentes complementos dise\u00f1ados para llevar tu negocio al
-            siguiente nivel.
-          </Text>
-        </SettingsAccordion>
-
-        <SettingsAccordion
           expanded={isMoreExpanded}
           onPress={() => toggle(setIsMoreExpanded, isMoreExpanded)}
-          title="M\u00e1s opciones"
+          title="Más opciones"
         >
-          <Text style={styles.accordionCopy}>
-            No hay m\u00e1s opciones disponibles por el momento.
-          </Text>
+          <Pressable
+            accessibilityHint="Elimina datos temporales sin cerrar sesión"
+            accessibilityLabel="Limpiar caché de la aplicación"
+            accessibilityRole="button"
+            onPress={clearCache}
+            style={({ pressed }) => [
+              styles.moreOption,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View style={styles.moreOptionIcon}>
+              <Ionicons
+                color={appTheme.colors.accentDark}
+                name="refresh-outline"
+                size={23}
+              />
+            </View>
+            <View style={styles.moreOptionCopy}>
+              <Text style={styles.moreOptionTitle}>Limpiar caché</Text>
+              <Text style={styles.moreOptionDescription}>
+                Elimina datos temporales de la aplicación.
+              </Text>
+            </View>
+          </Pressable>
         </SettingsAccordion>
       </ScrollView>
     </SafeAreaView>
@@ -444,6 +460,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 60,
   },
+  moreOption: {
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 17,
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 8,
+    padding: 14,
+    ...goldButtonShadow,
+  },
+  moreOptionCopy: { flex: 1 },
+  moreOptionDescription: {
+    color: COLORS.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 3,
+  },
+  moreOptionIcon: {
+    alignItems: 'center',
+    backgroundColor: COLORS.iconBackground,
+    borderRadius: 14,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  moreOptionTitle: { color: COLORS.text, fontSize: 16, fontWeight: '800' },
   pressed: { opacity: 0.74, transform: [{ scale: 0.985 }] },
   screen: appStyles.screen,
   section: { marginBottom: 36 },

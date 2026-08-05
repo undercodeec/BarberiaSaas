@@ -538,6 +538,10 @@ model Location {
   name                    String                   @db.VarChar(120)
   slug                    String                   @db.VarChar(80)
   addressLine             String?                  @map("address_line") @db.VarChar(240)
+  formattedAddress        String?                  @map("formatted_address") @db.VarChar(300)
+  googlePlaceId           String?                  @map("google_place_id") @db.VarChar(255)
+  latitude                Float?
+  longitude               Float?
   city                    String?                  @db.VarChar(120)
   countryCode             String                   @default("EC") @map("country_code") @db.Char(2)
   currencyCode            String                   @default("USD") @map("currency_code") @db.Char(3)
@@ -564,6 +568,7 @@ model Location {
 
   @@unique([organizationId, slug])
   @@index([organizationId])
+  @@index([googlePlaceId])
   @@map("locations")
 }
 

@@ -50,7 +50,11 @@ export default function HomePage() {
                   Base preparada
                 </h2>
               </div>
-              <span className="pulse-dot" aria-label="Sistema listo" />
+              <span
+                aria-label="Sistema listo"
+                className="pulse-dot"
+                role="status"
+              />
             </div>
             <ul className="mt-2 divide-y divide-white/10">
               {foundations.map((foundation, index) => (

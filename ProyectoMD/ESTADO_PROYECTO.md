@@ -15,7 +15,7 @@ backlog vigente.
 ### Bloqueadores para producción
 
 - [ ] Completar la Fase 13: pruebas E2E, seguridad, rendimiento, accesibilidad,
-      backups/restauración y checklist de producción.
+      recuperación con Neon y checklist de producción.
 - [x] Limitación general por IP para registro y reenvío de OTP, con límites y
       ventana configurables, cabecera `Retry-After` y soporte explícito para un
       proxy confiable.
@@ -31,19 +31,82 @@ backlog vigente.
 ### Pendientes no bloqueantes o fuera de alcance actual
 
 - [ ] Afinar detalles menores de UI/UX de reservas públicas.
-- [ ] Evaluar comisiones específicas sobre productos como ampliación de Fase 7.
-- [ ] Definir la funcionalidad y las reglas de préstamos a clientes antes de
-      incluirla en el MVP.
+- [x] Comisiones específicas sobre productos pospuestas hasta después del
+      piloto; el MVP calcula comisiones únicamente sobre servicios.
+- [x] Préstamos a clientes descartados del MVP y del piloto. Nava no entregará
+      dinero, calculará intereses ni administrará cuotas o vencimientos de
+      clientes. Una futura cuenta por cobrar por servicios ya prestados deberá
+      diseñarse como un módulo distinto y no como un préstamo.
+
+## Decisiones de producto vigentes para el piloto
+
+Este bloque resuelve las definiciones que antes impedían decidir qué desarrollar.
+Las funcionalidades pospuestas no deben aparecer como disponibles ni bloquear
+la estabilización, el despliegue piloto o las pruebas en Google Play.
+
+| Área | Decisión vigente | Consecuencia para el piloto |
+| --- | --- | --- |
+| Préstamos a clientes | Fuera del MVP. No habrá desembolso de dinero, interés, cuotas ni vencimientos. | No se crea modelo, API ni pantalla. Una posible cuenta por cobrar por consumo se evaluará después del piloto. |
+| Anticipos a colaboradores | Se mantienen como `Anticipo de comisión`, sin interés ni calendario de cuotas. No se presentan como préstamo formal. | Continúa la implementación actual, descontada únicamente de comisiones futuras y con trazabilidad. |
+| Comisiones de productos | Pospuestas. Solo los servicios generan comisión durante el MVP. | Las ventas de inventario afectan stock, Caja y reportes, pero no generan comisión. |
+| Pagos online de clientes | PayPhone, comprobantes de transferencia y anticipos online quedan deshabilitados durante el piloto inicial. | Wallet conserva Caja, movimientos y comisiones; los cobros se registran manualmente cuando el negocio los recibe. |
+| Facturación de Nava | La suscripción continúa simulada, sin cobro real ni precios publicados. | Esencial mantiene trial y límites; Multi permanece `Próximamente`. |
+| Permisos personalizados | Pospuestos los permisos por acción y alcance de sucursal. | El piloto utiliza los perfiles base Propietario, Administrador, Recepción y Profesional validados por la API. |
+| Configuración regional | Idioma, moneda y zona horaria no serán editables después del onboarding durante el piloto. | Se evita reinterpretar citas y movimientos históricos; un cambio excepcional requerirá soporte administrativo. |
+| Información adicional | Fuera del piloto hasta definir campos concretos con efecto operativo. | Se mantiene como `Próximamente` o se oculta; no presenta controles que simulen guardar. |
+| WhatsApp | Fuera del MVP. | Las notificaciones del piloto usan correo, notificación interna y Expo Push. |
+| Escalado de API | Una sola instancia de API en la VPS durante el piloto. | El rate limiting en memoria es suficiente; Redis se reconsidera antes de escalar horizontalmente. |
+
+### Valores iniciales de política de reservas
+
+- [x] Solicitar reconfirmación de asistencia.
+- [x] Enviar el recordatorio 24 horas antes de la cita.
+- [x] Permitir seis horas para responder a la reconfirmación.
+- [x] Mantener la cita si el cliente no reconfirma; no cancelar
+      automáticamente durante el piloto.
+- [x] Permitir cancelación y reprogramación hasta dos horas antes.
+- [x] Mantener estos valores editables por el negocio mediante la configuración
+      ya implementada. El texto legal/comercial definitivo continúa pendiente.
+
+### Orden de desarrollo desbloqueado
+
+1. Integración uniforme de Google Maps, ubicación actual y búsqueda de Places.
+2. Automatización de Fase 13: E2E, accesibilidad, seguridad y rendimiento.
+3. Configuración EAS y generación del AAB para prueba interna de Google Play.
+4. Despliegue piloto de API en una sola VPS y base/rama piloto en Neon.
+5. Validación manual en dispositivos físicos y corrección de incidencias.
+6. Dominio definitivo, enlaces universales, textos legales y preparación de
+   producción.
+
+Las decisiones comerciales sobre precios de Esencial/Multi y una futura
+integración PayPhone no bloquean el piloto porque esas capacidades permanecerán
+deshabilitadas. Sí deberán resolverse antes de vender suscripciones o activar
+pagos online reales.
 
 ## Decisión de infraestructura vigente
 
 - [x] PostgreSQL como base de datos inicial.
+- [x] Neon seleccionado como PostgreSQL administrado para producción.
 - [x] Prisma ORM 7 para esquema, cliente tipado y migraciones.
 - [x] API Node/Fastify como única frontera de datos para los clientes.
-- [x] Despliegue inicial preparado para una VPS; no se ha realizado ningún despliegue.
-- [x] Estrategia de migración futura a PostgreSQL administrado por Supabase sin acoplar el móvil a Supabase.
+- [x] Despliegue inicial de la API preparado para una VPS; no se ha realizado ningún despliegue.
+- [x] Neon reemplaza la estrategia anterior de migración a Supabase; el móvil continúa desacoplado de cualquier proveedor de base de datos.
 - [x] Supabase Auth, RPC, RLS, Storage y Realtime retirados de la implementación actual.
 - [x] Snapshot PostgreSQL + Prisma incluido en el repositorio.
+
+### Producción administrada con Neon
+
+- [ ] Crear el proyecto de producción de Neon en la región elegida y registrar
+      su cadena de conexión exclusivamente como secreto del servidor.
+- [ ] Aplicar `prisma migrate deploy` contra Neon y verificar que no existan
+      migraciones pendientes antes de habilitar tráfico de producción.
+- [ ] Configurar la ventana de restauración puntual (PITR) y los snapshots de
+      Neon según el plan contratado.
+- [ ] Ensayar una restauración en una rama de Neon y documentar el tiempo de
+      recuperación; no restaurar directamente la rama de producción como
+      primera acción.
+- [ ] Evaluar un `pg_dump` externo solo si se exige retención superior a Neon,
+      copia fuera del proveedor o un requisito legal/comercial específico.
 
 ## Resumen por fases
 
@@ -288,7 +351,8 @@ Decisión de alcance para el MVP:
 - gastos y retiros no generan comisión;
 - las anulaciones o devoluciones crearán una reversión auditable, nunca eliminarán la entrada original;
 - no se admitirán pagos parciales en este corte: la comisión nace con el cobro completo;
-- productos y reglas de comisión de productos se integrarán junto con Inventario (Fase 8).
+- los productos no generan comisión durante el MVP; una regla específica sobre
+  productos se evaluará después del piloto sin modificar el historial actual.
 - [x] Base de datos inicial de Comisiones creada mediante la migración `20260731214903_commission_engine`: reglas, entradas idempotentes con snapshot y liquidaciones.
 - [x] Alta de profesionales desde Gestión de colaboradores con comisión inicial persistida en la invitación. Al aceptar, se crea una regla `SERVICE_PERCENTAGE`; antes de aceptar no existe regla activa ni puede calcularse comisión.
 - [x] Conectar el cálculo automático al cobro de citas y el registro manual comisionable desde Caja.
@@ -317,7 +381,8 @@ Decisión de alcance para el MVP:
 
 ### Fase 13 — Estabilización del MVP
 
-- [ ] Seguridad, E2E, rendimiento, accesibilidad, backups y checklist de producción.
+- [ ] Seguridad, E2E, rendimiento, accesibilidad, recuperación con Neon y
+      checklist de producción.
 
 ## Historial de implementación y evidencia
 
@@ -425,11 +490,17 @@ dispositivos físicos.
 
 ### Pendiente: activación funcional de Location / Google Maps
 
-- [ ] Configurar una clave de Google Maps Platform en las variables de entorno móviles, sin versionarla en Git.
-- [ ] Habilitar facturación, `Maps SDK for Android` y `Places API (New)` en el proyecto de Google Cloud; para iOS, habilitar también `Maps SDK for iOS` cuando corresponda.
-- [ ] Restringir la clave Android al paquete `com.barbersaas.mobile`, su certificado SHA-1 y las APIs necesarias.
-- [ ] Instalar e integrar el SDK de mapa nativo, `expo-location` y la búsqueda/autocompletado de Places; sustituir el mapa visual actual por Google Maps y solicitar permiso de ubicación para centrar y marcar la posición del dispositivo.
-- [ ] Persistir latitud, longitud, `placeId` y dirección normalizada del negocio en PostgreSQL mediante una migración y una API autenticada.
+- [x] Catálogo de variables separado para las claves de servidor, Android, iOS
+      y Web, sin versionar valores reales en Git.
+- [x] El usuario confirmó que dispone de cuatro claves. La activación de
+      facturación, APIs y restricciones se validará al ejecutar el build piloto.
+- [ ] Confirmar en Google Cloud que la clave Android incluye el SHA-1 de Play
+      App Signing además del paquete `com.barbersaas.mobile`.
+- [x] SDK nativo, mapa Web, `expo-location`, Places Autocomplete y
+      geocodificación inversa integrados. El permiso se solicita únicamente al
+      pulsar `Usar mi ubicación actual`.
+- [x] Latitud, longitud, `googlePlaceId` y dirección normalizada persistidos en
+      `Location` mediante API autenticada, autorización y auditoría.
 
 ### Pendiente: persistencia de encuesta Welcome
 
@@ -1040,7 +1111,12 @@ que acepta reservas reales hasta completar esa fase.
       efecto de negocio.
 - [ ] Estas secciones no habilitan el boton `Guardar cambios`.
 
-## Modulo planificado 3 - Nava Wallet
+## Modulo planificado 3 - Nava Wallet (plan histórico)
+
+> Este diseño ampliado no forma parte del piloto inicial. La Wallet disponible
+> en el MVP se limita a Caja, movimientos y comisiones internas. PayPhone,
+> comprobantes y anticipos online continúan deshabilitados conforme al bloque
+> vigente de decisiones de producto.
 
 ### Cambio de alcance y definicion del producto
 
@@ -1576,23 +1652,23 @@ No saltar directamente a credenciales de produccion.
 - [ ] Actualizar esta seccion cambiando a `[x]` solamente lo que haya sido
       implementado y verificado.
 
-## Decisiones pendientes antes de produccion
+## Decisiones comerciales históricas aún no contratadas
 
-- [ ] Precio de Esencial.
-- [ ] Precio de Multi.
-- [ ] Periodicidad comercial y eventual descuento anual.
-- [ ] Acuerdo PayPhone para produccion y modalidad partner/comercio aliado.
-- [ ] Comisiones, retenciones y comunicacion comercial de PayPhone.
-- [ ] Endpoint o mecanismo oficial para consultar saldo retirable; mientras no
-      exista, Nava mostrara cobros registrados, no saldo real.
-- [ ] Tiempo maximo de revision de un comprobante ya enviado.
-- [ ] Politica de devoluciones fuera de la ventana de reverso del proveedor.
-- [ ] Almacenamiento privado y periodo de conservacion de comprobantes.
-- [ ] Contenido funcional de Configuracion general.
-- [ ] Contenido funcional de Informacion adicional.
-- [ ] Reglas definitivas de reservas anticipadas publicas.
-- [ ] Desarrollo completo de reservas publicas.
-- [ ] Desarrollo real multisucursal antes de activar Multi.
+Esta lista ya no bloquea el piloto: las capacidades afectadas quedan
+deshabilitadas. Solo deberá resolverse antes de venderlas o activarlas en
+producción.
+
+- [ ] Precio y periodicidad comercial de Esencial y Multi.
+- [ ] Acuerdo PayPhone para producción, modalidad partner/comercio aliado,
+      comisiones, retenciones y consulta de saldo retirable.
+- [ ] Política de revisión, disputas, devoluciones y conservación privada de
+      comprobantes si se habilitan transferencias o PayPhone.
+- [x] Configuración general e Información adicional quedan sin controles
+      editables durante el piloto.
+- [x] Las reservas públicas ya están implementadas; usan los valores iniciales
+      documentados en el bloque vigente y permiten configuración por negocio.
+- [x] Multi permanece desactivado hasta implementar y validar operación real
+      multisucursal.
 
 ## Proxima accion de desarrollo
 
@@ -3146,7 +3222,7 @@ caja, comisiones y registros históricos.
 | Historial de pagos a colaboradores | Disponible inicialmente en Wallet/Comisiones; luego tendrá filtros y exportación propios.                                                                      |
 | Alerta de inventario               | Disponible: catálogo, stock por sucursal, movimientos auditables, ajustes y filtro por umbral mínimo.                                                          |
 | Historial de ventas                | Disponible: detalle paginado de `SALE` por método, servicio, profesional, cita y cliente.                                                                      |
-| Préstamos a clientes               | Pendiente de definición. No se desarrollará hasta validar una funcionalidad y reglas adecuadas para el MVP; no debe confundirse con anticipos a colaboradores. |
+| Préstamos a clientes               | Fuera del MVP y del piloto. Nava no desembolsa dinero ni administra interés, cuotas o vencimientos; una futura cuenta por cobrar por servicios se diseñará por separado. |
 | Reseñas de clientes                | Disponible mediante Gestión de reseñas.                                                                                                                        |
 
 ### Verificación de este corte
@@ -3303,8 +3379,8 @@ caja, comisiones y registros históricos.
 - [x] Suite API/PostgreSQL: 29/29 pruebas aprobadas, incluida una prueba de dos
       ventas concurrentes que confirma un solo descuento, bloqueo de sobreventa,
       alerta de stock bajo, separación en reportes y reposición por reversión.
-- [ ] Las comisiones específicas sobre productos no forman parte de los
-      criterios de aceptación de Fase 8 y permanecen como ampliación de la Fase 7.
+- [x] Las comisiones específicas sobre productos quedan pospuestas hasta después
+      del piloto; Fase 8 conserva ventas, stock, Caja y reportes sin generarlas.
 - [ ] Validación visual final en dispositivo físico pendiente del cierre
       integral del MVP.
 
@@ -3512,3 +3588,60 @@ caja, comisiones y registros históricos.
 - [ ] El recorrido visual mediante Playwright en Chrome móvil y escritorio
       continúa pendiente; no debe confundirse con este recorrido integral de
       API y persistencia.
+
+## Google Maps, piloto Android y estabilización parcial — 4 de agosto de 2026
+
+### Ubicación uniforme y frontera segura
+
+- [x] Google Maps nativo mediante `react-native-maps` y proveedor Google para
+      Android/iOS; Web utiliza Google Maps JavaScript mediante un adaptador
+      específico de plataforma.
+- [x] Búsqueda por nombre de negocio, dirección o calles con debounce, token de
+      sesión, restricción por país y sesgo por coordenadas cuando existen.
+- [x] Botón explícito `Usar mi ubicación actual`; solicita solo permiso en
+      primer plano, centra el mapa y normaliza la dirección en el backend.
+- [x] El usuario puede tocar el mapa para mover el punto; guardar exige una
+      ubicación resuelta y confirmada, no texto libre sin coordenadas.
+- [x] Places API (New), Place Details y Geocoding se consumen exclusivamente
+      desde Fastify con `GOOGLE_MAPS_SERVER_API_KEY`. El cliente recibe campos
+      minimizados y nunca la clave del servidor.
+- [x] Límite independiente por usuario e IP para consultas de Google Maps,
+      configurable y con cabeceras `X-RateLimit-*`/`Retry-After`.
+- [x] Migración `20260804120000_google_business_location` aplicada en desarrollo
+      y `postgres-test`: 41 migraciones aplicadas.
+- [x] Actualización de ubicación limitada a propietario o administrador,
+      derivando organización y sucursal desde la sesión; cada cambio crea
+      `location.map_updated` en `AuditLog`.
+
+### Preparación de EAS y Google Play
+
+- [x] Configuración dinámica `app.config.ts` para inyectar las claves Android e
+      iOS durante el build y declarar el mensaje de permiso de ubicación.
+- [x] Perfil EAS `preview` configurado para producir un Android App Bundle con
+      variables del entorno `preview`; `production` queda separado.
+- [x] La compilación falla explícitamente si falta la clave correspondiente a
+      la plataforma en un build EAS.
+- [ ] Registrar en EAS `EXPO_PUBLIC_API_URL`,
+      `GOOGLE_MAPS_ANDROID_API_KEY` y `GOOGLE_MAPS_IOS_API_KEY` para `preview`.
+- [ ] Colocar `GOOGLE_MAPS_SERVER_API_KEY` en el `EnvironmentFile` privado de la
+      API piloto en la VPS y reiniciar el servicio.
+- [ ] Generar el AAB, cargarlo en la prueba interna de Play Console y comprobar
+      el mapa con el certificado de Play App Signing.
+
+### Fase 13 automatizada hasta este corte
+
+- [x] Cabeceras de seguridad HTTP mediante Helmet, HSTS solo en producción,
+      límite de cuerpo de 1 MiB y timeout de solicitud de 30 segundos.
+- [x] Playwright en Chrome móvil y escritorio: portada y auditoría Axe sin
+      infracciones críticas o serias, 4/4 pruebas aprobadas.
+- [x] Se corrigió el atributo ARIA inválido detectado automáticamente en el
+      indicador de estado de la portada Web.
+- [x] Escenario de rendimiento reproducible `test:performance`; línea base
+      local de 100 solicitudes a `/health`, concurrencia 10, cero fallos y p95
+      de 20,57 ms.
+- [x] Suite de validaciones: 21/21. Suite API/PostgreSQL y Google Maps: 36/36.
+- [x] Suite móvil: 5/5. Typecheck secuencial de los 12 paquetes, build de API,
+      build Web de Expo y build optimizado de la Web completados.
+- [ ] Ampliar Playwright al recorrido público con datos efímeros, ejecutar carga
+      contra la infraestructura piloto, validar accesibilidad móvil y completar
+      recuperación Neon/checklist de producción antes de cerrar Fase 13.

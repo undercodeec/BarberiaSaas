@@ -1,5 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { OnboardingAccountDetailsResponse } from '@barber-saas/api-client';
+import type {
+  GoogleMapsLocationCandidate,
+  OnboardingAccountDetailsResponse,
+} from '@barber-saas/api-client';
 import { useQuery } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
@@ -43,6 +46,7 @@ import {
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { BookingLinkSheet } from '../../src/components/BookingLinkSheet';
+import { BusinessLocationSheet } from '../../src/components/BusinessLocationSheet';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const MONTH_PROGRESS = 84;
@@ -935,7 +939,7 @@ function WelcomeSurveySheet({
   );
 }
 
-function LocationBannerSheet({
+export function LegacyLocationBannerSheet({
   initialAddress,
   onComplete,
   onDismiss,
@@ -1283,8 +1287,19 @@ export default function DashboardScreen() {
     setIsLocationBannerOpen(false);
 
     if (!session || !user || !accountQuery.isSuccess) return;
-    setNeedsLocationBanner(!accountQuery.data?.addressLine?.trim());
-  }, [accountQuery.data?.addressLine, accountQuery.isSuccess, session, user]);
+    const location = accountQuery.data?.businessLocation;
+    setNeedsLocationBanner(
+      location?.latitude === null ||
+        location?.latitude === undefined ||
+        location.longitude === null ||
+        location.longitude === undefined,
+    );
+  }, [
+    accountQuery.data?.businessLocation,
+    accountQuery.isSuccess,
+    session,
+    user,
+  ]);
 
   useEffect(() => {
     if (
@@ -1338,38 +1353,26 @@ export default function DashboardScreen() {
     setNeedsLocationBanner(false);
   };
 
-  const saveLocation = async (addressLine: string) => {
+  const saveLocation = async (location: GoogleMapsLocationCandidate) => {
     const account = accountQuery.data;
-    if (
-      !user ||
-      !account ||
-      !account.businessName ||
-      !account.city ||
-      !account.countryCode ||
-      !account.phone
-    ) {
+    if (!user || !account) {
       throw new Error(
         'No encontramos la informaci\u00f3n necesaria del negocio.',
       );
     }
 
-    await requireApiClient().request<OnboardingAccountDetailsResponse>(
-      '/v1/onboarding/account-details',
-      {
-        body: {
-          addressLine,
-          businessName: account.businessName,
-          city: account.city,
-          countryCode: account.countryCode,
-          coverImageUri: account.coverImageUri,
-          description: account.description,
-          facebookUrl: account.facebookUrl,
-          instagramUrl: account.instagramUrl,
-          phone: account.phone,
-        },
-        method: 'PATCH',
+    await requireApiClient().request('/v1/business-location', {
+      body: {
+        addressLine: location.formattedAddress.slice(0, 240),
+        city: location.city,
+        countryCode: location.countryCode,
+        formattedAddress: location.formattedAddress,
+        googlePlaceId: location.placeId || null,
+        latitude: location.latitude,
+        longitude: location.longitude,
       },
-    );
+      method: 'PUT',
+    });
     await accountQuery.refetch();
     setNeedsLocationBanner(false);
   };
@@ -1515,14 +1518,16 @@ export default function DashboardScreen() {
         onSubmit={saveWelcomeSurveyResponse}
         visible={isWelcomeSurveyOpen}
       />
-      <LocationBannerSheet
-        initialAddress={accountQuery.data?.addressLine ?? ''}
-        key={`location-banner-${user?.id ?? 'anonymous'}`}
-        onComplete={() => setIsLocationBannerOpen(false)}
-        onDismiss={dismissLocationBanner}
-        onSubmit={saveLocation}
-        visible={isLocationBannerOpen}
-      />
+      {isLocationBannerOpen ? (
+        <BusinessLocationSheet
+          countryCode={accountQuery.data?.countryCode ?? 'EC'}
+          initialLocation={accountQuery.data?.businessLocation ?? null}
+          onComplete={() => setIsLocationBannerOpen(false)}
+          onDismiss={dismissLocationBanner}
+          onSubmit={saveLocation}
+          visible
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -1701,7 +1706,11 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  locationPrimaryLabel: { color: appTheme.colors.accentDark, fontSize: 15, fontWeight: '900' },
+  locationPrimaryLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 15,
+    fontWeight: '900',
+  },
   locationRoad: {
     backgroundColor: '#f9f9f8',
     position: 'absolute',
@@ -1731,7 +1740,11 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  locationSecondaryLabel: { color: appTheme.colors.accentDark, fontSize: 15, fontWeight: '900' },
+  locationSecondaryLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 15,
+    fontWeight: '900',
+  },
   locationSheet: {
     backgroundColor: appTheme.colors.surfaceElevated,
     borderTopLeftRadius: 40,
@@ -1795,7 +1808,11 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  permissionPrimaryLabel: { color: appTheme.colors.accentDark, fontSize: 16, fontWeight: '900' },
+  permissionPrimaryLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 16,
+    fontWeight: '900',
+  },
   permissionSecondaryButton: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surface,

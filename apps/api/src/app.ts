@@ -1,4 +1,5 @@
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import {
   AppNotificationType,
   AppointmentStatus,
@@ -19,6 +20,9 @@ import {
   createOnboardingCollaboratorSchema,
   createOnboardingServiceSchema,
   deleteAccountSchema,
+  mapsAutocompleteSchema,
+  mapsPlaceDetailsSchema,
+  mapsReverseGeocodeSchema,
   recoverAccessSchema,
   registrationAvailabilitySchema,
   resendVerificationSchema,
@@ -29,6 +33,7 @@ import {
   updateOnboardingServiceSchema,
   updateOnboardingAccountDetailsSchema,
   updateAccountTypeSchema,
+  updateBusinessLocationSchema,
   verifyEmailSchema,
 } from '@barber-saas/validation';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
@@ -37,6 +42,7 @@ import { z, ZodError } from 'zod';
 
 import type { ApiConfig } from './config';
 import { ApiError, isUniqueConstraintError } from './errors';
+import { createGoogleMapsClient } from './google-maps';
 import { registerAgendaRoutes } from './agenda';
 import { registerBusinessScheduleRoutes } from './business-schedule';
 import { registerCashRegisterRoutes } from './cash-register';
@@ -412,6 +418,7 @@ const onboardingServiceParamsSchema = z.object({
 interface BuildApiOptions {
   readonly config: ApiConfig;
   readonly database?: DatabaseClient;
+  readonly googleMapsFetch?: typeof fetch;
   readonly invitationMailer?: InvitationMailer | null;
   readonly platformAccessMailer?: PlatformAccessMailer | null;
   readonly publicBookingMailer?: PublicBookingMailer | null;
@@ -798,6 +805,7 @@ async function authenticate(database: DatabaseClient, request: FastifyRequest) {
 export async function buildApi({
   config,
   database = createDatabaseClient({ connectionString: config.DATABASE_URL }),
+  googleMapsFetch,
   invitationMailer = null,
   platformAccessMailer = null,
   publicBookingMailer = null,
@@ -805,14 +813,78 @@ export async function buildApi({
   verificationMailer = null,
 }: BuildApiOptions) {
   const app = Fastify({
+    bodyLimit: 1_048_576,
     logger: config.APP_ENV === 'production',
+    requestTimeout: 30_000,
     trustProxy: config.API_TRUST_PROXY === 'true',
   });
   const authRateLimitBuckets = new Map<string, AuthRateLimitBucket>();
+  const googleMapsRateLimitBuckets = new Map<string, AuthRateLimitBucket>();
   const authRateLimitWindowMs = config.AUTH_IP_RATE_LIMIT_WINDOW_SECONDS * 1000;
+  const googleMaps = createGoogleMapsClient({
+    apiKey: config.GOOGLE_MAPS_SERVER_API_KEY,
+    fetchImplementation: googleMapsFetch,
+  });
+  const enforceGoogleMapsRateLimit = (
+    userId: string,
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ) => {
+    const now = Date.now();
+    const windowMs = config.GOOGLE_MAPS_RATE_LIMIT_WINDOW_SECONDS * 1000;
+    const key = `${userId}:${request.ip}`;
+    if (
+      !googleMapsRateLimitBuckets.has(key) &&
+      googleMapsRateLimitBuckets.size >= MAX_AUTH_RATE_LIMIT_BUCKETS
+    ) {
+      for (const [bucketKey, stored] of googleMapsRateLimitBuckets) {
+        if (stored.resetAt <= now) googleMapsRateLimitBuckets.delete(bucketKey);
+      }
+      if (googleMapsRateLimitBuckets.size >= MAX_AUTH_RATE_LIMIT_BUCKETS) {
+        const oldestKey = googleMapsRateLimitBuckets.keys().next().value as
+          string | undefined;
+        if (oldestKey) googleMapsRateLimitBuckets.delete(oldestKey);
+      }
+    }
+    const current = googleMapsRateLimitBuckets.get(key);
+    const bucket =
+      !current || current.resetAt <= now
+        ? { count: 0, resetAt: now + windowMs }
+        : current;
+    if (!current || current.resetAt <= now)
+      googleMapsRateLimitBuckets.set(key, bucket);
+    const allowed = bucket.count < config.GOOGLE_MAPS_RATE_LIMIT_MAX;
+    if (allowed) bucket.count += 1;
+    const retryAfterSeconds = Math.max(
+      1,
+      Math.ceil((bucket.resetAt - now) / 1000),
+    );
+    reply
+      .header('x-ratelimit-limit', String(config.GOOGLE_MAPS_RATE_LIMIT_MAX))
+      .header(
+        'x-ratelimit-remaining',
+        String(Math.max(0, config.GOOGLE_MAPS_RATE_LIMIT_MAX - bucket.count)),
+      )
+      .header('x-ratelimit-reset', String(Math.ceil(bucket.resetAt / 1000)));
+    if (!allowed) {
+      reply.header('retry-after', String(retryAfterSeconds));
+      throw new ApiError(
+        429,
+        'GOOGLE_MAPS_RATE_LIMITED',
+        'Has realizado demasiadas búsquedas de ubicación. Espera un momento.',
+      );
+    }
+  };
   await app.register(cors, {
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     origin: config.CORS_ORIGIN.split(',').map((origin) => origin.trim()),
+  });
+  await app.register(helmet, {
+    contentSecurityPolicy: false,
+    strictTransportSecurity:
+      config.APP_ENV === 'production'
+        ? { includeSubDomains: true, maxAge: 31_536_000 }
+        : false,
   });
 
   app.get('/health', async () => ({ status: 'ok' }));
@@ -1451,6 +1523,122 @@ export async function buildApi({
     return reply.code(204).send();
   });
 
+  app.post('/v1/maps/autocomplete', async (request, reply) => {
+    const { user } = await authenticate(database, request);
+    enforceGoogleMapsRateLimit(user.id, request, reply);
+    const input = mapsAutocompleteSchema.parse(request.body);
+    return { suggestions: await googleMaps.autocomplete(input) };
+  });
+
+  app.post('/v1/maps/place-details', async (request, reply) => {
+    const { user } = await authenticate(database, request);
+    enforceGoogleMapsRateLimit(user.id, request, reply);
+    const input = mapsPlaceDetailsSchema.parse(request.body);
+    return {
+      location: await googleMaps.placeDetails(
+        input.placeId,
+        input.sessionToken,
+      ),
+    };
+  });
+
+  app.post('/v1/maps/reverse-geocode', async (request, reply) => {
+    const { user } = await authenticate(database, request);
+    enforceGoogleMapsRateLimit(user.id, request, reply);
+    const input = mapsReverseGeocodeSchema.parse(request.body);
+    return {
+      location: await googleMaps.reverseGeocode(
+        input.latitude,
+        input.longitude,
+      ),
+    };
+  });
+
+  app.put('/v1/business-location', async (request) => {
+    const { user } = await authenticate(database, request);
+    const input = updateBusinessLocationSchema.parse(request.body);
+    const membership = await database.membership.findFirst({
+      include: {
+        memberLocations: { include: { location: true }, take: 1 },
+      },
+      where: { status: MembershipStatus.ACTIVE, userId: user.id },
+    });
+    const currentLocation = membership?.memberLocations[0]?.location;
+    if (!membership || !currentLocation)
+      throw new ApiError(
+        404,
+        'BUSINESS_LOCATION_NOT_FOUND',
+        'No encontramos una sucursal activa para tu cuenta.',
+      );
+    if (
+      membership.role !== MembershipRole.OWNER &&
+      membership.role !== MembershipRole.MANAGER
+    )
+      throw new ApiError(
+        403,
+        'BUSINESS_LOCATION_FORBIDDEN',
+        'No tienes permiso para modificar la ubicación del negocio.',
+      );
+
+    const updated = await database.$transaction(async (transaction) => {
+      const location = await transaction.location.update({
+        data: {
+          addressLine: input.addressLine,
+          city: input.city ?? currentLocation.city,
+          countryCode: input.countryCode ?? currentLocation.countryCode,
+          formattedAddress: input.formattedAddress,
+          googlePlaceId: input.googlePlaceId ?? null,
+          latitude: input.latitude,
+          longitude: input.longitude,
+        },
+        where: { id: currentLocation.id },
+      });
+      if (membership.role === MembershipRole.OWNER)
+        await transaction.userRegistrationProfile.updateMany({
+          data: {
+            addressLine: input.addressLine,
+            ...(input.city ? { city: input.city } : {}),
+            ...(input.countryCode ? { countryCode: input.countryCode } : {}),
+          },
+          where: { userId: user.id },
+        });
+      await transaction.auditLog.create({
+        data: {
+          action: 'location.map_updated',
+          actorUserId: user.id,
+          afterData: {
+            formattedAddress: location.formattedAddress,
+            googlePlaceId: location.googlePlaceId,
+            latitude: location.latitude,
+            longitude: location.longitude,
+          },
+          beforeData: {
+            formattedAddress: currentLocation.formattedAddress,
+            googlePlaceId: currentLocation.googlePlaceId,
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
+          },
+          entityId: location.id,
+          entityType: 'location',
+          locationId: location.id,
+          organizationId: membership.organizationId,
+        },
+      });
+      return location;
+    });
+    return {
+      location: {
+        addressLine: updated.addressLine,
+        city: updated.city,
+        countryCode: updated.countryCode,
+        formattedAddress: updated.formattedAddress,
+        googlePlaceId: updated.googlePlaceId,
+        latitude: updated.latitude,
+        longitude: updated.longitude,
+      },
+    };
+  });
+
   app.get('/v1/onboarding/account-details', async (request) => {
     const { user } = await authenticate(database, request);
     const [profile, membership] = await Promise.all([
@@ -1458,16 +1646,36 @@ export async function buildApi({
         where: { userId: user.id },
       }),
       database.membership.findFirst({
-        include: { organization: { select: { slug: true } } },
+        include: {
+          memberLocations: {
+            select: {
+              location: {
+                select: {
+                  addressLine: true,
+                  city: true,
+                  countryCode: true,
+                  formattedAddress: true,
+                  googlePlaceId: true,
+                  latitude: true,
+                  longitude: true,
+                },
+              },
+            },
+            take: 1,
+          },
+          organization: { select: { slug: true } },
+        },
         where: { status: MembershipStatus.ACTIVE, userId: user.id },
       }),
     ]);
+    const businessLocation = membership?.memberLocations[0]?.location ?? null;
     return {
       accountType: profile
         ? (profile.accountType.toLowerCase() as 'business' | 'professional')
         : null,
       addressLine: profile?.addressLine ?? null,
       businessName: profile?.businessName ?? null,
+      businessLocation,
       bookingUrl: profile
         ? publicBookingUrl(
             config.PUBLIC_WEB_URL,

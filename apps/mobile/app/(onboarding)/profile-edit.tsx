@@ -17,11 +17,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BottomNavigation } from '../../src/components/BottomNavigation';
+import {
+  appStyles,
+  appTheme,
+  BottomNavigation,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
-const PRIMARY = '#1C1F24';
+const PRIMARY = appTheme.colors.accent;
 const MAX_IMAGE_BYTES = 1_500_000;
 const MAX_IMAGE_DIMENSION = 1_600;
 type PhotoTarget = 'avatar' | 'portfolio';
@@ -159,7 +164,11 @@ export default function ProfileEditScreen() {
             onPress={() => router.replace('/settings')}
             style={styles.backButton}
           >
-            <Ionicons color="#111827" name="arrow-back" size={22} />
+            <Ionicons
+              color={appTheme.colors.accentDark}
+              name="arrow-back"
+              size={22}
+            />
           </Pressable>
           <View>
             <Text style={styles.eyebrow}>Cuenta</Text>
@@ -357,10 +366,12 @@ const styles = StyleSheet.create({
     height: 48,
     justifyContent: 'center',
     width: 48,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   avatar: {
     alignItems: 'center',
-    backgroundColor: '#EEEFF1',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 56,
     height: 112,
     justifyContent: 'center',
@@ -384,20 +395,23 @@ const styles = StyleSheet.create({
   avatarInitials: { color: PRIMARY, fontSize: 34, fontWeight: '900' },
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#EEEFF1',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     height: 46,
     justifyContent: 'center',
     width: 46,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   bioField: { minHeight: 108, paddingTop: 13 },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E0E5EC',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 22,
-    borderWidth: 1,
+    borderWidth: 0,
     marginTop: 17,
     padding: 17,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   content: {
     alignSelf: 'center',
@@ -408,7 +422,7 @@ const styles = StyleSheet.create({
   },
   emptyPortfolio: {
     alignItems: 'center',
-    backgroundColor: '#EEEFF1',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 16,
     gap: 8,
     marginTop: 16,
@@ -475,14 +489,14 @@ const styles = StyleSheet.create({
   },
   portfolioHint: { color: '#697483', fontSize: 12, marginTop: 4 },
   portfolioImage: {
-    backgroundColor: '#EEEFF1',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 13,
     height: 96,
     width: 96,
   },
   pressed: { opacity: 0.7, transform: [{ scale: 0.98 }] },
   readOnlyField: {
-    backgroundColor: '#EEEFF1',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 14,
     minHeight: 50,
     justifyContent: 'center',
@@ -496,9 +510,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 24,
     minHeight: 55,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   saveLabel: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
-  screen: { backgroundColor: '#FFFFFF', flex: 1 },
+  screen: appStyles.screen,
   sectionTitle: { color: '#111827', fontSize: 18, fontWeight: '900' },
   sheet: {
     backgroundColor: '#FFFFFF',

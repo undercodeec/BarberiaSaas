@@ -16,6 +16,7 @@
     "@barber-saas/permissions": "workspace:*",
     "@barber-saas/validation": "workspace:*",
     "@fastify/cors": "11.3.0",
+    "@fastify/helmet": "^13.1.0",
     "@prisma/client": "7.8.0",
     "dotenv": "17.4.2",
     "fastify": "5.10.0",

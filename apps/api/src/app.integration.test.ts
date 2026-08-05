@@ -52,6 +52,10 @@ describe('CORS', () => {
       expect(response.headers['access-control-allow-methods']).toContain(
         'PATCH',
       );
+      const health = await app.inject({ method: 'GET', url: '/health' });
+      expect(health.headers['x-content-type-options']).toBe('nosniff');
+      expect(health.headers['x-frame-options']).toBe('SAMEORIGIN');
+      expect(health.headers['strict-transport-security']).toBeUndefined();
     } finally {
       await app.close();
     }
@@ -396,6 +400,62 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(membership?.role).toBe('OWNER');
     expect(membership?.memberLocations).toHaveLength(1);
     expect(await database.auditLog.count()).toBe(1);
+  });
+
+  it('guarda coordenadas y placeId del negocio con auditoría', async () => {
+    const token = await register('maps-owner@example.com');
+    const created = await onboard(token, 'maps-business');
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'PUT',
+      payload: {
+        addressLine: 'Av. República y Amazonas',
+        city: 'Quito',
+        countryCode: 'EC',
+        formattedAddress: 'Av. República y Amazonas, Quito, Ecuador',
+        googlePlaceId: 'ChIJ-location-test',
+        latitude: -0.19,
+        longitude: -78.49,
+      },
+      url: '/v1/business-location',
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toMatchObject({
+      location: {
+        googlePlaceId: 'ChIJ-location-test',
+        latitude: -0.19,
+        longitude: -78.49,
+      },
+    });
+
+    await expect(
+      database.location.findUnique({ where: { id: created.locationId } }),
+    ).resolves.toMatchObject({
+      formattedAddress: 'Av. República y Amazonas, Quito, Ecuador',
+      googlePlaceId: 'ChIJ-location-test',
+      latitude: -0.19,
+      longitude: -78.49,
+    });
+    await expect(
+      database.auditLog.findFirst({
+        where: {
+          action: 'location.map_updated',
+          entityId: created.locationId,
+        },
+      }),
+    ).resolves.not.toBeNull();
+
+    const details = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: '/v1/onboarding/account-details',
+    });
+    expect(details.json()).toMatchObject({
+      businessLocation: {
+        formattedAddress: 'Av. República y Amazonas, Quito, Ecuador',
+        googlePlaceId: 'ChIJ-location-test',
+      },
+    });
   });
 
   it('revoca la sesión y anonimiza una cuenta solo después de validar bloqueos', async () => {

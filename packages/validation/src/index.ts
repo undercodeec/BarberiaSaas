@@ -141,6 +141,54 @@ export const updateOnboardingAccountDetailsSchema = z.object({
   phone: phoneSchema,
 });
 
+const latitudeSchema = z.number().finite().min(-90).max(90);
+const longitudeSchema = z.number().finite().min(-180).max(180);
+const googleSessionTokenSchema = z.string().trim().min(16).max(128);
+
+export const mapsAutocompleteSchema = z
+  .object({
+    countryCode: z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z]{2}$/u)
+      .transform((value) => value.toUpperCase()),
+    latitude: latitudeSchema.optional(),
+    longitude: longitudeSchema.optional(),
+    query: z.string().trim().min(3).max(160),
+    sessionToken: googleSessionTokenSchema,
+  })
+  .refine(
+    (value) =>
+      (value.latitude === undefined) === (value.longitude === undefined),
+    { message: 'La latitud y longitud deben enviarse juntas.' },
+  );
+
+export const mapsPlaceDetailsSchema = z.object({
+  placeId: z.string().trim().min(3).max(255),
+  sessionToken: googleSessionTokenSchema,
+});
+
+export const mapsReverseGeocodeSchema = z.object({
+  latitude: latitudeSchema,
+  longitude: longitudeSchema,
+});
+
+export const updateBusinessLocationSchema = z.object({
+  addressLine: z.string().trim().min(3).max(240),
+  city: z.string().trim().min(2).max(120).nullable().optional(),
+  countryCode: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z]{2}$/u)
+    .transform((value) => value.toUpperCase())
+    .nullable()
+    .optional(),
+  formattedAddress: z.string().trim().min(3).max(300),
+  googlePlaceId: z.string().trim().min(3).max(255).nullable().optional(),
+  latitude: latitudeSchema,
+  longitude: longitudeSchema,
+});
+
 export const resetPasswordSchema = z.object({
   password: passwordSchema,
   token: z.string().min(32, 'El enlace de recuperación no es válido.'),

@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { appTheme, goldShadow } from './BottomNavigation';
+import { appTheme, goldButtonShadow, goldShadow } from './BottomNavigation';
 import { requireApiClient } from '../lib/api';
 import { useAuth } from '../providers/AuthProvider';
 
@@ -327,11 +327,13 @@ const styles = StyleSheet.create({
   dot: { backgroundColor: '#101c2d', borderRadius: 5, height: 9, width: 9 },
   empty: {
     alignItems: 'center',
-    backgroundColor: '#F2F3F4',
-    borderRadius: 22,
+    backgroundColor: appTheme.colors.surface,
+    borderRadius: 17,
     gap: 10,
     marginTop: 42,
     padding: 28,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
   },
   emptyTitle: { color: '#101c2d', fontSize: 18, fontWeight: '900' },
   header: {

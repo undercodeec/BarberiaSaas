@@ -10,6 +10,8 @@ import {
   createAppointmentSchema,
   createSlug,
   locationOnboardingSchema,
+  mapsAutocompleteSchema,
+  mapsReverseGeocodeSchema,
   publicApiConfigSchema,
   replaceBusinessScheduleSchema,
   signUpSchema,
@@ -25,6 +27,37 @@ describe('esquemas de entorno', () => {
 
   it('rechaza una URL pública inválida', () => {
     expect(() => publicApiConfigSchema.parse({ url: 'incorrecta' })).toThrow();
+  });
+});
+
+describe('ubicación de Google Maps', () => {
+  it('acepta una búsqueda con coordenadas válidas y normaliza el país', () => {
+    expect(
+      mapsAutocompleteSchema.parse({
+        countryCode: 'ec',
+        latitude: -0.19,
+        longitude: -78.49,
+        query: 'Nava Barbería',
+        sessionToken: 'session-token-123456',
+      }).countryCode,
+    ).toBe('EC');
+  });
+
+  it('rechaza coordenadas incompletas o fuera del planeta', () => {
+    expect(
+      mapsAutocompleteSchema.safeParse({
+        countryCode: 'EC',
+        latitude: -0.19,
+        query: 'Nava Barbería',
+        sessionToken: 'session-token-123456',
+      }).success,
+    ).toBe(false);
+    expect(
+      mapsReverseGeocodeSchema.safeParse({
+        latitude: 120,
+        longitude: -78.49,
+      }).success,
+    ).toBe(false);
   });
 });
 

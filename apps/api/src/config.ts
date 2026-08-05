@@ -33,6 +33,19 @@ const environmentSchema = z
       .default(5),
     CORS_ORIGIN: z.string().min(1).default('http://localhost:3000'),
     DATABASE_URL: z.url().startsWith('postgresql://'),
+    GOOGLE_MAPS_RATE_LIMIT_MAX: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(10_000)
+      .default(60),
+    GOOGLE_MAPS_RATE_LIMIT_WINDOW_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(3600)
+      .default(60),
+    GOOGLE_MAPS_SERVER_API_KEY: optionalText,
     MOBILE_INVITATION_URL: z
       .string()
       .min(1)

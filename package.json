@@ -24,9 +24,11 @@
     "db:validate": "pnpm --filter @barber-saas/database db:validate",
     "test": "turbo run test",
     "test:e2e": "playwright test",
+    "test:performance": "node tests/performance/api-smoke.mjs",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@eslint/js": "9.39.5",
     "@playwright/test": "1.61.1",
     "@types/node": "26.1.1",

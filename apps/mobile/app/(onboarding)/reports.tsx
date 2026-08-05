@@ -248,13 +248,15 @@ export default function ReportsScreen() {
               {section.title}
             </Text>
             <View style={styles.cardList}>
-              {section.items.map((item) => (
-                <ReportNavigationCard
-                  item={item}
-                  key={item.id}
-                  onPress={() => openReport(item)}
-                />
-              ))}
+              {section.items
+                .filter((item) => item.id !== 'customer-loans')
+                .map((item) => (
+                  <ReportNavigationCard
+                    item={item}
+                    key={item.id}
+                    onPress={() => openReport(item)}
+                  />
+                ))}
             </View>
           </View>
         ))}
@@ -570,23 +572,11 @@ function ReportNavigationCard({
       <View style={styles.cardCopy}>
         <View style={styles.cardTitleRow}>
           <Text style={styles.cardTitle}>{item.title}</Text>
-          <View
-            style={
-              item.status === 'available'
-                ? styles.availableBadge
-                : styles.plannedBadge
-            }
-          >
-            <Text
-              style={
-                item.status === 'available'
-                  ? styles.availableLabel
-                  : styles.plannedLabel
-              }
-            >
-              {item.status === 'available' ? 'Disponible' : 'Planificado'}
-            </Text>
-          </View>
+          {item.status === 'planned' ? (
+            <View style={styles.plannedBadge}>
+              <Text style={styles.plannedLabel}>Planificado</Text>
+            </View>
+          ) : null}
         </View>
         <Text style={styles.cardDescription}>{item.description}</Text>
       </View>
@@ -602,13 +592,6 @@ function ReportNavigationCard({
 }
 
 const styles = StyleSheet.create({
-  availableBadge: {
-    backgroundColor: '#dff3e7',
-    borderRadius: 99,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  availableLabel: { color: '#287247', fontSize: 10, fontWeight: '900' },
   backButton: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surface,
