@@ -938,6 +938,7 @@ export function registerOperationsRoutes(
       current: {
         canManage: current.role === MembershipRole.OWNER,
         currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
+        currentPeriodStart: subscription.currentPeriodStart.toISOString(),
         featureFlags:
           planDefinition(currentPlan.code)?.featureFlags ??
           SUBSCRIPTION_PLANS[0].featureFlags,

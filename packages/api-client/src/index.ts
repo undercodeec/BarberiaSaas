@@ -570,6 +570,7 @@ export interface SubscriptionResponse {
   readonly current: {
     readonly canManage: boolean;
     readonly currentPeriodEnd: string;
+    readonly currentPeriodStart: string;
     readonly featureFlags: SubscriptionFeatureFlags;
     readonly graceEndsAt: string | null;
     readonly planCode: 'essential' | 'multi';

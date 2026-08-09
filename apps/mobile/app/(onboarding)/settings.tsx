@@ -3,6 +3,7 @@ import type { OnboardingAccountDetailsResponse } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { Redirect, useRouter } from 'expo-router';
+import * as Updates from 'expo-updates';
 import type { ComponentProps } from 'react';
 import { useState } from 'react';
 import {
@@ -38,6 +39,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isCheckingForUpdate, setIsCheckingForUpdate] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
@@ -81,6 +83,51 @@ export default function SettingsScreen() {
     if (!(await Linking.canOpenURL(url)))
       return Alert.alert(title, 'No pudimos abrir este enlace.');
     await Linking.openURL(url);
+  };
+  const checkForUpdate = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert(
+        'Actualizaciones disponibles en la app',
+        'Instala Nava en tu teléfono para recibir actualizaciones automáticas.',
+      );
+      return;
+    }
+    if (!Updates.isEnabled) {
+      Alert.alert(
+        'Actualizaciones no disponibles',
+        'Esta versión debe instalarse nuevamente para activar las actualizaciones automáticas.',
+      );
+      return;
+    }
+
+    setIsCheckingForUpdate(true);
+    try {
+      const update = await Updates.checkForUpdateAsync();
+      if (!update.isAvailable) {
+        Alert.alert('Nava está actualizada', 'Ya tienes la versión más reciente.');
+        return;
+      }
+
+      await Updates.fetchUpdateAsync();
+      Alert.alert(
+        'Actualización lista',
+        'Se descargó una nueva versión. Reinicia Nava para aplicarla.',
+        [
+          { style: 'cancel', text: 'Más tarde' },
+          {
+            onPress: () => void Updates.reloadAsync(),
+            text: 'Reiniciar ahora',
+          },
+        ],
+      );
+    } catch {
+      Alert.alert(
+        'No pudimos buscar actualizaciones',
+        'Comprueba tu conexión e inténtalo nuevamente.',
+      );
+    } finally {
+      setIsCheckingForUpdate(false);
+    }
   };
   const performLogout = async () => {
     if (isSigningOut) return;
@@ -235,13 +282,28 @@ export default function SettingsScreen() {
           <Ionicons color={appTheme.colors.accentDark} name="trash-outline" size={19} />
           <Text style={styles.deleteLabel}>Borrar mi cuenta</Text>
         </Pressable>
-        <View style={styles.version}>
-          <Ionicons color={appTheme.colors.accentDark} name="refresh-outline" size={22} />
+        <Pressable
+          accessibilityRole="button"
+          disabled={isCheckingForUpdate}
+          onPress={() => void checkForUpdate()}
+          style={({ pressed }) => [
+            styles.version,
+            pressed && styles.pressed,
+            isCheckingForUpdate && styles.disabled,
+          ]}
+        >
+          {isCheckingForUpdate ? (
+            <ActivityIndicator color={appTheme.colors.accentDark} size="small" />
+          ) : (
+            <Ionicons color={appTheme.colors.accentDark} name="refresh-outline" size={22} />
+          )}
           <View>
-            <Text style={styles.versionTitle}>Actualizacion</Text>
-            <Text style={styles.versionCopy}>Version instalada {version}</Text>
+            <Text style={styles.versionTitle}>
+              {isCheckingForUpdate ? 'Buscando actualización…' : 'Buscar actualización'}
+            </Text>
+            <Text style={styles.versionCopy}>Versión instalada {version}</Text>
           </View>
-        </View>
+        </Pressable>
       </ScrollView>
       <BottomNavigation active="settings" />
       <Modal

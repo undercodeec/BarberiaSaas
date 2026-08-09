@@ -14,6 +14,10 @@ backlog vigente.
 
 ### Bloqueadores para producción
 
+- [ ] Registrar `GOOGLE_MAPS_ANDROID_API_KEY` como variable sensible del entorno
+      `production` de EAS y volver a generar el Android App Bundle. El build
+      remoto `ac6fe0be-e400-4b6c-9a40-5d39836572a0` llegó hasta
+      `READ_APP_CONFIG`, pero se detuvo porque esa clave no existe en EAS.
 - [ ] Completar la Fase 13: pruebas E2E, seguridad, rendimiento, accesibilidad,
       recuperación con Neon y checklist de producción.
 - [x] Limitación general por IP para registro y reenvío de OTP, con límites y
@@ -3615,14 +3619,16 @@ caja, comisiones y registros históricos.
 
 ### Preparación de EAS y Google Play
 
-- [x] Configuración dinámica `app.config.ts` para inyectar las claves Android e
+- [x] Configuración dinámica `app.config.js` para inyectar las claves Android e
       iOS durante el build y declarar el mensaje de permiso de ubicación.
 - [x] Perfil EAS `preview` configurado para producir un Android App Bundle con
       variables del entorno `preview`; `production` queda separado.
 - [x] La compilación falla explícitamente si falta la clave correspondiente a
       la plataforma en un build EAS.
 - [ ] Registrar en EAS `EXPO_PUBLIC_API_URL`,
-      `GOOGLE_MAPS_ANDROID_API_KEY` y `GOOGLE_MAPS_IOS_API_KEY` para `preview`.
+      `GOOGLE_MAPS_ANDROID_API_KEY` y `GOOGLE_MAPS_IOS_API_KEY` para `preview` y
+      los valores correspondientes en `production`. En este último entorno no
+      hay todavía variables Plain text ni Sensitive registradas.
 - [ ] Colocar `GOOGLE_MAPS_SERVER_API_KEY` en el `EnvironmentFile` privado de la
       API piloto en la VPS y reiniciar el servicio.
 - [ ] Generar el AAB, cargarlo en la prueba interna de Play Console y comprobar
@@ -3645,3 +3651,70 @@ caja, comisiones y registros históricos.
 - [ ] Ampliar Playwright al recorrido público con datos efímeros, ejecutar carga
       contra la infraestructura piloto, validar accesibilidad móvil y completar
       recuperación Neon/checklist de producción antes de cerrar Fase 13.
+
+## Accesos rápidos del dashboard y Expo Updates — 4 de agosto de 2026
+
+### Accesos rápidos y creación de citas
+
+- [x] El dashboard conserva los accesos principales `Resumen`, `Compartir
+      enlace` y `Nueva cita`; `Resumen` abre `/business-summary`.
+- [x] Los accesos visibles se completaron con Servicios, Inventario y Nava
+      Wallet, manteniendo el lenguaje visual existente y usando rutas reales.
+- [x] `Nueva cita` abre `/new-booking`; el alta de un cliente reutiliza el mismo
+      panel inferior legítimo de Clientes, en vez de mantener dos formularios y
+      dos implementaciones divergentes.
+- [x] Se añadió `Agregar acceso` debajo de los accesos fijos. Abre una ventana
+      con Agenda, Caja, Clientes, Reservas, Avisos y Reseñas, permite añadir o
+      quitar accesos y persiste la selección por usuario mediante Secure Store
+      o `localStorage` en Web.
+- [x] Cambios confirmados y enviados a `origin/UI-UX-Desing` en el commit
+      `4b1be77` (`feat(mobile): add customizable dashboard shortcuts`).
+
+### Botón de actualización y configuración OTA
+
+- [x] `expo-updates` `~57.0.12` instalado en la aplicación móvil y registrado en
+      el lockfile del monorepositorio.
+- [x] El elemento de Actualización en Ajustes ahora es un botón funcional:
+      comprueba una OTA, informa cuando Nava está al día, descarga una versión
+      disponible y ofrece reiniciar la aplicación para aplicarla.
+- [x] El flujo controla Web, builds sin Expo Updates, estado de carga y errores
+      de conexión con mensajes comprensibles para el usuario.
+- [x] Configurada la URL de EAS Update para el proyecto
+      `0feb8bfa-2e01-44e6-8e79-22927a8a7dcb`, runtime explícito `0.1.0` y
+      canales independientes `development`, `preview` y `production`.
+- [x] Expo Updates activado en la configuración nativa Android con su URL y
+      runtime. Los permisos y ajustes nativos ajenos al objetivo generados por
+      `expo prebuild` fueron retirados; también se eliminó el `app.json` vacío
+      creado accidentalmente en la raíz.
+- [x] `app.config.ts` fue sustituido por CommonJS en `app.config.js` porque EAS
+      CLI 21.5.0 fallaba al evaluar el archivo TypeScript con
+      `Cannot read properties of undefined (reading 'CommonJS')`.
+- [x] El runtime se cambió de la política `{ policy: "appVersion" }` al valor
+      explícito `0.1.0`, requerido por EAS Update al detectar el flujo bare con
+      el directorio `android` versionado.
+- [x] Configuración Expo local validada: slug `barber-saas-mobile`, URL de
+      updates y project ID correctos. El typecheck móvil también fue aprobado
+      después de implementar el botón.
+- [x] Cuenta EAS verificada como `undercodeec`; se creó el canal y la rama
+      `production`, las credenciales Android remotas y el keystore por defecto.
+
+### Build de producción y bloqueo vigente
+
+- [x] Proyecto comprimido y cargado correctamente a EAS; fingerprint calculado,
+      versión `0.1.0`, runtime `0.1.0` y `versionCode` remoto incrementado a `3`.
+- [ ] El build Android de producción
+      `ac6fe0be-e400-4b6c-9a40-5d39836572a0` terminó en estado `ERRORED` durante
+      `READ_APP_CONFIG`. El log confirma como única causa inmediata:
+      `GOOGLE_MAPS_ANDROID_API_KEY es obligatoria para compilar Android`.
+- [ ] Crear `GOOGLE_MAPS_ANDROID_API_KEY` en el entorno EAS `production` con
+      visibilidad `sensitive`, volver a lanzar el build y supervisarlo hasta
+      obtener el AAB.
+- [ ] Instalar o distribuir ese nuevo build antes de probar el botón. Las
+      versiones instaladas previamente no contienen el módulo nativo de Expo
+      Updates y mostrarán que necesitan reinstalación.
+- [ ] Tras distribuir el build, publicar una primera OTA en el canal
+      `production` y verificar en un dispositivo físico la descarga, el reinicio
+      y la aplicación de la actualización.
+- [ ] Los cambios de Expo Updates y Ajustes descritos en esta sección permanecen
+      sin commit ni push; el commit `4b1be77` cubre únicamente el trabajo del
+      dashboard y creación de citas.

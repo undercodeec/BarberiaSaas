@@ -3,6 +3,10 @@
     "name": "Barbería",
     "slug": "barber-saas-mobile",
     "version": "0.1.0",
+    "runtimeVersion": "0.1.0",
+    "updates": {
+      "url": "https://u.expo.dev/0feb8bfa-2e01-44e6-8e79-22927a8a7dcb"
+    },
     "orientation": "portrait",
     "scheme": "barbersaas",
     "userInterfaceStyle": "dark",

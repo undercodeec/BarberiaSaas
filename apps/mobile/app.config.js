@@ -1,6 +1,4 @@
-import type { ConfigContext, ExpoConfig } from 'expo/config';
-
-export default ({ config }: ConfigContext): ExpoConfig => {
+module.exports = ({ config }) => {
   const androidMapsApiKey = process.env.GOOGLE_MAPS_ANDROID_API_KEY;
   const iosMapsApiKey = process.env.GOOGLE_MAPS_IOS_API_KEY;
   const buildPlatform = process.env.EAS_BUILD_PLATFORM;

@@ -12,3 +12,4 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - react-hook-form@7.82.0
+  - expo-updates@57.0.12

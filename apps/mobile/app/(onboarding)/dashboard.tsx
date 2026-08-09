@@ -1,14 +1,21 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
+  AppointmentRecord,
+  AppointmentsResponse,
+  CashRegisterSummaryResponse,
+  CurrentCashRegisterResponse,
+  CurrentOrganizationResponse,
   GoogleMapsLocationCandidate,
+  InventoryResponse,
   OnboardingAccountDetailsResponse,
+  SubscriptionResponse,
 } from '@barber-saas/api-client';
 import { useQuery } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
-import { useEffect, useRef, useState } from 'react';
-import { Redirect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
   AccessibilityInfo,
@@ -48,12 +55,11 @@ import { BookingLinkSheet } from '../../src/components/BookingLinkSheet';
 import { BusinessLocationSheet } from '../../src/components/BusinessLocationSheet';
 import { useAuth } from '../../src/providers/AuthProvider';
 
-const MONTH_PROGRESS = 84;
-const NOTIFICATION_BANNER_DELAY_MS = 5000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const DASHBOARD_BANNER_DELAY_MS = 10_000;
 const WELCOME_SURVEY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 const WELCOME_SURVEY_RESPONSE_KEY = 'barber-saas.welcome-survey-response';
 const QUICK_ACTIONS_STORAGE_KEY = 'barber-saas.dashboard-quick-actions';
-let notificationPromptSessionKey: string | null = null;
 const WELCOME_SURVEY_OPTIONS = [
   'Publicidad',
   'Redes sociales de Nava (Facebook o Instagram)',
@@ -78,11 +84,36 @@ const EXTRA_QUICK_ACTIONS: ReadonlyArray<{
   readonly route: string;
 }> = [
   { icon: 'calendar-outline', id: 'agenda', label: 'Agenda', route: '/agenda' },
-  { icon: 'receipt-outline', id: 'cash-register', label: 'Caja', route: '/cash-register' },
-  { icon: 'people-outline', id: 'clients', label: 'Clientes', route: '/clients' },
-  { icon: 'options-outline', id: 'booking-settings', label: 'Reservas', route: '/booking-settings' },
-  { icon: 'notifications-outline', id: 'notifications', label: 'Avisos', route: '/notifications' },
-  { icon: 'star-outline', id: 'reviews-management', label: 'Reseñas', route: '/reviews-management' },
+  {
+    icon: 'receipt-outline',
+    id: 'cash-register',
+    label: 'Caja',
+    route: '/cash-register',
+  },
+  {
+    icon: 'people-outline',
+    id: 'clients',
+    label: 'Clientes',
+    route: '/clients',
+  },
+  {
+    icon: 'options-outline',
+    id: 'booking-settings',
+    label: 'Reservas',
+    route: '/booking-settings',
+  },
+  {
+    icon: 'notifications-outline',
+    id: 'notifications',
+    label: 'Avisos',
+    route: '/notifications',
+  },
+  {
+    icon: 'star-outline',
+    id: 'reviews-management',
+    label: 'Reseñas',
+    route: '/reviews-management',
+  },
 ];
 
 function welcomeSurveyStorageKey(userId: string) {
@@ -200,8 +231,273 @@ function greeting() {
 }
 
 type DashboardProgressProps = {
+  readonly caption: string;
   readonly value: number;
 };
+
+type SubscriptionProgress = {
+  readonly caption: string;
+  readonly expiryLabel: string;
+  readonly percentage: number;
+  readonly title: string;
+};
+
+function dateTimestamp(value: string | null) {
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function expiryDateLabel(timestamp: number) {
+  return new Date(timestamp).toLocaleDateString('es-EC', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+function subscriptionProgress(
+  subscription: SubscriptionResponse | undefined,
+  now: number,
+  hasError = false,
+): SubscriptionProgress {
+  if (!subscription) {
+    return {
+      caption: 'de tiempo restante',
+      expiryLabel: hasError
+        ? 'No pudimos consultar la vigencia'
+        : 'Consultando la vigencia de tu plan',
+      percentage: 0,
+      title: 'Tu suscripción',
+    };
+  }
+
+  const current = subscription.current;
+  const planName =
+    subscription.plans.find(({ code }) => code === current.planCode)?.name ??
+    'Nava';
+  const periodStart = dateTimestamp(current.currentPeriodStart);
+  const periodEnd = dateTimestamp(current.currentPeriodEnd);
+  const trialEnd = dateTimestamp(current.trialEndsAt);
+  const graceEnd = dateTimestamp(current.graceEndsAt);
+
+  let phase: 'active' | 'expired' | 'grace' | 'trial';
+  let startsAt: number | null;
+  let endsAt: number | null;
+
+  if (current.status === 'cancelled' || current.status === 'suspended') {
+    phase = 'expired';
+    startsAt = null;
+    endsAt = graceEnd ?? trialEnd ?? periodEnd;
+  } else if (
+    (current.status === 'trial' && trialEnd !== null && now >= trialEnd) ||
+    current.status === 'past_due'
+  ) {
+    if (graceEnd !== null && now < graceEnd) {
+      phase = 'grace';
+      startsAt = trialEnd ?? periodEnd;
+      endsAt = graceEnd;
+    } else {
+      phase = 'expired';
+      startsAt = null;
+      endsAt = graceEnd ?? trialEnd ?? periodEnd;
+    }
+  } else if (current.status === 'trial') {
+    phase = 'trial';
+    startsAt = periodStart;
+    endsAt = trialEnd ?? periodEnd;
+  } else {
+    phase = 'active';
+    startsAt = periodStart;
+    endsAt = periodEnd;
+  }
+
+  if (
+    phase === 'expired' ||
+    startsAt === null ||
+    endsAt === null ||
+    endsAt <= now
+  ) {
+    return {
+      caption: 'de tiempo restante',
+      expiryLabel: endsAt
+        ? `Venció el ${expiryDateLabel(endsAt)}`
+        : 'La suscripción no está activa',
+      percentage: 0,
+      title: 'Suscripción vencida',
+    };
+  }
+
+  const duration = Math.max(DAY_MS, endsAt - startsAt);
+  const remaining = Math.max(0, Math.min(duration, endsAt - now));
+  const daysRemaining = Math.ceil(remaining / DAY_MS);
+  const totalDays = Math.max(1, Math.ceil(duration / DAY_MS));
+  const currentDay = Math.min(
+    totalDays,
+    Math.max(1, Math.floor((now - startsAt) / DAY_MS) + 1),
+  );
+  const percentage = Math.round((remaining / duration) * 100);
+
+  return {
+    caption: phase === 'trial' ? 'de prueba restante' : 'de tiempo restante',
+    expiryLabel:
+      daysRemaining === 0
+        ? `Venció el ${expiryDateLabel(endsAt)}`
+        : `Día ${currentDay} de ${totalDays}`,
+    percentage,
+    title:
+      phase === 'trial'
+        ? `Prueba gratuita · ${planName}`
+        : phase === 'grace'
+          ? 'Período de gracia'
+          : `Suscripción · ${planName}`,
+  };
+}
+
+type DashboardOperation = {
+  readonly actionLabel: string;
+  readonly description: string;
+  readonly icon: React.ComponentProps<typeof Ionicons>['name'];
+  readonly id: 'appointment' | 'cash-register' | 'inventory';
+  readonly priority: number;
+  readonly route: '/agenda' | '/cash-register' | '/inventory';
+  readonly title: string;
+};
+
+function dateInTimeZone(timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone,
+    year: 'numeric',
+  }).formatToParts(new Date());
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? '';
+
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+function appointmentStatusLabel(status: AppointmentRecord['status']): string {
+  if (status === 'awaiting_confirmation') return 'Por confirmar';
+  if (status === 'checked_in') return 'Cliente en el local';
+  if (status === 'confirmed') return 'Confirmada';
+  if (status === 'in_progress') return 'En curso';
+  if (status === 'pending_verification') return 'Verificación pendiente';
+  if (status === 'scheduled') return 'Agendada';
+  if (status === 'waiting') return 'En espera';
+  return 'Próxima cita';
+}
+
+function formatOperationMoney(value: number, currencyCode: string): string {
+  return new Intl.NumberFormat('es-EC', {
+    currency: currencyCode,
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    style: 'currency',
+  }).format(value / 100);
+}
+
+function timeInTimeZone(value: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('es-EC', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone,
+  }).format(new Date(value));
+}
+
+function dashboardOperations({
+  appointments,
+  cashSession,
+  cashSummary,
+  currencyCode,
+  inventory,
+  now,
+  timeZone,
+}: {
+  readonly appointments: readonly AppointmentRecord[] | undefined;
+  readonly cashSession: CurrentCashRegisterResponse['session'] | undefined;
+  readonly cashSummary: CashRegisterSummaryResponse | undefined;
+  readonly currencyCode: string;
+  readonly inventory: InventoryResponse | undefined;
+  readonly now: number;
+  readonly timeZone: string;
+}): DashboardOperation[] {
+  const operations: DashboardOperation[] = [];
+  const nextAppointment = (appointments ?? [])
+    .filter((appointment) => {
+      const endsAt = Date.parse(appointment.endsAt);
+      return (
+        !['cancelled', 'completed', 'expired', 'no_show'].includes(
+          appointment.status,
+        ) &&
+        Number.isFinite(endsAt) &&
+        endsAt > now
+      );
+    })
+    .sort(
+      (first, second) =>
+        Date.parse(first.startsAt) - Date.parse(second.startsAt),
+    )[0];
+
+  if (nextAppointment) {
+    const isInProgress = Date.parse(nextAppointment.startsAt) <= now;
+    const serviceNames = nextAppointment.services
+      .map((service) => service.serviceName)
+      .join(', ');
+    operations.push({
+      actionLabel: 'Abrir agenda',
+      description: `${serviceNames || 'Sin servicio'} · ${appointmentStatusLabel(nextAppointment.status)}`,
+      icon: 'calendar-outline',
+      id: 'appointment',
+      priority:
+        isInProgress ||
+        ['awaiting_confirmation', 'pending_verification'].includes(
+          nextAppointment.status,
+        )
+          ? 0
+          : 1,
+      route: '/agenda',
+      title: isInProgress
+        ? `Cita en curso · ${nextAppointment.clientName}`
+        : `${timeInTimeZone(nextAppointment.startsAt, timeZone)} · ${nextAppointment.clientName}`,
+    });
+  }
+
+  if (cashSession) {
+    const totals = cashSummary?.totals;
+    operations.push({
+      actionLabel: 'Ver caja',
+      description: `Ventas de hoy: ${formatOperationMoney(totals?.sales ?? 0, currencyCode)}`,
+      icon: 'receipt-outline',
+      id: 'cash-register',
+      priority: 2,
+      route: '/cash-register',
+      title: `Caja abierta · ${formatOperationMoney(
+        totals?.expectedCash ?? cashSession.openingAmountCents,
+        currencyCode,
+      )}`,
+    });
+  }
+
+  const lowStockProducts = inventory?.summary.lowStockProducts ?? 0;
+  if (lowStockProducts > 0) {
+    operations.push({
+      actionLabel: 'Ver inventario',
+      description: 'Revisa existencias antes de tu próxima venta.',
+      icon: 'warning-outline',
+      id: 'inventory',
+      priority: 3,
+      route: '/inventory',
+      title: `${lowStockProducts} ${
+        lowStockProducts === 1 ? 'producto llegó' : 'productos llegaron'
+      } al mínimo`,
+    });
+  }
+
+  return operations
+    .sort((first, second) => first.priority - second.priority)
+    .slice(0, 2);
+}
 
 const PRIMARY_WAVE_PATH = 'M0 10 Q25 0 50 10 T100 10 T150 10 T200 10 V20 H0 Z';
 const SECONDARY_WAVE_PATH =
@@ -297,7 +593,7 @@ function LiquidWaveSurface({
   );
 }
 
-function DashboardProgress({ value }: DashboardProgressProps) {
+function DashboardProgress({ caption, value }: DashboardProgressProps) {
   const normalizedValue = Math.min(100, Math.max(0, value));
   const [progress] = useState(() => new Animated.Value(0));
   const [firstWave] = useState(() => new Animated.Value(0));
@@ -402,7 +698,7 @@ function DashboardProgress({ value }: DashboardProgressProps) {
   });
   return (
     <View
-      accessibilityLabel={`${normalizedValue}% del mes transcurrido`}
+      accessibilityLabel={`${normalizedValue}% ${caption}`}
       accessibilityRole="progressbar"
       accessibilityValue={{ max: 100, min: 0, now: normalizedValue }}
       onLayout={(event) => setTankWidth(event.nativeEvent.layout.width)}
@@ -456,9 +752,7 @@ function DashboardProgress({ value }: DashboardProgressProps) {
 
       <View style={dashboardProgressStyles.label}>
         <Text style={dashboardProgressStyles.percentage}>{displayValue}%</Text>
-        <Text style={dashboardProgressStyles.caption}>
-          del mes transcurrido
-        </Text>
+        <Text style={dashboardProgressStyles.caption}>{caption}</Text>
       </View>
     </View>
   );
@@ -597,6 +891,52 @@ function QuickAction({
   );
 }
 
+function DashboardOperationCard({
+  operation,
+  onPress,
+}: {
+  readonly operation: DashboardOperation;
+  readonly onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityHint={`Abre ${operation.actionLabel.toLocaleLowerCase('es-EC')}`}
+      accessibilityLabel={operation.title}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[
+        styles.operationCard,
+        operation.id === 'inventory' && styles.operationCardAlert,
+      ]}
+    >
+      <View
+        style={[
+          styles.operationIcon,
+          operation.id === 'inventory' && styles.operationIconAlert,
+        ]}
+      >
+        <Ionicons
+          color={operation.id === 'inventory' ? '#A86612' : '#B47D17'}
+          name={operation.icon}
+          size={22}
+        />
+      </View>
+      <View style={styles.operationCopy}>
+        <Text numberOfLines={1} style={styles.operationTitle}>
+          {operation.title}
+        </Text>
+        <Text numberOfLines={1} style={styles.operationDescription}>
+          {operation.description}
+        </Text>
+        <View style={styles.operationActionRow}>
+          <Text style={styles.operationAction}>{operation.actionLabel}</Text>
+          <Ionicons color="#B47D17" name="arrow-forward" size={15} />
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 function ExtraQuickActionsSheet({
   selectedIds,
   onClose,
@@ -628,7 +968,10 @@ function ExtraQuickActionsSheet({
         />
         <View accessibilityViewIsModal style={styles.quickActionsPicker}>
           <View style={styles.quickActionsPickerHandle} />
-          <Text accessibilityRole="header" style={styles.quickActionsPickerTitle}>
+          <Text
+            accessibilityRole="header"
+            style={styles.quickActionsPickerTitle}
+          >
             Agrega un acceso rápido
           </Text>
           <Text style={styles.quickActionsPickerCopy}>
@@ -645,7 +988,9 @@ function ExtraQuickActionsSheet({
                 <View style={styles.quickActionsPickerIcon}>
                   <Ionicons color="#B47D17" name={action.icon} size={21} />
                 </View>
-                <Text style={styles.quickActionsPickerLabel}>{action.label}</Text>
+                <Text style={styles.quickActionsPickerLabel}>
+                  {action.label}
+                </Text>
                 <Ionicons color="#69717d" name="add" size={23} />
               </Pressable>
             ))}
@@ -1285,8 +1630,7 @@ export function LegacyLocationBannerSheet({
 export default function DashboardScreen() {
   const router = useRouter();
   const { session, user } = useAuth();
-  const currentNotificationSessionKey =
-    session && user ? `${user.id}:${session.expiresAt}` : null;
+  const canPromptForNotifications = Boolean(session && user);
   const accountQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -1295,8 +1639,64 @@ export default function DashboardScreen() {
       ),
     queryKey: ['onboarding-account-details', user?.id],
   });
+  const organizationQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<CurrentOrganizationResponse>(
+        '/v1/organizations/current',
+      ),
+    queryKey: ['current-organization'],
+  });
+  const subscriptionQuery = useQuery({
+    enabled: Boolean(session && user),
+    queryFn: () =>
+      requireApiClient().request<SubscriptionResponse>('/v1/subscription'),
+    queryKey: ['subscription', user?.id],
+  });
+  const operationTimeZone =
+    organizationQuery.data?.location?.timezone ??
+    organizationQuery.data?.organization.defaultTimezone ??
+    'America/Guayaquil';
+  const operationLocationId = organizationQuery.data?.location?.id;
+  const operationDate = dateInTimeZone(operationTimeZone);
+  const appointmentsQuery = useQuery({
+    enabled: Boolean(session && operationLocationId),
+    queryFn: () =>
+      requireApiClient().request<AppointmentsResponse>(
+        `/v1/appointments?date=${operationDate}&locationId=${encodeURIComponent(operationLocationId ?? '')}`,
+      ),
+    queryKey: [
+      'agenda-appointments',
+      'dashboard',
+      operationLocationId,
+      operationDate,
+    ],
+  });
+  const cashRegisterQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<CurrentCashRegisterResponse>(
+        '/v1/cash-register/current',
+      ),
+    queryKey: ['cash-register-current'],
+  });
+  const cashSummaryQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<CashRegisterSummaryResponse>(
+        '/v1/cash-register/summary',
+      ),
+    queryKey: ['cash-register-summary'],
+  });
+  const inventoryQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<InventoryResponse>('/v1/inventory'),
+    queryKey: ['inventory'],
+  });
 
   const businessName = accountQuery.data?.businessName ?? 'Tu negocio';
+  const [progressClock, setProgressClock] = useState(() => Date.now());
   const [isBookingSheetOpen, setIsBookingSheetOpen] = useState(false);
   const [isNotificationSheetOpen, setIsNotificationSheetOpen] = useState(false);
   const [notificationFlowState, setNotificationFlowState] = useState<
@@ -1310,6 +1710,7 @@ export default function DashboardScreen() {
     boolean | null
   >(null);
   const [isLocationBannerOpen, setIsLocationBannerOpen] = useState(false);
+  const [isDashboardFocused, setIsDashboardFocused] = useState(false);
   const [extraQuickActionIds, setExtraQuickActionIds] = useState<
     ExtraQuickActionId[]
   >([]);
@@ -1323,6 +1724,48 @@ export default function DashboardScreen() {
     accountQuery.isSuccess && !accountQuery.data?.onboardingCompletedAt;
   const extraQuickActions = EXTRA_QUICK_ACTIONS.filter((action) =>
     extraQuickActionIds.includes(action.id),
+  );
+  const planProgress = subscriptionProgress(
+    subscriptionQuery.data,
+    progressClock,
+    subscriptionQuery.isError,
+  );
+  const operations = useMemo(
+    () =>
+      dashboardOperations({
+        appointments: appointmentsQuery.data?.appointments,
+        cashSession: cashRegisterQuery.data?.session,
+        cashSummary: cashSummaryQuery.data,
+        currencyCode:
+          organizationQuery.data?.location?.currencyCode ??
+          organizationQuery.data?.organization.currencyCode ??
+          'USD',
+        inventory: inventoryQuery.data,
+        now: progressClock,
+        timeZone: operationTimeZone,
+      }),
+    [
+      appointmentsQuery.data?.appointments,
+      cashRegisterQuery.data?.session,
+      cashSummaryQuery.data,
+      inventoryQuery.data,
+      operationTimeZone,
+      organizationQuery.data?.location?.currencyCode,
+      organizationQuery.data?.organization.currencyCode,
+      progressClock,
+    ],
+  );
+
+  useEffect(() => {
+    const timer = setInterval(() => setProgressClock(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsDashboardFocused(true);
+      return () => setIsDashboardFocused(false);
+    }, []),
   );
 
   useEffect(() => {
@@ -1351,6 +1794,12 @@ export default function DashboardScreen() {
     setNotificationFlowState('checking');
     setIsNotificationSheetOpen(false);
 
+    if (!isDashboardFocused) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
     // Expo Web can report the browser permission as undetermined after a
     // refresh or sign-out. Push registration is native-only, so do not start
     // the permission flow in the web build.
@@ -1367,16 +1816,14 @@ export default function DashboardScreen() {
         if (isMounted) {
           const shouldRequestPermission =
             status !== Notifications.PermissionStatus.GRANTED &&
-            currentNotificationSessionKey !== null &&
-            notificationPromptSessionKey !== currentNotificationSessionKey;
+            canPromptForNotifications;
 
           if (shouldRequestPermission) {
-            notificationPromptSessionKey = currentNotificationSessionKey;
             notificationPromptTimer = setTimeout(() => {
               if (!isMounted) return;
               setIsNotificationSheetOpen(true);
               setNotificationFlowState('visible');
-            }, NOTIFICATION_BANNER_DELAY_MS);
+            }, DASHBOARD_BANNER_DELAY_MS);
             return;
           }
 
@@ -1391,13 +1838,13 @@ export default function DashboardScreen() {
       }
     };
 
-    if (session) void checkNotificationPermission();
+    if (canPromptForNotifications) void checkNotificationPermission();
 
     return () => {
       isMounted = false;
       if (notificationPromptTimer) clearTimeout(notificationPromptTimer);
     };
-  }, [currentNotificationSessionKey, session]);
+  }, [canPromptForNotifications, isDashboardFocused]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1447,15 +1894,26 @@ export default function DashboardScreen() {
   ]);
 
   useEffect(() => {
+    let locationBannerTimer: ReturnType<typeof setTimeout> | null = null;
+
     if (
+      isDashboardFocused &&
       notificationFlowState === 'completed' &&
       needsWelcomeSurvey === false &&
       !isWelcomeSurveyOpen &&
       needsLocationBanner
     ) {
-      setIsLocationBannerOpen(true);
+      locationBannerTimer = setTimeout(
+        () => setIsLocationBannerOpen(true),
+        DASHBOARD_BANNER_DELAY_MS,
+      );
     }
+
+    return () => {
+      if (locationBannerTimer) clearTimeout(locationBannerTimer);
+    };
   }, [
+    isDashboardFocused,
     isWelcomeSurveyOpen,
     needsLocationBanner,
     needsWelcomeSurvey,
@@ -1553,9 +2011,7 @@ export default function DashboardScreen() {
 
         <View style={styles.salesCard}>
           <View style={styles.salesHeader}>
-            <Text style={styles.salesTitle}>
-              {'Tus ventas \u00b7 Julio 2026'}
-            </Text>
+            <Text style={styles.salesTitle}>{planProgress.title}</Text>
             <Pressable
               accessibilityRole="button"
               onPress={() => router.push('/business-summary')}
@@ -1565,11 +2021,13 @@ export default function DashboardScreen() {
               <Ionicons color="#B47D17" name="bar-chart-outline" size={22} />
             </Pressable>
           </View>
-          <Text style={styles.salesValue}>$0</Text>
           <View style={styles.salesMeta}>
-            <Text style={styles.salesMetaText}>{'D\u00eda 26 de 31'}</Text>
+            <Text style={styles.salesMetaText}>{planProgress.expiryLabel}</Text>
           </View>
-          <DashboardProgress value={MONTH_PROGRESS} />
+          <DashboardProgress
+            caption={planProgress.caption}
+            value={planProgress.percentage}
+          />
         </View>
 
         <View style={styles.quickActions}>
@@ -1618,6 +2076,29 @@ export default function DashboardScreen() {
             <Text style={styles.addQuickActionLabel}>Agregar acceso</Text>
           </Pressable>
         </View>
+
+        {operations.length ? (
+          <View style={styles.operationsSection}>
+            <View style={styles.operationsHeader}>
+              <View>
+                <Text style={styles.operationsTitle}>En marcha</Text>
+                <Text style={styles.operationsCaption}>
+                  Lo importante para tu negocio ahora
+                </Text>
+              </View>
+              <Ionicons color="#B47D17" name="flash-outline" size={23} />
+            </View>
+            <View style={styles.operationsList}>
+              {operations.map((operation) => (
+                <DashboardOperationCard
+                  key={operation.id}
+                  onPress={() => router.push(operation.route)}
+                  operation={operation}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
 
         {shouldShowWelcome ? (
           <View style={styles.welcome}>
@@ -2138,6 +2619,50 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 22,
   },
+  operationAction: { color: '#9A6A17', fontSize: 12, fontWeight: '900' },
+  operationActionRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 7,
+  },
+  operationCard: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(199, 149, 50, 0.16)',
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    minHeight: 96,
+    paddingHorizontal: 15,
+    paddingVertical: 13,
+  },
+  operationCardAlert: {
+    backgroundColor: '#FFF9EE',
+    borderColor: 'rgba(204, 142, 35, 0.28)',
+  },
+  operationCopy: { flex: 1, minWidth: 0 },
+  operationDescription: { color: '#69717D', fontSize: 13, marginTop: 3 },
+  operationIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(235, 216, 170, 0.42)',
+    borderRadius: 16,
+    height: 46,
+    justifyContent: 'center',
+    width: 46,
+  },
+  operationIconAlert: { backgroundColor: 'rgba(244, 194, 97, 0.25)' },
+  operationTitle: { color: '#1C1C1C', fontSize: 15, fontWeight: '900' },
+  operationsCaption: { color: '#69717D', fontSize: 13, marginTop: 3 },
+  operationsHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  operationsList: { gap: 10, marginTop: 13 },
+  operationsSection: { marginTop: 28 },
+  operationsTitle: { color: '#1C1C1C', fontSize: 21, fontWeight: '900' },
   extraQuickActionSlot: { width: '25%' },
   extraQuickActions: {
     flexDirection: 'row',
@@ -2291,6 +2816,7 @@ const styles = StyleSheet.create({
   salesCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 30,
+    height: 202,
     marginTop: 48,
     overflow: 'hidden',
     padding: 21,
@@ -2318,14 +2844,6 @@ const styles = StyleSheet.create({
   },
   salesMetaText: { color: '#000000', fontSize: 15 },
   salesTitle: { color: '#1C1C1C', fontSize: 18, fontWeight: '600' },
-  salesValue: {
-    color: '#1C1C1C',
-    fontSize: 47,
-    fontWeight: '900',
-    marginTop: 24,
-    position: 'relative',
-    zIndex: 1,
-  },
   screen: appStyles.screen,
   summaryButton: {
     alignItems: 'center',
