@@ -1660,6 +1660,9 @@ export default function DashboardScreen() {
     queryFn: () =>
       requireApiClient().request<SubscriptionResponse>('/v1/subscription'),
     queryKey: ['subscription', user?.id],
+    refetchInterval: 60_000,
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
   const operationTimeZone =
     organizationQuery.data?.location?.timezone ??

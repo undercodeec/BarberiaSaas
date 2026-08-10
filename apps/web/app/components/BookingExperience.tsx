@@ -2,7 +2,10 @@
 
 import type { PublicBookingCatalog } from '@barber-saas/api-client';
 import { Country } from 'country-state-city';
+import Image from 'next/image';
 import { useMemo, useState } from 'react';
+
+import bookingHero from './booking-hero.png';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/u, '') ??
@@ -657,6 +660,8 @@ function Landing({
   catalog: PublicBookingCatalog;
   onBook: () => void;
 }) {
+  return <PublicBookingLanding catalog={catalog} onBook={onBook} />;
+  /* Previous landing kept below temporarily while the booking flow remains unchanged.
   return (
     <>
       <section className="mx-auto grid max-w-6xl gap-10 px-5 py-14 lg:grid-cols-[1.1fr_.9fr] lg:items-center">
@@ -758,6 +763,7 @@ function Landing({
       </section>
     </>
   );
+  */
 }
 
 function BookingSummary({
@@ -927,5 +933,590 @@ function ErrorMessage({ message }: { message: string }) {
     <p className="mt-5 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">
       {message}
     </p>
+  );
+}
+
+type LandingSection = 'reviews' | 'services' | 'team';
+
+function PublicBookingLanding({
+  catalog,
+  onBook,
+}: {
+  catalog: PublicBookingCatalog;
+  onBook: () => void;
+}) {
+  const [activeSection, setActiveSection] =
+    useState<LandingSection>('services');
+  const [search, setSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState('all');
+  const categories = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          catalog.services
+            .map((service) => service.category)
+            .filter((category): category is string => Boolean(category)),
+        ),
+      ),
+    [catalog.services],
+  );
+  const services = catalog.services.filter((service) => {
+    const matchesSearch = `${service.name} ${service.description ?? ''}`
+      .toLocaleLowerCase('es')
+      .includes(search.trim().toLocaleLowerCase('es'));
+    return (
+      matchesSearch &&
+      (activeCategory === 'all' || service.category === activeCategory)
+    );
+  });
+  const average = catalog.reviews.length
+    ? catalog.reviews.reduce((sum, review) => sum + review.rating, 0) /
+      catalog.reviews.length
+    : null;
+  const navigate = (section: LandingSection) => {
+    setActiveSection(section);
+    document.getElementById(section)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  };
+
+  return (
+    <>
+      <BusinessHero catalog={catalog} onBook={onBook} />
+      <SectionNavigation active={activeSection} onSelect={navigate} />
+      <main className="mx-auto max-w-6xl px-4 pb-12 sm:px-5 lg:px-8">
+        <section className="py-7">
+          <SectionHeading>Sobre nosotros</SectionHeading>
+          <p className="max-w-2xl text-sm leading-6 text-black/60 sm:text-base">
+            {catalog.organization.name} es un espacio para cuidar tu estilo
+            {catalog.location.city ? ` en ${catalog.location.city}` : ''}. Elige
+            el servicio y el profesional que mejor se adapten a tu próxima cita.
+          </p>
+        </section>
+
+        <section className="scroll-mt-20 py-7" id="services">
+          <SectionHeading
+            action="Ver todos"
+            onAction={() => navigate('services')}
+          >
+            Lo más pedido aquí
+          </SectionHeading>
+          {catalog.services[0] ? (
+            <FeaturedService
+              currency={catalog.location.currencyCode}
+              onBook={onBook}
+              service={catalog.services[0]}
+            />
+          ) : null}
+
+          <div className="mt-7">
+            <label className="flex min-h-11 items-center gap-3 rounded-xl border border-black/15 bg-white px-3">
+              <span aria-hidden="true" className="text-black/45">
+                ⌕
+              </span>
+              <span className="sr-only">Buscar servicios</span>
+              <input
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-black/40"
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar servicios..."
+                type="search"
+                value={search}
+              />
+            </label>
+            <div
+              aria-label="Filtrar servicios por categoría"
+              className="mt-3 flex [scrollbar-width:none] gap-2 overflow-x-auto pb-1"
+            >
+              {[
+                { id: 'all', label: 'Todos los servicios' },
+                ...categories.map((category) => ({
+                  id: category,
+                  label: category,
+                })),
+              ].map((category) => (
+                <button
+                  aria-pressed={activeCategory === category.id}
+                  className={`min-h-9 shrink-0 rounded-full px-3 text-xs font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black ${
+                    activeCategory === category.id
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black/60 hover:text-black'
+                  }`}
+                  key={category.id}
+                  onClick={() => setActiveCategory(category.id)}
+                  type="button"
+                >
+                  {category.label}
+                  {category.id === 'all' ? ` (${services.length})` : ''}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {services.length ? (
+            <div className="mt-5 grid gap-3 lg:grid-cols-2">
+              {services.map((service, index) => (
+                <ServiceCard
+                  currency={catalog.location.currencyCode}
+                  key={service.id}
+                  onBook={onBook}
+                  popular={index < 3}
+                  service={service}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="mt-5 rounded-xl bg-white p-4 text-sm text-black/55">
+              No encontramos servicios con esos filtros.
+            </p>
+          )}
+        </section>
+
+        <section
+          className="scroll-mt-20 border-t border-black/8 py-7"
+          id="team"
+        >
+          <SectionHeading>Colaboradores</SectionHeading>
+          <div className="-mr-4 flex snap-x [scrollbar-width:none] gap-3 overflow-x-auto pr-4 pb-2 sm:-mr-5 sm:pr-5 lg:-mr-8 lg:pr-8">
+            {catalog.professionals.map((professional) => (
+              <article
+                className="min-w-36 snap-start rounded-xl border border-black/10 bg-white p-4 text-center"
+                key={professional.id}
+              >
+                {professional.photoData ? (
+                  <Image
+                    alt={`Foto de ${professional.name}`}
+                    className="mx-auto rounded-full object-cover"
+                    height={56}
+                    src={professional.photoData}
+                    unoptimized
+                    width={56}
+                  />
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[#ecebe6] text-lg font-black"
+                  >
+                    {professional.name.slice(0, 1)}
+                  </span>
+                )}
+                <h3 className="mt-3 truncate text-sm font-black">
+                  {professional.name}
+                </h3>
+                <p className="mt-1 line-clamp-2 text-xs leading-4 text-black/50">
+                  {professional.bio || 'Profesional del equipo'}
+                </p>
+              </article>
+            ))}
+            {!catalog.professionals.length ? (
+              <p className="rounded-xl bg-white p-4 text-sm text-black/55">
+                Próximamente conocerás al equipo.
+              </p>
+            ) : null}
+          </div>
+        </section>
+
+        <section
+          className="scroll-mt-20 border-t border-black/8 py-7"
+          id="reviews"
+        >
+          <SectionHeading>Reseñas</SectionHeading>
+          <RatingsSummary average={average} reviews={catalog.reviews} />
+          <FeaturedReview reviews={catalog.reviews} />
+        </section>
+
+        <BusinessInformation catalog={catalog} onNavigate={navigate} />
+      </main>
+      <footer className="border-t border-black/10 px-4 py-6 text-center text-xs text-black/45 sm:px-5">
+        Desarrollado con Nava
+        <br />© {new Date().getFullYear()} Nava. Todos los derechos reservados.
+      </footer>
+    </>
+  );
+}
+
+function BusinessHero({
+  catalog,
+  onBook,
+}: {
+  catalog: PublicBookingCatalog;
+  onBook: () => void;
+}) {
+  const address = [catalog.location.addressLine, catalog.location.city]
+    .filter(Boolean)
+    .join(', ');
+  return (
+    <section className="relative isolate mx-auto h-[min(132vw,34rem)] min-h-96 max-w-6xl overflow-hidden bg-black sm:h-[31rem] sm:rounded-b-[2rem]">
+      <Image
+        alt="Interior de una barbería"
+        className="object-cover"
+        fill
+        placeholder="blur"
+        priority
+        sizes="(max-width: 768px) 100vw, 72rem"
+        src={bookingHero}
+      />
+      <div aria-hidden="true" className="absolute inset-0 bg-black/45" />
+      <div className="absolute inset-x-0 bottom-0 p-5 text-white sm:p-8">
+        <p className="text-xs font-black tracking-[0.18em] text-white/75 uppercase">
+          {catalog.location.name}
+        </p>
+        <h1 className="mt-2 max-w-xl text-4xl leading-none font-black tracking-[-0.045em] sm:text-6xl">
+          {catalog.organization.name}
+        </h1>
+        <span className="mt-4 inline-flex rounded-full border border-white/35 px-3 py-1 text-xs font-bold">
+          Barbería
+        </span>
+        <div className="mt-4 grid max-w-xl gap-2 text-sm text-white/85 sm:grid-cols-2">
+          <MetaItem icon="pin" value={address || 'Ubicación por confirmar'} />
+          <MetaItem icon="clock" value="Reservas online disponibles" />
+        </div>
+        <button
+          className="mt-5 min-h-11 rounded-full bg-white px-5 text-sm font-black text-black transition hover:bg-white/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          onClick={onBook}
+          type="button"
+        >
+          Reservar ahora
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function MetaItem({ icon, value }: { icon: 'clock' | 'pin'; value: string }) {
+  return (
+    <p className="flex min-w-0 items-center gap-2">
+      <span
+        aria-hidden="true"
+        className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-white/35 text-[11px]"
+      >
+        {icon === 'pin' ? '•' : '◷'}
+      </span>
+      <span className="truncate">{value}</span>
+    </p>
+  );
+}
+
+function SectionNavigation({
+  active,
+  onSelect,
+}: {
+  active: LandingSection;
+  onSelect: (section: LandingSection) => void;
+}) {
+  const sections: ReadonlyArray<{ id: LandingSection; label: string }> = [
+    { id: 'services', label: 'Servicios' },
+    { id: 'team', label: 'Equipo' },
+    { id: 'reviews', label: 'Reseñas' },
+  ];
+  return (
+    <nav
+      aria-label="Navegación de la barbería"
+      className="sticky top-0 z-10 border-b border-black/8 bg-[#f4f3ef]/95 backdrop-blur"
+    >
+      <div className="mx-auto flex max-w-6xl px-4 sm:px-5 lg:px-8">
+        {sections.map((section) => (
+          <button
+            aria-current={active === section.id ? 'page' : undefined}
+            className={`relative min-h-12 flex-1 text-sm font-bold transition focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-black ${
+              active === section.id
+                ? 'text-black'
+                : 'text-black/45 hover:text-black'
+            }`}
+            key={section.id}
+            onClick={() => onSelect(section.id)}
+            type="button"
+          >
+            {section.label}
+            {active === section.id ? (
+              <span
+                aria-hidden="true"
+                className="absolute inset-x-5 bottom-0 h-0.5 bg-black"
+              />
+            ) : null}
+          </button>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+function SectionHeading({
+  action,
+  children,
+  onAction,
+}: {
+  action?: string;
+  children: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="mb-4 flex items-center justify-between gap-4">
+      <h2 className="text-xl font-black tracking-[-0.03em] sm:text-2xl">
+        {children}
+      </h2>
+      {action && onAction ? (
+        <button
+          className="shrink-0 text-xs font-black text-black/60 hover:text-black focus-visible:outline-2 focus-visible:outline-black"
+          onClick={onAction}
+          type="button"
+        >
+          {action} →
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function FeaturedService({
+  currency,
+  onBook,
+  service,
+}: {
+  currency: string;
+  onBook: () => void;
+  service: PublicBookingCatalog['services'][number];
+}) {
+  return (
+    <article className="grid gap-4 rounded-2xl border border-black/10 bg-white p-3 shadow-[0_12px_36px_rgba(0,0,0,.06)] sm:grid-cols-[9rem_1fr] sm:p-4">
+      <div className="relative min-h-36 overflow-hidden rounded-xl bg-black sm:min-h-full">
+        <Image
+          alt="Ambiente de barbería"
+          className="object-cover"
+          fill
+          sizes="144px"
+          src={bookingHero}
+        />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] font-black tracking-[0.12em] text-black/45 uppercase">
+          Reserva online
+        </p>
+        <div className="mt-1 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="truncate text-lg font-black">{service.name}</h3>
+            <p className="mt-1 line-clamp-2 text-sm leading-5 text-black/55">
+              {service.description ||
+                'Un servicio preparado para tu próxima cita.'}
+            </p>
+          </div>
+          <strong className="shrink-0 text-base">
+            {money(service.priceCents, currency)}
+          </strong>
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <span className="text-xs font-bold text-black/50">
+            ◷ {service.durationMinutes} min
+          </span>
+          <button
+            className="min-h-10 rounded-lg bg-black px-4 text-sm font-black text-white transition hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+            onClick={onBook}
+            type="button"
+          >
+            Reservar
+          </button>
+        </div>
+        <p className="mt-3 border-t border-black/8 pt-3 text-xs text-black/45">
+          Disponible para reservar online
+        </p>
+      </div>
+    </article>
+  );
+}
+
+function ServiceCard({
+  currency,
+  onBook,
+  popular,
+  service,
+}: {
+  currency: string;
+  onBook: () => void;
+  popular: boolean;
+  service: PublicBookingCatalog['services'][number];
+}) {
+  return (
+    <article className="grid min-h-32 grid-cols-[4.75rem_minmax(0,1fr)] gap-3 rounded-xl border border-black/10 bg-white p-3">
+      <div className="relative h-[6.5rem] w-[4.75rem] overflow-hidden rounded-lg bg-[#ecebe6]">
+        <Image
+          alt={`Servicio ${service.name}`}
+          className="object-cover"
+          fill
+          sizes="76px"
+          src={bookingHero}
+        />
+      </div>
+      <div className="flex min-w-0 flex-col">
+        {popular ? (
+          <span className="w-fit rounded-full bg-[#f4f3ef] px-2 py-0.5 text-[10px] font-bold text-black/55">
+            Popular
+          </span>
+        ) : null}
+        <div className="mt-1 flex min-w-0 items-start justify-between gap-2">
+          <h3 className="line-clamp-2 text-sm leading-5 font-black">
+            {service.name}
+          </h3>
+          <strong className="shrink-0 text-sm">
+            {money(service.priceCents, currency)}
+          </strong>
+        </div>
+        <p className="mt-1 line-clamp-2 text-xs leading-4 text-black/50">
+          {service.description || 'Servicio disponible para reserva online.'}
+        </p>
+        <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+          <span className="text-[11px] font-bold text-black/45">
+            ◷ {service.durationMinutes} min
+          </span>
+          <button
+            className="min-h-8 rounded-md bg-black px-3 text-xs font-black text-white transition hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+            onClick={onBook}
+            type="button"
+          >
+            Reservar
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function RatingsSummary({
+  average,
+  reviews,
+}: {
+  average: number | null;
+  reviews: PublicBookingCatalog['reviews'];
+}) {
+  const distribution = [5, 4, 3, 2, 1].map((rating) => ({
+    count: reviews.filter((review) => review.rating === rating).length,
+    rating,
+  }));
+  return (
+    <div className="grid gap-5 rounded-2xl bg-white p-4 sm:grid-cols-[9rem_1fr] sm:items-center">
+      <div>
+        <p className="text-4xl font-black">
+          {average ? average.toFixed(1) : '—'}
+        </p>
+        <p className="mt-1 text-sm tracking-[0.12em] text-black/70">★★★★★</p>
+        <p className="mt-2 text-xs text-black/45">
+          {reviews.length} reseñas verificadas
+        </p>
+      </div>
+      <div className="space-y-2">
+        {distribution.map((item) => (
+          <div
+            className="grid grid-cols-[1.25rem_1fr_1.25rem] items-center gap-2 text-xs"
+            key={item.rating}
+          >
+            <span>{item.rating}★</span>
+            <span
+              aria-hidden="true"
+              className="h-1.5 overflow-hidden rounded-full bg-black/8"
+            >
+              <span
+                className="block h-full rounded-full bg-black"
+                style={{
+                  width: `${reviews.length ? (item.count / reviews.length) * 100 : 0}%`,
+                }}
+              />
+            </span>
+            <span className="text-right text-black/45">{item.count}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FeaturedReview({
+  reviews,
+}: {
+  reviews: PublicBookingCatalog['reviews'];
+}) {
+  const review = reviews.find((item) => item.comment) ?? reviews[0];
+  if (!review) {
+    return (
+      <p className="mt-4 rounded-xl border border-black/10 p-4 text-sm text-black/55">
+        Las reseñas verificadas aparecerán después de citas completadas.
+      </p>
+    );
+  }
+  return (
+    <blockquote className="mt-4 rounded-2xl border border-black/10 bg-white p-5">
+      <p aria-hidden="true" className="text-2xl leading-none text-black/35">
+        “
+      </p>
+      <p className="mt-2 text-base leading-7 font-bold">
+        {review.comment || 'Gracias por confiar en nuestro equipo.'}
+      </p>
+      <footer className="mt-4 text-sm text-black/55">
+        <strong className="text-black">{review.clientName}</strong> · cita con{' '}
+        {review.professionalName}
+      </footer>
+    </blockquote>
+  );
+}
+
+function BusinessInformation({
+  catalog,
+  onNavigate,
+}: {
+  catalog: PublicBookingCatalog;
+  onNavigate: (section: LandingSection) => void;
+}) {
+  const address = [catalog.location.addressLine, catalog.location.city]
+    .filter(Boolean)
+    .join(', ');
+  return (
+    <section className="border-t border-black/8 py-7">
+      <h2 className="text-xl font-black tracking-[-0.03em]">
+        {catalog.organization.name}
+      </h2>
+      <p className="mt-2 max-w-xl text-sm leading-6 text-black/60">
+        Reserva tu próximo servicio de forma simple y recibe la confirmación por
+        correo.
+      </p>
+      <div className="mt-6 grid gap-6 text-sm sm:grid-cols-2">
+        <div>
+          <h3 className="font-black">Navegación</h3>
+          <div className="mt-3 flex flex-col items-start gap-2">
+            <button
+              className="text-black/60 hover:text-black"
+              onClick={() => onNavigate('services')}
+              type="button"
+            >
+              Servicios
+            </button>
+            <button
+              className="text-black/60 hover:text-black"
+              onClick={() => onNavigate('team')}
+              type="button"
+            >
+              Colaboradores
+            </button>
+            <button
+              className="text-black/60 hover:text-black"
+              onClick={() => onNavigate('reviews')}
+              type="button"
+            >
+              Reseñas
+            </button>
+          </div>
+        </div>
+        <div>
+          <h3 className="font-black">Más información</h3>
+          <p className="mt-3 flex gap-2 text-black/60">
+            <span aria-hidden="true">•</span>
+            {address || 'Ubicación por confirmar'}
+          </p>
+          <p className="mt-2 flex gap-2 text-black/60">
+            <span aria-hidden="true">◷</span>Reservas online disponibles
+          </p>
+          {catalog.location.phone ? (
+            <p className="mt-2 text-black/60">{catalog.location.phone}</p>
+          ) : null}
+        </div>
+      </div>
+    </section>
   );
 }

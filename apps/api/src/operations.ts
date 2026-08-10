@@ -37,6 +37,7 @@ import {
 } from './security';
 import {
   ensureOrganizationSubscription,
+  GRACE_DAYS,
   planDefinition,
   SUBSCRIPTION_PLANS,
 } from './subscription-policy';
@@ -703,13 +704,16 @@ function registerPlatformRoutes(
         });
       } else if (input.action === 'reactivate') {
         const periodStart = new Date();
+        const periodEnd = new Date(
+          periodStart.getTime() + 30 * 24 * 60 * 60 * 1000,
+        );
         updated = await transaction.subscription.update({
           data: {
-            currentPeriodEnd: new Date(
-              periodStart.getTime() + 30 * 24 * 60 * 60 * 1000,
+            currentPeriodEnd: periodEnd,
+            graceEndsAt: new Date(
+              periodEnd.getTime() + GRACE_DAYS * 24 * 60 * 60 * 1000,
             ),
             currentPeriodStart: periodStart,
-            graceEndsAt: null,
             status: SubscriptionStatus.ACTIVE,
             trialEndsAt: null,
           },
@@ -997,14 +1001,20 @@ export function registerOperationsRoutes(
         input.status === 'active'
           ? SubscriptionStatus.ACTIVE
           : SubscriptionStatus.SUSPENDED;
+      const periodStart = new Date();
+      const periodEnd = new Date(
+        periodStart.getTime() + 30 * 24 * 60 * 60 * 1000,
+      );
       const updated = await transaction.subscription.update({
         data: {
           ...(status === SubscriptionStatus.ACTIVE
             ? {
-                currentPeriodEnd: new Date(
-                  Date.now() + 30 * 24 * 60 * 60 * 1000,
+                currentPeriodEnd: periodEnd,
+                currentPeriodStart: periodStart,
+                graceEndsAt: new Date(
+                  periodEnd.getTime() + GRACE_DAYS * 24 * 60 * 60 * 1000,
                 ),
-                currentPeriodStart: new Date(),
+                trialEndsAt: null,
               }
             : {}),
           status,

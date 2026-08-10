@@ -8,6 +8,19 @@ export interface MapCoordinate {
 
 const webApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY ?? '';
 
+function openStreetMapEmbedUrl({ latitude, longitude }: MapCoordinate) {
+  const latitudeOffset = 0.008;
+  const longitudeOffset = 0.012;
+  const bounds = [
+    longitude - longitudeOffset,
+    latitude - latitudeOffset,
+    longitude + longitudeOffset,
+    latitude + latitudeOffset,
+  ].join(',');
+  const marker = `${latitude},${longitude}`;
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bounds)}&layer=mapnik&marker=${encodeURIComponent(marker)}`;
+}
+
 export function BusinessLocationMap({
   coordinate,
   onCoordinateChange,
@@ -19,10 +32,18 @@ export function BusinessLocationMap({
   if (!webApiKey)
     return (
       <View style={[styles.container, styles.fallback]}>
-        <Text style={styles.fallbackText}>
-          Configura EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY para mostrar el mapa
-          web.
-        </Text>
+        <iframe
+          aria-label="Vista previa de la ubicaciÃ³n del negocio"
+          scrolling="no"
+          src={openStreetMapEmbedUrl(center)}
+          style={{ border: 0, height: '100%', width: '100%' }}
+          title="Vista previa de la ubicaciÃ³n del negocio"
+        />
+        <View pointerEvents="none" style={styles.previewNotice}>
+          <Text style={styles.fallbackText}>
+            Busca una direcciÃ³n o usa tu ubicaciÃ³n para seleccionar el punto.
+          </Text>
+        </View>
       </View>
     );
 
@@ -62,11 +83,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     width: '100%',
   },
-  fallback: {
-    alignItems: 'center',
-    backgroundColor: '#ECE8DF',
-    justifyContent: 'center',
-    padding: 24,
+  fallback: { backgroundColor: '#ECE8DF' },
+  fallbackText: { color: '#273243', fontSize: 12, textAlign: 'center' },
+  previewNotice: {
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+    bottom: 8,
+    left: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    position: 'absolute',
+    right: 8,
   },
-  fallbackText: { color: '#59616D', textAlign: 'center' },
 });

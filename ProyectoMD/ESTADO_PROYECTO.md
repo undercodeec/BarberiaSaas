@@ -2,7 +2,7 @@
 
 Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión posterior documentada en `docs/adr/0003-postgresql-prisma-y-api-en-vps.md`. Se marca `[x]` solo cuando la tarea está implementada y cuenta con la verificación indicada; `[ ]` significa pendiente o aún no demostrada.
 
-Última actualización: 2026-08-09
+Última actualización: 2026-08-09 (sesión local: mapa web, enlace de reservas y análisis de clientes)
 
 ## Estado operativo actual
 
@@ -3795,3 +3795,52 @@ caja, comisiones y registros históricos.
 - [ ] La migración no se aplicó a Neon durante esta sesión. Aplicarla solo
       mediante el despliegue controlado de la VPS, nunca desde las pruebas
       locales conectadas a `production`.
+
+## Ajustes de mapa y reservas en app móvil — 9 de agosto de 2026
+
+### Vista previa de la ubicación
+
+- [x] La variante Web de `BusinessLocationMap` ya no muestra solamente el aviso
+      de clave faltante. Sin `EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY` presenta una
+      vista previa centrada en la ubicación elegida mediante OpenStreetMap.
+- [x] Si existe `EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY`, se conserva Google Maps
+      interactivo: tocar el mapa permite ajustar el punto y ejecutar la
+      geocodificación inversa ya implementada.
+- [x] El permiso de ubicación real se solicita exclusivamente tras tocar
+      `Usar mi ubicación actual`, mediante
+      `Location.requestForegroundPermissionsAsync()`. Abrir el mapa, buscar o
+      ver su previsualización no dispara el permiso.
+
+### Enlace de reservas del dashboard
+
+- [x] El panel abierto con `Abrir` en la tarjeta de reservas se transformó en
+      un modal con entrada y salida suave desde abajo, colores y sombras del
+      tema actual del dashboard.
+- [x] `Copiar enlace` copia el enlace público; `Ver mi website` abre dicho
+      enlace; `Código QR` abre un QR que codifica el enlace para descargarlo o
+      compartirlo. Las tres acciones quedan deshabilitadas si el enlace aún no
+      está listo.
+- [ ] Antes de producción, decidir si el QR debe generarse internamente
+      (SVG/PNG en API o librería local) para no depender del generador web
+      externo usado por la implementación actual.
+
+### Revisión del flujo de clientes al crear una cita
+
+- [x] No existen dos formularios de alta divergentes: `new-booking.tsx`
+      reutiliza `ClientFormSheet` exportado por `clients.tsx`, el mismo endpoint
+      `POST /v1/clients` y la misma invalidación de caché.
+- [x] Los pasos posteriores a elegir cliente pertenecen a la cita, no a la
+      creación de cliente: profesional, servicios y fecha/hora conforman los
+      pasos 2 a 4 de `booking-details.tsx`.
+- [ ] Hay duplicación parcial de buscador/listado de clientes entre el
+      directorio y el selector de nueva cita. Mantener las dos pantallas por sus
+      objetivos distintos, pero extraer un componente reutilizable de búsqueda
+      y lista con modos `directory` y `select` en una mejora posterior.
+
+### Verificación y estado de cambios
+
+- [x] `pnpm --filter @barber-saas/mobile typecheck` aprobado después de los
+      cambios de mapa y panel de reservas.
+- [ ] Cambios locales sin commit al cerrar esta sesión:
+      `apps/mobile/src/components/BusinessLocationMap.web.tsx` y
+      `apps/mobile/src/components/BookingLinkSheet.tsx`.

@@ -1314,6 +1314,81 @@ describeWithDatabase('API con PostgreSQL', () => {
     );
   });
 
+  it('vence planes activos, aplica gracia y suspende nuevas escrituras', async () => {
+    const ownerToken = await register('active-expiry-owner@example.com');
+    const organization = await onboard(ownerToken, 'active-expiry');
+    const activationResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: { status: 'active' },
+      url: '/v1/subscription/simulate',
+    });
+    expect(activationResponse.statusCode).toBe(200);
+
+    const activatedSubscription = await database.subscription.findUnique({
+      where: { organizationId: organization.organizationId },
+    });
+    expect(activatedSubscription?.trialEndsAt).toBeNull();
+    expect(
+      (activatedSubscription?.graceEndsAt?.getTime() ?? 0) -
+        (activatedSubscription?.currentPeriodEnd.getTime() ?? 0),
+    ).toBe(7 * 24 * 60 * 60 * 1000);
+
+    const expiredPeriodEnd = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    await database.subscription.update({
+      data: {
+        currentPeriodEnd: expiredPeriodEnd,
+        graceEndsAt: null,
+        status: 'ACTIVE',
+      },
+      where: { organizationId: organization.organizationId },
+    });
+
+    const graceResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      url: '/v1/subscription',
+    });
+    expect(graceResponse.statusCode).toBe(200);
+    const grace = graceResponse.json<{
+      current: { graceEndsAt: string; readOnly: boolean; status: string };
+    }>().current;
+    expect(grace).toMatchObject({ readOnly: false, status: 'past_due' });
+    expect(new Date(grace.graceEndsAt).getTime()).toBe(
+      expiredPeriodEnd.getTime() + 7 * 24 * 60 * 60 * 1000,
+    );
+
+    await database.subscription.update({
+      data: { graceEndsAt: new Date(Date.now() - 1_000) },
+      where: { organizationId: organization.organizationId },
+    });
+    const suspendedResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      url: '/v1/subscription',
+    });
+    expect(suspendedResponse.statusCode).toBe(200);
+    expect(
+      suspendedResponse.json<{
+        current: { readOnly: boolean; status: string };
+      }>().current,
+    ).toMatchObject({ readOnly: true, status: 'suspended' });
+
+    const blockedWrite = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        durationMinutes: 30,
+        name: 'Servicio fuera de vigencia',
+        priceCents: 1_400,
+      },
+      url: '/v1/services',
+    });
+    expect(blockedWrite.statusCode).toBe(423);
+    expect(blockedWrite.json<{ code: string }>().code).toBe(
+      'SUBSCRIPTION_READ_ONLY',
+    );
+  });
   it('configura equipo, servicios y horarios con auditoría', async () => {
     const ownerToken = await register('phase2-owner@example.com');
     const organization = await onboard(ownerToken, 'fase-dos');

@@ -152,6 +152,43 @@ export async function ensureOrganizationSubscription(
       where: { id: subscription.id },
     });
   }
+
+  if (
+    subscription.status === SubscriptionStatus.ACTIVE &&
+    subscription.currentPeriodEnd <= now
+  ) {
+    const configuredGraceEnd = subscription.graceEndsAt;
+    const graceEndsAt =
+      configuredGraceEnd && configuredGraceEnd > subscription.currentPeriodEnd
+        ? configuredGraceEnd
+        : new Date(
+            subscription.currentPeriodEnd.getTime() + GRACE_DAYS * DAY_MS,
+          );
+    subscription = await transaction.subscription.update({
+      data: {
+        graceEndsAt,
+        status: SubscriptionStatus.PAST_DUE,
+        trialEndsAt: null,
+      },
+      where: { id: subscription.id },
+    });
+  }
+
+  if (
+    subscription.status === SubscriptionStatus.PAST_DUE &&
+    (!subscription.graceEndsAt ||
+      subscription.graceEndsAt <= subscription.currentPeriodEnd)
+  ) {
+    subscription = await transaction.subscription.update({
+      data: {
+        graceEndsAt: new Date(
+          subscription.currentPeriodEnd.getTime() + GRACE_DAYS * DAY_MS,
+        ),
+      },
+      where: { id: subscription.id },
+    });
+  }
+
   if (
     subscription.status === SubscriptionStatus.PAST_DUE &&
     subscription.graceEndsAt &&
