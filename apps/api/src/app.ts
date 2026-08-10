@@ -893,9 +893,6 @@ export async function buildApi({
     const input = registrationAvailabilitySchema.parse(request.body);
     const now = new Date();
     const email = input.email ? normalizeEmail(input.email) : null;
-    const businessNameKey = input.businessName
-      ? normalizeBusinessName(input.businessName)
-      : null;
     const phoneKey = input.phone ? normalizePhone(input.phone) : null;
     const [
       existingUser,
@@ -917,18 +914,8 @@ export async function buildApi({
             where: { email, expiresAt: { gt: now } },
           })
         : null,
-      businessNameKey
-        ? database.userRegistrationProfile.findUnique({
-            select: { userId: true },
-            where: { businessNameKey },
-          })
-        : null,
-      businessNameKey
-        ? database.pendingRegistration.findFirst({
-            select: { id: true },
-            where: { businessNameKey, expiresAt: { gt: now } },
-          })
-        : null,
+      null,
+      null,
       phoneKey
         ? database.userRegistrationProfile.findUnique({
             select: { userId: true },
@@ -949,7 +936,7 @@ export async function buildApi({
           pendingEmail)
           ? { email: 'Ese correo ya está registrado.' }
           : {}),
-        ...(businessNameKey && (profileBusiness || pendingBusiness)
+        ...(false && (profileBusiness || pendingBusiness)
           ? { businessName: 'Ese nombre de negocio ya está en uso.' }
           : {}),
         ...(phoneKey && (profilePhone || pendingPhone)
@@ -997,21 +984,21 @@ export async function buildApi({
         where: {
           email: { not: email },
           expiresAt: { lte: new Date() },
-          OR: [{ businessNameKey }, { phoneKey }],
+          phoneKey,
         },
       });
       const [duplicateProfile, duplicatePendingRegistration] =
         await Promise.all([
           database.userRegistrationProfile.findFirst({
             select: { businessNameKey: true, phoneKey: true },
-            where: { OR: [{ businessNameKey }, { phoneKey }] },
+            where: { phoneKey },
           }),
           database.pendingRegistration.findFirst({
             select: { businessNameKey: true, phoneKey: true },
             where: {
               email: { not: email },
               expiresAt: { gt: new Date() },
-              OR: [{ businessNameKey }, { phoneKey }],
+              phoneKey,
             },
           }),
         ]);

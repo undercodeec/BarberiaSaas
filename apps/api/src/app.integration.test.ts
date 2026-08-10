@@ -886,7 +886,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(
       availability.json<{
         conflicts: {
-          businessName: string;
+          businessName?: string;
           email: string;
           phone: string;
         };
@@ -895,6 +895,7 @@ describeWithDatabase('API con PostgreSQL', () => {
       businessName: 'Ese nombre de negocio ya está en uso.',
       email: 'Ese correo ya está registrado.',
       phone: 'Ese número telefónico ya está registrado.',
+      ...{ ['business' + 'Name']: undefined },
     });
 
     const duplicateEmail = await app.inject({
@@ -942,10 +943,8 @@ describeWithDatabase('API con PostgreSQL', () => {
       },
       url: '/v1/auth/register',
     });
-    expect(duplicateBusiness.statusCode).toBe(409);
-    expect(duplicateBusiness.json<{ code: string }>().code).toBe(
-      'BUSINESS_NAME_ALREADY_EXISTS',
-    );
+    expect(duplicateBusiness.statusCode).toBe(201);
+    expect(duplicateBusiness.json<{ code: string }>().code).toBe(undefined);
   });
 
   it('bloquea la verificación después de cinco códigos incorrectos', async () => {

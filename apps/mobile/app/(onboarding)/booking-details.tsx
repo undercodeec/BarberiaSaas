@@ -12,6 +12,7 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -30,6 +31,10 @@ import {
 
 type BookingStep = 'professional' | 'services' | 'schedule';
 type TimePeriod = 'all' | 'afternoon' | 'morning' | 'night';
+type SlotState = 'available' | 'blocked' | 'occupied' | 'past';
+type ScheduleSlot = AvailabilityResponse['slots'][number] & {
+  readonly state: SlotState;
+};
 
 const SLOT_PREVIEW_LIMIT = 9;
 const TIME_PERIODS: ReadonlyArray<{
@@ -54,6 +59,21 @@ function slotMatchesPeriod(startsAt: string, period: TimePeriod) {
 
 function periodEmptyLabel(period: TimePeriod) {
   return TIME_PERIODS.find(({ id }) => id === period)?.label.toLowerCase();
+}
+
+function slotStatusLabel(state: Exclude<SlotState, 'available'>) {
+  if (state === 'past') return 'Pasado';
+  if (state === 'occupied') return 'Ocupado';
+  return 'Bloqueado';
+}
+
+function appointmentDateTime(startsAt: string) {
+  return new Date(startsAt).toLocaleString('es-EC', {
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'long',
+  });
 }
 
 function localDateValue(date: Date) {
@@ -90,6 +110,8 @@ export default function BookingDetailsScreen() {
   const [walkInName, setWalkInName] = useState('');
   const [walkInPhone, setWalkInPhone] = useState('');
   const [walkInEmail, setWalkInEmail] = useState('');
+  const [createdAppointment, setCreatedAppointment] =
+    useState<AppointmentRecord | null>(null);
 
   const organizationQuery = useQuery({
     enabled: Boolean(session),
@@ -166,17 +188,37 @@ export default function BookingDetailsScreen() {
     ],
   });
 
-  const filteredSlots = useMemo(
-    () =>
-      (availabilityQuery.data?.slots ?? []).filter((slot) =>
-        slotMatchesPeriod(slot.startsAt, timePeriod),
-      ),
-    [availabilityQuery.data?.slots, timePeriod],
+  const scheduleSlots = useMemo<ScheduleSlot[]>(() => {
+    const now = Date.now();
+    const availableSlots = (availabilityQuery.data?.slots ?? []).map(
+      (slot): ScheduleSlot => ({
+        ...slot,
+        state: Date.parse(slot.startsAt) <= now ? 'past' : 'available',
+      }),
+    );
+    const unavailableSlots = (
+      availabilityQuery.data?.unavailableSlots ?? []
+    ).map((slot): ScheduleSlot => ({
+      endsAt: slot.endsAt,
+      startsAt: slot.startsAt,
+      state: Date.parse(slot.startsAt) <= now ? 'past' : slot.reason,
+    }));
+    return [...availableSlots, ...unavailableSlots].sort(
+      (left, right) => Date.parse(left.startsAt) - Date.parse(right.startsAt),
+    );
+  }, [availabilityQuery.data?.slots, availabilityQuery.data?.unavailableSlots]);
+  const filteredSlots = scheduleSlots.filter((slot) =>
+    slotMatchesPeriod(slot.startsAt, timePeriod),
   );
   const visibleSlots = showAllSlots
     ? filteredSlots
-    : filteredSlots.slice(0, SLOT_PREVIEW_LIMIT);
-  const hasMoreSlots = filteredSlots.length > SLOT_PREVIEW_LIMIT;
+    : filteredSlots
+        .filter((slot) => slot.state !== 'past')
+        .slice(0, SLOT_PREVIEW_LIMIT);
+  const hasMoreSlots = filteredSlots.length > visibleSlots.length;
+  const hasAvailableSlots = filteredSlots.some(
+    (slot) => slot.state === 'available',
+  );
 
   const selectedProfessional = professionals.find(
     (professional) => professional.id === professionalId,
@@ -224,10 +266,13 @@ export default function BookingDetailsScreen() {
         'No pudimos crear la cita',
         error instanceof Error ? error.message : 'Inténtalo nuevamente.',
       ),
-    onSuccess: async () => {
+    onSuccess: async ({ appointment }) => {
+      setCreatedAppointment(appointment);
+      setStartsAt(null);
       await queryClient.invalidateQueries({
         queryKey: ['agenda-appointments'],
       });
+      await queryClient.invalidateQueries({ queryKey: ['availability'] });
       await queryClient.invalidateQueries({ queryKey: ['client', clientId] });
       Alert.alert(
         'Cita agendada',
@@ -468,28 +513,43 @@ export default function BookingDetailsScreen() {
               <Text style={styles.empty}>Consultando disponibilidad...</Text>
             ) : null}
             <View style={styles.slotGrid}>
-              {visibleSlots.map((slot) => (
-                <Pressable
-                  key={slot.startsAt}
-                  onPress={() => setStartsAt(slot.startsAt)}
-                  style={[
-                    styles.slot,
-                    startsAt === slot.startsAt && styles.slotSelected,
-                  ]}
-                >
-                  <Text
+              {visibleSlots.map((slot) => {
+                const unavailable = slot.state !== 'available';
+                const selected = !unavailable && startsAt === slot.startsAt;
+                return (
+                  <Pressable
+                    accessibilityState={{ disabled: unavailable, selected }}
+                    disabled={unavailable}
+                    key={slot.startsAt}
+                    onPress={() => setStartsAt(slot.startsAt)}
                     style={[
-                      styles.slotText,
-                      startsAt === slot.startsAt && styles.slotTextSelected,
+                      styles.slot,
+                      unavailable && styles.slotUnavailable,
+                      slot.state === 'past' && styles.slotPast,
+                      slot.state === 'occupied' && styles.slotOccupied,
+                      selected && styles.slotSelected,
                     ]}
                   >
-                    {new Date(slot.startsAt).toLocaleTimeString('es-EC', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </Text>
-                </Pressable>
-              ))}
+                    <Text
+                      style={[
+                        styles.slotText,
+                        unavailable && styles.slotTextUnavailable,
+                        selected && styles.slotTextSelected,
+                      ]}
+                    >
+                      {new Date(slot.startsAt).toLocaleTimeString('es-EC', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </Text>
+                    {unavailable ? (
+                      <Text style={styles.slotStatusLabel}>
+                        {slotStatusLabel(slot.state)}
+                      </Text>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
             </View>
             {hasMoreSlots ? (
               <Pressable
@@ -508,6 +568,13 @@ export default function BookingDetailsScreen() {
                   size={20}
                 />
               </Pressable>
+            ) : null}
+            {!availabilityQuery.isLoading &&
+            filteredSlots.length &&
+            !hasAvailableSlots ? (
+              <Text style={styles.empty}>
+                Los horarios mostrados ya no estan disponibles para reservar.
+              </Text>
             ) : null}
             {!availabilityQuery.isLoading && !filteredSlots.length ? (
               <Text style={styles.empty}>
@@ -598,6 +665,45 @@ export default function BookingDetailsScreen() {
           />
         ) : null}
       </View>
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setCreatedAppointment(null)}
+        transparent
+        visible={createdAppointment !== null}
+      >
+        <View style={styles.successOverlay}>
+          <View accessibilityRole="alert" style={styles.successCard}>
+            <View style={styles.successIcon}>
+              <Ionicons
+                color={appTheme.colors.white}
+                name="checkmark"
+                size={30}
+              />
+            </View>
+            <Text style={styles.successTitle}>Cita agendada</Text>
+            <Text style={styles.successCopy}>
+              Tu cita fue reservada correctamente.
+            </Text>
+            {createdAppointment ? (
+              <Text style={styles.successDate}>
+                {appointmentDateTime(createdAppointment.startsAt)}
+              </Text>
+            ) : null}
+            <Pressable
+              onPress={() => router.replace('/agenda')}
+              style={styles.successPrimaryButton}
+            >
+              <Text style={styles.successPrimaryLabel}>Ver agenda</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setCreatedAppointment(null)}
+              style={styles.successSecondaryButton}
+            >
+              <Text style={styles.successSecondaryLabel}>Crear otra cita</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -792,6 +898,74 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
   },
   screen: { backgroundColor: appTheme.colors.background, flex: 1 },
+  successCard: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.surface,
+    borderRadius: appTheme.radii.card,
+    padding: 24,
+    width: '86%',
+  },
+  successCopy: {
+    color: appTheme.colors.textMuted,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  successDate: {
+    color: appTheme.colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  successIcon: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.accent,
+    borderRadius: 28,
+    height: 56,
+    justifyContent: 'center',
+    width: 56,
+  },
+  successOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 18, 21, 0.48)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  successPrimaryButton: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.accent,
+    borderRadius: appTheme.radii.control,
+    marginTop: 24,
+    minHeight: 50,
+    justifyContent: 'center',
+    width: '100%',
+  },
+  successPrimaryLabel: {
+    color: appTheme.colors.white,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  successSecondaryButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    minHeight: 44,
+    width: '100%',
+  },
+  successSecondaryLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  successTitle: {
+    color: appTheme.colors.text,
+    fontSize: 23,
+    fontWeight: '900',
+    marginTop: 16,
+  },
   sectionTitle: {
     color: appTheme.colors.text,
     fontSize: 15,
@@ -834,6 +1008,21 @@ const styles = StyleSheet.create({
   slotSelected: {
     backgroundColor: appTheme.colors.accent,
     borderColor: appTheme.colors.accent,
+  },
+  slotOccupied: {
+    backgroundColor: '#FDE9E6',
+    borderColor: '#E8B6AF',
+  },
+  slotPast: { opacity: 0.48 },
+  slotStatusLabel: {
+    color: appTheme.colors.textMuted,
+    fontSize: 10,
+    fontWeight: '800',
+    marginTop: 3,
+  },
+  slotTextUnavailable: { color: appTheme.colors.textMuted },
+  slotUnavailable: {
+    backgroundColor: appTheme.colors.surfaceMuted,
   },
   slotText: { color: appTheme.colors.text, fontSize: 13, fontWeight: '800' },
   slotTextSelected: { color: appTheme.colors.white },

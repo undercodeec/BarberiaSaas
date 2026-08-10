@@ -722,6 +722,11 @@ export interface AvailabilityResponse {
     readonly endsAt: string;
     readonly startsAt: string;
   }>;
+  readonly unavailableSlots: ReadonlyArray<{
+    readonly endsAt: string;
+    readonly reason: 'blocked' | 'occupied';
+    readonly startsAt: string;
+  }>;
 }
 
 export interface AppointmentEventsResponse {

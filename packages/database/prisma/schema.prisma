@@ -241,7 +241,7 @@ model PendingRegistration {
   lockedUntil     DateTime?                @map("locked_until") @db.Timestamptz(3)
   accountType     RegistrationAccountType? @map("account_type")
   businessName    String?                  @map("business_name") @db.VarChar(120)
-  businessNameKey String?                  @unique @map("business_name_key") @db.VarChar(120)
+  businessNameKey String?                  @map("business_name_key") @db.VarChar(120)
   phone           String?                  @db.VarChar(24)
   phoneKey        String?                  @unique @map("phone_key") @db.VarChar(24)
   countryCode     String?                  @map("country_code") @db.Char(2)
@@ -260,7 +260,7 @@ model UserRegistrationProfile {
   userId                String                  @id @map("user_id") @db.Uuid
   accountType           RegistrationAccountType @map("account_type")
   businessName          String                  @map("business_name") @db.VarChar(120)
-  businessNameKey       String                  @unique @map("business_name_key") @db.VarChar(120)
+  businessNameKey       String                  @map("business_name_key") @db.VarChar(120)
   countryCode           String                  @map("country_code") @db.Char(2)
   city                  String                  @db.VarChar(120)
   addressLine           String?                 @map("address_line") @db.VarChar(240)
