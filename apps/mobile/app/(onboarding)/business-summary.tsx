@@ -177,25 +177,25 @@ export default function BusinessSummaryScreen() {
               />
               <View style={styles.metricGrid}>
                 <MetricTile
-                  color="#e7f7ee"
+                  color={appTheme.colors.accentWash}
                   icon="arrow-up-outline"
                   label="Ventas cobradas"
                   value={money(report.income.salesCents, currency)}
                 />
                 <MetricTile
-                  color="#e7f7ee"
+                  color={appTheme.colors.accentWash}
                   icon="add-circle-outline"
                   label="Otros ingresos"
                   value={money(report.income.otherIncomeCents, currency)}
                 />
                 <MetricTile
-                  color="#fdecec"
+                  color={appTheme.colors.dangerSurface}
                   icon="arrow-down-outline"
                   label="Gastos operativos"
                   value={money(report.expenses.operatingCents, currency)}
                 />
                 <MetricTile
-                  color="#eef4ff"
+                  color={appTheme.colors.surfaceMuted}
                   icon="people-outline"
                   label="Pago a colaboradores"
                   value={money(
@@ -204,7 +204,7 @@ export default function BusinessSummaryScreen() {
                   )}
                 />
                 <MetricTile
-                  color="#f6f1ff"
+                  color={appTheme.colors.accentSubtle}
                   icon="swap-horizontal-outline"
                   label="Retiros de caja"
                   value={money(report.withdrawalsCents, currency)}
@@ -222,7 +222,7 @@ export default function BusinessSummaryScreen() {
               title="Tipo de ventas"
             >
               <ProgressMetric
-                color="#4979eb"
+                color={appTheme.colors.accent}
                 label="Servicios"
                 percent={percentage(
                   report.sales.servicesCents,
@@ -231,7 +231,7 @@ export default function BusinessSummaryScreen() {
                 value={money(report.sales.servicesCents, currency)}
               />
               <ProgressMetric
-                color="#61cadc"
+                color={appTheme.colors.accentLight}
                 label="Productos"
                 percent={percentage(
                   report.sales.productsCents,
@@ -240,7 +240,7 @@ export default function BusinessSummaryScreen() {
                 value={money(report.sales.productsCents, currency)}
               />
               <ProgressMetric
-                color="#9aa7b7"
+                color={appTheme.colors.textMuted}
                 label="Venta libre"
                 percent={percentage(
                   report.sales.uncategorizedCents,
@@ -358,9 +358,6 @@ function ReportCard({
           <Text style={styles.cardTitle}>{title}</Text>
           <Text style={styles.cardSubtitle}>{subtitle}</Text>
         </View>
-        <View style={styles.sparkBadge}>
-          <Ionicons color={appTheme.colors.white} name="sparkles" size={20} />
-        </View>
       </View>
       {children}
     </View>
@@ -380,13 +377,13 @@ function ComparisonBars({
   return (
     <View style={styles.comparisonArea}>
       <ChartColumn
-        color="#cbf3dc"
+        color={appTheme.colors.accentLight}
         height={(income / maximum) * 126}
         label="Ingresos"
         value={money(income, currency)}
       />
       <ChartColumn
-        color="#fde0e0"
+        color={appTheme.colors.dangerBorder}
         height={(expenses / maximum) * 126}
         label="Egresos"
         value={money(expenses, currency)}
@@ -437,7 +434,7 @@ function MetricTile({
     <View style={[styles.metricTile, { backgroundColor: color }]}>
       <View style={styles.metricHeading}>
         <Text style={styles.metricLabel}>{label}</Text>
-        <Ionicons color="#526170" name={icon} size={20} />
+        <Ionicons color={appTheme.colors.accentDark} name={icon} size={20} />
       </View>
       <Text style={styles.metricValue}>{value}</Text>
     </View>
@@ -494,13 +491,13 @@ function CommissionBars({
   return (
     <View style={styles.commissionArea}>
       <ChartColumn
-        color="#dff4f7"
+        color={appTheme.colors.accentLight}
         height={(products / maximum) * 110}
         label="Productos"
         value={money(products, currency)}
       />
       <ChartColumn
-        color="#e5eafe"
+        color={appTheme.colors.accent}
         height={(services / maximum) * 110}
         label="Servicios"
         value={money(services, currency)}
@@ -528,7 +525,7 @@ function FilterOption({
         {label}
       </Text>
       <Ionicons
-        color={active ? '#ffffff' : '#8a929d'}
+        color={active ? appTheme.colors.white : appTheme.colors.textMuted}
         name={active ? 'checkmark-circle' : 'ellipse-outline'}
         size={20}
       />
@@ -539,22 +536,23 @@ function FilterOption({
 const styles = StyleSheet.create({
   applyButton: {
     alignItems: 'center',
-    backgroundColor: appTheme.colors.surface,
-    borderRadius: 16,
+    backgroundColor: appTheme.colors.accent,
+    borderRadius: appTheme.radii.control,
     marginTop: 22,
     paddingVertical: 15,
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
   applyLabel: {
-    color: appTheme.colors.accentDark,
+    color: appTheme.colors.white,
     fontSize: 15,
     fontWeight: '900',
   },
   card: {
     backgroundColor: appTheme.colors.surface,
-    borderRadius: 24,
-    borderWidth: 0,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.card,
+    borderWidth: 1,
     padding: 18,
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
@@ -566,18 +564,18 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   cardSubtitle: {
-    color: '#7a818b',
+    color: appTheme.colors.textMuted,
     fontSize: 14,
     lineHeight: 20,
     marginTop: 4,
   },
-  cardTitle: { color: '#101c2d', fontSize: 21, fontWeight: '900' },
+  cardTitle: { color: appTheme.colors.text, fontSize: 21, fontWeight: '900' },
   chartColumn: { borderRadius: 12, width: 64 },
   chartColumnWrap: { alignItems: 'center', flex: 1 },
-  chartLabel: { color: '#7a818b', fontSize: 13, marginTop: 3 },
+  chartLabel: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 3 },
   chartTrack: { height: 132, justifyContent: 'flex-end' },
   chartValue: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 14,
     fontWeight: '900',
     marginTop: 8,
@@ -592,20 +590,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 24,
     marginBottom: 20,
-    paddingHorizontal: 18,
+    paddingHorizontal: appTheme.spacing.page,
   },
   content: {
     alignSelf: 'center',
     gap: 18,
     maxWidth: 720,
     paddingBottom: 44,
-    paddingHorizontal: 18,
+    paddingHorizontal: appTheme.spacing.page,
     width: '100%',
   },
   errorArea: { gap: 10 },
-  filterActive: { color: '#ffffff' },
+  filterActive: { color: appTheme.colors.white },
   filterLabel: {
-    color: '#6f7782',
+    color: appTheme.colors.textMuted,
     fontSize: 12,
     fontWeight: '900',
     marginBottom: 8,
@@ -614,16 +612,23 @@ const styles = StyleSheet.create({
   },
   filterOption: {
     alignItems: 'center',
-    borderColor: '#e2e5e9',
-    borderRadius: 14,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
     borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
     paddingVertical: 13,
   },
-  filterOptionActive: { backgroundColor: '#101c2d', borderColor: '#101c2d' },
-  filterOptionLabel: { color: '#263344', fontSize: 14, fontWeight: '800' },
+  filterOptionActive: {
+    backgroundColor: appTheme.colors.accent,
+    borderColor: appTheme.colors.accent,
+  },
+  filterOptionLabel: {
+    color: appTheme.colors.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
   filterSheet: {
     backgroundColor: appTheme.colors.surfaceElevated,
     borderTopLeftRadius: 40,
@@ -634,10 +639,19 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     width: '100%',
   },
-  footnote: { color: '#7a818b', fontSize: 12, lineHeight: 18, marginTop: 14 },
-  footerDivider: { backgroundColor: '#e0e4e8', height: 38, width: 1 },
-  footerLabel: { color: '#7a818b', fontSize: 12, marginTop: 2 },
-  footerValue: { color: '#101c2d', fontSize: 17, fontWeight: '900' },
+  footnote: {
+    color: appTheme.colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 14,
+  },
+  footerDivider: {
+    backgroundColor: appTheme.colors.border,
+    height: 38,
+    width: 1,
+  },
+  footerLabel: { color: appTheme.colors.textMuted, fontSize: 12, marginTop: 2 },
+  footerValue: { color: appTheme.colors.text, fontSize: 17, fontWeight: '900' },
   header: {
     alignItems: 'center',
     alignSelf: 'center',
@@ -650,12 +664,19 @@ const styles = StyleSheet.create({
   },
   headerButton: {
     alignItems: 'center',
-    borderRadius: 22,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
+    borderWidth: 1,
     height: 44,
     justifyContent: 'center',
     width: 44,
   },
-  headerCaption: { color: '#7a818b', fontSize: 12, marginTop: 2 },
+  headerCaption: {
+    color: appTheme.colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
+  },
   headerCopy: { flex: 1 },
   legendDot: { borderRadius: 5, height: 10, width: 10 },
   loadingCard: { alignItems: 'center', gap: 12, paddingVertical: 80 },
@@ -665,25 +686,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  metricLabel: { color: '#667080', flex: 1, fontSize: 12, lineHeight: 16 },
+  metricLabel: {
+    color: appTheme.colors.textMuted,
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+  },
   metricTile: { borderRadius: 17, minHeight: 94, padding: 14, width: '48%' },
   metricValue: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 17,
     fontWeight: '900',
     marginTop: 8,
   },
   modalBackdrop: {
-    backgroundColor: 'rgba(8, 15, 25, 0.46)',
+    backgroundColor: appTheme.colors.overlay,
     flex: 1,
     justifyContent: 'flex-end',
   },
-  muted: { color: '#7a818b', fontSize: 14 },
-  negativeValue: { color: '#c74646' },
+  muted: { color: appTheme.colors.textMuted, fontSize: 14 },
+  negativeValue: { color: appTheme.colors.danger },
   noteBadge: {
-    backgroundColor: '#eef0f3',
+    backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 99,
-    color: '#69717c',
+    color: appTheme.colors.textMuted,
     fontSize: 10,
     fontWeight: '800',
     paddingHorizontal: 7,
@@ -698,20 +724,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  progressLabel: { color: '#303b49', fontSize: 13, fontWeight: '800' },
+  progressLabel: {
+    color: appTheme.colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
   progressLabelRow: { alignItems: 'center', flexDirection: 'row', gap: 7 },
-  progressTrack: { backgroundColor: '#edf0f3', borderRadius: 99, height: 8 },
-  progressValue: { color: '#5e6875', fontSize: 12, fontWeight: '800' },
+  progressTrack: {
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderRadius: 99,
+    height: 8,
+  },
+  progressValue: {
+    color: appTheme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
   resultCaption: {
-    color: '#7a818b',
+    color: appTheme.colors.textMuted,
     fontSize: 13,
     lineHeight: 19,
     marginTop: 5,
   },
   resultHeader: { paddingBottom: 4, paddingHorizontal: 3, paddingTop: 10 },
-  resultLabel: { color: '#7a818b', fontSize: 18 },
+  resultLabel: { color: appTheme.colors.textMuted, fontSize: 18 },
   resultValue: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 38,
     fontWeight: '900',
     marginTop: 1,
@@ -719,43 +757,40 @@ const styles = StyleSheet.create({
   retryButton: {
     alignItems: 'center',
     alignSelf: 'flex-start',
-    borderColor: '#101c2d',
-    borderRadius: 14,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.accent,
+    borderRadius: appTheme.radii.control,
     borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  retryLabel: { color: '#101c2d', fontSize: 13, fontWeight: '900' },
+  retryLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 13,
+    fontWeight: '900',
+  },
   salesFooter: {
     alignItems: 'center',
-    backgroundColor: '#f7f8fa',
-    borderRadius: 16,
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderRadius: appTheme.radii.control,
     flexDirection: 'row',
     gap: 28,
     marginTop: 8,
     padding: 14,
   },
-  screen: { backgroundColor: '#ffffff', flex: 1 },
+  screen: { backgroundColor: appTheme.colors.background, flex: 1 },
   sheetHandle: {
     alignSelf: 'center',
-    backgroundColor: '#d8dce1',
+    backgroundColor: appTheme.colors.border,
     borderRadius: 99,
     height: 5,
     width: 44,
   },
   sheetTitle: {
-    color: '#101c2d',
+    color: appTheme.colors.text,
     fontSize: 23,
     fontWeight: '900',
     marginTop: 15,
   },
-  sparkBadge: {
-    alignItems: 'center',
-    backgroundColor: '#101c2d',
-    borderRadius: 22,
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
-  },
-  title: { color: '#101c2d', fontSize: 21, fontWeight: '900' },
+  title: { color: appTheme.colors.text, fontSize: 21, fontWeight: '900' },
 });
