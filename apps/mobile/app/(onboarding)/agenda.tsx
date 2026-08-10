@@ -14,6 +14,7 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   Animated,
   Alert,
+  Dimensions,
   Easing,
   Linking,
   Modal,
@@ -126,6 +127,7 @@ function localDateValue(date: Date): string {
 }
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
+const PAGE_SLIDE_DISTANCE = Dimensions.get('window').width;
 
 function timelineMinutes(
   schedules: ReadonlyArray<{
@@ -282,25 +284,40 @@ export default function AgendaScreen() {
       setIsDayTransitioning(true);
       const direction = offset > 0 ? 1 : -1;
       const nextDay = addDays(selectedDay, offset);
-      schedulePageSlide.setValue(direction * 42);
-      dayContentOpacity.setValue(0.68);
-      setSelectedDay(nextDay);
-      setCalendarMonth(nextDay);
       Animated.parallel([
         Animated.timing(schedulePageSlide, {
-          duration: 260,
-          easing: Easing.out(Easing.cubic),
-          toValue: 0,
+          duration: 170,
+          easing: Easing.in(Easing.cubic),
+          toValue: -direction * PAGE_SLIDE_DISTANCE,
           useNativeDriver: true,
         }),
         Animated.timing(dayContentOpacity, {
-          duration: 180,
-          easing: Easing.out(Easing.cubic),
-          toValue: 1,
+          duration: 150,
+          easing: Easing.in(Easing.cubic),
+          toValue: 0.22,
           useNativeDriver: true,
         }),
       ]).start(() => {
-        setIsDayTransitioning(false);
+        setSelectedDay(nextDay);
+        setCalendarMonth(nextDay);
+        schedulePageSlide.setValue(direction * PAGE_SLIDE_DISTANCE);
+        dayContentOpacity.setValue(0.22);
+        Animated.parallel([
+          Animated.timing(schedulePageSlide, {
+            duration: 300,
+            easing: Easing.out(Easing.cubic),
+            toValue: 0,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dayContentOpacity, {
+            duration: 240,
+            easing: Easing.out(Easing.cubic),
+            toValue: 1,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          setIsDayTransitioning(false);
+        });
       });
     },
     [dayContentOpacity, isDayTransitioning, schedulePageSlide, selectedDay],
@@ -322,6 +339,9 @@ export default function AgendaScreen() {
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gesture) =>
+          Math.abs(gesture.dx) > 12 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy),
+        onMoveShouldSetPanResponderCapture: (_, gesture) =>
           Math.abs(gesture.dx) > 12 &&
           Math.abs(gesture.dx) > Math.abs(gesture.dy),
         onPanResponderMove: (_, gesture) => {
@@ -472,7 +492,11 @@ export default function AgendaScreen() {
             onPress={() => router.push('/waitlist')}
             style={styles.filterButton}
           >
-            <Ionicons color="#111318" name="list-outline" size={23} />
+            <Ionicons
+              color={appTheme.colors.accentDark}
+              name="list-outline"
+              size={23}
+            />
           </Pressable>
           <Pressable
             accessibilityLabel="Ajustes agenda"
@@ -483,7 +507,11 @@ export default function AgendaScreen() {
             }}
             style={styles.filterButton}
           >
-            <Ionicons color="#111318" name="settings-outline" size={22} />
+            <Ionicons
+              color={appTheme.colors.accentDark}
+              name="settings-outline"
+              size={22}
+            />
           </Pressable>
         </View>
       </View>
@@ -495,7 +523,11 @@ export default function AgendaScreen() {
           onPress={() => moveSelectedDay(-1)}
           style={styles.viewControl}
         >
-          <Ionicons color="#111318" name="chevron-back" size={18} />
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="chevron-back"
+            size={18}
+          />
         </Pressable>
         <Pressable
           accessibilityLabel="Abrir calendario"
@@ -503,7 +535,11 @@ export default function AgendaScreen() {
           onPress={() => setIsCalendarOpen(true)}
           style={styles.weekPill}
         >
-          <Ionicons color="#111318" name="calendar-outline" size={17} />
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="calendar-outline"
+            size={17}
+          />
         </Pressable>
         <Pressable
           accessibilityLabel="Dia siguiente"
@@ -511,7 +547,11 @@ export default function AgendaScreen() {
           onPress={() => moveSelectedDay(1)}
           style={styles.viewControl}
         >
-          <Ionicons color="#111318" name="chevron-forward" size={18} />
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="chevron-forward"
+            size={18}
+          />
         </Pressable>
       </View>
 
@@ -572,7 +612,11 @@ export default function AgendaScreen() {
         </View>
         <View style={styles.availability}>
           <View style={styles.availabilityRing}>
-            <Ionicons color="#111318" name="checkmark" size={22} />
+            <Ionicons
+              color={appTheme.colors.accentDark}
+              name="checkmark"
+              size={22}
+            />
           </View>
           <View>
             <Text style={styles.availabilityLabel}>Agenda disponible</Text>
@@ -590,8 +634,9 @@ export default function AgendaScreen() {
       <View style={styles.timelineWrapper}>
         <AnimatedScrollView
           {...timelinePanResponder.panHandlers}
-          contentContainerStyle={[
-            styles.timelineContent,
+          contentContainerStyle={styles.timelineContent}
+          style={[
+            styles.timelinePage,
             {
               opacity: dayContentOpacity,
               transform: [{ translateX: schedulePageSlide }],
@@ -657,7 +702,7 @@ export default function AgendaScreen() {
                             ) : null}
                           </View>
                           <Ionicons
-                            color="#687282"
+                            color={appTheme.colors.accentDark}
                             name="ellipsis-vertical"
                             size={18}
                           />
@@ -700,7 +745,11 @@ export default function AgendaScreen() {
                 }
                 style={styles.monthControl}
               >
-                <Ionicons color="#111318" name="chevron-back" size={22} />
+                <Ionicons
+                  color={appTheme.colors.accentDark}
+                  name="chevron-back"
+                  size={22}
+                />
               </Pressable>
               <Text style={styles.calendarMonthLabel}>
                 {calendarMonth.toLocaleDateString('es-EC', {
@@ -724,7 +773,11 @@ export default function AgendaScreen() {
                 }
                 style={styles.monthControl}
               >
-                <Ionicons color="#111318" name="chevron-forward" size={22} />
+                <Ionicons
+                  color={appTheme.colors.accentDark}
+                  name="chevron-forward"
+                  size={22}
+                />
               </Pressable>
             </View>
             <View style={styles.monthWeekdays}>
@@ -827,7 +880,7 @@ export default function AgendaScreen() {
                   style={styles.checkboxRow}
                 >
                   <Ionicons
-                    color="#111318"
+                    color={appTheme.colors.accentDark}
                     name={selected ? 'checkbox' : 'square-outline'}
                     size={23}
                   />
@@ -856,7 +909,11 @@ export default function AgendaScreen() {
                       ]}
                     >
                       <Ionicons
-                        color={selected ? '#FFFFFF' : '#111318'}
+                        color={
+                          selected
+                            ? appTheme.colors.white
+                            : appTheme.colors.accentDark
+                        }
                         name={
                           value === 'day'
                             ? 'today-outline'
@@ -926,7 +983,11 @@ export default function AgendaScreen() {
                       ]}
                     >
                       <Ionicons
-                        color={selected ? '#FFFFFF' : '#111318'}
+                        color={
+                          selected
+                            ? appTheme.colors.white
+                            : appTheme.colors.accentDark
+                        }
                         name={icon}
                         size={23}
                       />
@@ -956,7 +1017,11 @@ export default function AgendaScreen() {
                   ]}
                 >
                   <Ionicons
-                    color={!selectedMemberId ? '#FFFFFF' : '#111318'}
+                    color={
+                      !selectedMemberId
+                        ? appTheme.colors.white
+                        : appTheme.colors.accentDark
+                    }
                     name="people-outline"
                     size={23}
                   />
@@ -981,7 +1046,11 @@ export default function AgendaScreen() {
                       ]}
                     >
                       <Ionicons
-                        color={selected ? '#FFFFFF' : '#111318'}
+                        color={
+                          selected
+                            ? appTheme.colors.white
+                            : appTheme.colors.accentDark
+                        }
                         name="person-outline"
                         size={23}
                       />
@@ -1133,18 +1202,29 @@ export default function AgendaScreen() {
 
 const styles = StyleSheet.create({
   appointmentCard: {
-    backgroundColor: '#EEF0F2',
-    borderLeftColor: '#111318',
+    backgroundColor: appTheme.colors.surface,
+    borderLeftColor: appTheme.colors.accent,
     borderLeftWidth: 4,
-    borderRadius: 12,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
+    borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
     marginBottom: 10,
-    padding: 12,
+    padding: 14,
+    ...goldShadow,
   },
-  appointmentClient: { color: '#111318', fontSize: 15, fontWeight: '900' },
+  appointmentClient: {
+    color: appTheme.colors.accentDark,
+    fontSize: 15,
+    fontWeight: '900',
+  },
   appointmentCopy: { flex: 1 },
-  appointmentMeta: { color: '#666666', fontSize: 12, marginTop: 3 },
+  appointmentMeta: {
+    color: appTheme.colors.textMuted,
+    fontSize: 12,
+    marginTop: 3,
+  },
   appointmentModal: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 28,
@@ -1156,12 +1236,16 @@ const styles = StyleSheet.create({
     right: 0,
   },
   appointmentModalBackdrop: {
-    backgroundColor: 'rgba(17, 19, 24, 0.42)',
+    backgroundColor: appTheme.colors.overlay,
     flex: 1,
   },
-  appointmentModalCopy: { color: '#666666', fontSize: 15, marginTop: 6 },
+  appointmentModalCopy: {
+    color: appTheme.colors.textMuted,
+    fontSize: 15,
+    marginTop: 6,
+  },
   appointmentModalTitle: {
-    color: '#111318',
+    color: appTheme.colors.accentDark,
     fontSize: 23,
     fontWeight: '900',
     marginTop: 14,
@@ -1179,7 +1263,11 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   modalCloseAction: { alignItems: 'center', paddingVertical: 16 },
-  modalCloseText: { color: '#4F5965', fontSize: 15, fontWeight: '800' },
+  modalCloseText: {
+    color: appTheme.colors.accentDark,
+    fontSize: 15,
+    fontWeight: '800',
+  },
   modalDangerAction: {
     alignItems: 'center',
     borderColor: '#F4C7C3',
@@ -1194,7 +1282,7 @@ const styles = StyleSheet.create({
   modalDangerText: { color: '#B42318', fontSize: 15, fontWeight: '900' },
   modalHandle: {
     alignSelf: 'center',
-    backgroundColor: '#C7CBD0',
+    backgroundColor: appTheme.colors.accentLight,
     borderRadius: 3,
     height: 5,
     width: 46,
@@ -1223,8 +1311,17 @@ const styles = StyleSheet.create({
     minHeight: 54,
   },
   modalWhatsAppText: { color: '#176B3A', fontSize: 15, fontWeight: '900' },
-  appointmentTime: { color: '#111318', fontSize: 13, fontWeight: '900' },
-  checkboxLabel: { color: '#111318', flex: 1, fontSize: 15, fontWeight: '700' },
+  appointmentTime: {
+    color: appTheme.colors.accentDark,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  checkboxLabel: {
+    color: appTheme.colors.accentDark,
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+  },
   checkboxRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -1233,8 +1330,8 @@ const styles = StyleSheet.create({
   },
   optionTile: {
     alignItems: 'center',
-    backgroundColor: '#F2F3F4',
-    borderColor: '#DDE0E3',
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderColor: appTheme.colors.border,
     borderRadius: 13,
     borderWidth: 1,
     justifyContent: 'center',
@@ -1243,7 +1340,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     width: 104,
   },
-  optionTileLabel: { color: '#111318', fontSize: 14, fontWeight: '800' },
+  optionTileLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 14,
+    fontWeight: '800',
+  },
   optionTileLabelSelected: { color: '#FFFFFF' },
   optionTileSelected: {
     backgroundColor: appTheme.colors.accent,
@@ -1260,18 +1361,18 @@ const styles = StyleSheet.create({
   settingsDragArea: { paddingBottom: 8 },
   settingsHandle: {
     alignSelf: 'center',
-    backgroundColor: '#C7CBD0',
+    backgroundColor: appTheme.colors.accentLight,
     borderRadius: 3,
     height: 5,
     width: 46,
   },
   settingsOverlay: {
-    backgroundColor: 'rgba(17, 19, 24, 0.42)',
+    backgroundColor: appTheme.colors.overlay,
     flex: 1,
     justifyContent: 'flex-end',
   },
   settingsSection: {
-    color: '#111318',
+    color: appTheme.colors.accentDark,
     fontSize: 16,
     fontWeight: '900',
     marginTop: 27,
@@ -1285,17 +1386,25 @@ const styles = StyleSheet.create({
     paddingTop: 15,
   },
   settingsTitle: {
-    color: '#111318',
+    color: appTheme.colors.accentDark,
     fontSize: 22,
     fontWeight: '900',
     marginTop: 17,
   },
   availability: { alignItems: 'center', flexDirection: 'row', gap: 10 },
-  availabilityCopy: { color: '#666666', fontSize: 12, marginTop: 2 },
-  availabilityLabel: { color: '#111318', fontSize: 13, fontWeight: '800' },
+  availabilityCopy: {
+    color: appTheme.colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  availabilityLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 13,
+    fontWeight: '800',
+  },
   availabilityRing: {
     alignItems: 'center',
-    borderColor: '#111318',
+    borderColor: appTheme.colors.accent,
     borderRadius: 26,
     borderWidth: 4,
     height: 52,
@@ -1303,7 +1412,7 @@ const styles = StyleSheet.create({
     width: 52,
   },
   date: {
-    color: '#5f5f5f',
+    color: appTheme.colors.textMuted,
     fontSize: 14,
     fontWeight: '600',
     marginTop: 3,
@@ -1318,16 +1427,24 @@ const styles = StyleSheet.create({
     minHeight: 65,
   },
   dayButtonSelected: {
-    backgroundColor: '#ffffff',
-    shadowColor: '#111318',
+    backgroundColor: appTheme.colors.surface,
+    shadowColor: appTheme.colors.accentDark,
     shadowOffset: { height: 5, width: 0 },
     shadowOpacity: 0.13,
     shadowRadius: 10,
   },
-  dayName: { color: '#767676', fontSize: 10, fontWeight: '800' },
-  dayNameSelected: { color: '#111318' },
-  dayNumber: { color: '#111318', fontSize: 17, fontWeight: '900' },
-  dayNumberSelected: { color: '#111318' },
+  dayName: {
+    color: appTheme.colors.textMuted,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  dayNameSelected: { color: appTheme.colors.accentDark },
+  dayNumber: {
+    color: appTheme.colors.accentDark,
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  dayNumberSelected: { color: appTheme.colors.accentDark },
   dayNumberToday: {
     textDecorationLine: 'underline',
     textDecorationStyle: 'solid',
@@ -1341,8 +1458,8 @@ const styles = StyleSheet.create({
   },
   filterButton: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderColor: '#dedede',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
     borderRadius: 18,
     borderWidth: 1,
     height: 48,
@@ -1384,7 +1501,7 @@ const styles = StyleSheet.create({
   hourContent: { flex: 1, minHeight: 89, paddingLeft: 10 },
   hourDivider: {
     borderStyle: 'dashed',
-    borderTopColor: '#dddddd',
+    borderTopColor: appTheme.colors.border,
     borderTopWidth: 1,
     height: 1,
     marginBottom: 9,
@@ -1404,11 +1521,24 @@ const styles = StyleSheet.create({
     padding: 16,
     ...goldShadow,
   },
-  summaryLabel: { color: '#737373', fontSize: 13, marginTop: 2 },
-  summaryValue: { color: '#111318', fontSize: 21, fontWeight: '900' },
+  summaryLabel: {
+    color: appTheme.colors.textMuted,
+    fontSize: 13,
+    marginTop: 2,
+  },
+  summaryValue: {
+    color: appTheme.colors.accentDark,
+    fontSize: 21,
+    fontWeight: '900',
+  },
   timeline: { marginTop: 13, position: 'relative' },
-  timelineWrapper: { flex: 1 },
+  timelinePage: { flex: 1 },
+  timelineWrapper: { flex: 1, overflow: 'hidden' },
   timelineContent: {
+    backgroundColor: appTheme.colors.surface,
+    borderTopColor: appTheme.colors.border,
+    borderTopWidth: 1,
+    marginTop: 12,
     paddingBottom: 132,
     paddingHorizontal: 20,
     paddingTop: 22,
@@ -1418,7 +1548,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  timelineTitle: { color: '#111318', fontSize: 18, fontWeight: '900' },
+  timelineTitle: {
+    color: appTheme.colors.accentDark,
+    fontSize: 18,
+    fontWeight: '900',
+  },
   title: {
     color: appTheme.colors.text,
     fontSize: 33,
@@ -1427,8 +1561,8 @@ const styles = StyleSheet.create({
   },
   viewControl: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderColor: '#e1e1e1',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
     borderRadius: 13,
     borderWidth: 1,
     height: 36,
@@ -1445,7 +1579,7 @@ const styles = StyleSheet.create({
   },
   weekPill: {
     alignItems: 'center',
-    backgroundColor: '#ececea',
+    backgroundColor: appTheme.colors.accentWash,
     borderRadius: 13,
     flexDirection: 'row',
     height: 36,
@@ -1461,7 +1595,7 @@ const styles = StyleSheet.create({
   },
   calendarCloseLabel: { color: '#ffffff', fontSize: 14, fontWeight: '900' },
   calendarModal: {
-    backgroundColor: '#ffffff',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 26,
     marginHorizontal: 20,
     padding: 20,
@@ -1473,7 +1607,7 @@ const styles = StyleSheet.create({
   },
   calendarModalBackdrop: {
     alignItems: 'center',
-    backgroundColor: 'rgba(17, 19, 24, 0.42)',
+    backgroundColor: appTheme.colors.overlay,
     flex: 1,
     justifyContent: 'center',
   },
@@ -1483,16 +1617,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   calendarMonthLabel: {
-    color: '#111318',
+    color: appTheme.colors.accentDark,
     fontSize: 18,
     fontWeight: '900',
     textTransform: 'capitalize',
   },
   calendarSection: { marginHorizontal: 20, marginTop: 20 },
-  emptySchedule: { color: '#767676', fontSize: 14, paddingVertical: 22 },
+  emptySchedule: {
+    color: appTheme.colors.textMuted,
+    fontSize: 14,
+    paddingVertical: 22,
+  },
   monthControl: {
     alignItems: 'center',
-    backgroundColor: '#f1f1ef',
+    backgroundColor: appTheme.colors.accentWash,
     borderRadius: 14,
     height: 38,
     justifyContent: 'center',
@@ -1504,16 +1642,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '14.2857%',
   },
-  monthDateLabel: { color: '#111318', fontSize: 14, fontWeight: '700' },
+  monthDateLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 14,
+    fontWeight: '700',
+  },
   monthDateLabelSelected: { color: '#ffffff' },
   monthDateSelected: {
     backgroundColor: appTheme.colors.accent,
     borderRadius: 14,
   },
-  monthDateToday: { color: '#2464e8', textDecorationLine: 'underline' },
+  monthDateToday: {
+    color: appTheme.colors.accentDark,
+    textDecorationLine: 'underline',
+  },
   monthGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 },
   monthWeekday: {
-    color: '#737373',
+    color: appTheme.colors.textMuted,
     fontSize: 12,
     fontWeight: '800',
     textAlign: 'center',
@@ -1521,7 +1666,7 @@ const styles = StyleSheet.create({
   },
   monthWeekdays: { flexDirection: 'row', marginTop: 22 },
   weekSelector: {
-    backgroundColor: '#ececea',
+    backgroundColor: appTheme.colors.accentWash,
     borderRadius: 23,
     flexDirection: 'row',
     padding: 6,

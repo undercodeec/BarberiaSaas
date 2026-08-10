@@ -22,6 +22,7 @@ import {
   Animated,
   Easing,
   Image,
+  Linking,
   Modal,
   PanResponder,
   Platform,
@@ -56,6 +57,10 @@ import { BusinessLocationSheet } from '../../src/components/BusinessLocationShee
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const SUBSCRIPTION_NOTICE_TRIAL_DAYS = 3;
+const SUBSCRIPTION_NOTICE_ACTIVE_DAYS = 7;
+// Reemplazar por la URL comercial definitiva cuando este disponible.
+const SUBSCRIPTION_UPGRADE_URL = 'https://navacloud.app/planes';
 const DASHBOARD_BANNER_DELAY_MS = 10_000;
 const WELCOME_SURVEY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 const WELCOME_SURVEY_RESPONSE_KEY = 'barber-saas.welcome-survey-response';
@@ -237,6 +242,8 @@ type DashboardProgressProps = {
 
 type SubscriptionProgress = {
   readonly caption: string;
+  readonly daysRemaining: number | null;
+  readonly phase: 'active' | 'expired' | 'grace' | 'trial' | 'unknown';
   readonly expiryLabel: string;
   readonly percentage: number;
   readonly title: string;
@@ -264,10 +271,12 @@ function subscriptionProgress(
   if (!subscription) {
     return {
       caption: 'de tiempo transcurrido',
+      daysRemaining: null,
       expiryLabel: hasError
         ? 'No pudimos consultar la vigencia'
         : 'Consultando la vigencia de tu plan',
       percentage: 100,
+      phase: 'unknown',
       title: 'Tu suscripción',
     };
   }
@@ -320,10 +329,12 @@ function subscriptionProgress(
   ) {
     return {
       caption: 'de tiempo transcurrido',
+      daysRemaining: null,
       expiryLabel: endsAt
         ? `Venció el ${expiryDateLabel(endsAt)}`
         : 'La suscripción no está activa',
       percentage: 100,
+      phase,
       title: 'Suscripción vencida',
     };
   }
@@ -350,9 +361,11 @@ function subscriptionProgress(
       daysRemaining === 0
         ? `Venció el ${expiryDateLabel(endsAt)}`
         : phase === 'trial'
-          ? `Te quedan ${daysRemaining} ${daysRemaining === 1 ? 'día' : 'días'} de prueba`
+          ? `Dia ${currentDay} de ${totalDays} restantes`
           : `Día ${currentDay} de ${totalDays}`,
+    daysRemaining,
     percentage,
+    phase,
     title:
       phase === 'trial'
         ? `Prueba gratuita · ${planName}`
@@ -362,6 +375,38 @@ function subscriptionProgress(
   };
 }
 
+type SubscriptionNotice = {
+  readonly copy: string;
+  readonly title: string;
+};
+
+function subscriptionNotice(
+  progress: SubscriptionProgress,
+): SubscriptionNotice | null {
+  if (progress.daysRemaining === null) return null;
+
+  if (
+    progress.phase === 'trial' &&
+    progress.daysRemaining <= SUBSCRIPTION_NOTICE_TRIAL_DAYS
+  ) {
+    return {
+      copy: `Tu prueba termina en ${progress.daysRemaining} ${progress.daysRemaining === 1 ? 'dia' : 'dias'}. Actualiza al plan Esencial para seguir usando Nava sin interrupciones.`,
+      title: 'Tu prueba esta por terminar',
+    };
+  }
+
+  if (
+    (progress.phase === 'active' || progress.phase === 'grace') &&
+    progress.daysRemaining <= SUBSCRIPTION_NOTICE_ACTIVE_DAYS
+  ) {
+    return {
+      copy: `Tu suscripcion vence en ${progress.daysRemaining} ${progress.daysRemaining === 1 ? 'dia' : 'dias'}. Pasa al plan Esencial para seguir usando la aplicacion.`,
+      title: 'Actualiza tu plan para continuar',
+    };
+  }
+
+  return null;
+}
 type DashboardOperation = {
   readonly actionLabel: string;
   readonly description: string;
@@ -1741,6 +1786,7 @@ export default function DashboardScreen() {
     progressClock,
     subscriptionQuery.isError,
   );
+  const planRenewalNotice = subscriptionNotice(planProgress);
   const operations = useMemo(
     () =>
       dashboardOperations({
@@ -2124,6 +2170,38 @@ export default function DashboardScreen() {
           </View>
         ) : null}
 
+        {planRenewalNotice ? (
+          <View style={styles.subscriptionNoticeCard}>
+            <View style={styles.subscriptionNoticeTopRow}>
+              <View style={styles.subscriptionNoticeCopyColumn}>
+                <Text style={styles.cardTitle}>{planRenewalNotice.title}</Text>
+                <Text style={styles.cardCopy}>{planRenewalNotice.copy}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void Linking.openURL(SUBSCRIPTION_UPGRADE_URL)}
+                  style={styles.subscriptionUpgradeButton}
+                >
+                  <Text style={styles.subscriptionUpgradeLabel}>
+                    Pasar a Esencial
+                  </Text>
+                  <Ionicons
+                    color={appTheme.colors.white}
+                    name="arrow-forward"
+                    size={18}
+                  />
+                </Pressable>
+              </View>
+              <View style={styles.subscriptionNoticeImageColumn}>
+                <Image
+                  accessibilityLabel="Corona dorada de suscripcion"
+                  resizeMode="contain"
+                  source={require('../../assets/suscripcion.png')}
+                  style={styles.subscriptionCrown}
+                />
+              </View>
+            </View>
+          </View>
+        ) : null}
         <View style={styles.reservationCard}>
           <View style={styles.reservationTopRow}>
             <View style={styles.reservationCopyColumn}>
@@ -2782,6 +2860,51 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     textAlign: 'center',
+  },
+  subscriptionNoticeCard: {
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.accentLight,
+    borderRadius: appTheme.radii.card,
+    borderWidth: 1,
+    marginTop: 24,
+    overflow: 'hidden',
+    padding: 22,
+    ...goldButtonShadow,
+  },
+  subscriptionNoticeCopyColumn: {
+    flex: 1.18,
+    paddingVertical: 8,
+  },
+  subscriptionNoticeImageColumn: {
+    alignItems: 'center',
+    flex: 0.82,
+    justifyContent: 'center',
+  },
+  subscriptionNoticeTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  subscriptionCrown: {
+    height: 154,
+    width: '145%',
+  },
+  subscriptionUpgradeButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: appTheme.colors.accent,
+    borderRadius: appTheme.radii.control,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    marginTop: 18,
+    minHeight: 46,
+    paddingHorizontal: 16,
+    ...goldButtonShadow,
+  },
+  subscriptionUpgradeLabel: {
+    color: appTheme.colors.white,
+    fontSize: 14,
+    fontWeight: '900',
   },
   reservationCard: {
     backgroundColor: '#FFFFFF',
