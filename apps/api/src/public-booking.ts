@@ -158,7 +158,7 @@ async function publicCatalog(
     organizationSlug,
     locationSlug,
   );
-  const [assignments, reviews, schedules, ownerMembership] = await Promise.all([
+  const [assignments, reviews, products, schedules, ownerMembership] = await Promise.all([
     database.professionalService.findMany({
       include: {
         membership: {
@@ -192,6 +192,21 @@ async function publicCatalog(
       take: 40,
       where: { isVisible: true, locationId: location.id },
     }),
+    database.product.findMany({
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        imageData: true,
+        inventory: {
+          select: { quantityOnHand: true },
+          where: { locationId: location.id },
+        },
+        name: true,
+        salePriceCents: true,
+        stockTrackingEnabled: true,
+      },
+      where: { isActive: true, organizationId: location.organizationId },
+    }),
     database.businessWeeklySchedule.findMany({
       orderBy: { weekday: 'asc' },
       where: { locationId: location.id },
@@ -200,6 +215,7 @@ async function publicCatalog(
       include: {
         user: {
           select: {
+            profilePhotoData: true,
             registrationProfile: { select: { coverImageUri: true } },
           },
         },
@@ -228,6 +244,7 @@ async function publicCatalog(
       description: string | null;
       durationMinutes: number;
       id: string;
+      imageData: string | null;
       name: string;
       priceCents: number;
     }
@@ -248,6 +265,7 @@ async function publicCatalog(
       durationMinutes:
         assignment.customDurationMinutes ?? assignment.service.durationMinutes,
       id: assignment.service.id,
+      imageData: assignment.service.imageData,
       name: assignment.service.name,
       priceCents: assignment.customPriceCents ?? assignment.service.priceCents,
     });
@@ -270,6 +288,7 @@ async function publicCatalog(
       name: location.organization.name,
       coverImageUri:
         ownerMembership?.user.registrationProfile?.coverImageUri ?? null,
+      profilePhotoData: ownerMembership?.user.profilePhotoData ?? null,
       slug: location.organization.slug,
     },
     policy: {
@@ -301,6 +320,15 @@ async function publicCatalog(
       isOpen: schedule.isOpen,
       startMinute: schedule.startMinute,
       weekday: schedule.weekday,
+    })),
+    products: products.map((product) => ({
+      id: product.id,
+      imageData: product.imageData,
+      isAvailable:
+        !product.stockTrackingEnabled ||
+        (product.inventory[0]?.quantityOnHand ?? 0) > 0,
+      name: product.name,
+      priceCents: product.salePriceCents,
     })),
     services: [...serviceMap.values()],
   };

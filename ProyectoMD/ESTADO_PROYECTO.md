@@ -3932,3 +3932,33 @@ caja, comisiones y registros históricos.
       jerarquía, no como fuente de textos, nombres o imágenes.
 - [ ] Completar la validación manual visual en 360, 390, 430, 768 y 1280 px y
       recorrer una reserva real con correo/OTP antes de cerrar la Fase 4.
+
+## Ajustes posteriores de reservas, registro y experiencia movil — 10 de agosto de 2026
+
+- [x] La foto de portada cargada durante el registro se conserva como `data URI` optimizada en `UserRegistrationProfile.coverImageUri`. La migracion asociada es `20260810180000_cover_image_data`; el catalogo publico la expone y el hero de reservas usa la imagen real del negocio.
+- [x] La cabecera redundante fue retirada del inicio de reservas. Las vistas internas conservan una accion para volver al inicio y el hero/navegacion se ajustaron para una transicion visual al hacer scroll.
+- [x] La disponibilidad de reservas ahora informa franjas ocupadas o bloqueadas. En el flujo movil, las horas pasadas, ocupadas y bloqueadas quedan inhabilitadas, y una reserva exitosa muestra confirmacion visible al usuario.
+- [x] El nombre comercial ya no se valida como unico entre usuarios. Email y telefono conservan su validacion de unicidad. La migracion correspondiente es `20260810190000_allow_duplicate_business_names`.
+- [x] Dashboard, agenda y lista de espera comparten la paleta dorada, superficies, botones y tarjetas del dashboard. La agenda incorpora una transicion horizontal de pagina al cambiar de fecha mediante gesto.
+- [x] El contador de prueba del dashboard usa el formato `Dia X de 7 restantes`, calculado con el temporizador real. Tambien se agrego una tarjeta de renovacion sobre la tarjeta de reservas: aparece en los ultimos 3 dias de prueba o 7 dias de suscripcion y adapta su mensaje al estado. Incluye la corona `assets/suscripcion.png` y una accion hacia el plan Esencial.
+- [x] Verificaciones realizadas: typecheck movil, typecheck/API integration y validacion de Prisma completaron correctamente antes de los commits `ad23a96`, `e23bd3b` y `64468a2`, ya enviados a `origin/main`.
+
+### Pendientes de cierre
+
+- [ ] Desplegar de forma controlada en Neon `20260810180000_cover_image_data` y `20260810190000_allow_duplicate_business_names`, comprobar `prisma migrate status` y validar en produccion la carga de portada y los nombres de negocio duplicados.
+- [ ] Definir y validar en produccion la URL comercial definitiva del boton de plan Esencial; por ahora se usa `https://navacloud.app/planes` como destino configurable.
+- [ ] Realizar una pasada manual final en dispositivos fisicos: gesto de cambio de fecha en agenda, estados de horarios no disponibles, confirmacion de reserva y transicion del hero publico.
+
+## Fotos comerciales y catálogo público de reservas — 10 de agosto de 2026
+
+- [x] El perfil del propietario se muestra junto al nombre del negocio en la página pública de reservas; la portada cargada durante el registro continúa usándose en el hero.
+- [x] Gestión de servicios e inventario móvil permiten cargar, reemplazar y quitar fotos optimizadas. Se añadieron los campos `Service.imageData` y `Product.imageData`, respaldados por la migración `20260810193000_service_and_product_images`.
+- [x] El catálogo público ahora expone y renderiza las fotos de servicios en la tarjeta destacada, el listado y el selector previo a la reserva, junto con nombre, descripción, duración y precio.
+- [x] La página de reservas incluye los productos activos del inventario de la sede con foto, nombre, precio y disponibilidad. Se muestran como catálogo informativo para compra en el local; no se agregan a una cita.
+- [x] `account-details.tsx` fue consolidada en `profile-edit.tsx`: la edición de perfil también reúne portada y datos comerciales, sin duplicar los datos personales. La ruta de ajustes dirige a la pantalla unificada.
+- [x] Se retiró la sección de portafolio sin uso del perfil.
+- [x] Validaciones realizadas: Prisma schema validate/generate, typecheck móvil, typecheck API y typecheck web aprobados; la prueba de integración pública amplió sus aserciones para fotos y productos, pero se omite localmente sin `TEST_DATABASE_URL`.
+
+### Pendiente de despliegue
+
+- [ ] Aplicar la migración `20260810193000_service_and_product_images` en producción y validar que una reserva pública muestre las fotos y el catálogo de productos de su sede.

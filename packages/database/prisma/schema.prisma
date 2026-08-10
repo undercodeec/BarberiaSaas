@@ -653,6 +653,7 @@ model Service {
   categoryId           String?               @map("category_id") @db.Uuid
   name                 String                @db.VarChar(120)
   description          String?               @db.VarChar(500)
+  imageData            String?               @map("image_data") @db.Text
   durationMinutes      Int                   @map("duration_minutes")
   priceCents           Int                   @map("price_cents")
   onlineBooking        Boolean               @default(true) @map("online_booking")
@@ -799,6 +800,7 @@ model Product {
   name                 String              @db.VarChar(120)
   sku                  String?             @db.VarChar(80)
   barcode              String?             @db.VarChar(80)
+  imageData            String?             @map("image_data") @db.Text
   costCents            Int                 @default(0) @map("cost_cents")
   salePriceCents       Int                 @map("sale_price_cents")
   currencyCode         String              @default("USD") @map("currency_code") @db.Char(3)

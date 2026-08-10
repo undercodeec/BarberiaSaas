@@ -1,10 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ServiceRecord, ServicesResponse } from '@barber-saas/api-client';
+import * as ImagePicker from 'expo-image-picker';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -26,6 +28,9 @@ import {
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
+const MAX_IMAGE_BYTES = 1_500_000;
+const MAX_IMAGE_DIMENSION = 1_600;
+
 const COLORS = {
   border: appTheme.colors.border,
   muted: appTheme.colors.textMuted,
@@ -46,6 +51,7 @@ export default function ServiceManagementScreen() {
   );
   const [serviceName, setServiceName] = useState('');
   const [serviceDescription, setServiceDescription] = useState('');
+  const [serviceImageData, setServiceImageData] = useState<string | null>(null);
   const [durationMinutes, setDurationMinutes] = useState('30');
   const [price, setPrice] = useState('');
   const [onlineBooking, setOnlineBooking] = useState(true);
@@ -89,6 +95,7 @@ export default function ServiceManagementScreen() {
         categoryId: selectedCategoryId,
         description: serviceDescription.trim() || null,
         durationMinutes: Number(durationMinutes),
+        imageData: serviceImageData,
         name: serviceName.trim(),
         onlineBooking,
         priceCents: Math.round(Number(price) * 100),
@@ -124,6 +131,7 @@ export default function ServiceManagementScreen() {
       setEditingService(null);
       setServiceName('');
       setServiceDescription('');
+      setServiceImageData(null);
       setDurationMinutes('30');
       setPrice('');
       setOnlineBooking(true);
@@ -146,6 +154,7 @@ export default function ServiceManagementScreen() {
       setEditingService(null);
       setServiceName('');
       setServiceDescription('');
+      setServiceImageData(null);
       setDurationMinutes('30');
       setPrice('');
       setOnlineBooking(true);
@@ -159,6 +168,7 @@ export default function ServiceManagementScreen() {
     setEditingService(service);
     setServiceName(service.name);
     setServiceDescription(service.description ?? '');
+    setServiceImageData(service.imageData);
     setDurationMinutes(String(service.durationMinutes));
     setPrice((service.priceCents / 100).toFixed(2));
     setOnlineBooking(service.onlineBooking);
@@ -170,6 +180,7 @@ export default function ServiceManagementScreen() {
     setEditingService(null);
     setServiceName('');
     setServiceDescription('');
+    setServiceImageData(null);
     setDurationMinutes('30');
     setPrice('');
     setOnlineBooking(true);
@@ -177,6 +188,33 @@ export default function ServiceManagementScreen() {
   };
 
   if (!session) return <Redirect href="/(auth)/login" />;
+
+  const chooseServicePhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permiso necesario', 'Autoriza el acceso para elegir una foto.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      base64: true,
+      quality: 0.7,
+    });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (!asset?.base64) {
+      Alert.alert('No pudimos leer la foto', 'Inténtalo con otra imagen.');
+      return;
+    }
+    const bytes = asset.fileSize ?? Math.ceil((asset.base64.length * 3) / 4);
+    if (bytes > MAX_IMAGE_BYTES || asset.width > MAX_IMAGE_DIMENSION || asset.height > MAX_IMAGE_DIMENSION) {
+      Alert.alert('Imagen demasiado grande', 'Máximo: 1.5 MB y 1600 × 1600 píxeles.');
+      return;
+    }
+    const mimeType = asset.mimeType?.startsWith('image/') ? asset.mimeType : 'image/jpeg';
+    setServiceImageData(`data:${mimeType};base64,${asset.base64}`);
+  };
 
   const requestError =
     categoryMutation.error ?? serviceMutation.error ?? archiveMutation.error;
@@ -316,6 +354,25 @@ export default function ServiceManagementScreen() {
           <Text style={styles.sectionTitle}>
             {editingService ? 'Editar servicio' : 'Nuevo servicio'}
           </Text>
+          <Pressable
+            accessibilityLabel="Elegir foto del servicio"
+            onPress={() => void chooseServicePhoto()}
+            style={styles.photoPicker}
+          >
+            {serviceImageData ? (
+              <Image source={{ uri: serviceImageData }} style={styles.photoPickerImage} />
+            ) : (
+              <>
+                <Ionicons color={appTheme.colors.accentDark} name="image-outline" size={25} />
+                <Text style={styles.photoPickerLabel}>Agregar foto del servicio</Text>
+              </>
+            )}
+          </Pressable>
+          {serviceImageData ? (
+            <Pressable onPress={() => setServiceImageData(null)} style={styles.removePhoto}>
+              <Text style={styles.removePhotoLabel}>Quitar foto</Text>
+            </Pressable>
+          ) : null}
           <Text style={styles.fieldLabel}>Nombre</Text>
           <TextInput
             onChangeText={setServiceName}
@@ -427,7 +484,11 @@ export default function ServiceManagementScreen() {
               ]}
             >
               <View style={styles.serviceIcon}>
-                <Ionicons color={appTheme.colors.accentDark} name="cut-outline" size={23} />
+                {service.imageData ? (
+                  <Image source={{ uri: service.imageData }} style={styles.serviceImage} />
+                ) : (
+                  <Ionicons color={appTheme.colors.accentDark} name="cut-outline" size={23} />
+                )}
               </View>
               <View style={styles.serviceCopy}>
                 <Text style={styles.serviceName}>{service.name}</Text>
@@ -560,6 +621,19 @@ const styles = StyleSheet.create({
     height: 54,
     paddingHorizontal: 14,
   },
+  photoPicker: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderRadius: 15,
+    height: 112,
+    justifyContent: 'center',
+    marginTop: 16,
+    overflow: 'hidden',
+  },
+  photoPickerImage: { height: '100%', width: '100%' },
+  photoPickerLabel: { color: appTheme.colors.accentDark, fontSize: 13, fontWeight: '800', marginTop: 7 },
+  removePhoto: { alignSelf: 'flex-start', marginTop: 8 },
+  removePhotoLabel: { color: appTheme.colors.danger, fontSize: 13, fontWeight: '800' },
   primaryButton: {
     backgroundColor: appTheme.colors.surface,
     flexBasis: 'auto',
@@ -616,6 +690,7 @@ const styles = StyleSheet.create({
     ...goldButtonShadow,
   },
   serviceCopy: { flex: 1 },
+  serviceImage: { height: '100%', width: '100%' },
   serviceIcon: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surfaceMuted,

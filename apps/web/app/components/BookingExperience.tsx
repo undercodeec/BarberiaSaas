@@ -354,7 +354,21 @@ export function BookingExperience({
                         onClick={() => toggleService(service.id)}
                         type="button"
                       >
-                        <span className="min-w-0">
+                        <span className="flex min-w-0 items-center gap-3">
+                          {service.imageData ? (
+                            <Image
+                              alt={`Foto de ${service.name}`}
+                              className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                              height={56}
+                              src={service.imageData}
+                              unoptimized
+                              width={56}
+                            />
+                          ) : (
+                            <span aria-hidden="true" className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-[#ecebe6] text-xl">
+                              S
+                            </span>
+                          )}
                           <span className="block truncate font-black">
                             {service.name}
                           </span>
@@ -924,7 +938,7 @@ function ErrorMessage({ message }: { message: string }) {
   );
 }
 
-type LandingSection = 'reviews' | 'services' | 'team';
+type LandingSection = 'products' | 'reviews' | 'services' | 'team';
 
 function PublicBookingLanding({
   catalog,
@@ -998,9 +1012,30 @@ function PublicBookingLanding({
       <div className="relative z-20 -mt-12 sm:-mt-16">
         <div className="sticky top-0 z-30 border-b border-[#E4E1DA] bg-[#FAF9F6]/95 shadow-[0_8px_24px_rgba(28,28,28,.05)] backdrop-blur">
           <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-5 lg:px-8">
-            <h1 className="max-w-xl text-3xl leading-none font-black tracking-[-0.045em] sm:text-4xl">{catalog.organization.name}</h1>
+            <div className="flex max-w-xl items-center gap-3">
+              {catalog.organization.profilePhotoData ? (
+                <Image
+                  alt={`Foto de perfil de ${catalog.organization.name}`}
+                  className="h-11 w-11 shrink-0 rounded-full border-2 border-white object-cover shadow-sm"
+                  height={44}
+                  src={catalog.organization.profilePhotoData}
+                  unoptimized
+                  width={44}
+                />
+              ) : (
+                <span
+                  aria-hidden="true"
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#1C1C1C] text-base font-black text-white"
+                >
+                  {catalog.organization.name.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <h1 className="text-3xl leading-none font-black tracking-[-0.045em] sm:text-4xl">
+                {catalog.organization.name}
+              </h1>
+            </div>
           </div>
-          <SectionNavigation active={activeSection} onSelect={navigate} />
+          <SectionNavigation active={activeSection} hasProducts={catalog.products.length > 0} onSelect={navigate} />
         </div>
         <main className="mx-auto max-w-6xl px-4 pb-12 sm:px-5 lg:px-8">
         <section className="py-7">
@@ -1088,6 +1123,27 @@ function PublicBookingLanding({
             </p>
           )}
         </section>
+
+        {catalog.products.length ? (
+          <section
+            className="scroll-mt-20 border-t border-black/8 py-7"
+            id="products"
+          >
+            <SectionHeading>Productos disponibles</SectionHeading>
+            <p className="-mt-2 mb-5 text-sm text-black/55">
+              Puedes adquirirlos durante tu visita al local.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {catalog.products.map((product) => (
+                <ProductCard
+                  currency={catalog.location.currencyCode}
+                  key={product.id}
+                  product={product}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <section
           className="scroll-mt-20 border-t border-black/8 py-7"
@@ -1227,12 +1283,15 @@ function MetaItem({ icon, value }: { icon: 'clock' | 'pin'; value: string }) {
 
 function SectionNavigation({
   active,
+  hasProducts,
   onSelect,
 }: {
   active: LandingSection;
+  hasProducts: boolean;
   onSelect: (section: LandingSection) => void;
 }) {
   const sections: ReadonlyArray<{ id: LandingSection; label: string }> = [
+    ...(hasProducts ? [{ id: 'products' as const, label: 'Productos' }] : []),
     { id: 'services', label: 'Servicios' },
     { id: 'team', label: 'Equipo' },
     { id: 'reviews', label: 'Reseñas' },
@@ -1313,7 +1372,8 @@ function FeaturedService({
           className="object-cover"
           fill
           sizes="144px"
-          src={bookingHero}
+          src={service.imageData ?? bookingHero}
+          unoptimized={Boolean(service.imageData)}
         />
       </div>
       <div className="min-w-0">
@@ -1371,7 +1431,8 @@ function ServiceCard({
           className="object-cover"
           fill
           sizes="76px"
-          src={bookingHero}
+          src={service.imageData ?? bookingHero}
+          unoptimized={Boolean(service.imageData)}
         />
       </div>
       <div className="flex min-w-0 flex-col">
@@ -1403,6 +1464,59 @@ function ServiceCard({
             Reservar
           </button>
         </div>
+      </div>
+    </article>
+  );
+}
+
+function ProductCard({
+  currency,
+  product,
+}: {
+  currency: string;
+  product: PublicBookingCatalog['products'][number];
+}) {
+  return (
+    <article className="overflow-hidden rounded-xl border border-black/10 bg-white">
+      <div className="relative aspect-[4/3] bg-[#ecebe6]">
+        {product.imageData ? (
+          <Image
+            alt={`Producto ${product.name}`}
+            className="object-cover"
+            fill
+            sizes="(max-width: 640px) 100vw, 33vw"
+            src={product.imageData}
+            unoptimized
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="grid h-full place-items-center text-4xl"
+          >
+            P
+          </span>
+        )}
+      </div>
+      <div className="p-4">
+        <p className="text-[10px] font-black tracking-[0.12em] text-black/45 uppercase">
+          Producto
+        </p>
+        <h3 className="mt-1 truncate text-base font-black">{product.name}</h3>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <strong>{money(product.priceCents, currency)}</strong>
+          <span
+            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+              product.isAvailable
+                ? 'bg-emerald-50 text-emerald-700'
+                : 'bg-black/5 text-black/45'
+            }`}
+          >
+            {product.isAvailable ? 'Disponible' : 'Agotado'}
+          </span>
+        </div>
+        <p className="mt-3 text-xs leading-4 text-black/50">
+          Disponible para comprar en el local.
+        </p>
       </div>
     </article>
   );

@@ -270,6 +270,7 @@ export interface InventoryProduct {
   readonly createdAt: string;
   readonly currencyCode: string;
   readonly id: string;
+  readonly imageData: string | null;
   readonly isActive: boolean;
   readonly isLowStock: boolean;
   readonly minimumStock: number;
@@ -529,6 +530,7 @@ export interface ServiceRecord {
   readonly description: string | null;
   readonly durationMinutes: number;
   readonly id: string;
+  readonly imageData: string | null;
   readonly name: string;
   readonly onlineBooking: boolean;
   readonly priceCents: number;
@@ -763,6 +765,7 @@ export interface PublicBookingCatalog {
     readonly timezone: string;
   };
   readonly organization: {
+    readonly profilePhotoData: string | null;
     readonly id: string;
     readonly coverImageUri: string | null;
     readonly name: string;
@@ -784,11 +787,19 @@ export interface PublicBookingCatalog {
     readonly professionalName: string;
     readonly rating: number;
   }>;
+  readonly products: ReadonlyArray<{
+    readonly id: string;
+    readonly imageData: string | null;
+    readonly isAvailable: boolean;
+    readonly name: string;
+    readonly priceCents: number;
+  }>;
   readonly services: ReadonlyArray<{
     readonly category: string | null;
     readonly description: string | null;
     readonly durationMinutes: number;
     readonly id: string;
+    readonly imageData: string | null;
     readonly name: string;
     readonly priceCents: number;
   }>;

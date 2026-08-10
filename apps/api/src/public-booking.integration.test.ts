@@ -51,6 +51,7 @@ integrationDescribe('reservas públicas', () => {
   beforeAll(async () => {
     const user = await database.user.create({
       data: {
+        profilePhotoData: 'data:image/jpeg;base64,cGVyZmls',
         email: `owner-${suffix}@example.com`,
         emailVerifiedAt: new Date(),
         fullName: 'Profesional Público',
@@ -107,6 +108,7 @@ integrationDescribe('reservas públicas', () => {
     const service = await database.service.create({
       data: {
         durationMinutes: 30,
+        imageData: 'data:image/jpeg;base64,c2VydmljaW8=',
         name: `Corte ${suffix}`,
         onlineBooking: true,
         organizationId,
@@ -117,6 +119,22 @@ integrationDescribe('reservas públicas', () => {
     await database.professionalService.create({
       data: { locationId, membershipId, serviceId },
     });
+    const product = await database.product.create({
+      data: {
+        imageData: 'data:image/jpeg;base64,cHJvZHVjdG8=',
+        name: `Cera ${suffix}`,
+        organizationId,
+        salePriceCents: 1800,
+      },
+    });
+    await database.locationInventory.create({
+      data: {
+        locationId,
+        productId: product.id,
+        quantityOnHand: 3,
+      },
+    });
+
     for (let weekday = 0; weekday < 7; weekday += 1) {
       await database.businessWeeklySchedule.create({
         data: {
@@ -249,12 +267,24 @@ integrationDescribe('reservas públicas', () => {
       url: `/v1/public/${organizationSlug}/principal`,
     });
     expect(catalog.statusCode).toBe(200);
+    expect(catalog.json().organization.profilePhotoData).toBe(
+      'data:image/jpeg;base64,cGVyZmls',
+    );
     expect(catalog.json().organization.coverImageUri).toBe(
       'data:image/jpeg;base64,aGVsbG8=',
     );
     expect(catalog.json().professionals).toHaveLength(1);
     expect(catalog.json().services).toHaveLength(1);
 
+    expect(catalog.json().services[0].imageData).toBe(
+      'data:image/jpeg;base64,c2VydmljaW8=',
+    );
+    expect(catalog.json().products).toEqual([
+      expect.objectContaining({
+        imageData: 'data:image/jpeg;base64,cHJvZHVjdG8=',
+        isAvailable: true,
+      }),
+    ]);
     const availability = await app.inject({
       method: 'GET',
       url: `/v1/public/${organizationSlug}/principal/availability?date=${futureSlot(3, 9).slice(0, 10)}&membershipId=${membershipId}&serviceIds=${serviceId}`,

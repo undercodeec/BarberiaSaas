@@ -1,5 +1,5 @@
-﻿import Ionicons from '@expo/vector-icons/Ionicons';
-import type { UserProfileResponse } from '@barber-saas/api-client';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import type { OnboardingAccountDetailsResponse, UserProfileResponse } from '@barber-saas/api-client';
 import * as ImagePicker from 'expo-image-picker';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
@@ -23,13 +23,14 @@ import {
   BottomNavigation,
   goldButtonShadow,
 } from '../../src/components/BottomNavigation';
+import { CountryCityFields } from '../../src/components/RegistrationSelectors';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const PRIMARY = appTheme.colors.accent;
 const MAX_IMAGE_BYTES = 1_500_000;
 const MAX_IMAGE_DIMENSION = 1_600;
-type PhotoTarget = 'avatar' | 'portfolio';
+type PhotoTarget = 'avatar' | 'business-cover';
 
 function initials(name: string) {
   return name
@@ -41,13 +42,20 @@ function initials(name: string) {
 }
 
 export default function ProfileEditScreen() {
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [bio, setBio] = useState('');
   const [photoData, setPhotoData] = useState<string | null>(null);
+  const [businessName, setBusinessName] = useState('');
+  const [businessAddress, setBusinessAddress] = useState('');
+  const [businessCity, setBusinessCity] = useState('');
+  const [businessCountryCode, setBusinessCountryCode] = useState('EC');
+  const [businessCoverImage, setBusinessCoverImage] = useState<string | null>(null);
+  const [facebookUrl, setFacebookUrl] = useState('');
+  const [instagramUrl, setInstagramUrl] = useState('');
   const [photoSheetTarget, setPhotoSheetTarget] = useState<PhotoTarget | null>(
     null,
   );
@@ -59,6 +67,15 @@ export default function ProfileEditScreen() {
     queryKey: ['user-profile'],
   });
   const profile = profileQuery.data?.profile;
+  const accountDetailsQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<OnboardingAccountDetailsResponse>(
+        '/v1/onboarding/account-details',
+      ),
+    queryKey: ['onboarding-account-details', user?.id],
+  });
+  const accountDetails = accountDetailsQuery.data;
 
   useEffect(() => {
     if (!profile) return;
@@ -68,19 +85,52 @@ export default function ProfileEditScreen() {
     setPhotoData(profile.photoData);
   }, [profile]);
 
+  useEffect(() => {
+    if (!accountDetails) return;
+    setBusinessName(accountDetails.businessName ?? '');
+    setBusinessAddress(accountDetails.addressLine ?? '');
+    setBusinessCity(accountDetails.city ?? '');
+    setBusinessCountryCode(accountDetails.countryCode ?? 'EC');
+    setBusinessCoverImage(accountDetails.coverImageUri);
+    setFacebookUrl(accountDetails.facebookUrl ?? '');
+    setInstagramUrl(accountDetails.instagramUrl ?? '');
+  }, [accountDetails]);
+
   const refreshProfile = () =>
     queryClient.invalidateQueries({ queryKey: ['user-profile'] });
   const saveProfile = useMutation({
-    mutationFn: () =>
-      requireApiClient().request<UserProfileResponse>('/v1/profile', {
-        body: JSON.stringify({
-          bio: bio.trim() || null,
-          fullName: fullName.trim(),
-          phone: phone.trim() || null,
-          photoData,
-        }),
-        method: 'PATCH',
-      }),
+    mutationFn: async () => {
+      const updatedProfile = await requireApiClient().request<UserProfileResponse>(
+        '/v1/profile',
+        {
+          body: JSON.stringify({
+            bio: bio.trim() || null,
+            fullName: fullName.trim(),
+            phone: phone.trim() || null,
+            photoData,
+          }),
+          method: 'PATCH',
+        },
+      );
+      if (accountDetails) {
+        await requireApiClient().request('/v1/onboarding/account-details', {
+          body: JSON.stringify({
+            addressLine: businessAddress.trim() || null,
+            businessName:
+              businessName.trim() || accountDetails.businessName || fullName.trim(),
+            city: businessCity.trim() || accountDetails.city || '',
+            countryCode: businessCountryCode,
+            coverImageUri: businessCoverImage,
+            description: accountDetails.description,
+            facebookUrl: facebookUrl.trim() || null,
+            instagramUrl: instagramUrl.trim() || null,
+            phone: phone.trim() || accountDetails.phone || '',
+          }),
+          method: 'PATCH',
+        });
+      }
+      return updatedProfile;
+    },
     onSuccess: () => {
       void refreshProfile();
       Alert.alert('Perfil guardado', 'Tus cambios fueron actualizados.');
@@ -88,23 +138,9 @@ export default function ProfileEditScreen() {
     onError: (error) =>
       Alert.alert(
         'No se pudo guardar',
-        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+        error instanceof Error ? error.message : 'IntÃ©ntalo nuevamente.',
       ),
   });
-  const addPortfolio = useMutation({
-    mutationFn: (newPhotoData: string) =>
-      requireApiClient().request('/v1/profile/portfolio', {
-        body: JSON.stringify({ photoData: newPhotoData }),
-        method: 'POST',
-      }),
-    onSuccess: () => void refreshProfile(),
-    onError: (error) =>
-      Alert.alert(
-        'No se pudo guardar la foto',
-        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
-      ),
-  });
-
   if (!session) return <Redirect href="/(auth)/login" />;
 
   const choosePhoto = async (source: 'camera' | 'library') => {
@@ -124,7 +160,10 @@ export default function ProfileEditScreen() {
     }
     const result =
       source === 'camera'
-        ? await ImagePicker.launchCameraAsync({ base64: true, quality: 0.7 })
+        ? await ImagePicker.launchCameraAsync({
+            base64: true,
+            quality: target === 'business-cover' ? 0.45 : 0.7,
+          })
         : await ImagePicker.launchImageLibraryAsync({
             base64: true,
             quality: 0.7,
@@ -132,18 +171,18 @@ export default function ProfileEditScreen() {
     if (result.canceled) return;
     const asset = result.assets[0];
     if (!asset?.base64) {
-      Alert.alert('No pudimos leer la foto', 'Inténtalo con otra imagen.');
+      Alert.alert('No pudimos leer la foto', 'IntÃ©ntalo con otra imagen.');
       return;
     }
     const bytes = asset.fileSize ?? Math.ceil((asset.base64.length * 3) / 4);
     if (
-      bytes > MAX_IMAGE_BYTES ||
+      bytes > (target === 'business-cover' ? 500_000 : MAX_IMAGE_BYTES) ||
       asset.width > MAX_IMAGE_DIMENSION ||
       asset.height > MAX_IMAGE_DIMENSION
     ) {
       Alert.alert(
         'Imagen demasiado grande',
-        'Máximo: 1.5 MB y 1600 × 1600 píxeles.',
+        'MÃ¡ximo: 1.5 MB y 1600 Ã— 1600 pÃ­xeles.',
       );
       return;
     }
@@ -152,7 +191,7 @@ export default function ProfileEditScreen() {
       : 'image/jpeg';
     const value = `data:${mimeType};base64,${asset.base64}`;
     if (target === 'avatar') setPhotoData(value);
-    else addPortfolio.mutate(value);
+    else setBusinessCoverImage(value);
   };
 
   return (
@@ -203,73 +242,86 @@ export default function ProfileEditScreen() {
           <Field label="Nombre" onChangeText={setFullName} value={fullName} />
           <Field
             keyboardType="phone-pad"
-            label="Teléfono"
+            label="TelÃ©fono"
             onChangeText={setPhone}
-            placeholder="Tu número de teléfono"
+            placeholder="Tu nÃºmero de telÃ©fono"
             value={phone}
           />
-          <Text style={styles.fieldLabel}>Correo electrónico</Text>
+          <Text style={styles.fieldLabel}>Correo electrÃ³nico</Text>
           <View style={styles.readOnlyField}>
             <Text style={styles.readOnlyText}>{profile?.email ?? '...'}</Text>
           </View>
         </View>
 
+        {accountDetails ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>InformaciÃ³n del negocio</Text>
+            <Text style={styles.businessHint}>
+              Estos datos se muestran en la pÃ¡gina pÃºblica de reservas.
+            </Text>
+            <Pressable
+              accessibilityLabel="Cambiar portada del negocio"
+              onPress={() => setPhotoSheetTarget('business-cover')}
+              style={styles.businessCover}
+            >
+              {businessCoverImage ? (
+                <Image source={{ uri: businessCoverImage }} style={styles.businessCoverImage} />
+              ) : (
+                <>
+                  <Ionicons color={PRIMARY} name="image-outline" size={28} />
+                  <Text style={styles.businessCoverLabel}>Agregar imagen de portada</Text>
+                </>
+              )}
+            </Pressable>
+            {businessCoverImage ? (
+              <Pressable onPress={() => setBusinessCoverImage(null)} style={styles.removeCover}>
+                <Text style={styles.removeCoverLabel}>Quitar portada</Text>
+              </Pressable>
+            ) : null}
+            <Field label="Nombre del negocio" onChangeText={setBusinessName} value={businessName} />
+            <Field
+              label="DirecciÃ³n"
+              onChangeText={setBusinessAddress}
+              placeholder="DirecciÃ³n del negocio"
+              value={businessAddress}
+            />
+            <CountryCityFields
+              city={businessCity}
+              countryCode={businessCountryCode}
+              onCity={setBusinessCity}
+              onCountry={(country) => {
+                setBusinessCountryCode(country.code);
+                setBusinessCity('');
+              }}
+            />
+            <Field
+              label="Enlace de Facebook"
+              onChangeText={setFacebookUrl}
+              placeholder="https://facebook.com/..."
+              value={facebookUrl}
+            />
+            <Field
+              label="Enlace de Instagram"
+              onChangeText={setInstagramUrl}
+              placeholder="https://instagram.com/..."
+              value={instagramUrl}
+            />
+          </View>
+        ) : null}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Cambios adicionales</Text>
-          <Text style={styles.fieldLabel}>Sobre mí</Text>
+          <Text style={styles.fieldLabel}>Sobre mÃ­</Text>
           <TextInput
             maxLength={500}
             multiline
             onChangeText={setBio}
-            placeholder="Cuéntale a tus clientes sobre tu trabajo"
+            placeholder="CuÃ©ntale a tus clientes sobre tu trabajo"
             placeholderTextColor="#7A8491"
             style={[styles.field, styles.bioField]}
             textAlignVertical="top"
             value={bio}
           />
           <Text style={styles.limitText}>{bio.length}/500</Text>
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.portfolioHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>Portafolio</Text>
-              <Text style={styles.portfolioHint}>
-                Fotos de hasta 1.5 MB y 1600 × 1600 px.
-              </Text>
-            </View>
-            <Pressable
-              accessibilityLabel="Añadir foto al portafolio"
-              disabled={addPortfolio.isPending}
-              onPress={() => setPhotoSheetTarget('portfolio')}
-              style={({ pressed }) => [
-                styles.addPhoto,
-                (pressed || addPortfolio.isPending) && styles.pressed,
-              ]}
-            >
-              <Ionicons color="#FFFFFF" name="add" size={25} />
-            </Pressable>
-          </View>
-          {profileQuery.isLoading ? (
-            <Text style={styles.emptyText}>Cargando fotos...</Text>
-          ) : profile?.portfolio.length ? (
-            <View style={styles.portfolioGrid}>
-              {profile.portfolio.map((item) => (
-                <Image
-                  key={item.id}
-                  source={{ uri: item.photoData }}
-                  style={styles.portfolioImage}
-                />
-              ))}
-            </View>
-          ) : (
-            <View style={styles.emptyPortfolio}>
-              <Ionicons color="#697483" name="images-outline" size={30} />
-              <Text style={styles.emptyText}>
-                Aún no tienes fotos en tu portafolio.
-              </Text>
-            </View>
-          )}
         </View>
 
         <Pressable
@@ -302,9 +354,9 @@ export default function ProfileEditScreen() {
             style={styles.sheet}
           >
             <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Añadir foto</Text>
+            <Text style={styles.sheetTitle}>AÃ±adir foto</Text>
             <Text style={styles.sheetCopy}>
-              Máximo 1.5 MB y 1600 × 1600 píxeles.
+              MÃ¡ximo 1.5 MB y 1600 Ã— 1600 pÃ­xeles.
             </Text>
             <Pressable
               onPress={() => void choosePhoto('camera')}
@@ -359,16 +411,6 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  addPhoto: {
-    alignItems: 'center',
-    backgroundColor: PRIMARY,
-    borderRadius: 16,
-    height: 48,
-    justifyContent: 'center',
-    width: 48,
-    transform: [{ translateY: -3 }],
-    ...goldButtonShadow,
-  },
   avatar: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surfaceMuted,
@@ -404,6 +446,18 @@ const styles = StyleSheet.create({
     ...goldButtonShadow,
   },
   bioField: { minHeight: 108, paddingTop: 13 },
+  businessCover: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderRadius: 16,
+    height: 152,
+    justifyContent: 'center',
+    marginTop: 16,
+    overflow: 'hidden',
+  },
+  businessCoverImage: { height: '100%', width: '100%' },
+  businessCoverLabel: { color: PRIMARY, fontSize: 13, fontWeight: '800', marginTop: 8 },
+  businessHint: { color: '#697483', fontSize: 13, lineHeight: 19, marginTop: 5 },
   card: {
     backgroundColor: appTheme.colors.surface,
     borderRadius: 22,
@@ -419,20 +473,6 @@ const styles = StyleSheet.create({
     paddingBottom: 118,
     paddingHorizontal: 22,
     width: '100%',
-  },
-  emptyPortfolio: {
-    alignItems: 'center',
-    backgroundColor: appTheme.colors.surfaceMuted,
-    borderRadius: 16,
-    gap: 8,
-    marginTop: 16,
-    padding: 22,
-  },
-  emptyText: {
-    color: '#697483',
-    fontSize: 13,
-    fontWeight: '700',
-    textAlign: 'center',
   },
   eyebrow: {
     color: PRIMARY,
@@ -476,25 +516,9 @@ const styles = StyleSheet.create({
   },
   photoHint: { color: '#697483', fontSize: 13, marginTop: 10 },
   photoSection: { alignItems: 'center', marginTop: 28 },
-  portfolioGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 9,
-    marginTop: 16,
-  },
-  portfolioHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  portfolioHint: { color: '#697483', fontSize: 12, marginTop: 4 },
-  portfolioImage: {
-    backgroundColor: appTheme.colors.surfaceMuted,
-    borderRadius: 13,
-    height: 96,
-    width: 96,
-  },
   pressed: { opacity: 0.7, transform: [{ scale: 0.98 }] },
+  removeCover: { alignSelf: 'flex-start', marginTop: 9 },
+  removeCoverLabel: { color: appTheme.colors.danger, fontSize: 13, fontWeight: '800' },
   readOnlyField: {
     backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 14,

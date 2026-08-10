@@ -21,6 +21,7 @@ type Authenticate = (
 const productFieldsSchema = z.object({
   barcode: z.string().trim().min(1).max(80).optional(),
   costCents: z.number().int().min(0).max(100_000_000),
+  imageData: z.string().trim().max(2_000_000).nullish(),
   minimumStock: z.number().int().min(0).max(1_000_000),
   name: z.string().trim().min(2).max(120),
   salePriceCents: z.number().int().min(1).max(100_000_000),
@@ -147,6 +148,7 @@ function productResponse(
     createdAt: Date;
     currencyCode: string;
     id: string;
+    imageData: string | null;
     inventory: ReadonlyArray<{
       locationId: string;
       quantityOnHand: number;
@@ -170,6 +172,7 @@ function productResponse(
     createdAt: product.createdAt.toISOString(),
     currencyCode: product.currencyCode,
     id: product.id,
+    imageData: product.imageData,
     isActive: product.isActive,
     isLowStock:
       product.stockTrackingEnabled && quantityOnHand <= product.minimumStock,
@@ -274,6 +277,7 @@ export function registerInventoryRoutes(
           data: {
             barcode: input.barcode || null,
             costCents: input.costCents,
+            imageData: input.imageData || null,
             currencyCode: currentScope.membership.organization.currencyCode,
             minimumStock: input.minimumStock,
             name: input.name,
@@ -365,6 +369,9 @@ export function registerInventoryRoutes(
               : {}),
             ...(input.costCents !== undefined
               ? { costCents: input.costCents }
+              : {}),
+            ...(input.imageData !== undefined
+              ? { imageData: input.imageData || null }
               : {}),
             ...(input.isActive !== undefined
               ? { isActive: input.isActive }

@@ -77,7 +77,7 @@ const settingsSections: readonly SettingsSection[] = [
         description: 'Edita la informaci\u00f3n de tu negocio.',
         icon: 'information-circle-outline',
         id: 'edit-business',
-        route: '/account-details',
+        route: '/profile-edit',
         title: 'Editar informaci\u00f3n',
       },
       {

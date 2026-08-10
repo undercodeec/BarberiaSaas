@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as ImagePicker from 'expo-image-picker';
 import type {
   InventoryProduct,
   InventoryResponse,
@@ -9,6 +10,7 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   Alert,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -25,6 +27,9 @@ import {
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
+
+const MAX_IMAGE_BYTES = 1_500_000;
+const MAX_IMAGE_DIMENSION = 1_600;
 
 type SheetMode = 'adjustment' | 'product';
 type AdjustmentType =
@@ -71,6 +76,7 @@ export default function InventoryScreen() {
   const [selectedProduct, setSelectedProduct] =
     useState<InventoryProduct | null>(null);
   const [name, setName] = useState('');
+  const [imageData, setImageData] = useState<string | null>(null);
   const [sku, setSku] = useState('');
   const [cost, setCost] = useState('0');
   const [price, setPrice] = useState('');
@@ -112,6 +118,7 @@ export default function InventoryScreen() {
         throw new Error('Ingresa el nombre del producto.');
       const body = {
         costCents: cents(cost, 'un costo'),
+        imageData,
         minimumStock: units(minimumStock, 'un stock mínimo'),
         name: name.trim(),
         salePriceCents: cents(price, 'un precio'),
@@ -212,6 +219,33 @@ export default function InventoryScreen() {
 
   if (!session) return <Redirect href="/(auth)/login" />;
 
+  const chooseProductPhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permiso necesario', 'Autoriza el acceso para elegir una foto.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      base64: true,
+      quality: 0.7,
+    });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (!asset?.base64) {
+      Alert.alert('No pudimos leer la foto', 'Inténtalo con otra imagen.');
+      return;
+    }
+    const bytes = asset.fileSize ?? Math.ceil((asset.base64.length * 3) / 4);
+    if (bytes > MAX_IMAGE_BYTES || asset.width > MAX_IMAGE_DIMENSION || asset.height > MAX_IMAGE_DIMENSION) {
+      Alert.alert('Imagen demasiado grande', 'Máximo: 1.5 MB y 1600 × 1600 píxeles.');
+      return;
+    }
+    const mimeType = asset.mimeType?.startsWith('image/') ? asset.mimeType : 'image/jpeg';
+    setImageData(`data:${mimeType};base64,${asset.base64}`);
+  };
+
   const money = (value: number) =>
     new Intl.NumberFormat('es-EC', {
       currency: inventoryQuery.data?.currencyCode ?? 'USD',
@@ -220,6 +254,7 @@ export default function InventoryScreen() {
   const resetProductForm = (product?: InventoryProduct) => {
     setEditingProduct(product ?? null);
     setName(product?.name ?? '');
+    setImageData(product?.imageData ?? null);
     setSku(product?.sku ?? '');
     setCost(((product?.costCents ?? 0) / 100).toFixed(2));
     setPrice(product ? (product.salePriceCents / 100).toFixed(2) : '');
@@ -345,11 +380,15 @@ export default function InventoryScreen() {
                       product.isLowStock && styles.productIconAlert,
                     ]}
                   >
-                    <Ionicons
-                      color={product.isLowStock ? '#B54747' : '#805E21'}
-                      name="cube-outline"
-                      size={25}
-                    />
+                    {product.imageData ? (
+                      <Image source={{ uri: product.imageData }} style={styles.productImage} />
+                    ) : (
+                      <Ionicons
+                        color={product.isLowStock ? '#B54747' : '#805E21'}
+                        name="cube-outline"
+                        size={25}
+                      />
+                    )}
                   </View>
                   <View style={styles.productCopy}>
                     <Text style={styles.productName}>{product.name}</Text>
@@ -510,6 +549,25 @@ export default function InventoryScreen() {
                 <Text style={styles.sheetTitle}>
                   {editingProduct ? 'Editar producto' : 'Nuevo producto'}
                 </Text>
+                <Pressable
+                  accessibilityLabel="Elegir foto del producto"
+                  onPress={() => void chooseProductPhoto()}
+                  style={styles.photoPicker}
+                >
+                  {imageData ? (
+                    <Image source={{ uri: imageData }} style={styles.photoPickerImage} />
+                  ) : (
+                    <>
+                      <Ionicons color="#805E21" name="image-outline" size={25} />
+                      <Text style={styles.photoPickerLabel}>Agregar foto del producto</Text>
+                    </>
+                  )}
+                </Pressable>
+                {imageData ? (
+                  <Pressable onPress={() => setImageData(null)} style={styles.removePhoto}>
+                    <Text style={styles.removePhotoLabel}>Quitar foto</Text>
+                  </Pressable>
+                ) : null}
                 <Field label="Nombre" onChange={setName} value={name} />
                 <Field label="SKU (opcional)" onChange={setSku} value={sku} />
                 <Field
@@ -852,6 +910,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
+  photoPicker: {
+    alignItems: 'center',
+    backgroundColor: '#F7F8FA',
+    borderColor: '#E2E5E9',
+    borderRadius: 15,
+    borderWidth: 1,
+    height: 112,
+    justifyContent: 'center',
+    marginTop: 16,
+    overflow: 'hidden',
+  },
+  photoPickerImage: { height: '100%', width: '100%' },
+  photoPickerLabel: { color: '#805E21', fontSize: 13, fontWeight: '800', marginTop: 7 },
   productActions: { gap: 8 },
   productCard: {
     alignItems: 'center',
@@ -870,8 +941,11 @@ const styles = StyleSheet.create({
     width: 50,
   },
   productIconAlert: { backgroundColor: '#FDECEC' },
+  productImage: { height: '100%', width: '100%' },
   productName: { color: '#18202B', fontSize: 16, fontWeight: '800' },
   pressed: { opacity: 0.74, transform: [{ scale: 0.98 }] },
+  removePhoto: { alignSelf: 'flex-start', marginTop: 8 },
+  removePhotoLabel: { color: '#B54747', fontSize: 13, fontWeight: '800' },
   reverseButton: { alignSelf: 'flex-start', marginTop: 8 },
   reverseText: { color: '#B54747', fontSize: 13, fontWeight: '800' },
   reversedText: {
