@@ -5,7 +5,7 @@ import {
 } from '@barber-saas/database';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-export const TRIAL_DAYS = 14;
+export const TRIAL_DAYS = 7;
 export const GRACE_DAYS = 7;
 
 export const SUBSCRIPTION_PLANS = [

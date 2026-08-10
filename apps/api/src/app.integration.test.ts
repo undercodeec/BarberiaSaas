@@ -1087,6 +1087,18 @@ describeWithDatabase('API con PostgreSQL', () => {
         where: { organizationId: organization.organizationId },
       }),
     ).toMatchObject({ status: 'TRIAL' });
+    const createdSubscription = await database.subscription.findUnique({
+      where: { organizationId: organization.organizationId },
+    });
+    expect(createdSubscription).not.toBeNull();
+    const periodStart = createdSubscription?.currentPeriodStart.getTime() ?? 0;
+    const trialEnd = createdSubscription?.trialEndsAt?.getTime() ?? 0;
+    const periodEnd = createdSubscription?.currentPeriodEnd.getTime() ?? 0;
+    const graceEnd = createdSubscription?.graceEndsAt?.getTime() ?? 0;
+    const dayMilliseconds = 24 * 60 * 60 * 1000;
+    expect(trialEnd - periodStart).toBe(7 * dayMilliseconds);
+    expect(periodEnd - periodStart).toBe(7 * dayMilliseconds);
+    expect(graceEnd - trialEnd).toBe(7 * dayMilliseconds);
 
     const subscriptionResponse = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },

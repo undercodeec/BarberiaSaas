@@ -2,7 +2,7 @@
 
 Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión posterior documentada en `docs/adr/0003-postgresql-prisma-y-api-en-vps.md`. Se marca `[x]` solo cuando la tarea está implementada y cuenta con la verificación indicada; `[ ]` significa pendiente o aún no demostrada.
 
-Última actualización: 2026-08-04
+Última actualización: 2026-08-09
 
 ## Estado operativo actual
 
@@ -25,8 +25,11 @@ backlog vigente.
       proxy confiable.
 - [ ] Definir textos legales, políticas y valores iniciales de cancelación,
       reprogramación y no confirmación.
-- [ ] Adquirir y configurar el dominio público HTTPS de producción; validar los
-      enlaces de reserva e invitación en Android, iOS y Web.
+- [x] Dominio público HTTPS configurado para el piloto: `reservas.navacloud.app`
+      sirve la Web de reservas y `api.navacloud.app` sirve la API mediante la
+      VPS. Ambos resuelven a la VPS y cuentan con certificados TLS válidos.
+- [ ] Validar el recorrido público completo de reserva, OTP y enlace de gestión
+      con datos reales, y los enlaces de invitación en Android, iOS y Web.
 - [ ] Realizar la validación visual y funcional final en dispositivos físicos
       para agenda, Caja/POS, inventario, planes y reportes.
 - [ ] Si la API se desplegará en más de una instancia, reemplazar el rate
@@ -93,17 +96,18 @@ pagos online reales.
 - [x] Neon seleccionado como PostgreSQL administrado para producción.
 - [x] Prisma ORM 7 para esquema, cliente tipado y migraciones.
 - [x] API Node/Fastify como única frontera de datos para los clientes.
-- [x] Despliegue inicial de la API preparado para una VPS; no se ha realizado ningún despliegue.
+- [x] API y Web pública desplegadas para el piloto en una sola VPS, con Neon
+      como base de datos administrada y Nginx como proxy inverso HTTPS.
 - [x] Neon reemplaza la estrategia anterior de migración a Supabase; el móvil continúa desacoplado de cualquier proveedor de base de datos.
 - [x] Supabase Auth, RPC, RLS, Storage y Realtime retirados de la implementación actual.
 - [x] Snapshot PostgreSQL + Prisma incluido en el repositorio.
 
 ### Producción administrada con Neon
 
-- [ ] Crear el proyecto de producción de Neon en la región elegida y registrar
-      su cadena de conexión exclusivamente como secreto del servidor.
-- [ ] Aplicar `prisma migrate deploy` contra Neon y verificar que no existan
-      migraciones pendientes antes de habilitar tráfico de producción.
+- [x] Proyecto/base de producción de Neon creado y su cadena de conexión
+      registrada exclusivamente en `/etc/nava/api.env` de la VPS.
+- [x] `prisma migrate deploy` ejecutado contra Neon: 41 migraciones aplicadas,
+      sin migraciones pendientes según `prisma migrate status`.
 - [ ] Configurar la ventana de restauración puntual (PITR) y los snapshots de
       Neon según el plan contratado.
 - [ ] Ensayar una restauración en una rama de Neon y documentar el tiempo de
@@ -111,6 +115,30 @@ pagos online reales.
       primera acción.
 - [ ] Evaluar un `pg_dump` externo solo si se exige retención superior a Neon,
       copia fuera del proveedor o un requisito legal/comercial específico.
+
+### Despliegue piloto VPS y dominio — 9 de agosto de 2026
+
+- [x] Repositorio instalado en `/opt/nava/app` bajo el usuario de servicio
+      `nava`; dependencias bloqueadas con `pnpm install --frozen-lockfile` y
+      Prisma Client generado en la VPS.
+- [x] Secretos de servidor aislados en `/etc/nava/api.env`, fuera del
+      repositorio y con permisos restringidos. No se creó PostgreSQL en la VPS:
+      toda la persistencia productiva permanece en Neon.
+- [x] API Fastify compilada e iniciada como `nava-api.service`, accesible solo
+      localmente en `127.0.0.1:4000`.
+- [x] Web pública de reservas compilada e iniciada como `nava-web.service`,
+      accesible solo localmente en `127.0.0.1:3000`.
+- [x] Nginx enruta `https://api.navacloud.app` hacia la API y
+      `https://reservas.navacloud.app` hacia la Web; se preservan las cabeceras
+      `X-Forwarded-*` necesarias para el proxy confiable.
+- [x] Certificados TLS emitidos con Certbot y redirección HTTPS habilitada para
+      ambos subdominios.
+- [x] Verificación externa: `GET https://api.navacloud.app/health` responde
+      `200 OK` con `{ "status": "ok" }`; la Web responde correctamente por
+      HTTPS y CORS autoriza `https://reservas.navacloud.app`.
+- [ ] Pendiente de esta etapa: crear y completar una reserva pública real desde
+      `https://reservas.navacloud.app/{organizationSlug}/{locationSlug}`, validar
+      el correo/OTP y probar el enlace de gestión de la cita.
 
 ## Resumen por fases
 
@@ -3718,3 +3746,52 @@ caja, comisiones y registros históricos.
 - [ ] Los cambios de Expo Updates y Ajustes descritos en esta sección permanecen
       sin commit ni push; el commit `4b1be77` cubre únicamente el trabajo del
       dashboard y creación de citas.
+
+## Corte de sesión local y piloto Neon — 9 de agosto de 2026
+
+### Entorno local conectado al piloto
+
+- [x] La API local inició correctamente en `http://127.0.0.1:4000` con
+      `APP_ENV=production`, `DATABASE_URL` configurada y `/health` respondiendo
+      `{ "status": "ok" }`.
+- [x] Neon tiene por ahora una sola rama, `production`; las pruebas locales del
+      piloto escriben datos reales controlados en ella. No existe una rama QA.
+- [ ] No ejecutar `pnpm test`, `db:migrate:dev`, `db:migrate:deploy` ni usar
+      `TEST_DATABASE_URL` contra `production`. Usar cuentas, correos y reservas
+      identificados como QA y depurar exclusivamente esos registros al cierre.
+- [ ] La API local ejecuta tareas de reservas y notificaciones cada minuto.
+      Detener `pnpm dev:api` al terminar cada prueba para que la VPS siga siendo
+      la única instancia permanente que procesa recordatorios.
+
+### Incidencias locales identificadas
+
+- [x] **CORS Expo Web:** `.env` permite `http://localhost:3000`,
+      `http://localhost:8081` y `http://127.0.0.1:8081`. La próxima instancia
+      de `pnpm dev:api` tomará la configuración; no se reinició una instancia
+      local existente porque procesa tareas contra Neon de producción.
+- [ ] **Buscador Google Maps local:** `POST /v1/maps/autocomplete` llega a la
+      API y responde `502`. La clave de servidor probablemente está restringida
+      a la IP de la VPS; crear una clave local separada, restringida a la IP
+      pública local y solo a Places API (New) y Geocoding API. No usar la IP
+      privada `192.168.18.35`. Reiniciar la API al reemplazar la clave en `.env`.
+- [x] El aviso de `pg` sobre `sslmode=require` es una advertencia futura y no
+      bloquea la conexión actual con Neon.
+- [x] El error histórico de `CashRegisterStatus` sin exportar ocurrió durante
+      una regeneración de Prisma; la API vigente inicia y responde correctamente.
+
+### Trial y animación de suscripción
+
+- [x] Decisión del piloto aplicada: trial de **7 días** y gracia de 7 días.
+      Las suscripciones nuevas calculan el trial, el período actual y la
+      gracia desde `TRIAL_DAYS = 7` y `GRACE_DAYS = 7`.
+- [x] El tanque del dashboard representa tiempo transcurrido: inicia en 1 %,
+      crece durante el trial, suscripción o gracia y llega a 100 % al vencer.
+      El texto expresa el tiempo transcurrido y conserva `Día N de 7`.
+- [x] Migración `20260809120000_trial_7_days` creada. Solo reduce los `TRIAL`
+      vigentes que conservan exactamente el período heredado de 14 días y su
+      gracia de 7 días: trial/período a inicio + 7 días y gracia a inicio +
+      14 días. La prueba de integración valida 7 días de trial y 7 de gracia
+      para suscripciones nuevas.
+- [ ] La migración no se aplicó a Neon durante esta sesión. Aplicarla solo
+      mediante el despliegue controlado de la VPS, nunca desde las pruebas
+      locales conectadas a `production`.

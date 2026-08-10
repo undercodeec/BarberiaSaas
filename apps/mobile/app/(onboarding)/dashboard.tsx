@@ -263,11 +263,11 @@ function subscriptionProgress(
 ): SubscriptionProgress {
   if (!subscription) {
     return {
-      caption: 'de tiempo restante',
+      caption: 'de tiempo transcurrido',
       expiryLabel: hasError
         ? 'No pudimos consultar la vigencia'
         : 'Consultando la vigencia de tu plan',
-      percentage: 0,
+      percentage: 100,
       title: 'Tu suscripción',
     };
   }
@@ -319,27 +319,33 @@ function subscriptionProgress(
     endsAt <= now
   ) {
     return {
-      caption: 'de tiempo restante',
+      caption: 'de tiempo transcurrido',
       expiryLabel: endsAt
         ? `Venció el ${expiryDateLabel(endsAt)}`
         : 'La suscripción no está activa',
-      percentage: 0,
+      percentage: 100,
       title: 'Suscripción vencida',
     };
   }
 
   const duration = Math.max(DAY_MS, endsAt - startsAt);
-  const remaining = Math.max(0, Math.min(duration, endsAt - now));
+  const elapsed = Math.max(0, Math.min(duration, now - startsAt));
+  const remaining = duration - elapsed;
   const daysRemaining = Math.ceil(remaining / DAY_MS);
   const totalDays = Math.max(1, Math.ceil(duration / DAY_MS));
   const currentDay = Math.min(
     totalDays,
     Math.max(1, Math.floor((now - startsAt) / DAY_MS) + 1),
   );
-  const percentage = Math.round((remaining / duration) * 100);
+  const percentage = Math.max(1, Math.round((elapsed / duration) * 100));
 
   return {
-    caption: phase === 'trial' ? 'de prueba restante' : 'de tiempo restante',
+    caption:
+      phase === 'trial'
+        ? 'de prueba transcurrida'
+        : phase === 'grace'
+          ? 'de gracia transcurrida'
+          : 'de tiempo transcurrido',
     expiryLabel:
       daysRemaining === 0
         ? `Venció el ${expiryDateLabel(endsAt)}`
