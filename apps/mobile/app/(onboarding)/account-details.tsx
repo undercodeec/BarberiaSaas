@@ -51,6 +51,15 @@ const EMPTY_FORM: FormValues = {
   phone: '',
 };
 
+const MAX_COVER_IMAGE_DATA_URI_LENGTH = 700_000;
+
+function persistedCoverUri(value: string | null): string | null {
+  if (!value) return null;
+  return value.startsWith('data:image/') || /^https?:\/\//u.test(value)
+    ? value
+    : null;
+}
+
 function profileToForm(profile: OnboardingAccountDetailsResponse): FormValues {
   return {
     address: profile.addressLine ?? '',
@@ -123,7 +132,7 @@ export default function AccountDetailsScreen() {
     if (!profileQuery.data) return;
     // La respuesta remota hidrata el borrador editable una vez que termina la consulta.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCoverUri(profileQuery.data.coverImageUri);
+    setCoverUri(persistedCoverUri(profileQuery.data.coverImageUri));
     setCountryCode(profileQuery.data.countryCode ?? 'EC');
     setForm(profileToForm(profileQuery.data));
   }, [profileQuery.data]);
@@ -145,10 +154,30 @@ export default function AccountDetailsScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: true,
       aspect: [16, 9],
+      base64: true,
       mediaTypes: ['images'],
-      quality: 0.8,
+      quality: 0.45,
     });
-    if (!result.canceled) setCoverUri(result.assets[0]?.uri ?? null);
+    if (result.canceled) return;
+
+    const asset = result.assets[0];
+    if (!asset?.base64) {
+      setRequestError('No pudimos preparar la imagen. Intentalo nuevamente.');
+      return;
+    }
+    const mimeType =
+      asset.mimeType && /^(image\/(jpeg|png|webp))$/u.test(asset.mimeType)
+        ? asset.mimeType
+        : 'image/jpeg';
+    const imageDataUri = `data:${mimeType};base64,${asset.base64}`;
+    if (imageDataUri.length > MAX_COVER_IMAGE_DATA_URI_LENGTH) {
+      setRequestError(
+        'La imagen es demasiado grande. Elige otra foto o recortala antes de continuar.',
+      );
+      return;
+    }
+    setRequestError(null);
+    setCoverUri(imageDataUri);
   };
 
   const save = async () => {

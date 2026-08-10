@@ -264,7 +264,9 @@ model UserRegistrationProfile {
   countryCode           String                  @map("country_code") @db.Char(2)
   city                  String                  @db.VarChar(120)
   addressLine           String?                 @map("address_line") @db.VarChar(240)
-  coverImageUri         String?                 @map("cover_image_uri") @db.VarChar(2048)
+  // Las portadas se guardan como data URI comprimida durante el piloto. TEXT
+  // evita truncar el contenido base64 y no requiere un proveedor externo.
+  coverImageUri         String?                 @map("cover_image_uri") @db.Text
   description           String?                 @db.VarChar(500)
   facebookUrl           String?                 @map("facebook_url") @db.VarChar(2048)
   instagramUrl          String?                 @map("instagram_url") @db.VarChar(2048)

@@ -3,7 +3,7 @@
 import type { PublicBookingCatalog } from '@barber-saas/api-client';
 import { Country } from 'country-state-city';
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import bookingHero from './booking-hero.png';
 
@@ -271,33 +271,21 @@ export function BookingExperience({
   };
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#f4f3ef] text-[#161616] [color-scheme:light]">
-      <header className="border-b border-black/8 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl min-w-0 items-center justify-between gap-3 px-4 py-4 sm:px-5">
-          <div className="min-w-0">
-            <p className="text-xs font-black tracking-[0.2em] uppercase">
-              Nava
-            </p>
-            <p className="mt-1 truncate text-sm text-black/55">
-              Reservas de {catalog.organization.name}
-            </p>
-          </div>
-          <button
-            aria-label={`Volver al inicio de reservas de ${catalog.location.name}`}
-            className="max-w-32 shrink-0 truncate rounded-full bg-black px-3 py-2 text-xs font-bold text-white transition hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black sm:max-w-none sm:px-4"
-            onClick={() => setStep('landing')}
-            type="button"
-          >
-            {catalog.location.name}
-          </button>
-        </div>
-      </header>
+    <main className="min-h-screen overflow-x-hidden bg-[#FAF9F6] text-[#1C1C1C] [color-scheme:light]">
 
       {step === 'landing' ? (
         <Landing catalog={catalog} onBook={() => setStep('professional')} />
       ) : (
         <section className="mx-auto grid w-full max-w-6xl min-w-0 gap-6 px-4 py-6 sm:px-5 sm:py-8 lg:grid-cols-[minmax(0,1fr)_330px] lg:gap-8">
           <div className="min-w-0 rounded-[2rem] bg-white p-4 shadow-[0_24px_80px_rgba(0,0,0,.08)] sm:p-8">
+            <button
+              className="mb-5 inline-flex min-h-10 items-center rounded-full border border-[#E4E1DA] bg-[#FAF9F6] px-4 text-sm font-black text-[#555A63] transition hover:border-[#E1B85B] hover:text-[#1C1C1C] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B47D17]"
+              onClick={() => setStep('landing')}
+              type="button"
+            >
+              Volver al inicio
+            </button>
+
             <Progress step={step} />
             {step === 'professional' ? (
               <>
@@ -310,7 +298,7 @@ export function BookingExperience({
                     <button
                       className={`flex min-w-0 items-center gap-4 rounded-2xl border p-4 text-left transition ${
                         professionalId === item.id
-                          ? 'border-black bg-black text-white'
+                          ? 'border-[#B47D17] bg-[#EBD8AA] text-[#1C1C1C]'
                           : 'border-black/10 hover:border-black/30'
                       }`}
                       key={item.id}
@@ -412,7 +400,7 @@ export function BookingExperience({
                       <button
                         className={`min-w-16 shrink-0 rounded-2xl border px-3 py-3 ${
                           selected
-                            ? 'border-black bg-black text-white'
+                            ? 'border-[#B47D17] bg-[#EBD8AA] text-[#1C1C1C]'
                             : 'border-black/10'
                         }`}
                         key={dateKey(item)}
@@ -446,7 +434,7 @@ export function BookingExperience({
                         aria-pressed={selected}
                         className={`min-w-0 rounded-xl border px-2 py-2.5 text-xs font-black transition sm:text-sm ${
                           selected
-                            ? 'border-black bg-black text-white'
+                            ? 'border-[#B47D17] bg-[#EBD8AA] text-[#1C1C1C]'
                             : 'border-black/10 bg-white text-black hover:border-black/30'
                         }`}
                         key={option.id}
@@ -471,7 +459,7 @@ export function BookingExperience({
                       <button
                         className={`w-full min-w-0 rounded-xl border px-2 py-3 text-sm font-black whitespace-nowrap ${
                           startsAt === slot.startsAt
-                            ? 'border-black bg-black text-white'
+                            ? 'border-[#B47D17] bg-[#EBD8AA] text-[#1C1C1C]'
                             : 'border-black/10'
                         }`}
                         key={slot.startsAt}
@@ -782,8 +770,8 @@ function BookingSummary({
   totalMinutes: number;
 }) {
   return (
-    <aside className="h-fit min-w-0 rounded-[2rem] bg-black p-5 text-white sm:p-6 lg:sticky lg:top-6">
-      <p className="text-xs font-bold tracking-[0.18em] text-white/45 uppercase">
+    <aside className="h-fit min-w-0 rounded-[2rem] border border-[#E4E1DA] bg-white p-5 text-[#1C1C1C] shadow-[0_16px_40px_rgba(28,28,28,.06)] sm:p-6 lg:sticky lg:top-6">
+      <p className="text-xs font-bold tracking-[0.18em] text-[#555A63] uppercase">
         Tu cita
       </p>
       <h2 className="mt-2 text-2xl font-black break-words">
@@ -818,8 +806,8 @@ function BookingSummary({
           }
         />
       </dl>
-      <div className="mt-6 flex items-end justify-between border-t border-white/15 pt-5">
-        <span className="text-sm text-white/50">Total</span>
+      <div className="mt-6 flex items-end justify-between border-t border-[#E4E1DA] pt-5">
+        <span className="text-sm text-[#555A63]">Total</span>
         <strong className="text-2xl">
           {money(totalCents, catalog.location.currencyCode)}
         </strong>
@@ -831,7 +819,7 @@ function BookingSummary({
 function SummaryItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex min-w-0 gap-4">
-      <dt className="w-20 shrink-0 text-white/45">{label}</dt>
+      <dt className="w-20 shrink-0 text-[#555A63]">{label}</dt>
       <dd className="min-w-0 flex-1 text-right font-bold break-words">
         {value}
       </dd>
@@ -852,7 +840,7 @@ function Progress({ step }: { step: Step }) {
   return (
     <div className="mb-8 h-1.5 overflow-hidden rounded-full bg-black/8">
       <div
-        className="h-full rounded-full bg-black transition-all"
+        className="h-full rounded-full bg-[#C79532] transition-all"
         style={{ width: `${(value / order.length) * 100}%` }}
       />
     </div>
@@ -893,7 +881,7 @@ function NextButton({
 }) {
   return (
     <button
-      className="mt-8 w-full rounded-2xl bg-black px-5 py-4 font-black text-white disabled:cursor-not-allowed disabled:opacity-30"
+      className="mt-8 w-full rounded-2xl bg-[#E1B85B] px-5 py-4 font-black text-[#1C1C1C] shadow-[0_12px_24px_rgba(180,125,23,.12)] transition hover:bg-[#EBD8AA] disabled:cursor-not-allowed disabled:opacity-30"
       disabled={disabled}
       onClick={onClick}
       type="button"
@@ -949,6 +937,25 @@ function PublicBookingLanding({
     useState<LandingSection>('services');
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+  const [heroScrollProgress, setHeroScrollProgress] = useState(0);
+
+  useEffect(() => {
+    let animationFrame = 0;
+    const updateHeroProgress = () => {
+      const progress = Math.min(1, Math.max(0, window.scrollY / 300));
+      setHeroScrollProgress(progress);
+    };
+    updateHeroProgress();
+    const onScroll = () => {
+      animationFrame = window.requestAnimationFrame(updateHeroProgress);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+    };
+  }, []);
+
   const categories = useMemo(
     () =>
       Array.from(
@@ -983,9 +990,19 @@ function PublicBookingLanding({
 
   return (
     <>
-      <BusinessHero catalog={catalog} onBook={onBook} />
-      <SectionNavigation active={activeSection} onSelect={navigate} />
-      <main className="mx-auto max-w-6xl px-4 pb-12 sm:px-5 lg:px-8">
+      <BusinessHero
+        catalog={catalog}
+        onBook={onBook}
+        scrollProgress={heroScrollProgress}
+      />
+      <div className="relative z-20 -mt-12 sm:-mt-16">
+        <div className="sticky top-0 z-30 border-b border-[#E4E1DA] bg-[#FAF9F6]/95 shadow-[0_8px_24px_rgba(28,28,28,.05)] backdrop-blur">
+          <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-5 lg:px-8">
+            <h1 className="max-w-xl text-3xl leading-none font-black tracking-[-0.045em] sm:text-4xl">{catalog.organization.name}</h1>
+          </div>
+          <SectionNavigation active={activeSection} onSelect={navigate} />
+        </div>
+        <main className="mx-auto max-w-6xl px-4 pb-12 sm:px-5 lg:px-8">
         <section className="py-7">
           <SectionHeading>Sobre nosotros</SectionHeading>
           <p className="max-w-2xl text-sm leading-6 text-black/60 sm:text-base">
@@ -1039,7 +1056,7 @@ function PublicBookingLanding({
                   aria-pressed={activeCategory === category.id}
                   className={`min-h-9 shrink-0 rounded-full px-3 text-xs font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black ${
                     activeCategory === category.id
-                      ? 'bg-black text-white'
+                      ? 'bg-[#EBD8AA] text-[#1C1C1C]'
                       : 'bg-white text-black/60 hover:text-black'
                   }`}
                   key={category.id}
@@ -1127,6 +1144,7 @@ function PublicBookingLanding({
 
         <BusinessInformation catalog={catalog} onNavigate={navigate} />
       </main>
+    </div>
       <footer className="border-t border-black/10 px-4 py-6 text-center text-xs text-black/45 sm:px-5">
         Desarrollado con Nava
         <br />© {new Date().getFullYear()} Nava. Todos los derechos reservados.
@@ -1138,33 +1156,43 @@ function PublicBookingLanding({
 function BusinessHero({
   catalog,
   onBook,
+  scrollProgress,
 }: {
   catalog: PublicBookingCatalog;
   onBook: () => void;
+  scrollProgress: number;
 }) {
   const address = [catalog.location.addressLine, catalog.location.city]
     .filter(Boolean)
     .join(', ');
+  const coverImage = catalog.organization.coverImageUri;
   return (
-    <section className="relative isolate mx-auto h-[min(132vw,34rem)] min-h-96 max-w-6xl overflow-hidden bg-black sm:h-[31rem] sm:rounded-b-[2rem]">
+    <section
+      className="relative isolate mx-auto h-[min(132vw,34rem)] min-h-96 max-w-6xl overflow-hidden bg-[#1C1C1C] shadow-[0_20px_56px_rgba(180,125,23,.16)] transition-opacity duration-150 sm:h-[31rem] sm:rounded-b-[2rem]"
+      style={{
+        opacity: 1 - scrollProgress * 0.78,
+        transform: `translateY(${scrollProgress * -16}px)`,
+      }}
+    >
       <Image
         alt="Interior de una barbería"
         className="object-cover"
         fill
-        placeholder="blur"
+        placeholder={coverImage ? 'empty' : 'blur'}
         priority
         sizes="(max-width: 768px) 100vw, 72rem"
-        src={bookingHero}
+        src={coverImage ?? bookingHero}
+        unoptimized={Boolean(coverImage)}
       />
-      <div aria-hidden="true" className="absolute inset-0 bg-black/45" />
+      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-[#1C1C1C]/90 via-[#1C1C1C]/38 to-[#1C1C1C]/16" />
       <div className="absolute inset-x-0 bottom-0 p-5 text-white sm:p-8">
         <p className="text-xs font-black tracking-[0.18em] text-white/75 uppercase">
           {catalog.location.name}
         </p>
-        <h1 className="mt-2 max-w-xl text-4xl leading-none font-black tracking-[-0.045em] sm:text-6xl">
+        <h2 className="sr-only">
           {catalog.organization.name}
-        </h1>
-        <span className="mt-4 inline-flex rounded-full border border-white/35 px-3 py-1 text-xs font-bold">
+        </h2>
+        <span className="mt-4 inline-flex rounded-full border border-[#EBD8AA]/70 bg-[#1C1C1C]/25 px-3 py-1 text-xs font-bold">
           Barbería
         </span>
         <div className="mt-4 grid max-w-xl gap-2 text-sm text-white/85 sm:grid-cols-2">
@@ -1172,7 +1200,7 @@ function BusinessHero({
           <MetaItem icon="clock" value="Reservas online disponibles" />
         </div>
         <button
-          className="mt-5 min-h-11 rounded-full bg-white px-5 text-sm font-black text-black transition hover:bg-white/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          className="mt-5 min-h-11 rounded-full bg-[#E1B85B] px-5 text-sm font-black text-[#1C1C1C] shadow-[0_10px_22px_rgba(180,125,23,.28)] transition hover:bg-[#EBD8AA] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           onClick={onBook}
           type="button"
         >
@@ -1212,7 +1240,7 @@ function SectionNavigation({
   return (
     <nav
       aria-label="Navegación de la barbería"
-      className="sticky top-0 z-10 border-b border-black/8 bg-[#f4f3ef]/95 backdrop-blur"
+      className="bg-transparent"
     >
       <div className="mx-auto flex max-w-6xl px-4 sm:px-5 lg:px-8">
         {sections.map((section) => (

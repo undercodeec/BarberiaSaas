@@ -158,7 +158,7 @@ async function publicCatalog(
     organizationSlug,
     locationSlug,
   );
-  const [assignments, reviews, schedules] = await Promise.all([
+  const [assignments, reviews, schedules, ownerMembership] = await Promise.all([
     database.professionalService.findMany({
       include: {
         membership: {
@@ -195,6 +195,20 @@ async function publicCatalog(
     database.businessWeeklySchedule.findMany({
       orderBy: { weekday: 'asc' },
       where: { locationId: location.id },
+    }),
+    database.membership.findFirst({
+      include: {
+        user: {
+          select: {
+            registrationProfile: { select: { coverImageUri: true } },
+          },
+        },
+      },
+      where: {
+        organizationId: location.organizationId,
+        role: MembershipRole.OWNER,
+        status: MembershipStatus.ACTIVE,
+      },
     }),
   ]);
   const professionalMap = new Map<
@@ -254,6 +268,8 @@ async function publicCatalog(
     organization: {
       id: location.organization.id,
       name: location.organization.name,
+      coverImageUri:
+        ownerMembership?.user.registrationProfile?.coverImageUri ?? null,
       slug: location.organization.slug,
     },
     policy: {

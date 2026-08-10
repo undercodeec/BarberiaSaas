@@ -2,7 +2,7 @@
 
 Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión posterior documentada en `docs/adr/0003-postgresql-prisma-y-api-en-vps.md`. Se marca `[x]` solo cuando la tarea está implementada y cuenta con la verificación indicada; `[ ]` significa pendiente o aún no demostrada.
 
-Última actualización: 2026-08-09 (sesión local: mapa web, enlace de reservas y análisis de clientes)
+Última actualización: 2026-08-10 (reservas, UI móvil y ciclo de suscripciones)
 
 ## Estado operativo actual
 
@@ -106,7 +106,7 @@ pagos online reales.
 
 - [x] Proyecto/base de producción de Neon creado y su cadena de conexión
       registrada exclusivamente en `/etc/nava/api.env` de la VPS.
-- [x] `prisma migrate deploy` ejecutado contra Neon: 41 migraciones aplicadas,
+- [x] `prisma migrate deploy` ejecutado contra Neon: 42 migraciones aplicadas,
       sin migraciones pendientes según `prisma migrate status`.
 - [ ] Configurar la ventana de restauración puntual (PITR) y los snapshots de
       Neon según el plan contratado.
@@ -3756,9 +3756,10 @@ caja, comisiones y registros históricos.
       `{ "status": "ok" }`.
 - [x] Neon tiene por ahora una sola rama, `production`; las pruebas locales del
       piloto escriben datos reales controlados en ella. No existe una rama QA.
-- [ ] No ejecutar `pnpm test`, `db:migrate:dev`, `db:migrate:deploy` ni usar
-      `TEST_DATABASE_URL` contra `production`. Usar cuentas, correos y reservas
-      identificados como QA y depurar exclusivamente esos registros al cierre.
+- [x] Las pruebas automatizadas y `db:migrate:dev` permanecen separadas de
+      `production`; `db:migrate:deploy` se reserva para despliegues controlados.
+      El 10 de agosto se aplicó únicamente la migración pendiente del trial y
+      se verificó después que las 42 migraciones estuvieran al día.
 - [ ] La API local ejecuta tareas de reservas y notificaciones cada minuto.
       Detener `pnpm dev:api` al terminar cada prueba para que la VPS siga siendo
       la única instancia permanente que procesa recordatorios.
@@ -3786,15 +3787,16 @@ caja, comisiones y registros históricos.
       gracia desde `TRIAL_DAYS = 7` y `GRACE_DAYS = 7`.
 - [x] El tanque del dashboard representa tiempo transcurrido: inicia en 1 %,
       crece durante el trial, suscripción o gracia y llega a 100 % al vencer.
-      El texto expresa el tiempo transcurrido y conserva `Día N de 7`.
+      Durante el trial muestra dinámicamente `Te quedan N días de prueba`,
+      calculado desde `trialEndsAt`, y se refresca cada minuto.
 - [x] Migración `20260809120000_trial_7_days` creada. Solo reduce los `TRIAL`
       vigentes que conservan exactamente el período heredado de 14 días y su
       gracia de 7 días: trial/período a inicio + 7 días y gracia a inicio +
       14 días. La prueba de integración valida 7 días de trial y 7 de gracia
       para suscripciones nuevas.
-- [ ] La migración no se aplicó a Neon durante esta sesión. Aplicarla solo
-      mediante el despliegue controlado de la VPS, nunca desde las pruebas
-      locales conectadas a `production`.
+- [x] Migración `20260809120000_trial_7_days` aplicada a Neon el 10 de agosto
+      mediante `prisma migrate deploy`; `prisma migrate status` confirmó 42
+      migraciones aplicadas y ninguna pendiente.
 
 ## Ajustes de mapa y reservas en app móvil — 9 de agosto de 2026
 
@@ -3841,6 +3843,92 @@ caja, comisiones y registros históricos.
 
 - [x] `pnpm --filter @barber-saas/mobile typecheck` aprobado después de los
       cambios de mapa y panel de reservas.
-- [ ] Cambios locales sin commit al cerrar esta sesión:
-      `apps/mobile/src/components/BusinessLocationMap.web.tsx` y
-      `apps/mobile/src/components/BookingLinkSheet.tsx`.
+- [x] Los cambios de `BusinessLocationMap.web.tsx` y `BookingLinkSheet.tsx`
+      quedaron incluidos y publicados en `origin/main` mediante el commit
+      `2350733`.
+
+## UI de reservas y ciclo de suscripciones — 10 de agosto de 2026
+
+### Flujo móvil de creación de citas
+
+- [x] `new-booking.tsx`, `booking-details.tsx` y `client-detail.tsx` adoptaron
+      la paleta, fondos, tarjetas, bordes, botones y jerarquía visual del
+      dashboard.
+- [x] El banner de edición de cliente usa el mismo lenguaje visual y conserva
+      la lógica existente de actualización.
+- [x] La selección de horarios ofrece filtros `Todos`, `Mañana`, `Tarde` y
+      `Noche`; inicialmente limita la cantidad visible y permite desplegar o
+      contraer el resto mediante una flecha.
+- [x] El resumen de la cita dejó de usar el bloque negro heredado y ahora usa
+      superficie, borde y textos del tema global.
+- [x] Se corrigió el nodo de texto suelto que provocaba el error de React Native
+      Web al renderizar `new-booking.tsx`.
+
+### Resumen del negocio
+
+- [x] `business-summary.tsx` fue unificado con `appTheme`: fondo, tarjetas,
+      filtros, botones, tipografía, bordes, radios, sombras y colores semánticos.
+- [x] Se retiraron los círculos decorativos con el icono de destellos ubicados
+      al lado derecho de los encabezados de cada card.
+
+### Vigencia real del trial y la suscripción
+
+- [x] Abrir, cerrar o consultar repetidamente la app no reinicia la prueba: la
+      suscripción se conserva en PostgreSQL mediante una fila única por
+      organización y el `upsert` no reemplaza sus fechas existentes.
+- [x] Un plan `ACTIVE` cuyo `currentPeriodEnd` ya venció pasa a `PAST_DUE`,
+      recibe siete días de gracia desde el fin del período y termina en
+      `SUSPENDED`; si se consulta después de la gracia, se suspende en la misma
+      verificación usando la hora del servidor.
+- [x] Las reactivaciones administrativas o simuladas crean un período nuevo de
+      30 días, limpian las fechas del trial anterior y establecen explícitamente
+      la nueva gracia.
+- [x] El dashboard vuelve a consultar `/v1/subscription` cada minuto y siempre
+      al montar la pantalla para mostrar la transición realizada por el backend.
+- [x] Pruebas unitarias cubren consultas repetidas sin reinicio, paso de activo
+      a gracia y suspensión directa después de la gracia. En la validación del
+      corte se ejecutaron 12 pruebas correctamente; 28 casos PostgreSQL quedaron
+      omitidos porque el entorno no tenía `TEST_DATABASE_URL` aislada.
+- [x] Typecheck de API y móvil, ESLint de los archivos API modificados y
+      `git diff --check` aprobados.
+
+### Reserva pública Web
+
+- [x] La ruta pública conserva `BookingExperience` como entrada y recibió una
+      experiencia mobile-first con hero, navegación por servicios/equipo/reseñas
+      y el flujo de profesional, servicios, fecha/hora, contacto, OTP y
+      confirmación.
+- [x] Los horarios públicos pueden filtrarse por todo el día, mañana, tarde y
+      noche, manteniendo la consulta real de disponibilidad del backend.
+- [ ] Ejecutar la revisión visual final y el recorrido E2E completo de esta
+      nueva presentación en móvil y escritorio antes de cerrar Fase 4.
+
+### Versionado
+
+- [x] `97eafff`: mejoras del flujo móvil de citas, cliente y contador del trial.
+- [x] `8e70e04`: unificación visual del resumen del negocio.
+- [x] `2350733`: experiencia pública de reservas, ciclo de suscripciones,
+      pruebas y consolidación de todos los cambios locales en `origin/main`.
+
+## Portal público de reservas: despliegue y UI/UX — 10 de agosto de 2026
+
+- [x] Corregida la configuración de la Web pública en la VPS: `API_URL` y
+      `NEXT_PUBLIC_API_URL` apuntan a `https://api.navacloud.app`, mientras que
+      `PUBLIC_WEB_URL` conserva `https://reservas.navacloud.app`.
+- [x] Verificación externa del enlace de Figaro's: `GET
+      https://api.navacloud.app/v1/public/figaros` devuelve la sucursal
+      `principal`; `https://reservas.navacloud.app/figaros` responde `307` a
+      `/figaros/principal` y la página final responde `200 OK`.
+- [x] La VPS regeneró Prisma Client y ejecutó el despliegue controlado de
+      migraciones contra Neon. La base conserva 42 migraciones aplicadas.
+- [x] La portada pública de reservas fue rediseñada con enfoque mobile-first:
+      hero de negocio, navegación por Servicios/Equipo/Reseñas, presentación,
+      servicio destacado, buscador y filtros, catálogo, carrusel de
+      colaboradores, resumen de valoraciones, testimonio e información final.
+      Los botones de reserva continúan entrando al flujo existente de
+      profesional, servicios, disponibilidad, datos, OTP y confirmación.
+- [x] El asset visual del hero es original, genérico y sin marcas de terceros;
+      la captura externa se utilizó únicamente como referencia de estructura y
+      jerarquía, no como fuente de textos, nombres o imágenes.
+- [ ] Completar la validación manual visual en 360, 390, 430, 768 y 1280 px y
+      recorrer una reserva real con correo/OTP antes de cerrar la Fase 4.

@@ -87,6 +87,20 @@ integrationDescribe('reservas públicas', () => {
       },
     });
     membershipId = membership.id;
+    await database.userRegistrationProfile.create({
+      data: {
+        accountType: 'BUSINESS',
+        businessName: `Negocio ${suffix}`,
+        businessNameKey: `negocio-${suffix}`,
+        city: 'Quito',
+        countryCode: 'EC',
+        coverImageUri: 'data:image/jpeg;base64,aGVsbG8=',
+        openingTime: '09:00',
+        closingTime: '18:00',
+        phoneKey: `+59398${String(Date.now()).slice(-7)}`,
+        userId,
+      },
+    });
     await database.memberLocation.create({
       data: { locationId, membershipId },
     });
@@ -235,6 +249,9 @@ integrationDescribe('reservas públicas', () => {
       url: `/v1/public/${organizationSlug}/principal`,
     });
     expect(catalog.statusCode).toBe(200);
+    expect(catalog.json().organization.coverImageUri).toBe(
+      'data:image/jpeg;base64,aGVsbG8=',
+    );
     expect(catalog.json().professionals).toHaveLength(1);
     expect(catalog.json().services).toHaveLength(1);
 

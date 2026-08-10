@@ -127,6 +127,24 @@ const optionalProfileUrl = z
   .union([z.literal(''), z.string().trim().url().max(2048), z.null()])
   .transform((value) => value || null);
 
+const MAX_COVER_IMAGE_DATA_URI_LENGTH = 700_000;
+const optionalCoverImage = z
+  .union([
+    z.literal(''),
+    z
+      .string()
+      .trim()
+      .max(MAX_COVER_IMAGE_DATA_URI_LENGTH)
+      .refine(
+        (value) =>
+          /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/u.test(value) ||
+          /^https?:\/\//u.test(value),
+        'La portada debe ser una imagen JPEG, PNG o WebP valida.',
+      ),
+    z.null(),
+  ])
+  .transform((value) => value || null);
+
 export const updateOnboardingAccountDetailsSchema = z.object({
   addressLine: optionalProfileText(240),
   businessName: businessNameSchema,
@@ -134,7 +152,7 @@ export const updateOnboardingAccountDetailsSchema = z.object({
   countryCode: z
     .string()
     .regex(/^[A-Z]{2}$/u, 'El c\u00f3digo de pa\u00eds no es v\u00e1lido.'),
-  coverImageUri: optionalProfileText(2048),
+  coverImageUri: optionalCoverImage,
   description: optionalProfileText(500),
   facebookUrl: optionalProfileUrl,
   instagramUrl: optionalProfileUrl,

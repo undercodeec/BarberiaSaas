@@ -759,6 +759,7 @@ export interface PublicBookingCatalog {
   };
   readonly organization: {
     readonly id: string;
+    readonly coverImageUri: string | null;
     readonly name: string;
     readonly slug: string;
   };
