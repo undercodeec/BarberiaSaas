@@ -23,8 +23,38 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
+import {
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 
 type BookingStep = 'professional' | 'services' | 'schedule';
+type TimePeriod = 'all' | 'afternoon' | 'morning' | 'night';
+
+const SLOT_PREVIEW_LIMIT = 9;
+const TIME_PERIODS: ReadonlyArray<{
+  readonly id: TimePeriod;
+  readonly label: string;
+  readonly range?: string;
+}> = [
+  { id: 'all', label: 'Todos' },
+  { id: 'morning', label: 'Mañana', range: '06:00–11:59' },
+  { id: 'afternoon', label: 'Tarde', range: '12:00–17:59' },
+  { id: 'night', label: 'Noche', range: '18:00–05:59' },
+];
+
+function slotMatchesPeriod(startsAt: string, period: TimePeriod) {
+  if (period === 'all') return true;
+
+  const hour = new Date(startsAt).getHours();
+  if (period === 'morning') return hour >= 6 && hour < 12;
+  if (period === 'afternoon') return hour >= 12 && hour < 18;
+  return hour >= 18 || hour < 6;
+}
+
+function periodEmptyLabel(period: TimePeriod) {
+  return TIME_PERIODS.find(({ id }) => id === period)?.label.toLowerCase();
+}
 
 function localDateValue(date: Date) {
   const year = date.getFullYear();
@@ -55,6 +85,8 @@ export default function BookingDetailsScreen() {
   const dates = useMemo(() => futureDates(), []);
   const [date, setDate] = useState(dates[0]!);
   const [startsAt, setStartsAt] = useState<string | null>(null);
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('all');
+  const [showAllSlots, setShowAllSlots] = useState(false);
   const [walkInName, setWalkInName] = useState('');
   const [walkInPhone, setWalkInPhone] = useState('');
   const [walkInEmail, setWalkInEmail] = useState('');
@@ -134,6 +166,18 @@ export default function BookingDetailsScreen() {
     ],
   });
 
+  const filteredSlots = useMemo(
+    () =>
+      (availabilityQuery.data?.slots ?? []).filter((slot) =>
+        slotMatchesPeriod(slot.startsAt, timePeriod),
+      ),
+    [availabilityQuery.data?.slots, timePeriod],
+  );
+  const visibleSlots = showAllSlots
+    ? filteredSlots
+    : filteredSlots.slice(0, SLOT_PREVIEW_LIMIT);
+  const hasMoreSlots = filteredSlots.length > SLOT_PREVIEW_LIMIT;
+
   const selectedProfessional = professionals.find(
     (professional) => professional.id === professionalId,
   );
@@ -208,6 +252,18 @@ export default function BookingDetailsScreen() {
     );
     setStartsAt(null);
   };
+  const chooseTimePeriod = (period: TimePeriod) => {
+    setTimePeriod(period);
+    setShowAllSlots(false);
+    if (startsAt && !slotMatchesPeriod(startsAt, period)) {
+      setStartsAt(null);
+    }
+  };
+  const chooseDate = (nextDate: Date) => {
+    setDate(nextDate);
+    setStartsAt(null);
+    setShowAllSlots(false);
+  };
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
@@ -221,7 +277,7 @@ export default function BookingDetailsScreen() {
           }}
           style={styles.backButton}
         >
-          <Ionicons color="#111827" name="arrow-back" size={23} />
+          <Ionicons color={appTheme.colors.icon} name="arrow-back" size={23} />
         </Pressable>
         <View>
           <Text style={styles.headerTitle}>Nueva cita</Text>
@@ -296,7 +352,11 @@ export default function BookingDetailsScreen() {
                 ]}
               >
                 <View style={styles.serviceIcon}>
-                  <Ionicons color="#111827" name="cut-outline" size={22} />
+                  <Ionicons
+                    color={appTheme.colors.accentDark}
+                    name="cut-outline"
+                    size={22}
+                  />
                 </View>
                 <View style={styles.cardCopy}>
                   <Text style={styles.cardTitle}>{service.name}</Text>
@@ -338,10 +398,7 @@ export default function BookingDetailsScreen() {
                 return (
                   <Pressable
                     key={localDateValue(item)}
-                    onPress={() => {
-                      setDate(item);
-                      setStartsAt(null);
-                    }}
+                    onPress={() => chooseDate(item)}
                     style={[styles.dateCard, selected && styles.dateSelected]}
                   >
                     <Text
@@ -367,11 +424,51 @@ export default function BookingDetailsScreen() {
               })}
             </ScrollView>
             <Text style={styles.sectionTitle}>Horarios disponibles</Text>
+            <View
+              accessibilityLabel="Filtrar horarios por franja"
+              accessibilityRole="radiogroup"
+              style={styles.timePeriodFilters}
+            >
+              {TIME_PERIODS.map((period) => {
+                const selected = timePeriod === period.id;
+                return (
+                  <Pressable
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    key={period.id}
+                    onPress={() => chooseTimePeriod(period.id)}
+                    style={[
+                      styles.timePeriodFilter,
+                      selected && styles.timePeriodFilterSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.timePeriodLabel,
+                        selected && styles.timePeriodLabelSelected,
+                      ]}
+                    >
+                      {period.label}
+                    </Text>
+                    {period.range ? (
+                      <Text
+                        style={[
+                          styles.timePeriodRange,
+                          selected && styles.timePeriodRangeSelected,
+                        ]}
+                      >
+                        {period.range}
+                      </Text>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
             {availabilityQuery.isLoading ? (
               <Text style={styles.empty}>Consultando disponibilidad...</Text>
             ) : null}
             <View style={styles.slotGrid}>
-              {(availabilityQuery.data?.slots ?? []).map((slot) => (
+              {visibleSlots.map((slot) => (
                 <Pressable
                   key={slot.startsAt}
                   onPress={() => setStartsAt(slot.startsAt)}
@@ -394,10 +491,29 @@ export default function BookingDetailsScreen() {
                 </Pressable>
               ))}
             </View>
-            {!availabilityQuery.isLoading &&
-            !(availabilityQuery.data?.slots.length ?? 0) ? (
+            {hasMoreSlots ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setShowAllSlots((visible) => !visible)}
+                style={styles.showMoreSlotsButton}
+              >
+                <Text style={styles.showMoreSlotsLabel}>
+                  {showAllSlots
+                    ? 'Mostrar menos horarios'
+                    : `Ver ${filteredSlots.length - SLOT_PREVIEW_LIMIT} horarios más`}
+                </Text>
+                <Ionicons
+                  color={appTheme.colors.accentDark}
+                  name={showAllSlots ? 'chevron-up' : 'chevron-down'}
+                  size={20}
+                />
+              </Pressable>
+            ) : null}
+            {!availabilityQuery.isLoading && !filteredSlots.length ? (
               <Text style={styles.empty}>
-                No hay espacios disponibles para esta fecha.
+                {timePeriod === 'all'
+                  ? 'No hay espacios disponibles para esta fecha.'
+                  : `No hay horarios disponibles en la ${periodEmptyLabel(timePeriod)}.`}
               </Text>
             ) : null}
 
@@ -490,7 +606,7 @@ function Selection({ selected }: { selected: boolean }) {
   return (
     <View style={[styles.selection, selected && styles.selectionSelected]}>
       {selected ? (
-        <Ionicons color="#FFFFFF" name="checkmark" size={15} />
+        <Ionicons color={appTheme.colors.white} name="checkmark" size={15} />
       ) : null}
     </View>
   );
@@ -521,7 +637,7 @@ function ActionButton({
       style={[styles.action, disabled && styles.actionDisabled]}
     >
       <Text style={styles.actionText}>{label}</Text>
-      <Ionicons color="#FFFFFF" name="arrow-forward" size={19} />
+      <Ionicons color={appTheme.colors.white} name="arrow-forward" size={19} />
     </Pressable>
   );
 }
@@ -529,28 +645,34 @@ function ActionButton({
 const styles = StyleSheet.create({
   action: {
     alignItems: 'center',
-    backgroundColor: '#111318',
-    borderRadius: 16,
+    backgroundColor: appTheme.colors.accent,
+    borderRadius: appTheme.radii.control,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
     minHeight: 54,
+    ...goldButtonShadow,
   },
   actionDisabled: { opacity: 0.35 },
-  actionText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+  actionText: { color: appTheme.colors.white, fontSize: 16, fontWeight: '900' },
   avatar: {
     alignItems: 'center',
-    backgroundColor: '#EEF1F5',
+    backgroundColor: appTheme.colors.accentWash,
     borderRadius: 24,
     height: 48,
     justifyContent: 'center',
     width: 48,
   },
-  avatarText: { color: '#111827', fontSize: 17, fontWeight: '900' },
+  avatarText: {
+    color: appTheme.colors.accentActive,
+    fontSize: 17,
+    fontWeight: '900',
+  },
   backButton: {
     alignItems: 'center',
-    borderColor: '#E2E5EA',
-    borderRadius: 20,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
     borderWidth: 1,
     height: 40,
     justifyContent: 'center',
@@ -558,21 +680,24 @@ const styles = StyleSheet.create({
   },
   card: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E3E6EB',
-    borderRadius: 18,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.card,
     borderWidth: 1,
     flexDirection: 'row',
     marginBottom: 10,
     padding: 14,
   },
   cardCopy: { flex: 1, marginLeft: 12 },
-  cardMeta: { color: '#687282', fontSize: 13, marginTop: 4 },
-  cardSelected: { backgroundColor: '#F6F8FA', borderColor: '#111318' },
-  cardTitle: { color: '#111827', fontSize: 15, fontWeight: '900' },
-  content: { padding: 20, paddingBottom: 130 },
+  cardMeta: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 4 },
+  cardSelected: {
+    backgroundColor: appTheme.colors.accentWash,
+    borderColor: appTheme.colors.accent,
+  },
+  cardTitle: { color: appTheme.colors.text, fontSize: 15, fontWeight: '900' },
+  content: { padding: appTheme.spacing.page, paddingBottom: 130 },
   copy: {
-    color: '#667085',
+    color: appTheme.colors.textMuted,
     fontSize: 14,
     lineHeight: 21,
     marginBottom: 20,
@@ -580,98 +705,102 @@ const styles = StyleSheet.create({
   },
   dateCard: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E2E5EA',
-    borderRadius: 15,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
     borderWidth: 1,
     minWidth: 58,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   dateDay: {
-    color: '#6E7785',
+    color: appTheme.colors.textMuted,
     fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
   dateNumber: {
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 18,
     fontWeight: '900',
     marginTop: 3,
   },
   dateRow: { gap: 8, paddingBottom: 6 },
-  dateSelected: { backgroundColor: '#111318', borderColor: '#111318' },
-  dateTextSelected: { color: '#FFFFFF' },
+  dateSelected: {
+    backgroundColor: appTheme.colors.accent,
+    borderColor: appTheme.colors.accent,
+  },
+  dateTextSelected: { color: appTheme.colors.white },
   empty: {
-    color: '#687282',
+    color: appTheme.colors.textMuted,
     fontSize: 14,
     lineHeight: 21,
     paddingVertical: 18,
     textAlign: 'center',
   },
   footer: {
-    backgroundColor: '#FFFFFF',
-    borderTopColor: '#E5E7EB',
+    backgroundColor: appTheme.colors.surfaceElevated,
+    borderTopColor: appTheme.colors.border,
     borderTopWidth: 1,
     bottom: 0,
     left: 0,
-    padding: 16,
+    padding: appTheme.spacing.page,
     position: 'absolute',
     right: 0,
   },
   formCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E5E7EB',
-    borderRadius: 18,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.card,
     borderWidth: 1,
     marginTop: 22,
     padding: 15,
   },
   header: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderBottomColor: '#ECEEF1',
+    backgroundColor: appTheme.colors.background,
+    borderBottomColor: appTheme.colors.border,
     borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
+    paddingHorizontal: appTheme.spacing.page,
     paddingVertical: 12,
   },
   headerSpacer: { width: 40 },
   headerStep: {
-    color: '#758091',
+    color: appTheme.colors.accentDark,
     fontSize: 10,
     fontWeight: '800',
     marginTop: 2,
     textAlign: 'center',
   },
   headerTitle: {
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 16,
     fontWeight: '900',
     textAlign: 'center',
   },
   input: {
-    borderColor: '#DDE1E7',
-    borderRadius: 13,
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
     borderWidth: 1,
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 14,
     marginTop: 10,
     minHeight: 48,
     paddingHorizontal: 13,
   },
-  screen: { backgroundColor: '#F7F8FA', flex: 1 },
+  screen: { backgroundColor: appTheme.colors.background, flex: 1 },
   sectionTitle: {
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 15,
     fontWeight: '900',
     marginBottom: 10,
     marginTop: 20,
   },
   selection: {
-    borderColor: '#B8C0CB',
+    borderColor: appTheme.colors.accentLight,
     borderRadius: 12,
     borderWidth: 1.5,
     height: 24,
@@ -679,13 +808,13 @@ const styles = StyleSheet.create({
   },
   selectionSelected: {
     alignItems: 'center',
-    backgroundColor: '#111318',
-    borderColor: '#111318',
+    backgroundColor: appTheme.colors.accent,
+    borderColor: appTheme.colors.accent,
     justifyContent: 'center',
   },
   serviceIcon: {
     alignItems: 'center',
-    backgroundColor: '#EEF1F5',
+    backgroundColor: appTheme.colors.accentWash,
     borderRadius: 14,
     height: 44,
     justifyContent: 'center',
@@ -693,28 +822,86 @@ const styles = StyleSheet.create({
   },
   slot: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#DDE1E7',
-    borderRadius: 12,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
     borderWidth: 1,
     minWidth: '30%',
     paddingHorizontal: 12,
     paddingVertical: 11,
   },
   slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  slotSelected: { backgroundColor: '#111318', borderColor: '#111318' },
-  slotText: { color: '#111827', fontSize: 13, fontWeight: '800' },
-  slotTextSelected: { color: '#FFFFFF' },
+  slotSelected: {
+    backgroundColor: appTheme.colors.accent,
+    borderColor: appTheme.colors.accent,
+  },
+  slotText: { color: appTheme.colors.text, fontSize: 13, fontWeight: '800' },
+  slotTextSelected: { color: appTheme.colors.white },
+  showMoreSlotsButton: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 5,
+    marginTop: 16,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+  },
+  showMoreSlotsLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  timePeriodFilter: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
+    borderWidth: 1,
+    minWidth: 92,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  timePeriodFilters: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  timePeriodFilterSelected: {
+    backgroundColor: appTheme.colors.accentWash,
+    borderColor: appTheme.colors.accent,
+  },
+  timePeriodLabel: {
+    color: appTheme.colors.text,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  timePeriodLabelSelected: { color: appTheme.colors.accentDark },
+  timePeriodRange: {
+    color: appTheme.colors.textMuted,
+    fontSize: 10,
+    marginTop: 2,
+  },
+  timePeriodRangeSelected: { color: appTheme.colors.accentDark },
   summary: {
-    backgroundColor: '#111318',
-    borderRadius: 20,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.card,
+    borderWidth: 1,
     marginTop: 22,
     padding: 17,
+    shadowColor: appTheme.colors.accentDark,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
   },
-  summaryLabel: { color: '#AAB2BF', fontSize: 12 },
+  summaryLabel: { color: appTheme.colors.textMuted, fontSize: 12 },
   summaryRow: {
     alignItems: 'flex-start',
-    borderTopColor: '#2B3038',
+    borderTopColor: appTheme.colors.border,
     borderTopWidth: 1,
     flexDirection: 'row',
     gap: 12,
@@ -722,33 +909,41 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   summaryTitle: {
-    color: '#FFFFFF',
+    color: appTheme.colors.text,
     fontSize: 16,
     fontWeight: '900',
     marginBottom: 8,
   },
   summaryValue: {
-    color: '#FFFFFF',
+    color: appTheme.colors.text,
     flex: 1,
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'right',
   },
   title: {
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 27,
     fontWeight: '900',
     letterSpacing: -0.7,
   },
   totalCard: {
     alignItems: 'center',
-    backgroundColor: '#111318',
-    borderRadius: 16,
+    backgroundColor: appTheme.colors.accentWash,
+    borderRadius: appTheme.radii.card,
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 8,
     padding: 16,
   },
-  totalLabel: { color: '#CBD0D8', fontSize: 13, fontWeight: '700' },
-  totalValue: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
+  totalLabel: {
+    color: appTheme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  totalValue: {
+    color: appTheme.colors.accentDark,
+    fontSize: 18,
+    fontWeight: '900',
+  },
 });

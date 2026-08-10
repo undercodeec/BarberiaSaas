@@ -349,7 +349,9 @@ function subscriptionProgress(
     expiryLabel:
       daysRemaining === 0
         ? `Venció el ${expiryDateLabel(endsAt)}`
-        : `Día ${currentDay} de ${totalDays}`,
+        : phase === 'trial'
+          ? `Te quedan ${daysRemaining} ${daysRemaining === 1 ? 'día' : 'días'} de prueba`
+          : `Día ${currentDay} de ${totalDays}`,
     percentage,
     title:
       phase === 'trial'

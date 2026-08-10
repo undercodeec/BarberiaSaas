@@ -15,6 +15,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
+import {
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 import { ClientFormSheet } from './clients';
 
 export default function NewBookingScreen() {
@@ -60,7 +64,7 @@ export default function NewBookingScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Ionicons color="#111827" name="close" size={24} />
+          <Ionicons color={appTheme.colors.icon} name="close" size={24} />
         </Pressable>
         <Text style={styles.step}>PASO 1 DE 4</Text>
         <View style={styles.headerSpacer} />
@@ -79,11 +83,19 @@ export default function NewBookingScreen() {
           onPress={() => setIsCreateClientOpen(true)}
           style={styles.addClientButton}
         >
-          <Ionicons color="#FFFFFF" name="person-add-outline" size={20} />
+          <Ionicons
+            color={appTheme.colors.white}
+            name="person-add-outline"
+            size={20}
+          />
           <Text style={styles.addClientLabel}>Añadir cliente</Text>
         </Pressable>
         <View style={styles.searchBox}>
-          <Ionicons color="#6E7785" name="search-outline" size={21} />
+          <Ionicons
+            color={appTheme.colors.textMuted}
+            name="search-outline"
+            size={21}
+          />
           <TextInput
             accessibilityLabel="Buscar cliente"
             onChangeText={setSearch}
@@ -102,7 +114,11 @@ export default function NewBookingScreen() {
           ]}
         >
           <View style={styles.withoutIcon}>
-            <Ionicons color="#111827" name="person-outline" size={22} />
+            <Ionicons
+              color={appTheme.colors.icon}
+              name="person-outline"
+              size={22}
+            />
           </View>
           <View style={styles.clientCopy}>
             <Text style={styles.clientName}>Continuar sin cliente</Text>
@@ -134,7 +150,8 @@ export default function NewBookingScreen() {
         onClose={() => setIsCreateClientOpen(false)}
         onCreated={(client) => setSelectedClientId(client.id)}
         visible={isCreateClientOpen}
-      />      <View style={styles.footer}>
+      />
+      <View style={styles.footer}>
         <View style={styles.progressTrack}>
           <View style={styles.progressValue} />
         </View>
@@ -151,7 +168,11 @@ export default function NewBookingScreen() {
             ]}
           >
             <Text style={styles.nextLabel}>Siguiente</Text>
-            <Ionicons color="#FFFFFF" name="arrow-forward" size={19} />
+            <Ionicons
+              color={appTheme.colors.white}
+              name="arrow-forward"
+              size={19}
+            />
           </Pressable>
         </View>
       </View>
@@ -197,7 +218,7 @@ function SelectionIndicator({ selected }: { selected: boolean }) {
   return (
     <View style={[styles.selection, selected && styles.selectionActive]}>
       {selected ? (
-        <Ionicons color="#FFFFFF" name="checkmark" size={15} />
+        <Ionicons color={appTheme.colors.white} name="checkmark" size={15} />
       ) : null}
     </View>
   );
@@ -206,13 +227,13 @@ function SelectionIndicator({ selected }: { selected: boolean }) {
 const styles = StyleSheet.create({
   additionalFields: { marginTop: 8 },
   additionalHeading: {
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 14,
     fontWeight: '800',
     marginTop: 12,
   },
   additionalLabel: {
-    color: '#111827',
+    color: appTheme.colors.text,
     flex: 1,
     fontSize: 15,
     fontWeight: '800',
@@ -226,48 +247,57 @@ const styles = StyleSheet.create({
   },
   addClientButton: {
     alignItems: 'center',
-    backgroundColor: '#111827',
-    borderRadius: 16,
+    backgroundColor: appTheme.colors.accent,
+    borderRadius: appTheme.radii.control,
     flexDirection: 'row',
     gap: 9,
     justifyContent: 'center',
     marginTop: 24,
     minHeight: 54,
+    ...goldButtonShadow,
   },
-  addClientLabel: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
+  addClientLabel: {
+    color: appTheme.colors.white,
+    fontSize: 15,
+    fontWeight: '900',
+  },
   avatar: {
     alignItems: 'center',
-    backgroundColor: '#E5E7EB',
+    backgroundColor: appTheme.colors.accentWash,
     borderRadius: 24,
     height: 48,
     justifyContent: 'center',
     width: 48,
   },
-  avatarLabel: { color: '#111827', fontSize: 18, fontWeight: '900' },
+  avatarLabel: {
+    color: appTheme.colors.accentActive,
+    fontSize: 18,
+    fontWeight: '900',
+  },
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E1E5EA',
-    borderRadius: 17,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
     borderWidth: 1,
     height: 44,
     justifyContent: 'center',
     width: 44,
   },
   clientSheet: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    backgroundColor: appTheme.colors.surfaceElevated,
+    borderTopLeftRadius: appTheme.radii.sheet,
+    borderTopRightRadius: appTheme.radii.sheet,
     paddingBottom: 34,
     paddingHorizontal: 22,
     paddingTop: 14,
   },
   field: {
-    backgroundColor: '#F6F7F8',
-    borderColor: '#D8DDE3',
-    borderRadius: 15,
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
     borderWidth: 1,
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 16,
     marginTop: 13,
     paddingHorizontal: 15,
@@ -275,22 +305,22 @@ const styles = StyleSheet.create({
   },
   handle: {
     alignSelf: 'center',
-    backgroundColor: '#C8CDD4',
+    backgroundColor: appTheme.colors.border,
     borderRadius: 3,
     height: 5,
     width: 45,
   },
   modalBackdrop: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
   modalOverlay: {
-    backgroundColor: 'rgba(17, 24, 39, 0.4)',
+    backgroundColor: appTheme.colors.overlay,
     flex: 1,
     justifyContent: 'flex-end',
   },
   clientCard: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E1E5EA',
-    borderRadius: 19,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.card,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
@@ -298,27 +328,41 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   clientCopy: { flex: 1 },
-  clientEmail: { color: '#6E7785', fontSize: 12, marginTop: 3 },
-  clientMeta: { color: '#6E7785', fontSize: 13, marginTop: 3 },
-  clientName: { color: '#111827', fontSize: 15, fontWeight: '900' },
-  content: { paddingBottom: 130, paddingHorizontal: 22, paddingTop: 25 },
-  copy: { color: '#5D6672', fontSize: 15, lineHeight: 22, marginTop: 9 },
+  clientEmail: { color: appTheme.colors.textMuted, fontSize: 12, marginTop: 3 },
+  clientMeta: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 3 },
+  clientName: { color: appTheme.colors.text, fontSize: 15, fontWeight: '900' },
+  content: {
+    paddingBottom: 130,
+    paddingHorizontal: appTheme.spacing.page,
+    paddingTop: 25,
+  },
+  copy: {
+    color: appTheme.colors.textMuted,
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 9,
+  },
   exitButton: {
     alignItems: 'center',
-    borderColor: '#C8CDD4',
-    borderRadius: 16,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
     borderWidth: 1,
     flex: 0.8,
     justifyContent: 'center',
     minHeight: 53,
   },
-  exitLabel: { color: '#111827', fontSize: 15, fontWeight: '900' },
+  exitLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 15,
+    fontWeight: '900',
+  },
   footer: {
-    backgroundColor: '#FFFFFF',
-    borderTopColor: '#E1E5EA',
+    backgroundColor: appTheme.colors.surfaceElevated,
+    borderTopColor: appTheme.colors.border,
     borderTopWidth: 1,
     paddingBottom: 16,
-    paddingHorizontal: 22,
+    paddingHorizontal: appTheme.spacing.page,
     paddingTop: 12,
   },
   footerActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
@@ -326,57 +370,68 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 22,
+    paddingHorizontal: appTheme.spacing.page,
     paddingTop: 12,
   },
   headerSpacer: { height: 44, width: 44 },
   listTitle: {
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 16,
     fontWeight: '900',
     marginTop: 25,
   },
-  muted: { color: '#6E7785', fontSize: 14, marginTop: 14 },
+  muted: { color: appTheme.colors.textMuted, fontSize: 14, marginTop: 14 },
   nextButton: {
     alignItems: 'center',
-    backgroundColor: '#111827',
-    borderRadius: 16,
+    backgroundColor: appTheme.colors.accent,
+    borderRadius: appTheme.radii.control,
     flex: 1.2,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
     minHeight: 53,
+    ...goldButtonShadow,
   },
   nextButtonDisabled: { opacity: 0.38 },
-  nextLabel: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
+  nextLabel: { color: appTheme.colors.white, fontSize: 15, fontWeight: '900' },
   progressTrack: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: appTheme.colors.border,
     borderRadius: 3,
     height: 5,
     overflow: 'hidden',
   },
-  progressValue: { backgroundColor: '#111827', height: '100%', width: '25%' },
-  sheetCopy: { color: '#6E7785', fontSize: 14, lineHeight: 20, marginTop: 7 },
+  progressValue: {
+    backgroundColor: appTheme.colors.accent,
+    height: '100%',
+    width: '25%',
+  },
+  sheetCopy: {
+    color: appTheme.colors.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 7,
+  },
   sheetSaveButton: {
     alignItems: 'center',
-    backgroundColor: '#111827',
-    borderRadius: 16,
+    backgroundColor: appTheme.colors.accent,
+    borderRadius: appTheme.radii.control,
     justifyContent: 'center',
     marginTop: 21,
     minHeight: 54,
+    ...goldButtonShadow,
   },
   sheetTitle: {
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 22,
     fontWeight: '900',
     marginTop: 17,
   },
-  screen: { backgroundColor: '#FBFCFF', flex: 1 },
+  screen: { backgroundColor: appTheme.colors.background, flex: 1 },
   searchBox: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E1E5EA',
-    borderRadius: 17,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 9,
@@ -384,39 +439,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     minHeight: 55,
   },
-  searchInput: { color: '#111827', flex: 1, fontSize: 15 },
+  searchInput: { color: appTheme.colors.text, flex: 1, fontSize: 15 },
   selectedCard: {
-    backgroundColor: '#F3F4F6',
-    borderColor: '#111827',
+    backgroundColor: appTheme.colors.accentWash,
+    borderColor: appTheme.colors.accent,
     borderWidth: 2,
   },
   selection: {
     alignItems: 'center',
-    borderColor: '#AAB2BD',
+    borderColor: appTheme.colors.accentLight,
     borderRadius: 14,
     borderWidth: 1.5,
     height: 27,
     justifyContent: 'center',
     width: 27,
   },
-  selectionActive: { backgroundColor: '#111827', borderColor: '#111827' },
+  selectionActive: {
+    backgroundColor: appTheme.colors.accent,
+    borderColor: appTheme.colors.accent,
+  },
   step: {
-    color: '#111827',
+    color: appTheme.colors.accentDark,
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 1.1,
   },
   title: {
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 29,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
   withoutClient: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E1E5EA',
-    borderRadius: 19,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.card,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
@@ -425,7 +483,7 @@ const styles = StyleSheet.create({
   },
   withoutIcon: {
     alignItems: 'center',
-    backgroundColor: '#E5E7EB',
+    backgroundColor: appTheme.colors.accentWash,
     borderRadius: 23,
     height: 46,
     justifyContent: 'center',

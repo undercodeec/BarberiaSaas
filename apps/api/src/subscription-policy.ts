@@ -110,6 +110,38 @@ export async function ensureOrganizationSubscription(
     update: {},
     where: { organizationId },
   });
+  const legacyTrialEndsAt = new Date(
+    subscription.currentPeriodStart.getTime() + 14 * DAY_MS,
+  );
+  const legacyGraceEndsAt = new Date(
+    legacyTrialEndsAt.getTime() + GRACE_DAYS * DAY_MS,
+  );
+  const hasLegacyFourteenDayTrial =
+    subscription.status === SubscriptionStatus.TRIAL &&
+    subscription.trialEndsAt?.getTime() === legacyTrialEndsAt.getTime() &&
+    subscription.currentPeriodEnd.getTime() === legacyTrialEndsAt.getTime() &&
+    subscription.graceEndsAt?.getTime() === legacyGraceEndsAt.getTime() &&
+    subscription.trialEndsAt > now;
+
+  // The database migration performs this repair in bulk. Keeping this small
+  // guard here makes the seven-day policy effective for a legacy trial as soon
+  // as it is read, even when a deployment has not yet applied that migration.
+  if (hasLegacyFourteenDayTrial) {
+    const normalizedTrialEndsAt = new Date(
+      subscription.currentPeriodStart.getTime() + TRIAL_DAYS * DAY_MS,
+    );
+    subscription = await transaction.subscription.update({
+      data: {
+        currentPeriodEnd: normalizedTrialEndsAt,
+        graceEndsAt: new Date(
+          normalizedTrialEndsAt.getTime() + GRACE_DAYS * DAY_MS,
+        ),
+        trialEndsAt: normalizedTrialEndsAt,
+      },
+      where: { id: subscription.id },
+    });
+  }
+
   if (
     subscription.status === SubscriptionStatus.TRIAL &&
     subscription.trialEndsAt &&
