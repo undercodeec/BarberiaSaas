@@ -51,18 +51,18 @@ Este bloque resuelve las definiciones que antes impedían decidir qué desarroll
 Las funcionalidades pospuestas no deben aparecer como disponibles ni bloquear
 la estabilización, el despliegue piloto o las pruebas en Google Play.
 
-| Área | Decisión vigente | Consecuencia para el piloto |
-| --- | --- | --- |
-| Préstamos a clientes | Fuera del MVP. No habrá desembolso de dinero, interés, cuotas ni vencimientos. | No se crea modelo, API ni pantalla. Una posible cuenta por cobrar por consumo se evaluará después del piloto. |
-| Anticipos a colaboradores | Se mantienen como `Anticipo de comisión`, sin interés ni calendario de cuotas. No se presentan como préstamo formal. | Continúa la implementación actual, descontada únicamente de comisiones futuras y con trazabilidad. |
-| Comisiones de productos | Pospuestas. Solo los servicios generan comisión durante el MVP. | Las ventas de inventario afectan stock, Caja y reportes, pero no generan comisión. |
-| Pagos online de clientes | PayPhone, comprobantes de transferencia y anticipos online quedan deshabilitados durante el piloto inicial. | Wallet conserva Caja, movimientos y comisiones; los cobros se registran manualmente cuando el negocio los recibe. |
-| Facturación de Nava | La suscripción continúa simulada, sin cobro real ni precios publicados. | Esencial mantiene trial y límites; Multi permanece `Próximamente`. |
-| Permisos personalizados | Pospuestos los permisos por acción y alcance de sucursal. | El piloto utiliza los perfiles base Propietario, Administrador, Recepción y Profesional validados por la API. |
-| Configuración regional | Idioma, moneda y zona horaria no serán editables después del onboarding durante el piloto. | Se evita reinterpretar citas y movimientos históricos; un cambio excepcional requerirá soporte administrativo. |
-| Información adicional | Fuera del piloto hasta definir campos concretos con efecto operativo. | Se mantiene como `Próximamente` o se oculta; no presenta controles que simulen guardar. |
-| WhatsApp | Fuera del MVP. | Las notificaciones del piloto usan correo, notificación interna y Expo Push. |
-| Escalado de API | Una sola instancia de API en la VPS durante el piloto. | El rate limiting en memoria es suficiente; Redis se reconsidera antes de escalar horizontalmente. |
+| Área                      | Decisión vigente                                                                                                     | Consecuencia para el piloto                                                                                       |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Préstamos a clientes      | Fuera del MVP. No habrá desembolso de dinero, interés, cuotas ni vencimientos.                                       | No se crea modelo, API ni pantalla. Una posible cuenta por cobrar por consumo se evaluará después del piloto.     |
+| Anticipos a colaboradores | Se mantienen como `Anticipo de comisión`, sin interés ni calendario de cuotas. No se presentan como préstamo formal. | Continúa la implementación actual, descontada únicamente de comisiones futuras y con trazabilidad.                |
+| Comisiones de productos   | Pospuestas. Solo los servicios generan comisión durante el MVP.                                                      | Las ventas de inventario afectan stock, Caja y reportes, pero no generan comisión.                                |
+| Pagos online de clientes  | PayPhone, comprobantes de transferencia y anticipos online quedan deshabilitados durante el piloto inicial.          | Wallet conserva Caja, movimientos y comisiones; los cobros se registran manualmente cuando el negocio los recibe. |
+| Facturación de Nava       | La suscripción continúa simulada, sin cobro real ni precios publicados.                                              | Esencial mantiene trial y límites; Multi permanece `Próximamente`.                                                |
+| Permisos personalizados   | Pospuestos los permisos por acción y alcance de sucursal.                                                            | El piloto utiliza los perfiles base Propietario, Administrador, Recepción y Profesional validados por la API.     |
+| Configuración regional    | Idioma, moneda y zona horaria no serán editables después del onboarding durante el piloto.                           | Se evita reinterpretar citas y movimientos históricos; un cambio excepcional requerirá soporte administrativo.    |
+| Información adicional     | Fuera del piloto hasta definir campos concretos con efecto operativo.                                                | Se mantiene como `Próximamente` o se oculta; no presenta controles que simulen guardar.                           |
+| WhatsApp                  | Fuera del MVP.                                                                                                       | Las notificaciones del piloto usan correo, notificación interna y Expo Push.                                      |
+| Escalado de API           | Una sola instancia de API en la VPS durante el piloto.                                                               | El rate limiting en memoria es suficiente; Redis se reconsidera antes de escalar horizontalmente.                 |
 
 ### Valores iniciales de política de reservas
 
@@ -3245,17 +3245,17 @@ caja, comisiones y registros históricos.
 
 ### Plan de las demás opciones de Reportes
 
-| Opción                             | Estado e integración definida                                                                                                                                  |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Historial de caja                  | Disponible mediante la pestaña Historial de Wallet: cierres, efectivo esperado, contado y diferencia.                                                          |
-| Historial de gastos                | Disponible: listado paginado de movimientos `EXPENSE`, filtros por fecha/sucursal/método y CSV.                                                                |
-| Historial de depósitos             | Disponible: `DEPOSIT` y `OTHER_INCOME` paginados, con filtros por fecha/sucursal/método y CSV; no reutiliza `SALE`.                                            |
-| Pagar a colaboradores              | Disponible mediante Wallet/Comisiones y sus liquidaciones auditables.                                                                                          |
-| Historial de pagos a colaboradores | Disponible inicialmente en Wallet/Comisiones; luego tendrá filtros y exportación propios.                                                                      |
-| Alerta de inventario               | Disponible: catálogo, stock por sucursal, movimientos auditables, ajustes y filtro por umbral mínimo.                                                          |
-| Historial de ventas                | Disponible: detalle paginado de `SALE` por método, servicio, profesional, cita y cliente.                                                                      |
+| Opción                             | Estado e integración definida                                                                                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Historial de caja                  | Disponible mediante la pestaña Historial de Wallet: cierres, efectivo esperado, contado y diferencia.                                                                    |
+| Historial de gastos                | Disponible: listado paginado de movimientos `EXPENSE`, filtros por fecha/sucursal/método y CSV.                                                                          |
+| Historial de depósitos             | Disponible: `DEPOSIT` y `OTHER_INCOME` paginados, con filtros por fecha/sucursal/método y CSV; no reutiliza `SALE`.                                                      |
+| Pagar a colaboradores              | Disponible mediante Wallet/Comisiones y sus liquidaciones auditables.                                                                                                    |
+| Historial de pagos a colaboradores | Disponible inicialmente en Wallet/Comisiones; luego tendrá filtros y exportación propios.                                                                                |
+| Alerta de inventario               | Disponible: catálogo, stock por sucursal, movimientos auditables, ajustes y filtro por umbral mínimo.                                                                    |
+| Historial de ventas                | Disponible: detalle paginado de `SALE` por método, servicio, profesional, cita y cliente.                                                                                |
 | Préstamos a clientes               | Fuera del MVP y del piloto. Nava no desembolsa dinero ni administra interés, cuotas o vencimientos; una futura cuenta por cobrar por servicios se diseñará por separado. |
-| Reseñas de clientes                | Disponible mediante Gestión de reseñas.                                                                                                                        |
+| Reseñas de clientes                | Disponible mediante Gestión de reseñas.                                                                                                                                  |
 
 ### Verificación de este corte
 
@@ -3685,7 +3685,7 @@ caja, comisiones y registros históricos.
 ### Accesos rápidos y creación de citas
 
 - [x] El dashboard conserva los accesos principales `Resumen`, `Compartir
-      enlace` y `Nueva cita`; `Resumen` abre `/business-summary`.
+    enlace` y `Nueva cita`; `Resumen` abre `/business-summary`.
 - [x] Los accesos visibles se completaron con Servicios, Inventario y Nava
       Wallet, manteniendo el lenguaje visual existente y usando rutas reales.
 - [x] `Nueva cita` abre `/new-booking`; el alta de un cliente reutiliza el mismo
@@ -3916,7 +3916,7 @@ caja, comisiones y registros históricos.
       `NEXT_PUBLIC_API_URL` apuntan a `https://api.navacloud.app`, mientras que
       `PUBLIC_WEB_URL` conserva `https://reservas.navacloud.app`.
 - [x] Verificación externa del enlace de Figaro's: `GET
-      https://api.navacloud.app/v1/public/figaros` devuelve la sucursal
+    https://api.navacloud.app/v1/public/figaros` devuelve la sucursal
       `principal`; `https://reservas.navacloud.app/figaros` responde `307` a
       `/figaros/principal` y la página final responde `200 OK`.
 - [x] La VPS regeneró Prisma Client y ejecutó el despliegue controlado de
@@ -3962,3 +3962,79 @@ caja, comisiones y registros históricos.
 ### Pendiente de despliegue
 
 - [ ] Aplicar la migración `20260810193000_service_and_product_images` en producción y validar que una reserva pública muestre las fotos y el catálogo de productos de su sede.
+
+## Estrategia Freemium MVP de Nava - 10 de agosto de 2026
+
+> Esta seccion reemplaza las decisiones anteriores de trial de 7 dias y planes
+> Esencial/Multi. La fuente vigente es `ESTRATEGIA_FREEMIUM_MVP_NAVA.md`.
+
+### Planes, trial y persistencia
+
+- [x] Las cuentas nuevas inician un trial de Nava Local durante 14 dias, sin
+      tarjeta. Al vencer, el backend cambia automaticamente la suscripcion a
+      `FREE`, conserva la organizacion activa y no elimina ningun dato.
+- [x] Se definieron Nava Free (USD 0), Nava Esencial (USD 9.83) y Nava Local
+      (USD 29.99). Los mismos planes y precios aplican tanto a cuentas
+      profesionales como a cuentas de negocio.
+- [x] Nava Esencial incluye 1 profesional y 1 sucursal, reservas y clientes
+      ilimitados, agenda, reservas publicas, servicios, historial de clientes,
+      caja operativa y reportes esenciales. No incluye equipo, inventario ni
+      comisiones.
+- [x] Nava Local incluye 1 sucursal, profesionales ilimitados sin cobro por
+      usuario, reservas y clientes ilimitados, POS/caja, comisiones,
+      inventario, reportes completos, roles y permisos.
+- [x] La migracion `20260810230000_freemium_strategy` agrega el estado `FREE`,
+      el control de cortesia y crea/actualiza los tres planes. Las referencias
+      heredadas de Solo pasan a Esencial y las de Multi pasan a Local.
+- [x] Los trials vigentes creados con la regla anterior de 7 dias se amplian a
+      14 dias. Los ciclos pagados conservan la gracia tecnica de 7 dias.
+
+### Autoridad backend y limites Free
+
+- [x] `subscription-policy.ts` centraliza planes, features, consumo y
+      entitlements. La aplicacion movil solo presenta el estado; la API vuelve
+      a validar antes de cada escritura protegida.
+- [x] Nava Free limita una sucursal, un profesional activo utilizable, 40
+      reservas creadas en una ventana movil de 30 dias y 100 clientes activos.
+      Todos los estados de reserva cuentan por `createdAt`; cancelar una cita
+      no recupera cupo.
+- [x] Las reservas manuales y publicas usan bloqueo transaccional por
+      organizacion para evitar exceder el cupo por solicitudes simultaneas.
+- [x] Al superar limites se bloquean nuevas reservas, altas de clientes y
+      profesionales, pero se mantienen lecturas, historial y gestion de datos
+      existentes. En un downgrade con varios profesionales, solo el primero
+      incluido por el plan puede recibir nuevas reservas; los demas permanecen
+      disponibles como historial.
+- [x] Inventario y nuevas operaciones de comisiones se validan como capacidades
+      de Nava Local desde el backend. Los GET historicos siguen disponibles.
+- [x] La pagina publica respeta el limite y presenta un mensaje neutral de
+      reservas temporalmente pausadas sin revelar el estado comercial.
+
+### Cortesia, experiencia y conversion
+
+- [x] Nava Free ofrece una sola cortesia de +5 reservas por organizacion al
+      alcanzar las 40 incluidas. Su activacion es atomica y queda auditada.
+- [x] Configuracion > Suscripcion muestra permanentemente consumo de reservas,
+      clientes, profesionales y sucursales, precios reales, capacidades del
+      plan y estado de la cortesia.
+- [x] Se implementaron avisos progresivos al llegar a 20, 30, 36 y 40 reservas
+      tanto en Suscripcion como de forma discreta en Home.
+- [x] El panel administrativo permite asignar Free, Esencial o Local y
+      desbloquear limites inmediatamente sin reinstalar la aplicacion.
+- [x] Se registran hitos auditables al alcanzar 5, 10, 20, 30 y 40 reservas,
+      ademas del uso de la cortesia y los cambios de plan.
+
+### Verificacion y siguientes pasos
+
+- [x] Prisma schema validate aprobado.
+- [x] Typecheck aprobado en API, Web publica, app movil y panel administrativo.
+- [x] Suite API aprobada con 14 pruebas ejecutadas y 28 pruebas PostgreSQL
+      omitidas localmente por no existir `TEST_DATABASE_URL` aislada. Se agrego
+      cobertura para la conversion automatica de trial vencido a Nava Free y
+      se actualizaron las expectativas de integracion a los nuevos planes.
+- [ ] Aplicar `20260810230000_freemium_strategy` en Neon/VPS con
+      `prisma migrate deploy`, regenerar Prisma Client y reiniciar `nava-api` y
+      `nava-web` antes de validar los limites en produccion.
+- [ ] El checkout, webhooks y cobro recurrente pertenecen a la Etapa D de la
+      estrategia. Hasta elegir proveedor, los upgrades se administran desde el
+      panel interno.

@@ -26,6 +26,11 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import { reconcileAppointmentCommissions } from './commissions';
 import { ApiError } from './errors';
+import {
+  assertCanCreateBooking,
+  assertCanUseProfessional,
+  recordBookingMilestone,
+} from './subscription-policy';
 
 interface AuthenticatedIdentity {
   readonly user: { readonly email: string; readonly id: string };
@@ -681,6 +686,13 @@ export function registerAgendaRoutes(
     try {
       const appointment = await database.$transaction(async (transaction) => {
         await transaction.$queryRaw`WITH lock AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtext(${input.professionalMembershipId}))) SELECT 1 AS locked FROM lock`;
+        await transaction.$queryRaw`WITH lock AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtext(${current.organizationId}))) SELECT 1 AS locked FROM lock`;
+        await assertCanCreateBooking(transaction, current.organizationId);
+        await assertCanUseProfessional(
+          transaction,
+          current.organizationId,
+          input.professionalMembershipId,
+        );
         await assertBookable(transaction, {
           endsAt,
           locationId: input.locationId,
@@ -745,6 +757,7 @@ export function registerAgendaRoutes(
             organizationId: created.organizationId,
           },
         });
+        await recordBookingMilestone(transaction, current.organizationId);
         return created;
       });
       return reply

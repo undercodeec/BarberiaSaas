@@ -272,7 +272,6 @@ export function BookingExperience({
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#FAF9F6] text-[#1C1C1C] [color-scheme:light]">
-
       {step === 'landing' ? (
         <Landing catalog={catalog} onBook={() => setStep('professional')} />
       ) : (
@@ -365,7 +364,10 @@ export function BookingExperience({
                               width={56}
                             />
                           ) : (
-                            <span aria-hidden="true" className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-[#ecebe6] text-xl">
+                            <span
+                              aria-hidden="true"
+                              className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-[#ecebe6] text-xl"
+                            >
                               S
                             </span>
                           )}
@@ -1001,12 +1003,21 @@ function PublicBookingLanding({
       block: 'start',
     });
   };
+  const startBooking = () => {
+    if (catalog.bookingAvailability.canCreate) {
+      onBook();
+      return;
+    }
+    document.getElementById('booking-paused')?.scrollIntoView({
+      behavior: 'smooth',
+    });
+  };
 
   return (
     <>
       <BusinessHero
         catalog={catalog}
-        onBook={onBook}
+        onBook={startBooking}
         scrollProgress={heroScrollProgress}
       />
       <div className="relative z-20 -mt-12 sm:-mt-16">
@@ -1035,172 +1046,186 @@ function PublicBookingLanding({
               </h1>
             </div>
           </div>
-          <SectionNavigation active={activeSection} hasProducts={catalog.products.length > 0} onSelect={navigate} />
+          <SectionNavigation
+            active={activeSection}
+            hasProducts={catalog.products.length > 0}
+            onSelect={navigate}
+          />
         </div>
         <main className="mx-auto max-w-6xl px-4 pb-12 sm:px-5 lg:px-8">
-        <section className="py-7">
-          <SectionHeading>Sobre nosotros</SectionHeading>
-          <p className="max-w-2xl text-sm leading-6 text-black/60 sm:text-base">
-            {catalog.organization.name} es un espacio para cuidar tu estilo
-            {catalog.location.city ? ` en ${catalog.location.city}` : ''}. Elige
-            el servicio y el profesional que mejor se adapten a tu próxima cita.
-          </p>
-        </section>
-
-        <section className="scroll-mt-20 py-7" id="services">
-          <SectionHeading
-            action="Ver todos"
-            onAction={() => navigate('services')}
-          >
-            Lo más pedido aquí
-          </SectionHeading>
-          {catalog.services[0] ? (
-            <FeaturedService
-              currency={catalog.location.currencyCode}
-              onBook={onBook}
-              service={catalog.services[0]}
-            />
+          {!catalog.bookingAvailability.canCreate ? (
+            <div
+              className="mt-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-900"
+              id="booking-paused"
+            >
+              {catalog.bookingAvailability.message}
+            </div>
           ) : null}
 
-          <div className="mt-7">
-            <label className="flex min-h-11 items-center gap-3 rounded-xl border border-black/15 bg-white px-3">
-              <span aria-hidden="true" className="text-black/45">
-                ⌕
-              </span>
-              <span className="sr-only">Buscar servicios</span>
-              <input
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-black/40"
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar servicios..."
-                type="search"
-                value={search}
-              />
-            </label>
-            <div
-              aria-label="Filtrar servicios por categoría"
-              className="mt-3 flex [scrollbar-width:none] gap-2 overflow-x-auto pb-1"
-            >
-              {[
-                { id: 'all', label: 'Todos los servicios' },
-                ...categories.map((category) => ({
-                  id: category,
-                  label: category,
-                })),
-              ].map((category) => (
-                <button
-                  aria-pressed={activeCategory === category.id}
-                  className={`min-h-9 shrink-0 rounded-full px-3 text-xs font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black ${
-                    activeCategory === category.id
-                      ? 'bg-[#EBD8AA] text-[#1C1C1C]'
-                      : 'bg-white text-black/60 hover:text-black'
-                  }`}
-                  key={category.id}
-                  onClick={() => setActiveCategory(category.id)}
-                  type="button"
-                >
-                  {category.label}
-                  {category.id === 'all' ? ` (${services.length})` : ''}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {services.length ? (
-            <div className="mt-5 grid gap-3 lg:grid-cols-2">
-              {services.map((service, index) => (
-                <ServiceCard
-                  currency={catalog.location.currencyCode}
-                  key={service.id}
-                  onBook={onBook}
-                  popular={index < 3}
-                  service={service}
-                />
-              ))}
-            </div>
-          ) : (
-            <p className="mt-5 rounded-xl bg-white p-4 text-sm text-black/55">
-              No encontramos servicios con esos filtros.
+          <section className="py-7">
+            <SectionHeading>Sobre nosotros</SectionHeading>
+            <p className="max-w-2xl text-sm leading-6 text-black/60 sm:text-base">
+              {catalog.organization.name} es un espacio para cuidar tu estilo
+              {catalog.location.city ? ` en ${catalog.location.city}` : ''}.
+              Elige el servicio y el profesional que mejor se adapten a tu
+              próxima cita.
             </p>
-          )}
-        </section>
+          </section>
 
-        {catalog.products.length ? (
+          <section className="scroll-mt-20 py-7" id="services">
+            <SectionHeading
+              action="Ver todos"
+              onAction={() => navigate('services')}
+            >
+              Lo más pedido aquí
+            </SectionHeading>
+            {catalog.services[0] ? (
+              <FeaturedService
+                currency={catalog.location.currencyCode}
+                onBook={startBooking}
+                service={catalog.services[0]}
+              />
+            ) : null}
+
+            <div className="mt-7">
+              <label className="flex min-h-11 items-center gap-3 rounded-xl border border-black/15 bg-white px-3">
+                <span aria-hidden="true" className="text-black/45">
+                  ⌕
+                </span>
+                <span className="sr-only">Buscar servicios</span>
+                <input
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-black/40"
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Buscar servicios..."
+                  type="search"
+                  value={search}
+                />
+              </label>
+              <div
+                aria-label="Filtrar servicios por categoría"
+                className="mt-3 flex [scrollbar-width:none] gap-2 overflow-x-auto pb-1"
+              >
+                {[
+                  { id: 'all', label: 'Todos los servicios' },
+                  ...categories.map((category) => ({
+                    id: category,
+                    label: category,
+                  })),
+                ].map((category) => (
+                  <button
+                    aria-pressed={activeCategory === category.id}
+                    className={`min-h-9 shrink-0 rounded-full px-3 text-xs font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black ${
+                      activeCategory === category.id
+                        ? 'bg-[#EBD8AA] text-[#1C1C1C]'
+                        : 'bg-white text-black/60 hover:text-black'
+                    }`}
+                    key={category.id}
+                    onClick={() => setActiveCategory(category.id)}
+                    type="button"
+                  >
+                    {category.label}
+                    {category.id === 'all' ? ` (${services.length})` : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {services.length ? (
+              <div className="mt-5 grid gap-3 lg:grid-cols-2">
+                {services.map((service, index) => (
+                  <ServiceCard
+                    currency={catalog.location.currencyCode}
+                    key={service.id}
+                    onBook={startBooking}
+                    popular={index < 3}
+                    service={service}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="mt-5 rounded-xl bg-white p-4 text-sm text-black/55">
+                No encontramos servicios con esos filtros.
+              </p>
+            )}
+          </section>
+
+          {catalog.products.length ? (
+            <section
+              className="scroll-mt-20 border-t border-black/8 py-7"
+              id="products"
+            >
+              <SectionHeading>Productos disponibles</SectionHeading>
+              <p className="-mt-2 mb-5 text-sm text-black/55">
+                Puedes adquirirlos durante tu visita al local.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {catalog.products.map((product) => (
+                  <ProductCard
+                    currency={catalog.location.currencyCode}
+                    key={product.id}
+                    product={product}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           <section
             className="scroll-mt-20 border-t border-black/8 py-7"
-            id="products"
+            id="team"
           >
-            <SectionHeading>Productos disponibles</SectionHeading>
-            <p className="-mt-2 mb-5 text-sm text-black/55">
-              Puedes adquirirlos durante tu visita al local.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {catalog.products.map((product) => (
-                <ProductCard
-                  currency={catalog.location.currencyCode}
-                  key={product.id}
-                  product={product}
-                />
+            <SectionHeading>Colaboradores</SectionHeading>
+            <div className="-mr-4 flex snap-x [scrollbar-width:none] gap-3 overflow-x-auto pr-4 pb-2 sm:-mr-5 sm:pr-5 lg:-mr-8 lg:pr-8">
+              {catalog.professionals.map((professional) => (
+                <article
+                  className="min-w-36 snap-start rounded-xl border border-black/10 bg-white p-4 text-center"
+                  key={professional.id}
+                >
+                  {professional.photoData ? (
+                    <Image
+                      alt={`Foto de ${professional.name}`}
+                      className="mx-auto rounded-full object-cover"
+                      height={56}
+                      src={professional.photoData}
+                      unoptimized
+                      width={56}
+                    />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[#ecebe6] text-lg font-black"
+                    >
+                      {professional.name.slice(0, 1)}
+                    </span>
+                  )}
+                  <h3 className="mt-3 truncate text-sm font-black">
+                    {professional.name}
+                  </h3>
+                  <p className="mt-1 line-clamp-2 text-xs leading-4 text-black/50">
+                    {professional.bio || 'Profesional del equipo'}
+                  </p>
+                </article>
               ))}
+              {!catalog.professionals.length ? (
+                <p className="rounded-xl bg-white p-4 text-sm text-black/55">
+                  Próximamente conocerás al equipo.
+                </p>
+              ) : null}
             </div>
           </section>
-        ) : null}
 
-        <section
-          className="scroll-mt-20 border-t border-black/8 py-7"
-          id="team"
-        >
-          <SectionHeading>Colaboradores</SectionHeading>
-          <div className="-mr-4 flex snap-x [scrollbar-width:none] gap-3 overflow-x-auto pr-4 pb-2 sm:-mr-5 sm:pr-5 lg:-mr-8 lg:pr-8">
-            {catalog.professionals.map((professional) => (
-              <article
-                className="min-w-36 snap-start rounded-xl border border-black/10 bg-white p-4 text-center"
-                key={professional.id}
-              >
-                {professional.photoData ? (
-                  <Image
-                    alt={`Foto de ${professional.name}`}
-                    className="mx-auto rounded-full object-cover"
-                    height={56}
-                    src={professional.photoData}
-                    unoptimized
-                    width={56}
-                  />
-                ) : (
-                  <span
-                    aria-hidden="true"
-                    className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[#ecebe6] text-lg font-black"
-                  >
-                    {professional.name.slice(0, 1)}
-                  </span>
-                )}
-                <h3 className="mt-3 truncate text-sm font-black">
-                  {professional.name}
-                </h3>
-                <p className="mt-1 line-clamp-2 text-xs leading-4 text-black/50">
-                  {professional.bio || 'Profesional del equipo'}
-                </p>
-              </article>
-            ))}
-            {!catalog.professionals.length ? (
-              <p className="rounded-xl bg-white p-4 text-sm text-black/55">
-                Próximamente conocerás al equipo.
-              </p>
-            ) : null}
-          </div>
-        </section>
+          <section
+            className="scroll-mt-20 border-t border-black/8 py-7"
+            id="reviews"
+          >
+            <SectionHeading>Reseñas</SectionHeading>
+            <RatingsSummary average={average} reviews={catalog.reviews} />
+            <FeaturedReview reviews={catalog.reviews} />
+          </section>
 
-        <section
-          className="scroll-mt-20 border-t border-black/8 py-7"
-          id="reviews"
-        >
-          <SectionHeading>Reseñas</SectionHeading>
-          <RatingsSummary average={average} reviews={catalog.reviews} />
-          <FeaturedReview reviews={catalog.reviews} />
-        </section>
-
-        <BusinessInformation catalog={catalog} onNavigate={navigate} />
-      </main>
-    </div>
+          <BusinessInformation catalog={catalog} onNavigate={navigate} />
+        </main>
+      </div>
       <footer className="border-t border-black/10 px-4 py-6 text-center text-xs text-black/45 sm:px-5">
         Desarrollado con Nava
         <br />© {new Date().getFullYear()} Nava. Todos los derechos reservados.
@@ -1240,14 +1265,15 @@ function BusinessHero({
         src={coverImage ?? bookingHero}
         unoptimized={Boolean(coverImage)}
       />
-      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-[#1C1C1C]/90 via-[#1C1C1C]/38 to-[#1C1C1C]/16" />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-gradient-to-t from-[#1C1C1C]/90 via-[#1C1C1C]/38 to-[#1C1C1C]/16"
+      />
       <div className="absolute inset-x-0 bottom-0 p-5 text-white sm:p-8">
         <p className="text-xs font-black tracking-[0.18em] text-white/75 uppercase">
           {catalog.location.name}
         </p>
-        <h2 className="sr-only">
-          {catalog.organization.name}
-        </h2>
+        <h2 className="sr-only">{catalog.organization.name}</h2>
         <span className="mt-4 inline-flex rounded-full border border-[#EBD8AA]/70 bg-[#1C1C1C]/25 px-3 py-1 text-xs font-bold">
           Barbería
         </span>
@@ -1297,10 +1323,7 @@ function SectionNavigation({
     { id: 'reviews', label: 'Reseñas' },
   ];
   return (
-    <nav
-      aria-label="Navegación de la barbería"
-      className="bg-transparent"
-    >
+    <nav aria-label="Navegación de la barbería" className="bg-transparent">
       <div className="mx-auto flex max-w-6xl px-4 sm:px-5 lg:px-8">
         {sections.map((section) => (
           <button

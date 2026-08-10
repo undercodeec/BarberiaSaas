@@ -3,6 +3,7 @@ import {
   AppointmentSource,
   AppointmentStatus,
   MembershipRole,
+  SubscriptionStatus,
   MembershipStatus,
   UnconfirmedBookingAction,
   type DatabaseClient,
@@ -32,7 +33,14 @@ import {
   createVerificationCode,
   hashOpaqueToken,
 } from './security';
-import { organizationSubscriptionIsReadOnly } from './subscription-policy';
+import {
+  assertCanUseProfessional,
+  assertCanCreateBooking,
+  getAllowedProfessionalIds,
+  getSubscriptionUsage,
+  recordBookingMilestone,
+  organizationSubscriptionIsReadOnly,
+} from './subscription-policy';
 
 const PUBLIC_VERIFICATION_DURATION_MS = 10 * 60 * 1000;
 const MANAGEMENT_AFTER_END_MS = 30 * 24 * 60 * 60 * 1000;
@@ -158,75 +166,89 @@ async function publicCatalog(
     organizationSlug,
     locationSlug,
   );
-  const [assignments, reviews, products, schedules, ownerMembership] = await Promise.all([
-    database.professionalService.findMany({
-      include: {
-        membership: {
-          include: {
-            user: {
-              select: {
-                fullName: true,
-                profileBio: true,
-                profilePhotoData: true,
+  const subscriptionUsage = await getSubscriptionUsage(
+    database,
+    location.organizationId,
+  );
+  const allowedProfessionalIds = await getAllowedProfessionalIds(
+    database,
+    location.organizationId,
+  );
+  const [assignments, reviews, products, schedules, ownerMembership] =
+    await Promise.all([
+      database.professionalService.findMany({
+        include: {
+          membership: {
+            include: {
+              user: {
+                select: {
+                  fullName: true,
+                  profileBio: true,
+                  profilePhotoData: true,
+                },
               },
             },
           },
+          service: { include: { category: true } },
         },
-        service: { include: { category: true } },
-      },
-      where: {
-        locationId: location.id,
-        membership: { status: MembershipStatus.ACTIVE },
-        service: {
-          isActive: true,
-          onlineBooking: true,
-          organizationId: location.organizationId,
-        },
-      },
-    }),
-    database.appointmentReview.findMany({
-      include: {
-        professional: { include: { user: { select: { fullName: true } } } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 40,
-      where: { isVisible: true, locationId: location.id },
-    }),
-    database.product.findMany({
-      orderBy: { name: 'asc' },
-      select: {
-        id: true,
-        imageData: true,
-        inventory: {
-          select: { quantityOnHand: true },
-          where: { locationId: location.id },
-        },
-        name: true,
-        salePriceCents: true,
-        stockTrackingEnabled: true,
-      },
-      where: { isActive: true, organizationId: location.organizationId },
-    }),
-    database.businessWeeklySchedule.findMany({
-      orderBy: { weekday: 'asc' },
-      where: { locationId: location.id },
-    }),
-    database.membership.findFirst({
-      include: {
-        user: {
-          select: {
-            profilePhotoData: true,
-            registrationProfile: { select: { coverImageUri: true } },
+        where: {
+          locationId: location.id,
+          membership: {
+            ...(allowedProfessionalIds === null
+              ? {}
+              : { id: { in: allowedProfessionalIds } }),
+            status: MembershipStatus.ACTIVE,
+          },
+          service: {
+            isActive: true,
+            onlineBooking: true,
+            organizationId: location.organizationId,
           },
         },
-      },
-      where: {
-        organizationId: location.organizationId,
-        role: MembershipRole.OWNER,
-        status: MembershipStatus.ACTIVE,
-      },
-    }),
-  ]);
+      }),
+      database.appointmentReview.findMany({
+        include: {
+          professional: { include: { user: { select: { fullName: true } } } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 40,
+        where: { isVisible: true, locationId: location.id },
+      }),
+      database.product.findMany({
+        orderBy: { name: 'asc' },
+        select: {
+          id: true,
+          imageData: true,
+          inventory: {
+            select: { quantityOnHand: true },
+            where: { locationId: location.id },
+          },
+          name: true,
+          salePriceCents: true,
+          stockTrackingEnabled: true,
+        },
+        where: { isActive: true, organizationId: location.organizationId },
+      }),
+      database.businessWeeklySchedule.findMany({
+        orderBy: { weekday: 'asc' },
+        where: { locationId: location.id },
+      }),
+      database.membership.findFirst({
+        include: {
+          user: {
+            select: {
+              profilePhotoData: true,
+              registrationProfile: { select: { coverImageUri: true } },
+            },
+          },
+        },
+        where: {
+          organizationId: location.organizationId,
+          role: MembershipRole.OWNER,
+          status: MembershipStatus.ACTIVE,
+        },
+      }),
+    ]);
   const professionalMap = new Map<
     string,
     {
@@ -271,6 +293,26 @@ async function publicCatalog(
     });
   }
   return {
+    bookingAvailability: {
+      canCreate:
+        subscriptionUsage.subscription.status !==
+          SubscriptionStatus.SUSPENDED &&
+        subscriptionUsage.subscription.status !==
+          SubscriptionStatus.CANCELLED &&
+        (subscriptionUsage.effectiveBookingLimit === null ||
+          subscriptionUsage.usage.rolling30DayBookings <
+            subscriptionUsage.effectiveBookingLimit),
+      message:
+        subscriptionUsage.subscription.status ===
+          SubscriptionStatus.SUSPENDED ||
+        subscriptionUsage.subscription.status ===
+          SubscriptionStatus.CANCELLED ||
+        (subscriptionUsage.effectiveBookingLimit !== null &&
+          subscriptionUsage.usage.rolling30DayBookings >=
+            subscriptionUsage.effectiveBookingLimit)
+          ? 'Las reservas online de este negocio estan temporalmente pausadas. Puedes contactar directamente con el negocio.'
+          : null,
+    },
     location: {
       addressLine: location.addressLine,
       city: location.city,
@@ -864,6 +906,7 @@ export function registerPublicBookingRoutes(
           'PUBLIC_BOOKING_UNAVAILABLE',
           'Este negocio no está aceptando nuevas reservas por el momento.',
         );
+      await assertCanCreateBooking(database, location.organizationId, 'public');
       const context = await loadBookingContext(
         database,
         location.organizationId,
@@ -905,6 +948,18 @@ export function registerPublicBookingRoutes(
       );
       try {
         const appointment = await database.$transaction(async (transaction) => {
+          await transaction.$queryRaw`WITH lock AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtext(${location.organizationId}))) SELECT 1 AS locked FROM lock`;
+          await assertCanCreateBooking(
+            transaction,
+            location.organizationId,
+            'public',
+          );
+          await assertCanUseProfessional(
+            transaction,
+            location.organizationId,
+            input.membershipId,
+          );
+
           const created = await transaction.appointment.create({
             data: {
               clientEmail: input.email.toLowerCase(),
@@ -944,6 +999,7 @@ export function registerPublicBookingRoutes(
               type: AppointmentEventType.CREATED,
             },
           });
+          await recordBookingMilestone(transaction, location.organizationId);
           return created;
         });
         if (mailer) {

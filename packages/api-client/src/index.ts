@@ -556,13 +556,15 @@ export interface SubscriptionFeatureFlags {
 
 export interface SubscriptionPlanRecord {
   readonly available: boolean;
-  readonly code: 'essential' | 'multi';
+  readonly code: 'essential' | 'free' | 'local';
   readonly currencyCode: string;
   readonly featureFlags: SubscriptionFeatureFlags;
   readonly features: readonly string[];
   readonly limits: {
+    readonly clients: number | null;
     readonly locations: number;
-    readonly teamMembers: null;
+    readonly rolling30DayBookings: number | null;
+    readonly teamMembers: number | null;
   };
   readonly monthlyPriceCents: number | null;
   readonly name: string;
@@ -575,16 +577,25 @@ export interface SubscriptionResponse {
     readonly currentPeriodStart: string;
     readonly featureFlags: SubscriptionFeatureFlags;
     readonly graceEndsAt: string | null;
-    readonly planCode: 'essential' | 'multi';
+    readonly planCode: 'essential' | 'free' | 'local';
     readonly readOnly: boolean;
     readonly simulationAvailable: boolean;
     readonly status:
-      'active' | 'cancelled' | 'past_due' | 'suspended' | 'trial';
+      'active' | 'cancelled' | 'free' | 'past_due' | 'suspended' | 'trial';
     readonly trialEndsAt: string | null;
   };
   readonly plans: readonly SubscriptionPlanRecord[];
   readonly usage: {
+    readonly bookingLimit: number | null;
+    readonly bookingWindowStartsAt: string;
+    readonly clients: number;
+    readonly clientLimit: number | null;
+    readonly graceAvailable: boolean;
+    readonly graceBookings: number;
+    readonly graceUsed: boolean;
     readonly locations: number;
+    readonly rolling30DayBookings: number;
+    readonly teamMemberLimit: number | null;
     readonly teamMembers: number;
   };
 }
@@ -752,6 +763,10 @@ export interface BookingSettingsResponse {
 }
 
 export interface PublicBookingCatalog {
+  readonly bookingAvailability: {
+    readonly canCreate: boolean;
+    readonly message: string | null;
+  };
   readonly location: {
     readonly addressLine: string | null;
     readonly city: string | null;

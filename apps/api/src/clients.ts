@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import { ApiError } from './errors';
+import { assertCanCreateClient } from './subscription-policy';
 
 type Authenticate = (
   database: DatabaseClient,
@@ -228,6 +229,9 @@ export function registerClientRoutes(
   app.post('/v1/clients', async (request, reply) => {
     const { user } = await authenticate(database, request);
     const organizationId = await currentOrganizationId(database, user.id);
+    if (organizationId) {
+      await assertCanCreateClient(database, organizationId);
+    }
     const input = createClientSchema.parse(request.body);
     const client = await database.client.create({
       data: {

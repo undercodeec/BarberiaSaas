@@ -18,10 +18,62 @@ const STATUS_LABELS: Record<SubscriptionResponse['current']['status'], string> =
   {
     active: 'Activa',
     cancelled: 'Cancelada',
+    free: 'Plan gratuito',
     past_due: 'Período de gracia',
     suspended: 'Solo lectura',
     trial: 'Prueba gratuita',
   };
+
+function formatPrice(cents: number | null, currencyCode: string) {
+  if (cents === null) return 'Consultar';
+  if (cents === 0) return 'Gratis';
+  return `${new Intl.NumberFormat('es-EC', {
+    currency: currencyCode,
+    style: 'currency',
+  }).format(cents / 100)} / mes`;
+}
+
+function bookingUsageNotice(subscription: SubscriptionResponse | undefined) {
+  if (!subscription || subscription.current.planCode !== 'free') return null;
+  const usage = subscription.usage;
+  const effectiveLimit = usage.bookingLimit;
+  if (effectiveLimit === null) return null;
+  const baseLimit =
+    effectiveLimit - (usage.graceUsed ? usage.graceBookings : 0);
+  const used = usage.rolling30DayBookings;
+
+  if (usage.graceAvailable && used >= baseLimit)
+    return {
+      copy: `Llegaste a ${baseLimit} reservas. Puedes activar una unica cortesia de ${usage.graceBookings} reservas o pasar a un plan sin limite.`,
+      title: 'Limite mensual alcanzado',
+    };
+  if (used >= effectiveLimit)
+    return {
+      copy: 'Las nuevas reservas estan pausadas. Tus datos y reservas anteriores siguen disponibles.',
+      title: 'Reservas temporalmente pausadas',
+    };
+  if (usage.graceUsed && used >= baseLimit)
+    return {
+      copy: `Te quedan ${effectiveLimit - used} reservas de cortesia en esta ventana de 30 dias.`,
+      title: 'Cortesia activa',
+    };
+  if (used >= 36)
+    return {
+      copy: `Te quedan ${baseLimit - used} reservas antes de alcanzar el limite de Nava Free.`,
+      title: 'Estas cerca del limite',
+    };
+  if (used >= 30)
+    return {
+      copy: `Ya utilizaste ${used} de ${baseLimit} reservas en los ultimos 30 dias.`,
+      title: '75% del limite utilizado',
+    };
+  if (used >= 20)
+    return {
+      copy: `Ya gestionaste ${used} reservas con Nava en los ultimos 30 dias.`,
+      title: 'Tu negocio esta creciendo',
+    };
+  return null;
+}
 
 export default function SubscriptionScreen() {
   const router = useRouter();
@@ -43,6 +95,15 @@ export default function SubscriptionScreen() {
       await queryClient.invalidateQueries({ queryKey: ['subscription'] });
     },
   });
+  const activateGrace = useMutation({
+    mutationFn: () =>
+      requireApiClient().request('/v1/subscription/booking-grace', {
+        method: 'POST',
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['subscription'] });
+    },
+  });
   if (!session) return <Redirect href="/(auth)/login" />;
 
   const subscription = subscriptionQuery.data;
@@ -52,6 +113,7 @@ export default function SubscriptionScreen() {
   const trialEnd = subscription?.current.trialEndsAt
     ? new Date(subscription.current.trialEndsAt).toLocaleDateString()
     : null;
+  const usageNotice = bookingUsageNotice(subscription);
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -106,13 +168,54 @@ export default function SubscriptionScreen() {
               </View>
             ) : null}
           </View>
-          <Text style={styles.priceLabel}>Precio por definir</Text>
+          <Text style={styles.priceLabel}>
+            {currentPlan
+              ? formatPrice(
+                  currentPlan.monthlyPriceCents,
+                  currentPlan.currencyCode,
+                )
+              : 'Consultando precio'}
+          </Text>
           {trialEnd ? (
             <Text style={styles.periodCopy}>
               Prueba sin tarjeta hasta el {trialEnd}.
             </Text>
           ) : null}
-          <View style={styles.usageRow}>
+          <View style={styles.usageGrid}>
+            <UsageItem
+              label="Reservas (ultimos 30 dias)"
+              value={
+                subscription
+                  ? `${subscription.usage.rolling30DayBookings} / ${subscription.usage.bookingLimit ?? 'Ilimitadas'}`
+                  : '-'
+              }
+            />
+            <UsageItem
+              label="Clientes activos"
+              value={
+                subscription
+                  ? `${subscription.usage.clients} / ${subscription.usage.clientLimit ?? 'Ilimitados'}`
+                  : '-'
+              }
+            />
+            <UsageItem
+              label="Profesionales"
+              value={
+                subscription
+                  ? `${subscription.usage.teamMembers} / ${subscription.usage.teamMemberLimit ?? 'Ilimitados'}`
+                  : '-'
+              }
+            />
+            <UsageItem
+              label="Sucursales"
+              value={
+                subscription
+                  ? `${subscription.usage.locations} / ${currentPlan?.limits.locations ?? '-'}`
+                  : '-'
+              }
+            />
+          </View>
+          <View style={styles.hiddenUsage}>
             <View style={styles.usageItem}>
               <Text style={styles.usageValue}>
                 {subscription?.usage.locations ?? '—'} /{' '}
@@ -129,6 +232,39 @@ export default function SubscriptionScreen() {
             </View>
           </View>
         </View>
+
+        {usageNotice ? (
+          <View style={styles.limitCard}>
+            <Ionicons color="#A15C00" name="speedometer-outline" size={23} />
+            <View style={styles.headerCopy}>
+              <Text style={styles.warningTitle}>{usageNotice.title}</Text>
+              <Text style={styles.infoCopy}>{usageNotice.copy}</Text>
+              {subscription?.usage.graceAvailable &&
+              subscription.current.canManage ? (
+                <Pressable
+                  disabled={activateGrace.isPending}
+                  onPress={() => activateGrace.mutate()}
+                  style={styles.graceButton}
+                >
+                  <Text style={styles.graceButtonLabel}>
+                    {activateGrace.isPending
+                      ? 'Activando...'
+                      : `Activar +${subscription.usage.graceBookings} reservas`}
+                  </Text>
+                </Pressable>
+              ) : null}
+              {activateGrace.error ? (
+                <InlineMessage
+                  message={
+                    activateGrace.error instanceof Error
+                      ? activateGrace.error.message
+                      : 'No pudimos activar la cortesia.'
+                  }
+                />
+              ) : null}
+            </View>
+          </View>
+        ) : null}
 
         {subscription?.current.readOnly ? (
           <View style={styles.warningCard}>
@@ -224,7 +360,9 @@ export default function SubscriptionScreen() {
             <View style={styles.planHeading}>
               <View style={styles.headerCopy}>
                 <Text style={styles.planName}>{plan.name}</Text>
-                <Text style={styles.planPrice}>Precio por definir</Text>
+                <Text style={styles.planPrice}>
+                  {formatPrice(plan.monthlyPriceCents, plan.currencyCode)}
+                </Text>
               </View>
               <View
                 style={
@@ -270,6 +408,20 @@ export default function SubscriptionScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+function UsageItem({
+  label,
+  value,
+}: {
+  readonly label: string;
+  readonly value: string;
+}) {
+  return (
+    <View style={styles.usageTile}>
+      <Text style={styles.usageValue}>{value}</Text>
+      <Text style={styles.usageLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -476,6 +628,36 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   usageValue: { color: appTheme.colors.text, fontSize: 18, fontWeight: '900' },
+  graceButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: appTheme.colors.accentDark,
+    borderRadius: 12,
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  graceButtonLabel: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
+  hiddenUsage: { display: 'none' },
+  limitCard: {
+    alignItems: 'flex-start',
+    backgroundColor: '#FFF4DE',
+    borderRadius: 18,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 16,
+  },
+  usageGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 20,
+  },
+  usageTile: {
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderRadius: 14,
+    minWidth: '47%',
+    padding: 12,
+  },
   warningCard: {
     alignItems: 'flex-start',
     backgroundColor: '#FFF4DE',

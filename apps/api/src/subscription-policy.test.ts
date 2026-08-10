@@ -5,6 +5,7 @@ import {
   ensureOrganizationSubscription,
   GRACE_DAYS,
   TRIAL_DAYS,
+  planDefinition,
 } from './subscription-policy';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -14,6 +15,7 @@ interface StoredSubscription {
   currentPeriodEnd: Date;
   currentPeriodStart: Date;
   graceEndsAt: Date | null;
+  freeBookingGraceUsed: boolean;
   id: string;
   organizationId: string;
   planId: string;
@@ -36,6 +38,10 @@ function subscriptionTransaction(initial: StoredSubscription) {
         code: where.code,
         id: `plan-${where.code}`,
       })),
+      findUnique: vi.fn(async () => null),
+    },
+    organization: {
+      update: vi.fn(async () => ({})),
     },
     subscription: {
       update,
@@ -59,8 +65,9 @@ function storedSubscription(
     currentPeriodStart: now,
     graceEndsAt: null,
     id: 'subscription-1',
+    freeBookingGraceUsed: false,
     organizationId: 'organization-1',
-    planId: 'plan-essential',
+    planId: 'plan-local',
     status: SubscriptionStatus.ACTIVE,
     trialEndsAt: null,
     updatedAt: now,
@@ -137,5 +144,63 @@ describe('política de suscripciones', () => {
     expect(result.subscription.status).toBe(SubscriptionStatus.SUSPENDED);
     expect(context.update).toHaveBeenCalledTimes(2);
     expect(context.current().status).toBe(SubscriptionStatus.SUSPENDED);
+  });
+
+  it('convierte automaticamente una prueba vencida en Nava Free', async () => {
+    const now = new Date('2026-08-10T12:00:00.000Z');
+    const trialEndsAt = new Date(now.getTime() - DAY_MS);
+    const original = storedSubscription({
+      currentPeriodEnd: trialEndsAt,
+      currentPeriodStart: new Date(trialEndsAt.getTime() - TRIAL_DAYS * DAY_MS),
+      status: SubscriptionStatus.TRIAL,
+      trialEndsAt,
+    });
+    const context = subscriptionTransaction(original);
+
+    const result = await ensureOrganizationSubscription(
+      context.transaction,
+      original.organizationId,
+      now,
+    );
+
+    expect(result.subscription.status).toBe(SubscriptionStatus.FREE);
+    expect(result.subscription.planId).toBe('plan-free');
+    expect(result.subscription.trialEndsAt).toBeNull();
+  });
+
+  it('define Esencial en USD 9.83 y Local en USD 29.99 con limites distintos', () => {
+    const essential = planDefinition('essential');
+    const local = planDefinition('local');
+
+    expect(essential).toMatchObject({
+      limits: {
+        clients: null,
+        locations: 1,
+        rolling30DayBookings: null,
+        teamMembers: 1,
+      },
+      monthlyPriceCents: 983,
+      name: 'Nava Esencial',
+    });
+    expect(essential?.featureFlags).toMatchObject({
+      commissions: false,
+      inventory: false,
+      team: false,
+    });
+    expect(local).toMatchObject({
+      limits: {
+        clients: null,
+        locations: 1,
+        rolling30DayBookings: null,
+        teamMembers: null,
+      },
+      monthlyPriceCents: 2999,
+      name: 'Nava Local',
+    });
+    expect(local?.featureFlags).toMatchObject({
+      commissions: true,
+      inventory: true,
+      team: true,
+    });
   });
 });

@@ -38,6 +38,7 @@ type ModalState = {
 } | null;
 
 const statusLabels: Readonly<Record<string, string>> = {
+  free: 'Gratuita',
   active: 'Activa',
   cancelled: 'Cancelada',
   past_due: 'Pago pendiente',
@@ -429,15 +430,20 @@ function Overview({
             </div>
           </div>
           <div className="status-summary">
-            {['trial', 'active', 'past_due', 'suspended', 'cancelled'].map(
-              (status) => (
-                <div className="status-summary-row" key={status}>
-                  <span className={`status-dot status-dot--${status}`} />
-                  <span>{statusLabel(status)}</span>
-                  <strong>{overview.subscriptions[status] ?? 0}</strong>
-                </div>
-              ),
-            )}
+            {[
+              'trial',
+              'free',
+              'active',
+              'past_due',
+              'suspended',
+              'cancelled',
+            ].map((status) => (
+              <div className="status-summary-row" key={status}>
+                <span className={`status-dot status-dot--${status}`} />
+                <span>{statusLabel(status)}</span>
+                <strong>{overview.subscriptions[status] ?? 0}</strong>
+              </div>
+            ))}
           </div>
           <p className="privacy-callout">
             <Icon name="shield" /> Este panel muestra únicamente información
@@ -599,6 +605,7 @@ function Organizations({
           >
             <option value="all">Todos los estados</option>
             <option value="trial">En prueba</option>
+            <option value="free">Gratuitas</option>
             <option value="active">Activas</option>
             <option value="past_due">Pago pendiente</option>
             <option value="suspended">Suspendidas</option>
@@ -780,9 +787,7 @@ function OperationModal({
   readonly onSubmit: (reason: string, planCode: string) => Promise<void>;
 }) {
   const [reason, setReason] = useState('');
-  const [planCode, setPlanCode] = useState(
-    modal.organization.plan ?? 'essential',
-  );
+  const [planCode, setPlanCode] = useState(modal.organization.plan ?? 'local');
   const [error, setError] = useState<string | null>(null);
   const titles = {
     change_plan: 'Cambiar plan',
@@ -865,16 +870,19 @@ function OperationModal({
               indicado.
             </p>
             {modal.type === 'change_plan' ? (
-              <label>
-                Nuevo plan
-                <select
-                  onChange={(event) => setPlanCode(event.target.value)}
-                  value={planCode}
-                >
-                  <option value="essential">Esencial</option>
-                  <option value="multi">Multi</option>
-                </select>
-              </label>
+              <>
+                <label>
+                  Nuevo plan
+                  <select
+                    onChange={(event) => setPlanCode(event.target.value)}
+                    value={planCode}
+                  >
+                    <option value="free">Nava Free</option>
+                    <option value="essential">Nava Esencial - $9.83</option>
+                    <option value="local">Nava Local - $29.99</option>
+                  </select>
+                </label>
+              </>
             ) : null}
             <label>
               Motivo de la operación

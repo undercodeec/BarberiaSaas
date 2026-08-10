@@ -1093,11 +1093,10 @@ describeWithDatabase('API con PostgreSQL', () => {
     const periodStart = createdSubscription?.currentPeriodStart.getTime() ?? 0;
     const trialEnd = createdSubscription?.trialEndsAt?.getTime() ?? 0;
     const periodEnd = createdSubscription?.currentPeriodEnd.getTime() ?? 0;
-    const graceEnd = createdSubscription?.graceEndsAt?.getTime() ?? 0;
     const dayMilliseconds = 24 * 60 * 60 * 1000;
-    expect(trialEnd - periodStart).toBe(7 * dayMilliseconds);
-    expect(periodEnd - periodStart).toBe(7 * dayMilliseconds);
-    expect(graceEnd - trialEnd).toBe(7 * dayMilliseconds);
+    expect(trialEnd - periodStart).toBe(14 * dayMilliseconds);
+    expect(periodEnd - periodStart).toBe(14 * dayMilliseconds);
+    expect(createdSubscription?.graceEndsAt).toBeNull();
 
     const subscriptionResponse = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },
@@ -1118,12 +1117,13 @@ describeWithDatabase('API con PostgreSQL', () => {
     ).toMatchObject({
       current: {
         featureFlags: { inventory: true, multiLocation: false },
-        planCode: 'essential',
+        planCode: 'local',
         status: 'trial',
       },
       plans: expect.arrayContaining([
+        expect.objectContaining({ available: true, code: 'free' }),
         expect.objectContaining({ available: true, code: 'essential' }),
-        expect.objectContaining({ available: false, code: 'multi' }),
+        expect.objectContaining({ available: true, code: 'local' }),
       ]),
       usage: { locations: 1, teamMembers: 1 },
     });
@@ -1141,9 +1141,10 @@ describeWithDatabase('API con PostgreSQL', () => {
       url: '/v1/subscription',
     });
     expect(
-      graceResponse.json<{ current: { readOnly: boolean; status: string } }>()
-        .current,
-    ).toMatchObject({ readOnly: false, status: 'past_due' });
+      graceResponse.json<{
+        current: { planCode: string; readOnly: boolean; status: string };
+      }>().current,
+    ).toMatchObject({ planCode: 'free', readOnly: false, status: 'free' });
     await database.subscription.update({
       data: { graceEndsAt: new Date(Date.now() - 1_000) },
       where: { organizationId: organization.organizationId },
@@ -1157,7 +1158,7 @@ describeWithDatabase('API con PostgreSQL', () => {
       automaticSuspension.json<{
         current: { readOnly: boolean; status: string };
       }>().current,
-    ).toMatchObject({ readOnly: true, status: 'suspended' });
+    ).toMatchObject({ readOnly: false, status: 'free' });
     expect(
       (
         await app.inject({
@@ -3347,7 +3348,7 @@ describeWithDatabase('API con PostgreSQL', () => {
       method: 'PATCH',
       payload: {
         action: 'change_plan',
-        planCode: 'multi',
+        planCode: 'local',
         reason: 'Piloto autorizado para validar múltiples sucursales.',
       },
       url: `/v1/platform/organizations/${pilot.organizationId}`,
@@ -3360,7 +3361,7 @@ describeWithDatabase('API con PostgreSQL', () => {
           where: { organizationId: pilot.organizationId },
         })
       ).plan.code,
-    ).toBe('multi');
+    ).toBe('local');
 
     const suspended = await app.inject({
       headers: { authorization: `Bearer ${platformToken}` },

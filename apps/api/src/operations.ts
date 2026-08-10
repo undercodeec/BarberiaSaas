@@ -36,8 +36,14 @@ import {
   hashOpaqueToken,
 } from './security';
 import {
+  assertCanCreateTeamMember,
   ensureOrganizationSubscription,
+  getEntitlements,
+  getSubscriptionUsage,
+  grantFirstBookingGrace,
   GRACE_DAYS,
+  parsePlanFeatureFlags,
+  parsePlanLimits,
   planDefinition,
   SUBSCRIPTION_PLANS,
 } from './subscription-policy';
@@ -75,7 +81,15 @@ const platformOrganizationListSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
   search: z.string().trim().max(120).optional(),
   status: z
-    .enum(['all', 'trial', 'active', 'past_due', 'suspended', 'cancelled'])
+    .enum([
+      'all',
+      'trial',
+      'free',
+      'active',
+      'past_due',
+      'suspended',
+      'cancelled',
+    ])
     .default('all'),
 });
 const platformOrganizationActionSchema = z.discriminatedUnion('action', [
@@ -729,9 +743,31 @@ function registerPlatformRoutes(
         });
         if (!plan)
           throw new ApiError(404, 'PLAN_NOT_FOUND', 'El plan no existe.');
+        const periodStart = new Date();
+        const periodEnd = new Date(
+          periodStart.getTime() + 30 * 24 * 60 * 60 * 1000,
+        );
+        const isFree = plan.code === 'free';
         updated = await transaction.subscription.update({
-          data: { planId: plan.id },
+          data: {
+            currentPeriodEnd: periodEnd,
+            currentPeriodStart: periodStart,
+            graceEndsAt: isFree
+              ? null
+              : new Date(
+                  periodEnd.getTime() + GRACE_DAYS * 24 * 60 * 60 * 1000,
+                ),
+            planId: plan.id,
+            status: isFree
+              ? SubscriptionStatus.FREE
+              : SubscriptionStatus.ACTIVE,
+            trialEndsAt: null,
+          },
           where: { id: subscription.id },
+        });
+        await transaction.organization.update({
+          data: { status: OrganizationStatus.ACTIVE },
+          where: { id: organization.id },
         });
       }
       const organizationStatus =
@@ -739,7 +775,7 @@ function registerPlatformRoutes(
           ? OrganizationStatus.SUSPENDED
           : input.action === 'reactivate'
             ? OrganizationStatus.ACTIVE
-            : organization.status;
+            : OrganizationStatus.ACTIVE;
       await transaction.auditLog.create({
         data: {
           action: `platform.organization.${input.action}`,
@@ -915,6 +951,23 @@ export function registerOperationsRoutes(
         'SUBSCRIPTION_READ_ONLY',
         'Tu suscripción está en modo de solo lectura. Reactívala para realizar cambios.',
       );
+    const feature = path.startsWith('/v1/inventory')
+      ? 'inventory'
+      : path.startsWith('/v1/commissions')
+        ? 'commissions'
+        : null;
+    if (feature) {
+      const entitlements = await getEntitlements(
+        database,
+        membership.organizationId,
+      );
+      if (!entitlements.featureFlags[feature])
+        throw new ApiError(
+          403,
+          'PLAN_FEATURE_NOT_INCLUDED',
+          'Esta funcion requiere Nava Local.',
+        );
+    }
   });
 
   app.get('/v1/subscription', async (request) => {
@@ -924,17 +977,11 @@ export function registerOperationsRoutes(
     const { plans, subscription } = await database.$transaction((transaction) =>
       ensureOrganizationSubscription(transaction, current.organizationId, now),
     );
-    const [locations, teamMembers] = await Promise.all([
-      database.location.count({
-        where: { isActive: true, organizationId: current.organizationId },
-      }),
-      database.membership.count({
-        where: {
-          organizationId: current.organizationId,
-          status: MembershipStatus.ACTIVE,
-        },
-      }),
-    ]);
+    const subscriptionUsage = await getSubscriptionUsage(
+      database,
+      current.organizationId,
+      now,
+    );
     const currentPlan = plans.find(({ id }) => id === subscription.planId);
     if (!currentPlan)
       throw new Error('La suscripción no tiene un plan válido.');
@@ -943,9 +990,7 @@ export function registerOperationsRoutes(
         canManage: current.role === MembershipRole.OWNER,
         currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
         currentPeriodStart: subscription.currentPeriodStart.toISOString(),
-        featureFlags:
-          planDefinition(currentPlan.code)?.featureFlags ??
-          SUBSCRIPTION_PLANS[0].featureFlags,
+        featureFlags: parsePlanFeatureFlags(currentPlan.featureFlags),
         graceEndsAt: subscription.graceEndsAt?.toISOString() ?? null,
         planCode: currentPlan.code,
         readOnly:
@@ -963,16 +1008,52 @@ export function registerOperationsRoutes(
           available: definition?.available ?? false,
           code: plan.code,
           currencyCode: plan.currencyCode,
-          featureFlags:
-            planDefinition(plan.code)?.featureFlags ??
-            SUBSCRIPTION_PLANS[0].featureFlags,
+          featureFlags: parsePlanFeatureFlags(plan.featureFlags),
           features: plan.features,
-          limits: plan.limits,
+          limits: parsePlanLimits(plan.limits),
           monthlyPriceCents: plan.monthlyPriceCents,
           name: plan.name,
         };
       }),
-      usage: { locations, teamMembers },
+      usage: {
+        bookingLimit: subscriptionUsage.effectiveBookingLimit,
+        bookingWindowStartsAt:
+          subscriptionUsage.bookingWindowStartsAt.toISOString(),
+        clients: subscriptionUsage.usage.clients,
+        clientLimit: subscriptionUsage.limits.clients,
+        graceAvailable: subscriptionUsage.grace.available,
+        graceBookings: subscriptionUsage.grace.bookings,
+        graceUsed: subscriptionUsage.grace.used,
+        locations: subscriptionUsage.usage.locations,
+        rolling30DayBookings: subscriptionUsage.usage.rolling30DayBookings,
+        teamMemberLimit: subscriptionUsage.limits.teamMembers,
+        teamMembers: subscriptionUsage.usage.teamMembers,
+      },
+    };
+  });
+
+  app.post('/v1/subscription/booking-grace', async (request) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(database, user.id);
+    if (current.role !== MembershipRole.OWNER) {
+      throw new ApiError(
+        403,
+        'FORBIDDEN',
+        'Solo el propietario puede activar las reservas de cortesia.',
+      );
+    }
+    const result = await grantFirstBookingGrace(
+      database,
+      current.organizationId,
+    );
+    return {
+      usage: {
+        bookingLimit: result.effectiveBookingLimit,
+        graceAvailable: result.grace.available,
+        graceBookings: result.grace.bookings,
+        graceUsed: result.grace.used,
+        rolling30DayBookings: result.usage.rolling30DayBookings,
+      },
     };
   });
 
@@ -993,10 +1074,13 @@ export function registerOperationsRoutes(
       );
     const input = subscriptionSimulationSchema.parse(request.body);
     const result = await database.$transaction(async (transaction) => {
-      const { subscription } = await ensureOrganizationSubscription(
+      const { plans, subscription } = await ensureOrganizationSubscription(
         transaction,
         current.organizationId,
       );
+      const localPlan = plans.find(({ code }) => code === 'local');
+      if (!localPlan) throw new Error('Nava Local no esta disponible.');
+
       const status =
         input.status === 'active'
           ? SubscriptionStatus.ACTIVE
@@ -1015,6 +1099,7 @@ export function registerOperationsRoutes(
                   periodEnd.getTime() + GRACE_DAYS * 24 * 60 * 60 * 1000,
                 ),
                 trialEndsAt: null,
+                planId: localPlan.id,
               }
             : {}),
           status,
@@ -1464,6 +1549,7 @@ export function registerOperationsRoutes(
       'membership.manage',
     );
     const input = createTeamInvitationSchema.parse(request.body);
+    await assertCanCreateTeamMember(database, current.organizationId);
     if (!invitationMailer) {
       throw new ApiError(
         503,
@@ -1637,6 +1723,7 @@ export function registerOperationsRoutes(
         'La invitación no es válida o ya venció.',
       );
     }
+    await assertCanCreateTeamMember(database, invitation.organizationId);
     const membershipInAnotherOrganization = await database.membership.findFirst(
       {
         where: {

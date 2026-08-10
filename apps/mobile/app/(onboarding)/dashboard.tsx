@@ -22,7 +22,6 @@ import {
   Animated,
   Easing,
   Image,
-  Linking,
   Modal,
   PanResponder,
   Platform,
@@ -59,8 +58,6 @@ import { useAuth } from '../../src/providers/AuthProvider';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SUBSCRIPTION_NOTICE_TRIAL_DAYS = 3;
 const SUBSCRIPTION_NOTICE_ACTIVE_DAYS = 7;
-// Reemplazar por la URL comercial definitiva cuando este disponible.
-const SUBSCRIPTION_UPGRADE_URL = 'https://navacloud.app/planes';
 const DASHBOARD_BANNER_DELAY_MS = 10_000;
 const WELCOME_SURVEY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 const WELCOME_SURVEY_RESPONSE_KEY = 'barber-saas.welcome-survey-response';
@@ -286,6 +283,27 @@ function subscriptionProgress(
     subscription.plans.find(({ code }) => code === current.planCode)?.name ??
     'Nava';
   const periodStart = dateTimestamp(current.currentPeriodStart);
+  if (current.status === 'free') {
+    return {
+      caption: 'del limite mensual',
+      daysRemaining: null,
+      expiryLabel: `${subscription.usage.rolling30DayBookings} reservas en los ultimos 30 dias`,
+      percentage:
+        subscription.usage.bookingLimit === null
+          ? 0
+          : Math.min(
+              100,
+              Math.round(
+                (subscription.usage.rolling30DayBookings /
+                  subscription.usage.bookingLimit) *
+                  100,
+              ),
+            ),
+      phase: 'active',
+      title: planName,
+    };
+  }
+
   const periodEnd = dateTimestamp(current.currentPeriodEnd);
   const trialEnd = dateTimestamp(current.trialEndsAt);
   const graceEnd = dateTimestamp(current.graceEndsAt);
@@ -382,7 +400,46 @@ type SubscriptionNotice = {
 
 function subscriptionNotice(
   progress: SubscriptionProgress,
+  subscription: SubscriptionResponse | undefined,
 ): SubscriptionNotice | null {
+  if (subscription?.current.planCode === 'free') {
+    const usage = subscription.usage;
+    const limit = usage.bookingLimit;
+    if (limit !== null) {
+      const used = usage.rolling30DayBookings;
+      const baseLimit = limit - (usage.graceUsed ? usage.graceBookings : 0);
+      if (used >= limit)
+        return {
+          copy: 'Las nuevas reservas estan pausadas. Tu historial y tus datos siguen disponibles.',
+          title: 'Limite de reservas alcanzado',
+        };
+      if (usage.graceAvailable && used >= baseLimit)
+        return {
+          copy: `Llegaste a ${baseLimit} reservas. Activa tu cortesia en Suscripcion o compara los planes sin limite.`,
+          title: 'Tienes +5 reservas de cortesia',
+        };
+      if (usage.graceUsed && used >= baseLimit)
+        return {
+          copy: `Te quedan ${limit - used} reservas de cortesia en esta ventana de 30 dias.`,
+          title: 'Cortesia activa',
+        };
+      if (used >= 36)
+        return {
+          copy: `Te quedan ${baseLimit - used} reservas antes del limite de Nava Free.`,
+          title: 'Estas cerca del limite',
+        };
+      if (used >= 30)
+        return {
+          copy: `Ya utilizaste ${used} de ${baseLimit} reservas en los ultimos 30 dias.`,
+          title: '75% del limite utilizado',
+        };
+      if (used >= 20)
+        return {
+          copy: `Ya gestionaste ${used} reservas con Nava en los ultimos 30 dias.`,
+          title: 'Tu negocio esta creciendo',
+        };
+    }
+  }
   if (progress.daysRemaining === null) return null;
 
   if (
@@ -390,7 +447,7 @@ function subscriptionNotice(
     progress.daysRemaining <= SUBSCRIPTION_NOTICE_TRIAL_DAYS
   ) {
     return {
-      copy: `Tu prueba termina en ${progress.daysRemaining} ${progress.daysRemaining === 1 ? 'dia' : 'dias'}. Actualiza al plan Esencial para seguir usando Nava sin interrupciones.`,
+      copy: `Tu prueba termina en ${progress.daysRemaining} ${progress.daysRemaining === 1 ? 'dia' : 'dias'}. Revisa Nava Esencial o Local para continuar sin limites.`,
       title: 'Tu prueba esta por terminar',
     };
   }
@@ -400,7 +457,7 @@ function subscriptionNotice(
     progress.daysRemaining <= SUBSCRIPTION_NOTICE_ACTIVE_DAYS
   ) {
     return {
-      copy: `Tu suscripcion vence en ${progress.daysRemaining} ${progress.daysRemaining === 1 ? 'dia' : 'dias'}. Pasa al plan Esencial para seguir usando la aplicacion.`,
+      copy: `Tu suscripcion vence en ${progress.daysRemaining} ${progress.daysRemaining === 1 ? 'dia' : 'dias'}. Revisa Nava Esencial o Local para continuar.`,
       title: 'Actualiza tu plan para continuar',
     };
   }
@@ -1786,7 +1843,10 @@ export default function DashboardScreen() {
     progressClock,
     subscriptionQuery.isError,
   );
-  const planRenewalNotice = subscriptionNotice(planProgress);
+  const planRenewalNotice = subscriptionNotice(
+    planProgress,
+    subscriptionQuery.data,
+  );
   const operations = useMemo(
     () =>
       dashboardOperations({
@@ -2178,11 +2238,11 @@ export default function DashboardScreen() {
                 <Text style={styles.cardCopy}>{planRenewalNotice.copy}</Text>
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => void Linking.openURL(SUBSCRIPTION_UPGRADE_URL)}
+                  onPress={() => router.push('/subscription')}
                   style={styles.subscriptionUpgradeButton}
                 >
                   <Text style={styles.subscriptionUpgradeLabel}>
-                    Pasar a Esencial
+                    Ver planes
                   </Text>
                   <Ionicons
                     color={appTheme.colors.white}
