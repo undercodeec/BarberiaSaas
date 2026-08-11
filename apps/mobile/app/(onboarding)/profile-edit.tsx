@@ -138,7 +138,7 @@ export default function ProfileEditScreen() {
     onError: (error) =>
       Alert.alert(
         'No se pudo guardar',
-        error instanceof Error ? error.message : 'IntÃ©ntalo nuevamente.',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
       ),
   });
   if (!session) return <Redirect href="/(auth)/login" />;
@@ -171,7 +171,7 @@ export default function ProfileEditScreen() {
     if (result.canceled) return;
     const asset = result.assets[0];
     if (!asset?.base64) {
-      Alert.alert('No pudimos leer la foto', 'IntÃ©ntalo con otra imagen.');
+      Alert.alert('No pudimos leer la foto', 'Inténtalo con otra imagen.');
       return;
     }
     const bytes = asset.fileSize ?? Math.ceil((asset.base64.length * 3) / 4);
@@ -182,7 +182,7 @@ export default function ProfileEditScreen() {
     ) {
       Alert.alert(
         'Imagen demasiado grande',
-        'MÃ¡ximo: 1.5 MB y 1600 Ã— 1600 pÃ­xeles.',
+        'Máximo: 1.5 MB y 1600 × 1600 píxeles.',
       );
       return;
     }
@@ -242,12 +242,12 @@ export default function ProfileEditScreen() {
           <Field label="Nombre" onChangeText={setFullName} value={fullName} />
           <Field
             keyboardType="phone-pad"
-            label="TelÃ©fono"
+            label="Teléfono"
             onChangeText={setPhone}
-            placeholder="Tu nÃºmero de telÃ©fono"
+            placeholder="Tu número de teléfono"
             value={phone}
           />
-          <Text style={styles.fieldLabel}>Correo electrÃ³nico</Text>
+          <Text style={styles.fieldLabel}>Correo electrónico</Text>
           <View style={styles.readOnlyField}>
             <Text style={styles.readOnlyText}>{profile?.email ?? '...'}</Text>
           </View>
@@ -255,9 +255,9 @@ export default function ProfileEditScreen() {
 
         {accountDetails ? (
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>InformaciÃ³n del negocio</Text>
+            <Text style={styles.sectionTitle}>Información del negocio</Text>
             <Text style={styles.businessHint}>
-              Estos datos se muestran en la pÃ¡gina pÃºblica de reservas.
+              Estos datos se muestran en la página pública de reservas.
             </Text>
             <Pressable
               accessibilityLabel="Cambiar portada del negocio"
@@ -280,9 +280,9 @@ export default function ProfileEditScreen() {
             ) : null}
             <Field label="Nombre del negocio" onChangeText={setBusinessName} value={businessName} />
             <Field
-              label="DirecciÃ³n"
+              label="Dirección"
               onChangeText={setBusinessAddress}
-              placeholder="DirecciÃ³n del negocio"
+              placeholder="Dirección del negocio"
               value={businessAddress}
             />
             <CountryCityFields
@@ -310,12 +310,12 @@ export default function ProfileEditScreen() {
         ) : null}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Cambios adicionales</Text>
-          <Text style={styles.fieldLabel}>Sobre mÃ­</Text>
+          <Text style={styles.fieldLabel}>Sobre mí</Text>
           <TextInput
             maxLength={500}
             multiline
             onChangeText={setBio}
-            placeholder="CuÃ©ntale a tus clientes sobre tu trabajo"
+            placeholder="Cuéntale a tus clientes sobre tu trabajo"
             placeholderTextColor="#7A8491"
             style={[styles.field, styles.bioField]}
             textAlignVertical="top"
@@ -354,9 +354,9 @@ export default function ProfileEditScreen() {
             style={styles.sheet}
           >
             <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>AÃ±adir foto</Text>
+            <Text style={styles.sheetTitle}>Añadir foto</Text>
             <Text style={styles.sheetCopy}>
-              MÃ¡ximo 1.5 MB y 1600 Ã— 1600 pÃ­xeles.
+              Máximo 1.5 MB y 1600 × 1600 píxeles.
             </Text>
             <Pressable
               onPress={() => void choosePhoto('camera')}

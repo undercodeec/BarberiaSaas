@@ -33,15 +33,15 @@ export function BusinessLocationMap({
     return (
       <View style={[styles.container, styles.fallback]}>
         <iframe
-          aria-label="Vista previa de la ubicaciÃ³n del negocio"
+          aria-label="Vista previa de la ubicación del negocio"
           scrolling="no"
           src={openStreetMapEmbedUrl(center)}
           style={{ border: 0, height: '100%', width: '100%' }}
-          title="Vista previa de la ubicaciÃ³n del negocio"
+          title="Vista previa de la ubicación del negocio"
         />
         <View pointerEvents="none" style={styles.previewNotice}>
           <Text style={styles.fallbackText}>
-            Busca una direcciÃ³n o usa tu ubicaciÃ³n para seleccionar el punto.
+            Busca una dirección o usa tu ubicación para seleccionar el punto.
           </Text>
         </View>
       </View>

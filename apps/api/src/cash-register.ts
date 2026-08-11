@@ -417,13 +417,13 @@ export function registerCashRegisterRoutes(
       throw new ApiError(
         400,
         'COMMISSION_REQUIRES_SALE',
-        'Solo las ventas pueden generar comisiÃ³n.',
+        'Solo las ventas pueden generar comisión.',
       );
     if (input.appointmentId && hasCommissionService)
       throw new ApiError(
         400,
         'DUPLICATE_COMMISSION_SOURCE',
-        'La cita ya define el servicio y el profesional de la comisiÃ³n.',
+        'La cita ya define el servicio y el profesional de la comisión.',
       );
     if (
       ['sale', 'deposit', 'other_income'].includes(input.type) &&
@@ -455,7 +455,7 @@ export function registerCashRegisterRoutes(
           throw new ApiError(
             403,
             'ORGANIZATION_REQUIRED',
-            'La cita debe pertenecer a una organizaciÃ³n activa.',
+            'La cita debe pertenecer a una organización activa.',
           );
         const appointment = await transaction.appointment.findFirst({
           include: { services: true },
@@ -498,7 +498,7 @@ export function registerCashRegisterRoutes(
           throw new ApiError(
             400,
             'COMMISSION_CONTEXT_REQUIRED',
-            'Configura una organizaciÃ³n y sucursal para registrar comisiones.',
+            'Configura una organización y sucursal para registrar comisiones.',
           );
         const assignment = await transaction.professionalService.findFirst({
           include: { service: true },
@@ -520,7 +520,7 @@ export function registerCashRegisterRoutes(
           throw new ApiError(
             404,
             'COMMISSION_ASSIGNMENT_NOT_FOUND',
-            'El servicio no estÃ¡ asignado al profesional seleccionado.',
+            'El servicio no está asignado al profesional seleccionado.',
           );
         commissionableService = assignment.service;
       }
@@ -668,7 +668,7 @@ export function registerCashRegisterRoutes(
           throw new ApiError(
             409,
             'COMMISSION_RULE_NOT_FOUND',
-            'El profesional no tiene una regla de comisiÃ³n vigente.',
+            'El profesional no tiene una regla de comisión vigente.',
           );
       }
       return created;

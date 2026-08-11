@@ -71,7 +71,7 @@ function publicConfiguration(
       lastTestedAt: configuration.lastTestedAt?.toISOString() ?? null,
       status: configuration.connectionStatus.toLowerCase() as
         'connected' | 'error' | 'requires_attention',
-      storeIdHint: `����${configuration.storeId.slice(-4)}`,
+      storeIdHint: `••••${configuration.storeId.slice(-4)}`,
     },
     encryptionConfigured,
   };

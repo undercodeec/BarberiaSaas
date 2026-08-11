@@ -716,7 +716,7 @@ export default function WalletScreen() {
               </Pressable>
             ) : null}
           </View>
-        ) : null}{' '}
+        ) : null}
       </ScrollView>
       <Modal
         animationType="slide"
@@ -878,7 +878,7 @@ export default function WalletScreen() {
             ) : null}
           </ScrollView>
         </View>
-      </Modal>{' '}
+      </Modal>
       <Modal
         animationType="slide"
         onRequestClose={() => setSheetMode(null)}
