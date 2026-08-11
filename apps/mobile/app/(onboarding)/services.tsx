@@ -263,7 +263,7 @@ export default function ServicesOnboardingScreen() {
           foregroundColor={appTheme.colors.accentDark}
           icon="arrow-forward-outline"
           label="Siguiente"
-          onPress={() => router.push('/(onboarding)/account-details')}
+          onPress={() => router.push('/(onboarding)/congratulations')}
           style={styles.nextButton}
           variant="outline"
         />

@@ -23,7 +23,7 @@
       [
         "expo-contacts",
         {
-          "contactsPermission": "Permite que Nava importe tus contactos para crear reservas m?s r?pido."
+          "contactsPermission": "Permite que Nava importe tus contactos para crear reservas más rápido."
         }
       ]
     ],
