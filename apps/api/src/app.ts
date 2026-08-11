@@ -56,6 +56,7 @@ import type {
   AppointmentNotifier,
 } from './notifications';
 import { registerProfileRoutes } from './profile';
+import { registerPayphoneRoutes } from './payphone';
 import { registerReportRoutes } from './reports';
 import {
   processPublicBookingLifecycle,
@@ -2351,6 +2352,7 @@ export async function buildApi({
   registerCashRegisterRoutes(app, database, authenticate);
   registerCommissionRoutes(app, database, authenticate);
   registerProfileRoutes(app, database, authenticate);
+  registerPayphoneRoutes(app, database, authenticate, config);
   registerReportRoutes(app, database, authenticate);
 
   const publicBookingLifecycleTimer = setInterval(() => {

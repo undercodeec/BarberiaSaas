@@ -96,6 +96,17 @@ enum PaymentMethod {
   OTHER
 }
 
+enum PayphoneEnvironment {
+  TEST
+  PRODUCTION
+}
+
+enum PayphoneConnectionStatus {
+  REQUIRES_ATTENTION
+  CONNECTED
+  ERROR
+}
+
 enum CommissionRuleType {
   SERVICE_PERCENTAGE
   SERVICE_FIXED
@@ -415,8 +426,27 @@ model Organization {
   subscription                       Subscription?
   products                           Product[]
   stockMovements                     StockMovement[]
+  payphoneConfiguration              PayphoneConfiguration?
 
   @@map("organizations")
+}
+
+model PayphoneConfiguration {
+  id               String                   @id @default(uuid()) @db.Uuid
+  organizationId   String                   @unique @map("organization_id") @db.Uuid
+  environment      PayphoneEnvironment      @default(TEST)
+  storeId          String                   @map("store_id") @db.VarChar(160)
+  encryptedToken   String                   @map("encrypted_token") @db.Text
+  isEnabled        Boolean                  @default(false) @map("is_enabled")
+  connectionStatus PayphoneConnectionStatus @default(REQUIRES_ATTENTION) @map("connection_status")
+  connectedAt      DateTime?                @map("connected_at") @db.Timestamptz(3)
+  lastTestedAt     DateTime?                @map("last_tested_at") @db.Timestamptz(3)
+  lastErrorCode    String?                  @map("last_error_code") @db.VarChar(80)
+  createdAt        DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization     Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("payphone_configurations")
 }
 
 model Plan {

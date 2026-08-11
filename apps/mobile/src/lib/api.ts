@@ -39,6 +39,7 @@ export const apiClient = configResult.success
   ? createApiClient({
       baseUrl: configResult.data.url,
       getAccessToken: getStoredSessionToken,
+      timeoutMs: 20_000,
     })
   : null;
 

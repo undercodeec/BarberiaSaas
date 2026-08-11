@@ -146,13 +146,39 @@ describe('política de suscripciones', () => {
     expect(context.current().status).toBe(SubscriptionStatus.SUSPENDED);
   });
 
-  it('convierte automaticamente una prueba vencida en Nava Free', async () => {
+  it('convierte una prueba vencida en un periodo de gracia de tres dias', async () => {
     const now = new Date('2026-08-10T12:00:00.000Z');
     const trialEndsAt = new Date(now.getTime() - DAY_MS);
     const original = storedSubscription({
       currentPeriodEnd: trialEndsAt,
       currentPeriodStart: new Date(trialEndsAt.getTime() - TRIAL_DAYS * DAY_MS),
       status: SubscriptionStatus.TRIAL,
+      trialEndsAt,
+    });
+    const context = subscriptionTransaction(original);
+
+    const result = await ensureOrganizationSubscription(
+      context.transaction,
+      original.organizationId,
+      now,
+    );
+
+    expect(result.subscription.status).toBe(SubscriptionStatus.PAST_DUE);
+    expect(result.subscription.planId).toBe('plan-local');
+    expect(result.subscription.trialEndsAt).toEqual(trialEndsAt);
+    expect(result.subscription.graceEndsAt).toEqual(
+      new Date(trialEndsAt.getTime() + GRACE_DAYS * DAY_MS),
+    );
+  });
+
+  it('convierte una prueba cuya gracia terminó en Nava Free', async () => {
+    const now = new Date('2026-08-10T12:00:00.000Z');
+    const trialEndsAt = new Date(now.getTime() - (GRACE_DAYS + 1) * DAY_MS);
+    const original = storedSubscription({
+      currentPeriodEnd: trialEndsAt,
+      currentPeriodStart: new Date(trialEndsAt.getTime() - TRIAL_DAYS * DAY_MS),
+      graceEndsAt: new Date(trialEndsAt.getTime() + GRACE_DAYS * DAY_MS),
+      status: SubscriptionStatus.PAST_DUE,
       trialEndsAt,
     });
     const context = subscriptionTransaction(original);

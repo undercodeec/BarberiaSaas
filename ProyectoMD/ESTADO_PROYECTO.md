@@ -3970,9 +3970,10 @@ caja, comisiones y registros históricos.
 
 ### Planes, trial y persistencia
 
-- [x] Las cuentas nuevas inician un trial de Nava Local durante 14 dias, sin
-      tarjeta. Al vencer, el backend cambia automaticamente la suscripcion a
-      `FREE`, conserva la organizacion activa y no elimina ningun dato.
+- [x] Las cuentas nuevas inician un trial de Nava Local durante 7 dias, sin
+      tarjeta. Al vencer pasan a `PAST_DUE` con 3 dias de gracia y conservan
+      las capacidades premium; al finalizar la gracia cambian a `FREE`, sin
+      eliminar datos ni desactivar la organizacion.
 - [x] Se definieron Nava Free (USD 0), Nava Esencial (USD 9.83) y Nava Local
       (USD 29.99). Los mismos planes y precios aplican tanto a cuentas
       profesionales como a cuentas de negocio.
@@ -3986,8 +3987,10 @@ caja, comisiones y registros históricos.
 - [x] La migracion `20260810230000_freemium_strategy` agrega el estado `FREE`,
       el control de cortesia y crea/actualiza los tres planes. Las referencias
       heredadas de Solo pasan a Esencial y las de Multi pasan a Local.
-- [x] Los trials vigentes creados con la regla anterior de 7 dias se amplian a
-      14 dias. Los ciclos pagados conservan la gracia tecnica de 7 dias.
+- [x] Los trials activos que conservan exactamente el calendario automatico
+      anterior de 14 dias se normalizan a 7 dias al evaluar la suscripcion.
+      Los ciclos pagados vencidos reciben 3 dias de gracia y despues quedan en
+      modo `SUSPENDED` de solo lectura.
 
 ### Autoridad backend y limites Free
 
@@ -4038,3 +4041,31 @@ caja, comisiones y registros históricos.
 - [ ] El checkout, webhooks y cobro recurrente pertenecen a la Etapa D de la
       estrategia. Hasta elegir proveedor, los upgrades se administran desde el
       panel interno.
+
+## Configuracion PayPhone por negocio — 11 de agosto de 2026
+
+- [x] Wallet permite al propietario guardar Token y StoreID por negocio, seleccionar Pruebas o Produccion, probar la conexion, activar/desactivar y desconectar.
+- [x] La pantalla de configuracion explica como crear la aplicacion API de PayPhone, obtener Token y StoreID, y enlaza al video oficial indicado, delimitando el tramo necesario de 1:00 a 4:00.
+- [x] El Token se cifra con AES-256-GCM en la API y nunca se devuelve al cliente, se registra en auditoria ni se incluye en logs.
+- [x] La prueba genera solamente un API Link unico de USD 0.01 que vence en una hora; crear el link no realiza cobro y verifica conjuntamente Token y StoreID.
+- [ ] Desplegar la migracion `20260811120000_payphone_configuration`, configurar `PAYPHONE_CREDENTIALS_ENCRYPTION_KEY` como secreto exclusivo de la API y reiniciar el servicio.
+- [ ] La generacion de links de pago para reservas, confirmacion de transacciones y webhook autorizado siguen pendientes. Por ello, activar la configuracion aun no habilita cobros al cliente final.
+
+## Correccion de vigencia de demo y suscripciones — 11 de agosto de 2026
+
+- [x] Se corrigio el ciclo de demo a `TRIAL` de 7 dias, `PAST_DUE` de 3 dias
+      de gracia y posterior downgrade a Nava Free. La transicion distingue la
+      gracia de demo de la gracia de una suscripcion pagada vencida, que
+      finaliza en `SUSPENDED` y modo de solo lectura.
+- [x] `/v1/subscription` ahora calcula estado, limites y planes en una unica
+      transaccion, evitando una evaluacion duplicada de la suscripcion por cada
+      consulta del dashboard.
+- [x] El cliente movil limita las solicitudes HTTP a 20 segundos y expone un
+      error `REQUEST_TIMEOUT`, para que el medidor no quede indefinidamente en
+      “Consultando la vigencia de tu plan”.
+- [x] Verificado con 6 pruebas unitarias de politica de suscripcion, typecheck
+      de API y typecheck de `@barber-saas/api-client`.
+- [ ] El cobro recurrente, checkout, webhooks de pago, cancelacion al fin del
+      periodo y reintentos de pago siguen pendientes de integrar con el
+      proveedor seleccionado. Por ahora los cambios de plan se administran
+      desde el panel interno.

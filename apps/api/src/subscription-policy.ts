@@ -10,8 +10,8 @@ import { ApiError } from './errors';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ROLLING_BOOKING_WINDOW_DAYS = 30;
-export const TRIAL_DAYS = 14;
-export const GRACE_DAYS = 7;
+export const TRIAL_DAYS = 7;
+export const GRACE_DAYS = 3;
 export const FREE_BOOKING_GRACE = 5;
 
 export interface PlanLimits {
@@ -224,22 +224,23 @@ export async function ensureOrganizationSubscription(
     }
   }
 
-  const sevenDayTrialEnd = new Date(
-    subscription.currentPeriodStart.getTime() + 7 * DAY_MS,
+  const legacyTrialEnd = new Date(
+    subscription.currentPeriodStart.getTime() + 14 * DAY_MS,
+  );
+  const configuredTrialEnd = new Date(
+    subscription.currentPeriodStart.getTime() + TRIAL_DAYS * DAY_MS,
   );
   if (
     subscription.status === SubscriptionStatus.TRIAL &&
-    subscription.trialEndsAt?.getTime() === sevenDayTrialEnd.getTime() &&
+    subscription.trialEndsAt?.getTime() === legacyTrialEnd.getTime() &&
+    subscription.currentPeriodEnd.getTime() === legacyTrialEnd.getTime() &&
     subscription.trialEndsAt > now
   ) {
-    const extendedTrialEnd = new Date(
-      subscription.currentPeriodStart.getTime() + TRIAL_DAYS * DAY_MS,
-    );
     subscription = await transaction.subscription.update({
       data: {
-        currentPeriodEnd: extendedTrialEnd,
+        currentPeriodEnd: configuredTrialEnd,
         graceEndsAt: null,
-        trialEndsAt: extendedTrialEnd,
+        trialEndsAt: configuredTrialEnd,
       },
       where: { id: subscription.id },
     });
@@ -253,16 +254,12 @@ export async function ensureOrganizationSubscription(
     subscription = await transaction.subscription.update({
       data: {
         currentPeriodEnd: subscription.trialEndsAt,
-        graceEndsAt: null,
-        planId: free.id,
-        status: SubscriptionStatus.FREE,
-        trialEndsAt: null,
+        graceEndsAt: new Date(
+          subscription.trialEndsAt.getTime() + GRACE_DAYS * DAY_MS,
+        ),
+        status: SubscriptionStatus.PAST_DUE,
       },
       where: { id: subscription.id },
-    });
-    await transaction.organization.update({
-      data: { status: OrganizationStatus.ACTIVE },
-      where: { id: organizationId },
     });
   }
 
@@ -307,10 +304,26 @@ export async function ensureOrganizationSubscription(
     subscription.graceEndsAt &&
     subscription.graceEndsAt <= now
   ) {
-    subscription = await transaction.subscription.update({
-      data: { status: SubscriptionStatus.SUSPENDED },
-      where: { id: subscription.id },
-    });
+    if (subscription.trialEndsAt) {
+      subscription = await transaction.subscription.update({
+        data: {
+          graceEndsAt: null,
+          planId: free.id,
+          status: SubscriptionStatus.FREE,
+          trialEndsAt: null,
+        },
+        where: { id: subscription.id },
+      });
+      await transaction.organization.update({
+        data: { status: OrganizationStatus.ACTIVE },
+        where: { id: organizationId },
+      });
+    } else {
+      subscription = await transaction.subscription.update({
+        data: { status: SubscriptionStatus.SUSPENDED },
+        where: { id: subscription.id },
+      });
+    }
   }
 
   return { plans: storedPlans, subscription };

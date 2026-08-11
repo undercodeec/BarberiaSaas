@@ -974,17 +974,21 @@ export function registerOperationsRoutes(
     const { user } = await authenticate(database, request);
     const current = await requireMembership(database, user.id);
     const now = new Date();
-    const { plans, subscription } = await database.$transaction((transaction) =>
-      ensureOrganizationSubscription(transaction, current.organizationId, now),
+    const { plans, subscriptionUsage } = await database.$transaction(
+      async (transaction) => {
+        const usage = await getSubscriptionUsage(
+          transaction,
+          current.organizationId,
+          now,
+        );
+        const availablePlans = await transaction.plan.findMany({
+          orderBy: { sortOrder: 'asc' },
+          where: { isActive: true },
+        });
+        return { plans: availablePlans, subscriptionUsage: usage };
+      },
     );
-    const subscriptionUsage = await getSubscriptionUsage(
-      database,
-      current.organizationId,
-      now,
-    );
-    const currentPlan = plans.find(({ id }) => id === subscription.planId);
-    if (!currentPlan)
-      throw new Error('La suscripción no tiene un plan válido.');
+    const { plan: currentPlan, subscription } = subscriptionUsage;
     return {
       current: {
         canManage: current.role === MembershipRole.OWNER,

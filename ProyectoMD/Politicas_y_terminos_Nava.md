@@ -3,7 +3,7 @@
 > **Estado del documento:** plantilla previa a publicación.  
 > **Última actualización:** 10 de agosto de 2026.  
 > **Versión:** 1.0.0.  
-> **Importante:** reemplaza todos los campos marcados como `[PENDIENTE: ...]` y solicita una revisión jurídica en Ecuador antes de publicar este documento.
+> **Importante:** solicita una revisión jurídica en Ecuador antes de publicar este documento y verifica que las rutas, proveedores y funcionalidades descritas estén efectivamente implementados.
 
 Este documento reúne las reglas aplicables al uso de **Nava**, su política de privacidad, sus términos y condiciones, su política de cookies y el procedimiento para solicitar la eliminación de cuentas y datos personales.
 
@@ -27,13 +27,13 @@ Nava es una plataforma tecnológica para la gestión de barberías y negocios re
 | Dato | Información |
 |---|---|
 | Nombre comercial | Nava |
-| Titular o razón social | [PENDIENTE: nombre completo o razón social] |
-| RUC o identificación tributaria | [PENDIENTE: RUC] |
-| Domicilio | [PENDIENTE: dirección, ciudad y país] |
-| Correo de soporte | [PENDIENTE: correo de soporte] |
-| Correo de privacidad | [PENDIENTE: correo para protección de datos] |
-| Teléfono | [PENDIENTE: teléfono] |
-| Sitio web | [PENDIENTE: URL oficial de Nava] |
+| Titular o razón social | Christopher Alexander Gallardo Campos |
+| RUC o identificación tributaria | 1727155671001 |
+| Domicilio | Quito, Ecuador |
+| Correo de soporte | soport@navacloud.app |
+| Correo de privacidad | soport@navacloud.app |
+| Teléfono | No disponible |
+| Sitio web | https://navacloud.app |
 
 En este documento, **“Nava”**, **“la Plataforma”**, **“nosotros”** o **“nuestro”** se refieren al titular identificado anteriormente. **“Negocio”** o **“barbería”** se refiere a la persona o entidad que contrata y utiliza Nava. **“Usuario”** se refiere a propietarios, administradores, empleados o profesionales autorizados para acceder. **“Cliente final”** se refiere a la persona que reserva o recibe servicios de un negocio que utiliza Nava.
 
@@ -65,10 +65,10 @@ La responsabilidad sobre los datos depende del contexto en que fueron recopilado
 | Registro de la cuenta del negocio | Nava | Responsable del tratamiento |
 | Suscripción, pagos, soporte y seguridad | Nava | Responsable del tratamiento |
 | Analítica y comunicaciones propias de Nava | Nava | Responsable del tratamiento |
-| Clientes registrados por una barbería | La barbería | Encargado del tratamiento |
-| Reservas, servicios e historial del cliente | La barbería | Encargado del tratamiento |
-| Información de empleados y profesionales | La barbería, salvo excepciones | Encargado del tratamiento |
-| Marketing realizado por una barbería | La barbería | Proveedor tecnológico |
+| Clientes registrados por una barbería | La barbería | Responsable del tratamiento; Nava actúa como encargado |
+| Reservas, servicios e historial del cliente | La barbería | Responsable del tratamiento; Nava actúa como encargado |
+| Información de empleados y profesionales | La barbería, salvo excepciones | Responsable del tratamiento; Nava actúa como encargado |
+| Marketing realizado por una barbería | La barbería | Responsable del tratamiento; Nava actúa como proveedor tecnológico/encargado |
 
 Cuando Nava actúa como encargado, tratará los datos únicamente siguiendo instrucciones documentadas del negocio, salvo que una obligación legal exija actuar de otra manera.
 
@@ -184,13 +184,13 @@ Nava podrá permitir el acceso estrictamente necesario a proveedores que apoyen 
 
 | Proveedor | Servicio | Datos posibles | Ubicación |
 |---|---|---|---|
-| Neon | Base de datos PostgreSQL | Cuentas, citas y datos operativos | [PENDIENTE: región seleccionada] |
-| [PENDIENTE: proveedor de VPS] | Infraestructura y alojamiento | Datos del sistema y registros | [PENDIENTE] |
-| [PENDIENTE: proveedor de correo] | Correos transaccionales | Nombre, correo y contenido | [PENDIENTE] |
-| [PENDIENTE: proveedor de pagos] | Cobro de suscripciones | Identificación y pago | [PENDIENTE] |
-| [PENDIENTE: WhatsApp/SMS] | Recordatorios | Teléfono y mensaje | [PENDIENTE] |
-| [PENDIENTE: analítica] | Métricas de uso | IP, dispositivo y eventos | [PENDIENTE] |
-| [PENDIENTE: almacenamiento] | Archivos y copias | Archivos vinculados a cuentas | [PENDIENTE] |
+| Neon | Base de datos PostgreSQL | Cuentas, citas y datos operativos | Virginia, Estados Unidos |
+| Dinoranck | Infraestructura y alojamiento | Datos del sistema y registros | Virginia, Estados Unidos |
+| Hostinger | Correos transaccionales | Nombre, correo y contenido | Estados Unidos |
+| PayPhone | Cobro de suscripciones | Identificación y pago | Ecuador |
+| No se utiliza actualmente | No se envían recordatorios por WhatsApp ni SMS | No aplica | No aplica |
+| Google Analytics (GA4) | Métricas de uso | IP, dispositivo y eventos | Estados Unidos y otros países donde Google procese los datos |
+| Neon | Base de datos | Datos registrados en la aplicación, incluidos datos de usuarios y contenido multimedia | Virginia, Estados Unidos |
 
 Los proveedores solo podrán tratar los datos para prestar el servicio contratado, deberán guardar confidencialidad y aplicar medidas de seguridad apropiadas.
 
@@ -202,7 +202,7 @@ Nava no vende bases de datos personales.
 
 Algunos proveedores podrían procesar datos fuera de Ecuador. Antes de realizar una transferencia internacional, Nava verificará la existencia de un nivel adecuado de protección o utilizará las garantías permitidas por la normativa, como cláusulas contractuales, instrumentos jurídicamente vinculantes u otros mecanismos reconocidos.
 
-La lista actualizada de proveedores, países y garantías estará disponible en `[PENDIENTE: URL de subencargados]` o podrá solicitarse al correo de privacidad.
+La lista actualizada de proveedores, países y garantías podrá solicitarse al correo de privacidad.
 
 ## 2.10. Conservación de datos
 
@@ -212,9 +212,9 @@ Los datos se conservarán únicamente durante el tiempo necesario para las final
 |---|---|
 | Cuenta activa | Mientras exista la cuenta y la relación contractual |
 | Datos de clientes de una barbería | Mientras lo indique la barbería o permanezca vigente el servicio |
-| Copias de seguridad | [PENDIENTE: ciclo de rotación y plazo máximo] |
-| Registros de seguridad | [PENDIENTE: plazo técnicamente justificado] |
-| Solicitudes de soporte | [PENDIENTE: plazo] |
+| Copias de seguridad | Se realizan cada 30 días y se conservan por un máximo de 90 días |
+| Registros de seguridad | Entre 6 y 12 meses, según su utilidad técnica y de seguridad |
+| Solicitudes de soporte | Entre 1 y 2 años, según sea necesario para seguimiento y defensa de reclamaciones |
 | Consentimientos y aceptaciones | Mientras sean necesarios para demostrar cumplimiento |
 | Información contable o tributaria | Durante el plazo exigido por la legislación aplicable |
 | Solicitudes de derechos | Durante el plazo necesario para demostrar su atención |
@@ -235,7 +235,7 @@ El titular puede solicitar, según corresponda:
 - **retiro del consentimiento:** revocar autorizaciones previamente otorgadas;
 - **no ser objeto de decisiones automatizadas:** pedir intervención humana cuando una decisión produzca efectos jurídicos o significativos.
 
-Para ejercer un derecho, el titular podrá escribir a **[PENDIENTE: correo de privacidad]** con el asunto `Solicitud de protección de datos` e indicar:
+Para ejercer un derecho, el titular podrá escribir a **soport@navacloud.app** con el asunto `Solicitud de protección de datos` e indicar:
 
 1. nombre completo;
 2. correo o teléfono asociado;
@@ -275,7 +275,7 @@ Ningún sistema es completamente invulnerable. En caso de una vulneración, Nava
 
 ## 2.14. Decisiones automatizadas e inteligencia artificial
 
-En la versión actual, Nava **[PENDIENTE: confirmar si utiliza IA o decisiones automatizadas]**.
+En la versión actual, Nava no utiliza inteligencia artificial, recomendaciones automatizadas ni decisiones automatizadas que produzcan efectos jurídicos o significativos sobre los titulares.
 
 Si en el futuro se incorporan recomendaciones, clasificación automática, asistentes o decisiones basadas en inteligencia artificial, esta Política deberá explicar su lógica general, los datos utilizados, las consecuencias previstas y la forma de solicitar intervención humana cuando corresponda.
 
@@ -360,12 +360,12 @@ Configuración comercial pendiente:
 
 | Condición | Regla de Nava |
 |---|---|
-| Duración de prueba | [PENDIENTE] |
-| Precio y periodicidad | [PENDIENTE] |
-| Renovación automática | [PENDIENTE] |
-| Aviso previo al cobro | [PENDIENTE] |
-| Periodo de gracia por impago | [PENDIENTE] |
-| Reembolsos | [PENDIENTE] |
+| Duración de prueba | 12 días |
+| Precio y periodicidad | Nava Free: USD 0/mes; Nava Esencial: USD 9,83/mes; Nava Local: USD 29,99/mes. Los límites y funciones de cada plan se informarán en la oferta vigente. |
+| Renovación automática | No se aplica. Cada renovación o pago debe realizarse manualmente por el usuario. |
+| Aviso previo al cobro | 5 días antes del vencimiento o cobro aplicable |
+| Periodo de gracia por impago | 3 días |
+| Reembolsos | Los pagos son finales y no reembolsables, sin perjuicio de los derechos irrenunciables que reconozca la ley. |
 
 Si existe renovación automática, se informará de manera visible antes del pago y el usuario podrá cancelarla mediante un mecanismo razonablemente sencillo.
 
@@ -379,22 +379,22 @@ Si un pago es rechazado, Nava podrá notificar al usuario y limitar temporalment
 
 ## 3.7. Cambios de precio
 
-Nava podrá modificar precios para periodos futuros. El cambio será comunicado con una anticipación razonable de **[PENDIENTE: número de días]** y no afectará importes ya pagados por el periodo vigente.
+Nava podrá modificar precios para periodos futuros. El cambio será comunicado con una anticipación razonable de **15 días** y no afectará importes ya pagados por el periodo vigente.
 
 Si el usuario no acepta el nuevo precio, podrá cancelar la renovación antes de que entre en vigor.
 
 ## 3.8. Cancelación y reembolsos
 
-El titular puede cancelar la renovación desde **[PENDIENTE: ruta dentro de Nava]** o mediante **[PENDIENTE: canal alternativo]**.
+El titular puede cancelar la suscripción desde **Ajustes → Mi negocio → Suscripción**. También podrá solicitar asistencia a través del correo de soporte.
 
 La cancelación de la suscripción:
 
 - detiene cobros futuros;
 - no implica necesariamente un reembolso del periodo iniciado;
-- permite utilizar el servicio hasta **[PENDIENTE: fin del periodo o regla aplicable]**;
+- permite utilizar el servicio hasta el final del periodo ya pagado;
 - no elimina automáticamente la cuenta ni los datos.
 
-La política de reembolsos será **[PENDIENTE: describir regla completa y excepciones legales]**. Ninguna disposición limitará derechos irrenunciables reconocidos por la legislación de protección al consumidor.
+Los pagos realizados son finales y no se realizan reembolsos por periodos iniciados, salvo cuando la legislación aplicable exija lo contrario. Ninguna disposición limitará derechos irrenunciables reconocidos por la legislación de protección al consumidor.
 
 ## 3.9. Uso aceptable
 
@@ -459,13 +459,13 @@ Nava podrá mejorar, sustituir o retirar funciones. Si un cambio reduce sustanci
 
 ## 3.15. Copias de seguridad
 
-Nava mantendrá copias de seguridad conforme a su procedimiento técnico vigente: **[PENDIENTE: frecuencia, retención y alcance]**.
+Nava mantendrá copias de seguridad cada 30 días, con una retención máxima de 90 días. Estas copias abarcan los datos necesarios para recuperar la operación de la Plataforma.
 
 Las copias de seguridad son una medida de continuidad y no deben considerarse un archivo permanente del negocio. El usuario deberá realizar exportaciones cuando necesite conservar información por razones legales o comerciales.
 
 ## 3.16. Soporte
 
-El soporte se brindará por **[PENDIENTE: canales]**, en el horario **[PENDIENTE]** y con los tiempos de respuesta establecidos en el plan contratado.
+El soporte se brindará por correo electrónico y WhatsApp, en días laborables de Ecuador, de 10:00 a 19:00 (hora de Ecuador), con los tiempos de respuesta establecidos en el plan contratado.
 
 El usuario deberá colaborar con información suficiente para diagnosticar un problema, sin enviar contraseñas ni datos innecesarios de clientes.
 
@@ -486,7 +486,7 @@ Salvo urgencia, obligación legal o riesgo de seguridad, Nava notificará la cau
 
 El usuario puede solicitar el cierre de su cuenta. Nava podrá terminar la relación por incumplimiento grave, uso ilícito o imposibilidad legal de continuar prestando el servicio.
 
-Antes del cierre, el negocio podrá exportar sus datos durante **[PENDIENTE: periodo de exportación]**, excepto cuando exista una prohibición legal o un riesgo de seguridad.
+Antes del cierre, el negocio podrá exportar sus datos durante **30 días calendario**, excepto cuando exista una prohibición legal o un riesgo de seguridad.
 
 El cierre de acceso, la cancelación de suscripción y la eliminación de datos son procesos distintos. La eliminación se regirá por la sección correspondiente de este documento.
 
@@ -519,7 +519,7 @@ No se aplicarán retroactivamente condiciones que perjudiquen derechos ya adquir
 
 Estos Términos se rigen por las leyes de la República del Ecuador.
 
-Antes de iniciar una controversia, el usuario podrá contactar a **[PENDIENTE: correo de reclamos]** para buscar una solución directa. Esto no limita el derecho a acudir ante autoridades administrativas, de protección de datos, de consumo o judiciales competentes.
+Antes de iniciar una controversia, el usuario podrá contactar a **soport@navacloud.app** para buscar una solución directa. Esto no limita el derecho a acudir ante autoridades administrativas, de protección de datos, de consumo o judiciales competentes.
 
 La jurisdicción será la que determine la legislación aplicable, respetando los derechos irrenunciables de consumidores y titulares de datos.
 
@@ -545,11 +545,12 @@ Nava podrá utilizar las siguientes categorías únicamente si las herramientas 
 
 ## 4.3. Cookies concretas
 
-Antes de publicar, sustituye esta tabla por el inventario generado directamente desde el sitio:
+El siguiente inventario corresponde a la implementación prevista de Google Analytics 4. Debe verificarse nuevamente en producción si se añaden integraciones o etiquetas adicionales:
 
 | Nombre | Proveedor | Finalidad | Duración | Categoría |
 |---|---|---|---|---|
-| [PENDIENTE] | [PENDIENTE] | [PENDIENTE] | [PENDIENTE] | [PENDIENTE] |
+| `_ga` | Google Analytics 4 | Distinguir usuarios únicos y medir el uso del sitio | Hasta 2 años, sujeto a los límites del navegador | Analítica |
+| `_ga_<identificador-del-contenedor>` | Google Analytics 4 | Mantener el estado de la sesión | Hasta 2 años, sujeto a los límites del navegador | Analítica |
 
 ## 4.4. Gestión del consentimiento
 
@@ -581,11 +582,9 @@ El usuario también puede eliminar o bloquear cookies desde su navegador, aunque
 
 El propietario de una cuenta podrá iniciar la solicitud desde:
 
-`Configuración → Privacidad y datos → Eliminar cuenta y datos`
+`Ajustes → Borrar mi cuenta`
 
-**[PENDIENTE: confirmar que esta ruta exista antes de publicarla]**.
-
-También podrá solicitarla sin iniciar sesión escribiendo a **[PENDIENTE: correo de privacidad]** con el asunto `Eliminación de datos de Nava`.
+También podrá solicitarla sin iniciar sesión escribiendo a **soport@navacloud.app** con el asunto `Eliminación de datos de Nava`.
 
 La solicitud debe incluir:
 
@@ -635,7 +634,7 @@ Cuando sea posible, se informará la categoría conservada, el motivo y el plazo
 
 Los datos se eliminarán de los sistemas activos y se comunicarán las instrucciones necesarias a proveedores o subencargados.
 
-Los datos residuales en copias de seguridad quedarán aislados de usos ordinarios y desaparecerán conforme al ciclo documentado de rotación: **[PENDIENTE: plazo máximo de copias]**. Si una copia se restaura, Nava aplicará nuevamente las solicitudes de eliminación vigentes antes de reanudar el uso normal.
+Los datos residuales en copias de seguridad quedarán aislados de usos ordinarios y desaparecerán conforme al ciclo documentado de rotación, con un plazo máximo de **90 días**. Si una copia se restaura, Nava aplicará nuevamente las solicitudes de eliminación vigentes antes de reanudar el uso normal.
 
 ## 5.8. Confirmación
 
@@ -659,7 +658,7 @@ La eliminación es irreversible. Se recomienda exportar la información necesari
 
 ## Versión recomendada
 
-Al reservar, autorizas al establecimiento **[NOMBRE DE LA BARBERÍA]** a utilizar los datos ingresados para gestionar tu cita, contactarte sobre el servicio y enviarte recordatorios. **Nava** proporciona la tecnología y trata esta información por cuenta del establecimiento. Consulta la [Política de Privacidad]([PENDIENTE: URL]) y contacta al establecimiento para ejercer tus derechos.
+Al reservar, autorizas al establecimiento **[NOMBRE DE LA BARBERÍA]** a utilizar los datos ingresados para gestionar tu cita, contactarte sobre el servicio y enviarte recordatorios. **Nava** proporciona la tecnología y trata esta información por cuenta del establecimiento. Consulta la [Política de Privacidad](https://navacloud.app/tratamiento-de-datos) y contacta al establecimiento para ejercer tus derechos.
 
 Si la barbería desea enviar promociones, debe incluir una casilla independiente, opcional y desmarcada:
 
@@ -731,7 +730,7 @@ El negocio se compromete a:
 
 ## 7.7. Subencargados
 
-El negocio autoriza de forma general el uso de los proveedores publicados en **[PENDIENTE: URL de subencargados]**. Nava informará sobre incorporaciones o sustituciones relevantes y ofrecerá un mecanismo razonable para formular objeciones justificadas.
+El negocio autoriza de forma general el uso de los proveedores descritos en esta Política de Privacidad o que sean informados a solicitud mediante el correo de privacidad. Nava informará sobre incorporaciones o sustituciones relevantes y ofrecerá un mecanismo razonable para formular objeciones justificadas.
 
 ## 7.8. Incidentes
 
@@ -747,7 +746,7 @@ El negocio será responsable de determinar las notificaciones que deba realizar 
 
 ## 7.9. Finalización
 
-Al terminar el servicio, el negocio podrá solicitar una exportación dentro de **[PENDIENTE: plazo]**. Después, Nava eliminará o anonimizará los datos conforme a su política de conservación, excepto la información que deba permanecer bloqueada por obligación legal.
+Al terminar el servicio, el negocio podrá solicitar una exportación dentro de **30 días calendario**. Después, Nava eliminará o anonimizará los datos conforme a su política de conservación, excepto la información que deba permanecer bloqueada por obligación legal.
 
 ---
 
@@ -755,14 +754,14 @@ Al terminar el servicio, el negocio podrá solicitar una exportación dentro de 
 
 Para consultas sobre el servicio:
 
-- **Correo de soporte:** [PENDIENTE: correo]
-- **Teléfono:** [PENDIENTE: teléfono]
+- **Correo de soporte:** soport@navacloud.app
+- **Teléfono:** No disponible
 
 Para privacidad, derechos o eliminación:
 
-- **Correo de privacidad:** [PENDIENTE: correo]
-- **Formulario:** [PENDIENTE: URL]
-- **Dirección:** [PENDIENTE: domicilio]
+- **Correo de privacidad:** soport@navacloud.app
+- **Formulario y página de eliminación:** https://navacloud.app/tratamiento-de-datos
+- **Dirección:** Quito, Ecuador
 
 El titular también puede presentar un reclamo ante la **Superintendencia de Protección de Datos Personales del Ecuador**, sin perjuicio de otros derechos o acciones disponibles.
 

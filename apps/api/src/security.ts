@@ -1,4 +1,6 @@
 import {
+  createCipheriv,
+  createDecipheriv,
   createHash,
   randomBytes,
   randomInt,
@@ -82,4 +84,67 @@ export function createVerificationCode(): string {
 
 export function hashOpaqueToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
+}
+
+function paymentCredentialsKey(encodedKey: string): Buffer {
+  const key = Buffer.from(encodedKey, 'base64');
+  if (key.length !== 32)
+    throw new Error(
+      'PAYPHONE_CREDENTIALS_ENCRYPTION_KEY debe codificar exactamente 32 bytes.',
+    );
+  return key;
+}
+
+/** Cifra secretos de un comercio y los liga criptograficamente a su organizacion. */
+export function encryptPaymentCredential({
+  organizationId,
+  secret,
+  encodedKey,
+}: {
+  readonly encodedKey: string;
+  readonly organizationId: string;
+  readonly secret: string;
+}): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv(
+    'aes-256-gcm',
+    paymentCredentialsKey(encodedKey),
+    iv,
+  );
+  cipher.setAAD(Buffer.from(organizationId));
+  const encrypted = Buffer.concat([
+    cipher.update(secret, 'utf8'),
+    cipher.final(),
+  ]);
+  return [
+    'v1',
+    iv.toString('base64url'),
+    cipher.getAuthTag().toString('base64url'),
+    encrypted.toString('base64url'),
+  ].join('.');
+}
+
+export function decryptPaymentCredential({
+  organizationId,
+  encryptedSecret,
+  encodedKey,
+}: {
+  readonly encodedKey: string;
+  readonly encryptedSecret: string;
+  readonly organizationId: string;
+}): string {
+  const [version, ivValue, tagValue, value] = encryptedSecret.split('.');
+  if (version !== 'v1' || !ivValue || !tagValue || !value)
+    throw new Error('El formato de la credencial cifrada no es valido.');
+  const decipher = createDecipheriv(
+    'aes-256-gcm',
+    paymentCredentialsKey(encodedKey),
+    Buffer.from(ivValue, 'base64url'),
+  );
+  decipher.setAAD(Buffer.from(organizationId));
+  decipher.setAuthTag(Buffer.from(tagValue, 'base64url'));
+  return Buffer.concat([
+    decipher.update(Buffer.from(value, 'base64url')),
+    decipher.final(),
+  ]).toString('utf8');
 }

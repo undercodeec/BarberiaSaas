@@ -4,12 +4,14 @@ import type {
   CashRegisterSummaryResponse,
   CommissionOverviewResponse,
   CurrentOrganizationResponse,
+  PayphoneConfigurationResponse,
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -52,6 +54,12 @@ export default function WalletScreen() {
     null,
   );
   const [amount, setAmount] = useState('');
+  const [payphoneSheetOpen, setPayphoneSheetOpen] = useState(false);
+  const [payphoneEnvironment, setPayphoneEnvironment] = useState<
+    'test' | 'production'
+  >('test');
+  const [payphoneStoreId, setPayphoneStoreId] = useState('');
+  const [payphoneToken, setPayphoneToken] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<
     'cash' | 'other' | 'transfer'
   >('cash');
@@ -91,6 +99,92 @@ export default function WalletScreen() {
         '/v1/commissions/overview',
       ),
     queryKey: ['commission-overview'],
+  });
+  const payphoneQuery = useQuery({
+    enabled: Boolean(session) && tab === 'settings',
+    queryFn: () =>
+      requireApiClient().request<PayphoneConfigurationResponse>(
+        '/v1/payphone/configuration',
+      ),
+    queryKey: ['payphone-configuration'],
+  });
+  const refreshPayphone = () =>
+    queryClient.invalidateQueries({ queryKey: ['payphone-configuration'] });
+  const savePayphone = useMutation({
+    mutationFn: () =>
+      requireApiClient().request<PayphoneConfigurationResponse>(
+        '/v1/payphone/configuration',
+        {
+          body: {
+            environment: payphoneEnvironment,
+            storeId: payphoneStoreId.trim(),
+            token: payphoneToken.trim(),
+          },
+          method: 'POST',
+        },
+      ),
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos guardar PayPhone',
+        error instanceof Error ? error.message : 'Intentalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      setPayphoneToken('');
+      await refreshPayphone();
+      Alert.alert(
+        'Credenciales guardadas',
+        'Ahora prueba la conexion antes de activarla.',
+      );
+    },
+  });
+  const testPayphone = useMutation({
+    mutationFn: () =>
+      requireApiClient().request<PayphoneConfigurationResponse>(
+        '/v1/payphone/configuration/test',
+        { method: 'POST' },
+      ),
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos conectar PayPhone',
+        error instanceof Error ? error.message : 'Intentalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      await refreshPayphone();
+      Alert.alert(
+        'Conexion verificada',
+        'Ya puedes activar PayPhone para este negocio.',
+      );
+    },
+  });
+  const setPayphoneEnabled = useMutation({
+    mutationFn: (enabled: boolean) =>
+      requireApiClient().request<PayphoneConfigurationResponse>(
+        '/v1/payphone/configuration',
+        { body: { enabled }, method: 'PATCH' },
+      ),
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos actualizar PayPhone',
+        error instanceof Error ? error.message : 'Intentalo nuevamente.',
+      ),
+    onSuccess: refreshPayphone,
+  });
+  const disconnectPayphone = useMutation({
+    mutationFn: () =>
+      requireApiClient().request<void>('/v1/payphone/configuration', {
+        method: 'DELETE',
+      }),
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos desconectar PayPhone',
+        error instanceof Error ? error.message : 'Intentalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      setPayphoneSheetOpen(false);
+      setPayphoneStoreId('');
+      setPayphoneToken('');
+      await refreshPayphone();
+    },
   });
   const role = organizationQuery.data?.membership?.role;
   const canManageCommissions = role === 'owner' || role === 'manager';
@@ -586,7 +680,7 @@ export default function WalletScreen() {
           </View>
         ) : null}
         {tab === 'settings' ? (
-          <View style={styles.card}>
+          <View style={styles.payphoneCard}>
             <View style={styles.icon}>
               <Ionicons
                 color={appTheme.colors.accentDark}
@@ -597,16 +691,217 @@ export default function WalletScreen() {
             <View style={styles.copy}>
               <Text style={styles.cardTitle}>PayPhone</Text>
               <Text style={styles.cardDescription}>
-                No configurado. Conecta tu cuenta PayPhone Business desde
-                Configuración.
+                {payphoneQuery.data?.configuration
+                  ? `${payphoneQuery.data.configuration.isEnabled ? 'Activo' : 'Configurado sin activar'} · ${payphoneQuery.data.configuration.storeIdHint}`
+                  : 'Conecta la cuenta PayPhone Business de este negocio.'}
               </Text>
             </View>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>Próximamente</Text>
+              <Text style={styles.badgeText}>
+                {payphoneQuery.data?.configuration?.status === 'connected'
+                  ? 'Conectado'
+                  : payphoneQuery.data?.configuration?.status === 'error'
+                    ? 'Error'
+                    : 'Pendiente'}
+              </Text>
             </View>
+            {role === 'owner' ? (
+              <Pressable
+                accessibilityLabel="Configurar PayPhone"
+                onPress={() => {
+                  const configuration = payphoneQuery.data?.configuration;
+                  setPayphoneEnvironment(configuration?.environment ?? 'test');
+                  setPayphoneStoreId('');
+                  setPayphoneToken('');
+                  setPayphoneSheetOpen(true);
+                }}
+                style={styles.payphoneAction}
+              >
+                <Text style={styles.primaryActionText}>Configurar</Text>
+              </Pressable>
+            ) : null}
           </View>
-        ) : null}
+        ) : null}{' '}
       </ScrollView>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setPayphoneSheetOpen(false)}
+        transparent
+        visible={payphoneSheetOpen}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable
+            accessibilityLabel="Cerrar configuracion PayPhone"
+            onPress={() => setPayphoneSheetOpen(false)}
+            style={styles.modalBackdrop}
+          />
+          <ScrollView contentContainerStyle={styles.payphoneSheet}>
+            <Text style={styles.sheetTitle}>Configurar PayPhone</Text>
+            <Text style={styles.sheetCopy}>
+              Ingresa las credenciales de PayPhone Business de este negocio. El
+              Token se cifra en el servidor y nunca se mostrara nuevamente.
+            </Text>
+            <View style={styles.payphoneGuide}>
+              <Text style={styles.payphoneGuideTitle}>
+                Como obtener tu Token y StoreID
+              </Text>
+              <Text style={styles.payphoneGuideStep}>
+                1. Ingresa a PayPhone Business con una cuenta administradora y
+                crea un usuario con rol Desarrollador.
+              </Text>
+              <Text style={styles.payphoneGuideStep}>
+                2. Ingresa a PayPhone Developer con ese usuario y pulsa Agregar
+                para crear una aplicacion.
+              </Text>
+              <Text style={styles.payphoneGuideStep}>
+                3. Selecciona tipo de aplicacion API, completa los datos y
+                guarda. Elige primero el ambiente Pruebas.
+              </Text>
+              <Text style={styles.payphoneGuideStep}>
+                4. Abre Credenciales, copia solamente Token y StoreID, y pegalos
+                abajo. No compartas el Token con nadie.
+              </Text>
+              <Pressable
+                accessibilityLabel="Ver video de configuracion de PayPhone"
+                onPress={() =>
+                  void Linking.openURL(
+                    'https://www.youtube.com/watch?v=Y7KCMq91QPk&list=PL5vPkGVDdQxRw-tRc5gocIEj9E2iv6fts&index=2',
+                  )
+                }
+              >
+                <Text style={styles.linkText}>
+                  Ver video guia — mira solo del minuto 1:00 al 4:00
+                </Text>
+              </Pressable>
+              <Text style={styles.payphoneGuideNote}>
+                El resto del video no es necesario para Nava: solo necesitas los
+                campos Token y StoreID.
+              </Text>
+            </View>
+            {!payphoneQuery.data?.encryptionConfigured ? (
+              <Text style={styles.warningCopy}>
+                Falta preparar el cifrado en el servidor. Solicita al
+                administrador configurar PAYPHONE_CREDENTIALS_ENCRYPTION_KEY.
+              </Text>
+            ) : null}
+            <Text style={styles.inputLabel}>Ambiente</Text>
+            <View style={styles.methodRow}>
+              {(['test', 'production'] as const).map((value) => (
+                <Pressable
+                  key={value}
+                  onPress={() => setPayphoneEnvironment(value)}
+                  style={[
+                    styles.method,
+                    payphoneEnvironment === value && styles.methodActive,
+                  ]}
+                >
+                  <Text
+                    style={
+                      payphoneEnvironment === value
+                        ? styles.methodTextActive
+                        : styles.methodText
+                    }
+                  >
+                    {value === 'test' ? 'Pruebas' : 'Produccion'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.inputLabel}>StoreID</Text>
+            <TextInput
+              autoCapitalize="none"
+              editable={!savePayphone.isPending}
+              onChangeText={setPayphoneStoreId}
+              placeholder="StoreID de PayPhone"
+              placeholderTextColor={appTheme.colors.textMuted}
+              style={styles.input}
+              value={payphoneStoreId}
+            />
+            <Text style={styles.inputLabel}>Token</Text>
+            <TextInput
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!savePayphone.isPending}
+              onChangeText={setPayphoneToken}
+              placeholder={
+                payphoneQuery.data?.configuration
+                  ? 'Nuevo Token para rotarlo'
+                  : 'Token de PayPhone'
+              }
+              placeholderTextColor={appTheme.colors.textMuted}
+              secureTextEntry
+              style={styles.input}
+              value={payphoneToken}
+            />
+            <Pressable
+              disabled={
+                !payphoneStoreId.trim() ||
+                !payphoneToken.trim() ||
+                savePayphone.isPending ||
+                !payphoneQuery.data?.encryptionConfigured
+              }
+              onPress={() => savePayphone.mutate()}
+              style={styles.confirmButton}
+            >
+              <Text style={styles.confirmButtonText}>
+                {savePayphone.isPending
+                  ? 'Guardando...'
+                  : 'Guardar credenciales'}
+              </Text>
+            </Pressable>
+            {payphoneQuery.data?.configuration ? (
+              <>
+                <Pressable
+                  disabled={testPayphone.isPending}
+                  onPress={() => testPayphone.mutate()}
+                  style={styles.secondaryAction}
+                >
+                  <Text style={styles.secondaryActionText}>
+                    {testPayphone.isPending ? 'Probando...' : 'Probar conexion'}
+                  </Text>
+                </Pressable>
+                {payphoneQuery.data.configuration.status === 'connected' ? (
+                  <Pressable
+                    disabled={setPayphoneEnabled.isPending}
+                    onPress={() =>
+                      setPayphoneEnabled.mutate(
+                        !payphoneQuery.data?.configuration?.isEnabled,
+                      )
+                    }
+                    style={styles.confirmButton}
+                  >
+                    <Text style={styles.confirmButtonText}>
+                      {payphoneQuery.data.configuration.isEnabled
+                        ? 'Desactivar PayPhone'
+                        : 'Activar PayPhone'}
+                    </Text>
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  disabled={disconnectPayphone.isPending}
+                  onPress={() =>
+                    Alert.alert(
+                      'Desconectar PayPhone',
+                      'Se eliminara el Token cifrado de este negocio.',
+                      [
+                        { style: 'cancel', text: 'Cancelar' },
+                        {
+                          onPress: () => disconnectPayphone.mutate(),
+                          style: 'destructive',
+                          text: 'Desconectar',
+                        },
+                      ],
+                    )
+                  }
+                  style={styles.dangerButton}
+                >
+                  <Text style={styles.dangerText}>Desconectar PayPhone</Text>
+                </Pressable>
+              </>
+            ) : null}
+          </ScrollView>
+        </View>
+      </Modal>{' '}
       <Modal
         animationType="slide"
         onRequestClose={() => setSheetMode(null)}
@@ -825,6 +1120,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
   },
+  dangerButton: { alignItems: 'center', padding: 12 },
   dateField: { flex: 1 },
   dateRow: { flexDirection: 'row', gap: 10 },
   financialRow: {
@@ -876,6 +1172,53 @@ const styles = StyleSheet.create({
   modalBackdrop: { flex: 1 },
   modalRoot: { backgroundColor: 'rgba(0,0,0,0.35)', flex: 1 },
   notesInput: { minHeight: 70, textAlignVertical: 'top' },
+  payphoneAction: {
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  payphoneCard: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.surface,
+    borderRadius: 19,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    padding: 16,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
+  },
+  payphoneGuide: {
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderRadius: 14,
+    gap: 8,
+    marginTop: 8,
+    padding: 14,
+  },
+  payphoneGuideNote: {
+    color: appTheme.colors.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  payphoneGuideStep: {
+    color: appTheme.colors.text,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  payphoneGuideTitle: {
+    color: appTheme.colors.text,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  payphoneSheet: {
+    backgroundColor: appTheme.colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    gap: 8,
+    marginTop: 'auto',
+    padding: 22,
+    paddingBottom: 36,
+  },
   primaryAction: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surface,

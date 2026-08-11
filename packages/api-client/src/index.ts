@@ -4,6 +4,7 @@ export interface ApiRequestOptions {
   readonly method?: 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT';
   readonly responseType?: 'json' | 'text';
   readonly signal?: AbortSignal;
+  readonly timeoutMs?: number;
 }
 
 export interface ApiClient {
@@ -17,6 +18,7 @@ export interface ApiClientConfig {
   readonly baseUrl: string;
   readonly fetchImplementation?: typeof fetch;
   readonly getAccessToken?: () => Promise<string | null>;
+  readonly timeoutMs?: number;
 }
 
 export interface AuthenticatedUser {
@@ -453,6 +455,19 @@ export interface MovementReportResponse {
   readonly totalAmountCents: number;
 }
 
+export interface PayphoneConfiguration {
+  readonly connectedAt: string | null;
+  readonly environment: 'production' | 'test';
+  readonly isEnabled: boolean;
+  readonly lastTestedAt: string | null;
+  readonly status: 'connected' | 'error' | 'requires_attention';
+  readonly storeIdHint: string;
+}
+
+export interface PayphoneConfigurationResponse {
+  readonly configuration: PayphoneConfiguration | null;
+  readonly encryptionConfigured: boolean;
+}
 export interface ApiMessageResponse {
   readonly message: string;
   // Reserved for future shared message fields.
@@ -889,12 +904,48 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
       if (options.body !== undefined) {
         requestInit.body = JSON.stringify(options.body);
       }
-      if (options.signal !== undefined) requestInit.signal = options.signal;
+      const timeoutMs = options.timeoutMs ?? config.timeoutMs;
+      const timeoutController =
+        timeoutMs && timeoutMs > 0 ? new AbortController() : null;
+      let timedOut = false;
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const abortForCaller = () => timeoutController?.abort();
+      if (options.signal && timeoutController) {
+        if (options.signal.aborted) timeoutController.abort();
+        else
+          options.signal.addEventListener('abort', abortForCaller, {
+            once: true,
+          });
+      }
+      if (timeoutController) {
+        timeoutId = setTimeout(() => {
+          timedOut = true;
+          timeoutController.abort();
+        }, timeoutMs);
+        requestInit.signal = timeoutController.signal;
+      } else if (options.signal !== undefined) {
+        requestInit.signal = options.signal;
+      }
 
-      const response = await fetchImplementation(
-        `${baseUrl}/${path.replace(/^\//u, '')}`,
-        requestInit,
-      );
+      let response: Response;
+      try {
+        response = await fetchImplementation(
+          `${baseUrl}/${path.replace(/^\//u, '')}`,
+          requestInit,
+        );
+      } catch (error) {
+        if (timedOut)
+          throw new ApiClientError(
+            408,
+            'REQUEST_TIMEOUT',
+            'La solicitud demoró demasiado. Verifica tu conexión e inténtalo nuevamente.',
+          );
+        throw error;
+      } finally {
+        if (timeoutId !== undefined) clearTimeout(timeoutId);
+        if (options.signal && timeoutController)
+          options.signal.removeEventListener('abort', abortForCaller);
+      }
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as {
