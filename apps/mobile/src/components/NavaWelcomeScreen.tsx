@@ -71,7 +71,7 @@ export function NavaWelcomeScreen({
 
           <View style={styles.message}>
             <Text accessibilityRole="header" style={styles.title}>
-              Bienvenido a <Image resizeMode="contain" source={logoImage} style={styles.inlineBrandLogo} />
+              Bienvenido a Nava
             </Text>
             <Text style={styles.description}>
               Reserva tu cita y gestiona{'\n'}tu barbería con facilidad

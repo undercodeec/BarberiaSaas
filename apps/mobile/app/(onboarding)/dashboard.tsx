@@ -1739,8 +1739,10 @@ export function LegacyLocationBannerSheet({
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { session, user } = useAuth();
-  const canPromptForNotifications = Boolean(session && user);
+  const { session, showNotificationsAfterSignIn, user } = useAuth();
+  const canPromptForNotifications = Boolean(
+    session && user && showNotificationsAfterSignIn,
+  );
   const accountQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>

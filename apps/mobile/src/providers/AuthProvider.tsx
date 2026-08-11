@@ -31,6 +31,7 @@ import {
 interface AuthContextValue {
   readonly configurationError: string | null;
   readonly isLoading: boolean;
+  readonly showNotificationsAfterSignIn: boolean;
   readonly session: { readonly expiresAt: string } | null;
   readonly signIn: (input: SignInInput) => Promise<void>;
   readonly signOut: () => Promise<void>;
@@ -48,6 +49,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<{ expiresAt: string } | null>(null);
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showNotificationsAfterSignIn, setShowNotificationsAfterSignIn] =
+    useState(false);
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -66,11 +69,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
     void restoreSession();
   }, []);
 
-  const applyAuthResponse = useCallback(async (response: AuthResponse) => {
-    await storeSessionToken(response.session.token);
-    setSession({ expiresAt: response.session.expiresAt });
-    setUser(response.user);
-  }, []);
+  const applyAuthResponse = useCallback(
+    async (response: AuthResponse, showNotifications = false) => {
+      await storeSessionToken(response.session.token);
+      setSession({ expiresAt: response.session.expiresAt });
+      setShowNotificationsAfterSignIn(showNotifications);
+      setUser(response.user);
+    },
+    [],
+  );
 
   const signIn = useCallback(
     async (input: SignInInput) => {
@@ -78,7 +85,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         '/v1/auth/login',
         { body: input, method: 'POST' },
       );
-      await applyAuthResponse(response);
+      await applyAuthResponse(response, true);
     },
     [applyAuthResponse],
   );
@@ -116,6 +123,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     } finally {
       await clearSessionToken();
       setSession(null);
+      setShowNotificationsAfterSignIn(false);
       setUser(null);
     }
   }, []);
@@ -125,6 +133,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       configurationError: apiConfigurationError,
       isLoading,
       session,
+      showNotificationsAfterSignIn,
       resendVerification,
       signIn,
       signOut,
@@ -136,6 +145,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       isLoading,
       resendVerification,
       session,
+      showNotificationsAfterSignIn,
       signIn,
       signOut,
       signUp,

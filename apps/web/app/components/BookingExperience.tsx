@@ -113,6 +113,7 @@ export function BookingExperience({
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [verificationCode, setVerificationCode] = useState('');
   const [managementUrl, setManagementUrl] = useState<string | null>(null);
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [developmentCode, setDevelopmentCode] = useState<string | null>(null);
   const [idempotencyKey, setIdempotencyKey] = useState(() =>
     crypto.randomUUID(),
@@ -259,6 +260,16 @@ export function BookingExperience({
         )}`,
       );
       setStep('confirmed');
+      const paymentResponse = await fetch(
+        `${API_URL}/v1/public/booking/${encodeURIComponent(result.managementToken)}/payphone-link`,
+        { method: 'POST' },
+      );
+      if (paymentResponse.ok) {
+        const payment = (await paymentResponse.json()) as {
+          paymentUrl: string | null;
+        };
+        setPaymentUrl(payment.paymentUrl);
+      }
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -631,9 +642,23 @@ export function BookingExperience({
                   Enviamos los detalles a tu correo. Conserva el enlace privado
                   para confirmar asistencia, reprogramar o cancelar.
                 </p>
+                {paymentUrl ? (
+                  <a
+                    className="mt-7 inline-flex rounded-full bg-[#ffbd00] px-6 py-3 font-black text-black"
+                    href={paymentUrl}
+                  >
+                    Pagar ahora con PayPhone
+                  </a>
+                ) : null}
+                {paymentUrl ? (
+                  <p className="mx-auto mt-3 max-w-md text-sm text-black/55">
+                    El pago será verificado por el negocio. Conserva tu
+                    comprobante de PayPhone.
+                  </p>
+                ) : null}
                 {managementUrl ? (
                   <a
-                    className="mt-7 inline-flex rounded-full bg-black px-6 py-3 font-black text-white"
+                    className="mt-4 inline-flex rounded-full bg-black px-6 py-3 font-black text-white"
                     href={managementUrl}
                   >
                     Ver mi cita

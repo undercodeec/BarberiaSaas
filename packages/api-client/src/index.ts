@@ -457,7 +457,6 @@ export interface MovementReportResponse {
 
 export interface PayphoneConfiguration {
   readonly connectedAt: string | null;
-  readonly environment: 'production' | 'test';
   readonly isEnabled: boolean;
   readonly lastTestedAt: string | null;
   readonly status: 'connected' | 'error' | 'requires_attention';

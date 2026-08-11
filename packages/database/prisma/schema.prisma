@@ -107,6 +107,14 @@ enum PayphoneConnectionStatus {
   ERROR
 }
 
+enum OnlinePaymentStatus {
+  PENDING
+  APPROVED
+  CANCELLED
+  FAILED
+  EXPIRED
+}
+
 enum CommissionRuleType {
   SERVICE_PERCENTAGE
   SERVICE_FIXED
@@ -212,6 +220,7 @@ model User {
   portfolioItems           UserPortfolioItem[]
   appNotifications         AppNotification[]
   pushTokens               PushToken[]
+  payphoneManualConfirmations PaymentAttempt[] @relation("PayphoneManualConfirmation")
 
   @@index([deletedAt])
   @@map("users")
@@ -391,23 +400,23 @@ model PasswordResetToken {
 }
 
 model Organization {
-  id                                 String                   @id @default(uuid()) @db.Uuid
-  name                               String                   @db.VarChar(120)
-  slug                               String                   @unique @db.VarChar(80)
-  status                             OrganizationStatus       @default(TRIAL)
-  currencyCode                       String                   @default("USD") @map("currency_code") @db.Char(3)
-  defaultTimezone                    String                   @default("America/Guayaquil") @map("default_timezone") @db.VarChar(64)
-  bookingConfirmationEnabled         Boolean                  @default(true) @map("booking_confirmation_enabled")
-  bookingReminderMinutes             Int                      @default(1440) @map("booking_reminder_minutes")
-  bookingConfirmationDeadlineMinutes Int                      @default(360) @map("booking_confirmation_deadline_minutes")
-  bookingUnconfirmedAction           UnconfirmedBookingAction @default(KEEP) @map("booking_unconfirmed_action")
-  bookingCancellationLeadMinutes     Int                      @default(120) @map("booking_cancellation_lead_minutes")
-  bookingRescheduleLeadMinutes       Int                      @default(120) @map("booking_reschedule_lead_minutes")
-  bookingPolicyVersion               Int                      @default(1) @map("booking_policy_version")
-  bookingPolicyText                  String                   @default("Acepto asistir puntualmente y cancelar o reprogramar dentro del plazo informado por el negocio.") @map("booking_policy_text") @db.VarChar(1000)
-  createdAt                          DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt                          DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt                          DateTime?                @map("deleted_at") @db.Timestamptz(3)
+  id                                 String                       @id @default(uuid()) @db.Uuid
+  name                               String                       @db.VarChar(120)
+  slug                               String                       @unique @db.VarChar(80)
+  status                             OrganizationStatus           @default(TRIAL)
+  currencyCode                       String                       @default("USD") @map("currency_code") @db.Char(3)
+  defaultTimezone                    String                       @default("America/Guayaquil") @map("default_timezone") @db.VarChar(64)
+  bookingConfirmationEnabled         Boolean                      @default(true) @map("booking_confirmation_enabled")
+  bookingReminderMinutes             Int                          @default(1440) @map("booking_reminder_minutes")
+  bookingConfirmationDeadlineMinutes Int                          @default(360) @map("booking_confirmation_deadline_minutes")
+  bookingUnconfirmedAction           UnconfirmedBookingAction     @default(KEEP) @map("booking_unconfirmed_action")
+  bookingCancellationLeadMinutes     Int                          @default(120) @map("booking_cancellation_lead_minutes")
+  bookingRescheduleLeadMinutes       Int                          @default(120) @map("booking_reschedule_lead_minutes")
+  bookingPolicyVersion               Int                          @default(1) @map("booking_policy_version")
+  bookingPolicyText                  String                       @default("Acepto asistir puntualmente y cancelar o reprogramar dentro del plazo informado por el negocio.") @map("booking_policy_text") @db.VarChar(1000)
+  createdAt                          DateTime                     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                          DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt                          DateTime?                    @map("deleted_at") @db.Timestamptz(3)
   locations                          Location[]
   memberships                        Membership[]
   auditLogs                          AuditLog[]
@@ -426,6 +435,7 @@ model Organization {
   subscription                       Subscription?
   products                           Product[]
   stockMovements                     StockMovement[]
+  paymentAttempts                    PaymentAttempt[]
   payphoneConfiguration              PayphoneConfiguration?
 
   @@map("organizations")
@@ -450,20 +460,20 @@ model PayphoneConfiguration {
 }
 
 model Plan {
-  id                String         @id @default(uuid()) @db.Uuid
-  code              String         @unique @db.VarChar(40)
-  name              String         @db.VarChar(80)
-  monthlyPriceCents Int?           @map("monthly_price_cents")
-  currencyCode      String         @default("USD") @map("currency_code") @db.Char(3)
-  limits            Json           @default("{}")
-  features          Json           @default("[]")
-  featureFlags      Json           @default("{}") @map("feature_flags")
-  isActive          Boolean        @default(true) @map("is_active")
-  isPublic          Boolean        @default(false) @map("is_public")
-  sortOrder         Int            @default(0) @map("sort_order")
-  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
-  subscriptions     Subscription[]
+  id                          String                       @id @default(uuid()) @db.Uuid
+  code                        String                       @unique @db.VarChar(40)
+  name                        String                       @db.VarChar(80)
+  monthlyPriceCents           Int?                         @map("monthly_price_cents")
+  currencyCode                String                       @default("USD") @map("currency_code") @db.Char(3)
+  limits                      Json                         @default("{}")
+  features                    Json                         @default("[]")
+  featureFlags                Json                         @default("{}") @map("feature_flags")
+  isActive                    Boolean                      @default(true) @map("is_active")
+  isPublic                    Boolean                      @default(false) @map("is_public")
+  sortOrder                   Int                          @default(0) @map("sort_order")
+  createdAt                   DateTime                     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                   DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  subscriptions               Subscription[]
 
   @@index([isActive, sortOrder])
   @@map("plans")
@@ -599,6 +609,7 @@ model Location {
   appointmentReviews      AppointmentReview[]
   inventory               LocationInventory[]
   stockMovements          StockMovement[]
+  paymentAttempts         PaymentAttempt[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -1047,6 +1058,7 @@ model Appointment {
   publicAccess                      PublicBookingAccess?
   review                            AppointmentReview?
   appNotifications                  AppNotification[]
+  paymentAttempts                   PaymentAttempt[]
 
   @@unique([organizationId, publicIdempotencyKeyHash])
   @@index([organizationId, startsAt])
@@ -1103,6 +1115,37 @@ model PublicBookingAccess {
 
   @@index([verifiedAt, managementExpiresAt])
   @@map("public_booking_access")
+}
+
+model PaymentAttempt {
+  id                    String              @id @default(uuid()) @db.Uuid
+  organizationId        String              @map("organization_id") @db.Uuid
+  locationId            String              @map("location_id") @db.Uuid
+  appointmentId         String              @map("appointment_id") @db.Uuid
+  provider              String              @default("payphone") @db.VarChar(40)
+  clientTransactionId   String              @unique @map("client_transaction_id") @db.VarChar(15)
+  providerTransactionId String?             @unique @map("provider_transaction_id") @db.VarChar(80)
+  storeId               String              @map("store_id") @db.VarChar(160)
+  amountCents           Int                 @map("amount_cents")
+  currencyCode          String              @default("USD") @map("currency_code") @db.Char(3)
+  paymentUrl            String?             @map("payment_url") @db.Text
+  status                OnlinePaymentStatus @default(PENDING)
+  expiresAt             DateTime            @map("expires_at") @db.Timestamptz(3)
+  approvedAt            DateTime?           @map("approved_at") @db.Timestamptz(3)
+  providerPayload       Json?               @map("provider_payload")
+  manuallyConfirmedAt   DateTime?           @map("manually_confirmed_at") @db.Timestamptz(3)
+  manuallyConfirmedByUserId String?          @map("manually_confirmed_by_user_id") @db.Uuid
+  manualConfirmationNote String?             @map("manual_confirmation_note") @db.VarChar(500)
+  createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization          Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location              Location            @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  appointment           Appointment         @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  manuallyConfirmedBy    User?               @relation("PayphoneManualConfirmation", fields: [manuallyConfirmedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([appointmentId, createdAt])
+  @@index([organizationId, status, expiresAt])
+  @@map("payment_attempts")
 }
 
 model AppointmentReview {

@@ -443,12 +443,7 @@ export function RegistrationFlow() {
                   {step === 'choice' ? (
                     <View style={s.roleContent}>
                       <Text accessibilityRole="header" style={s.title}>
-                        ¿Cómo quieres unirte a{' '}
-                        <Image
-                          resizeMode="contain"
-                          source={logoImage}
-                          style={s.inlineBrandLogo}
-                        />
+                        ¿Cómo quieres unirte a Nava
                         ?
                       </Text>
                       <Text style={s.description}>

@@ -26,8 +26,10 @@ import {
   publicAppointment,
   zonedDateTimeToUtc,
 } from './agenda';
+import type { ApiConfig } from './config';
 import { ApiError } from './errors';
 import type { AppointmentNotifier } from './notifications';
+import { createPayphonePaymentLink } from './payphone-payments';
 import {
   createOpaqueToken,
   createVerificationCode,
@@ -807,6 +809,7 @@ export function registerPublicBookingRoutes(
   notifier: AppointmentNotifier | null,
   appEnvironment: 'local' | 'preview' | 'production' | 'staging',
   publicBaseUrl = DEFAULT_PUBLIC_BOOKING_BASE_URL,
+  config: ApiConfig,
 ) {
   app.get('/v1/public/:organizationSlug', async (request) => {
     enforceRateLimit(request, 'catalog', 120, 60_000);
@@ -1183,6 +1186,13 @@ export function registerPublicBookingRoutes(
     };
   });
 
+  app.post('/v1/public/booking/:token/payphone-link', async (request) => {
+    enforceRateLimit(request, 'payphone-link', 10, 15 * 60_000);
+    const { token } = tokenPathSchema.parse(request.params);
+    const access = await requireManagedAppointment(database, token);
+    assertActivePublicAppointment(access.appointment.status);
+    return createPayphonePaymentLink(database, config, access.appointmentId);
+  });
   app.get('/v1/public/booking/:token', async (request) => {
     enforceRateLimit(request, 'manage-booking', 90, 60_000);
     const { token } = tokenPathSchema.parse(request.params);

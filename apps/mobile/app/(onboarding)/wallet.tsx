@@ -55,9 +55,6 @@ export default function WalletScreen() {
   );
   const [amount, setAmount] = useState('');
   const [payphoneSheetOpen, setPayphoneSheetOpen] = useState(false);
-  const [payphoneEnvironment, setPayphoneEnvironment] = useState<
-    'test' | 'production'
-  >('test');
   const [payphoneStoreId, setPayphoneStoreId] = useState('');
   const [payphoneToken, setPayphoneToken] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<
@@ -116,7 +113,6 @@ export default function WalletScreen() {
         '/v1/payphone/configuration',
         {
           body: {
-            environment: payphoneEnvironment,
             storeId: payphoneStoreId.trim(),
             token: payphoneToken.trim(),
           },
@@ -710,7 +706,6 @@ export default function WalletScreen() {
                 accessibilityLabel="Configurar PayPhone"
                 onPress={() => {
                   const configuration = payphoneQuery.data?.configuration;
-                  setPayphoneEnvironment(configuration?.environment ?? 'test');
                   setPayphoneStoreId('');
                   setPayphoneToken('');
                   setPayphoneSheetOpen(true);
@@ -755,7 +750,7 @@ export default function WalletScreen() {
               </Text>
               <Text style={styles.payphoneGuideStep}>
                 3. Selecciona tipo de aplicacion API, completa los datos y
-                guarda. Elige primero el ambiente Pruebas.
+                guarda. PayPhone determina el ambiente con esas credenciales.
               </Text>
               <Text style={styles.payphoneGuideStep}>
                 4. Abre Credenciales, copia solamente Token y StoreID, y pegalos
@@ -775,7 +770,10 @@ export default function WalletScreen() {
               </Pressable>
               <Text style={styles.payphoneGuideNote}>
                 El resto del video no es necesario para Nava: solo necesitas los
-                campos Token y StoreID.
+                campos Token y StoreID. Nava genera el enlace de cobro, pero
+                PayPhone no comunica automáticamente el resultado. Verifica la
+                transacción en PayPhone Business antes de registrarla como
+                pagada.
               </Text>
             </View>
             {!payphoneQuery.data?.encryptionConfigured ? (
@@ -785,28 +783,7 @@ export default function WalletScreen() {
               </Text>
             ) : null}
             <Text style={styles.inputLabel}>Ambiente</Text>
-            <View style={styles.methodRow}>
-              {(['test', 'production'] as const).map((value) => (
-                <Pressable
-                  key={value}
-                  onPress={() => setPayphoneEnvironment(value)}
-                  style={[
-                    styles.method,
-                    payphoneEnvironment === value && styles.methodActive,
-                  ]}
-                >
-                  <Text
-                    style={
-                      payphoneEnvironment === value
-                        ? styles.methodTextActive
-                        : styles.methodText
-                    }
-                  >
-                    {value === 'test' ? 'Pruebas' : 'Produccion'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+
             <Text style={styles.inputLabel}>StoreID</Text>
             <TextInput
               autoCapitalize="none"

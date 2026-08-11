@@ -21,7 +21,6 @@ type Authenticate = (
 const PAYPHONE_LINKS_URL = 'https://pay.payphonetodoesposible.com/api/Links';
 
 const saveConfigurationSchema = z.object({
-  environment: z.enum(['test', 'production']),
   storeId: z.string().trim().min(1).max(160),
   token: z.string().trim().min(16).max(4_096),
 });
@@ -54,7 +53,6 @@ function publicConfiguration(
   configuration: {
     connectionStatus: PayphoneConnectionStatus;
     connectedAt: Date | null;
-    environment: 'TEST' | 'PRODUCTION';
     isEnabled: boolean;
     lastTestedAt: Date | null;
     storeId: string;
@@ -69,8 +67,6 @@ function publicConfiguration(
   return {
     configuration: {
       connectedAt: configuration.connectedAt?.toISOString() ?? null,
-      environment: configuration.environment.toLowerCase() as
-        'production' | 'test',
       isEnabled: configuration.isEnabled,
       lastTestedAt: configuration.lastTestedAt?.toISOString() ?? null,
       status: configuration.connectionStatus.toLowerCase() as
@@ -81,7 +77,7 @@ function publicConfiguration(
   };
 }
 
-function encryptionKey(config: ApiConfig): string {
+export function payphoneEncryptionKey(config: ApiConfig): string {
   if (!config.PAYPHONE_CREDENTIALS_ENCRYPTION_KEY)
     throw new ApiError(
       503,
@@ -129,7 +125,7 @@ async function verifyCredentials(
     throw new ApiError(
       422,
       'PAYPHONE_AUTH_FAILED',
-      'PayPhone rechazo el Token. Verifica que pertenezca al ambiente seleccionado.',
+      'PayPhone rechazo el Token. Verifica que pertenezca a la cuenta PayPhone correcta.',
     );
   if (response.status >= 500)
     throw new ApiError(
@@ -140,7 +136,7 @@ async function verifyCredentials(
   throw new ApiError(
     422,
     'PAYPHONE_CONFIGURATION_REJECTED',
-    'PayPhone rechazo el StoreID o la configuracion. Revisa ambos datos y el ambiente seleccionado.',
+    'PayPhone rechazo el StoreID o la configuracion. Revisa ambos datos en PayPhone Business.',
   );
 }
 
@@ -172,7 +168,7 @@ export function registerPayphoneRoutes(
     const { user } = await authenticate(database, request);
     const membership = await ownerScope(database, user.id);
     const input = saveConfigurationSchema.parse(request.body);
-    const key = encryptionKey(config);
+    const key = payphoneEncryptionKey(config);
     let encryptedToken: string;
     try {
       encryptedToken = encryptPaymentCredential({
@@ -191,7 +187,6 @@ export function registerPayphoneRoutes(
       create: {
         connectionStatus: PayphoneConnectionStatus.REQUIRES_ATTENTION,
         encryptedToken,
-        environment: input.environment === 'test' ? 'TEST' : 'PRODUCTION',
         isEnabled: false,
         organizationId: membership.organizationId,
         storeId: input.storeId,
@@ -200,7 +195,6 @@ export function registerPayphoneRoutes(
         connectedAt: null,
         connectionStatus: PayphoneConnectionStatus.REQUIRES_ATTENTION,
         encryptedToken,
-        environment: input.environment === 'test' ? 'TEST' : 'PRODUCTION',
         isEnabled: false,
         lastErrorCode: null,
         lastTestedAt: null,
@@ -212,7 +206,7 @@ export function registerPayphoneRoutes(
       data: {
         action: 'payphone.configuration_saved',
         actorUserId: user.id,
-        afterData: { environment: input.environment },
+        afterData: { storeIdChanged: true },
         entityId: configuration.id,
         entityType: 'payphone_configuration',
         organizationId: membership.organizationId,
@@ -236,7 +230,7 @@ export function registerPayphoneRoutes(
 
     try {
       const token = decryptPaymentCredential({
-        encodedKey: encryptionKey(config),
+        encodedKey: payphoneEncryptionKey(config),
         encryptedSecret: configuration.encryptedToken,
         organizationId: membership.organizationId,
       });

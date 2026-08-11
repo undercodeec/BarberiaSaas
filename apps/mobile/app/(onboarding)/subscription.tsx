@@ -2,7 +2,15 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type { SubscriptionResponse } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InlineMessage } from '../../src/components/InlineMessage';
@@ -102,6 +110,24 @@ export default function SubscriptionScreen() {
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['subscription'] });
+    },
+  });
+  const payWithPayphone = useMutation({
+    mutationFn: (planCode: 'essential' | 'local') =>
+      requireApiClient().request<{ paymentUrl: string }>(
+        '/v1/subscription/payphone-link',
+        {
+          body: { planCode },
+          method: 'POST',
+        },
+      ),
+    onSuccess: (payment) => {
+      void Linking.openURL(payment.paymentUrl).catch(() => {
+        Alert.alert(
+          'No pudimos abrir PayPhone',
+          'Copia el enlace o intenta de nuevo desde este dispositivo.',
+        );
+      });
     },
   });
   if (!session) return <Redirect href="/(auth)/login" />;
@@ -388,8 +414,35 @@ export default function SubscriptionScreen() {
                 <Text style={styles.featureLabel}>{feature}</Text>
               </View>
             ))}
+            {plan.available &&
+            subscription.current.canManage &&
+            (plan.code === 'essential' || plan.code === 'local') ? (
+              <Pressable
+                disabled={payWithPayphone.isPending}
+                onPress={() => {
+                  if (plan.code === 'essential' || plan.code === 'local')
+                    payWithPayphone.mutate(plan.code);
+                }}
+                style={styles.payButton}
+              >
+                <Text style={styles.primaryLabel}>
+                  {payWithPayphone.isPending
+                    ? 'Preparando pago...'
+                    : `Pagar ${plan.name} con PayPhone`}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
         ))}
+        {payWithPayphone.error ? (
+          <InlineMessage
+            message={
+              payWithPayphone.error instanceof Error
+                ? payWithPayphone.error.message
+                : 'No pudimos preparar el pago con PayPhone.'
+            }
+          />
+        ) : null}
         <View style={styles.infoCard}>
           <Ionicons
             color={appTheme.colors.accentDark}
@@ -398,11 +451,12 @@ export default function SubscriptionScreen() {
           />
           <View style={styles.headerCopy}>
             <Text style={styles.infoTitle}>
-              Facturación todavía no habilitada
+              Pago de suscripción con PayPhone
             </Text>
             <Text style={styles.infoCopy}>
-              Esta etapa simula estados y límites. Nava no solicitará tarjeta ni
-              usará el PayPhone de tu negocio para cobrar la suscripción.
+              Nava usa su propia cuenta PayPhone, nunca la de tu negocio. Cada
+              pago cubre 30 días; la renovación automática aún no está
+              habilitada.
             </Text>
           </View>
         </View>
@@ -539,6 +593,12 @@ const styles = StyleSheet.create({
   },
   infoTitle: { color: appTheme.colors.text, fontSize: 15, fontWeight: '800' },
   periodCopy: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 8 },
+  payButton: {
+    backgroundColor: appTheme.colors.accentDark,
+    borderRadius: 14,
+    marginTop: 16,
+    padding: 12,
+  },
   planCard: {
     backgroundColor: appTheme.colors.surface,
     borderRadius: 20,

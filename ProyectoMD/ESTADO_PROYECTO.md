@@ -3685,7 +3685,7 @@ caja, comisiones y registros históricos.
 ### Accesos rápidos y creación de citas
 
 - [x] El dashboard conserva los accesos principales `Resumen`, `Compartir
-    enlace` y `Nueva cita`; `Resumen` abre `/business-summary`.
+  enlace` y `Nueva cita`; `Resumen` abre `/business-summary`.
 - [x] Los accesos visibles se completaron con Servicios, Inventario y Nava
       Wallet, manteniendo el lenguaje visual existente y usando rutas reales.
 - [x] `Nueva cita` abre `/new-booking`; el alta de un cliente reutiliza el mismo
@@ -3916,7 +3916,7 @@ caja, comisiones y registros históricos.
       `NEXT_PUBLIC_API_URL` apuntan a `https://api.navacloud.app`, mientras que
       `PUBLIC_WEB_URL` conserva `https://reservas.navacloud.app`.
 - [x] Verificación externa del enlace de Figaro's: `GET
-    https://api.navacloud.app/v1/public/figaros` devuelve la sucursal
+  https://api.navacloud.app/v1/public/figaros` devuelve la sucursal
       `principal`; `https://reservas.navacloud.app/figaros` responde `307` a
       `/figaros/principal` y la página final responde `200 OK`.
 - [x] La VPS regeneró Prisma Client y ejecutó el despliegue controlado de
@@ -4042,14 +4042,30 @@ caja, comisiones y registros históricos.
       estrategia. Hasta elegir proveedor, los upgrades se administran desde el
       panel interno.
 
-## Configuracion PayPhone por negocio — 11 de agosto de 2026
+## Configuracion PayPhone por negocio — MVP manual
 
-- [x] Wallet permite al propietario guardar Token y StoreID por negocio, seleccionar Pruebas o Produccion, probar la conexion, activar/desactivar y desconectar.
-- [x] La pantalla de configuracion explica como crear la aplicacion API de PayPhone, obtener Token y StoreID, y enlaza al video oficial indicado, delimitando el tramo necesario de 1:00 a 4:00.
-- [x] El Token se cifra con AES-256-GCM en la API y nunca se devuelve al cliente, se registra en auditoria ni se incluye en logs.
-- [x] La prueba genera solamente un API Link unico de USD 0.01 que vence en una hora; crear el link no realiza cobro y verifica conjuntamente Token y StoreID.
-- [ ] Desplegar la migracion `20260811120000_payphone_configuration`, configurar `PAYPHONE_CREDENTIALS_ENCRYPTION_KEY` como secreto exclusivo de la API y reiniciar el servicio.
-- [ ] La generacion de links de pago para reservas, confirmacion de transacciones y webhook autorizado siguen pendientes. Por ello, activar la configuracion aun no habilita cobros al cliente final.
+- [x] Wallet permite al propietario guardar Token y StoreID por negocio,
+      probar conexión, activar/desactivar,
+      rotar y desconectar credenciales cifradas con AES-256-GCM.
+- [x] La reserva pública genera un API Link de una hora con importe en centavos
+      e identificador interno único. Abrir o regresar del enlace no cambia el
+      estado de pago de la cita.
+- [x] La Agenda permite a usuarios con `appointment.manage` registrar un cobro
+      PayPhone manualmente después de declarar que verificaron la transacción,
+      indicando la referencia PayPhone y una nota opcional.
+- [x] La confirmación manual es transaccional e idempotente: crea una venta
+      `CARD`, deja el efectivo esperado intacto, actualiza la cita a `PAID`,
+      concilia comisiones cuando corresponde y crea auditoría con actor,
+      referencia e importe.
+- [x] El endpoint de Notificación Externa y la consulta automática API Sale se
+      retiraron del flujo del MVP. Nava no confirma pagos automáticamente.
+- [ ] Desplegar `20260811120000_payphone_configuration`,
+      `20260811150000_payphone_payment_attempts` y
+      `20260811170000_payphone_manual_confirmation`; configurar
+      `PAYPHONE_CREDENTIALS_ENCRYPTION_KEY`, reiniciar API/Web y realizar una
+      prueba controlada que se verifique manualmente en PayPhone Business.
+- [x] La guía operacional actual está en
+      `ProyectoMD/PAYPHONE_PUESTA_EN_MARCHA.md`.
 
 ## Correccion de vigencia de demo y suscripciones — 11 de agosto de 2026
 
@@ -4065,7 +4081,4 @@ caja, comisiones y registros históricos.
       “Consultando la vigencia de tu plan”.
 - [x] Verificado con 6 pruebas unitarias de politica de suscripcion, typecheck
       de API y typecheck de `@barber-saas/api-client`.
-- [ ] El cobro recurrente, checkout, webhooks de pago, cancelacion al fin del
-      periodo y reintentos de pago siguen pendientes de integrar con el
-      proveedor seleccionado. Por ahora los cambios de plan se administran
-      desde el panel interno.
+- [ ] Los pagos de suscripción de Nava no forman parte de este MVP; no se usan credenciales globales ni cobro de suscripciones con PayPhone.

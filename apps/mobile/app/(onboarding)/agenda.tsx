@@ -23,6 +23,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -106,6 +107,26 @@ function minuteAtTimeZone(value: string, timeZone: string): number {
   return part('hour') * 60 + part('minute');
 }
 
+type PayphoneManualConfirmationResponse = {
+  readonly activeConfiguration: boolean;
+  readonly appointment: {
+    readonly clientName: string;
+    readonly startsAt: string;
+    readonly totalCents: number;
+  };
+  readonly eligible: boolean;
+  readonly paymentStatus: 'paid' | 'pending';
+  readonly attempt: {
+    readonly confirmedAt: string | null;
+    readonly confirmedByName: string | null;
+    readonly currencyCode: string;
+    readonly expiresAt: string;
+    readonly note: string | null;
+    readonly reference: string | null;
+    readonly status: 'confirmed_manually' | 'expired' | 'pending_verification';
+    readonly transactionReference: string;
+  } | null;
+};
 type AgendaView = 'day' | 'month' | 'week';
 type AgendaStatusFilter =
   | 'active'
@@ -239,6 +260,10 @@ export default function AgendaScreen() {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedAppointment, setSelectedAppointment] =
     useState<AppointmentRecord | null>(null);
+  const [manualPaymentSheetOpen, setManualPaymentSheetOpen] = useState(false);
+  const [manualPaymentConfirmed, setManualPaymentConfirmed] = useState(false);
+  const [manualPaymentNote, setManualPaymentNote] = useState('');
+  const [manualPaymentReference, setManualPaymentReference] = useState('');
   const [calendarMonth, setCalendarMonth] = useState(today);
   const [dayContentOpacity] = useState(() => new Animated.Value(1));
   const [schedulePageSlide] = useState(() => new Animated.Value(0));
@@ -446,6 +471,50 @@ export default function AgendaScreen() {
     selectedDaySchedules,
   ]);
 
+  const manualPaymentQuery = useQuery({
+    enabled: Boolean(session && selectedAppointment),
+    queryFn: () =>
+      requireApiClient().request<PayphoneManualConfirmationResponse>(
+        `/v1/appointments/${selectedAppointment!.id}/payphone/manual-confirmation`,
+      ),
+    queryKey: ['payphone-manual-confirmation', selectedAppointment?.id],
+  });
+  const confirmPayphonePayment = useMutation({
+    mutationFn: () => {
+      if (!selectedAppointment)
+        throw new Error('Selecciona una cita para registrar el cobro.');
+      return requireApiClient().request(
+        `/v1/appointments/${selectedAppointment.id}/payphone/manual-confirmation`,
+        {
+          body: {
+            confirmed: true,
+            note: manualPaymentNote.trim() || undefined,
+            providerReference: manualPaymentReference.trim(),
+          },
+          method: 'POST',
+        },
+      );
+    },
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos registrar el cobro',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      setManualPaymentSheetOpen(false);
+      setManualPaymentConfirmed(false);
+      setManualPaymentNote('');
+      setManualPaymentReference('');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['agenda-appointments'] }),
+        queryClient.invalidateQueries({ queryKey: ['cash-register-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['commission-overview'] }),
+        queryClient.invalidateQueries({
+          queryKey: ['payphone-manual-confirmation'],
+        }),
+      ]);
+    },
+  });
   const filteredAppointments = useMemo(() => {
     return (appointmentsQuery.data ?? []).filter((appointment) => {
       if (!showCancelled && appointment.status === 'cancelled') return false;
@@ -1115,6 +1184,23 @@ export default function AgendaScreen() {
               <Ionicons color="#ffffff" name="calendar-outline" size={20} />
               <Text style={styles.modalPrimaryText}>Reprogramar cita</Text>
             </Pressable>
+            {selectedAppointment?.paymentStatus === 'pending' &&
+            manualPaymentQuery.data?.eligible ? (
+              <Pressable
+                onPress={() => {
+                  setManualPaymentConfirmed(false);
+                  setManualPaymentNote('');
+                  setManualPaymentReference('');
+                  setManualPaymentSheetOpen(true);
+                }}
+                style={styles.modalPayphoneAction}
+              >
+                <Ionicons color="#FFFFFF" name="card-outline" size={20} />
+                <Text style={styles.modalPrimaryText}>
+                  Registrar cobro PayPhone
+                </Text>
+              </Pressable>
+            ) : null}{' '}
             <Pressable
               onPress={() => {
                 if (!selectedAppointment?.clientPhone) {
@@ -1175,6 +1261,119 @@ export default function AgendaScreen() {
         </Pressable>
       </Modal>
 
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setManualPaymentSheetOpen(false)}
+        transparent
+        visible={manualPaymentSheetOpen}
+      >
+        <View style={styles.paymentSheetRoot}>
+          <Pressable
+            onPress={() => setManualPaymentSheetOpen(false)}
+            style={styles.appointmentModalBackdrop}
+          />
+          <ScrollView contentContainerStyle={styles.paymentSheet}>
+            <Text style={styles.appointmentModalTitle}>
+              Confirmar cobro PayPhone
+            </Text>
+            <Text style={styles.paymentWarning}>
+              Antes de continuar, verifica en PayPhone Business que el pago fue
+              aprobado y que el monto recibido coincide con el total de la cita.
+              Nava no puede comprobar este pago automáticamente.
+            </Text>
+            <View style={styles.paymentDetails}>
+              <Text style={styles.paymentDetail}>
+                Cliente:{' '}
+                {manualPaymentQuery.data?.appointment.clientName ?? '-'}
+              </Text>
+              <Text style={styles.paymentDetail}>
+                Fecha:{' '}
+                {manualPaymentQuery.data?.appointment.startsAt
+                  ? new Date(
+                      manualPaymentQuery.data.appointment.startsAt,
+                    ).toLocaleString('es-EC')
+                  : '-'}
+              </Text>
+              <Text style={styles.paymentDetail}>
+                Total esperado: $
+                {(
+                  (manualPaymentQuery.data?.appointment.totalCents ?? 0) / 100
+                ).toFixed(2)}{' '}
+                {manualPaymentQuery.data?.attempt?.currencyCode ?? 'USD'}
+              </Text>
+              <Text style={styles.paymentDetail}>
+                Enlace generado:{' '}
+                {manualPaymentQuery.data?.attempt
+                  ? new Date(
+                      new Date(
+                        manualPaymentQuery.data.attempt.expiresAt,
+                      ).getTime() -
+                        60 * 60 * 1000,
+                    ).toLocaleString('es-EC')
+                  : '-'}
+              </Text>
+              <Text style={styles.paymentDetail}>
+                Referencia interna:{' '}
+                {manualPaymentQuery.data?.attempt?.transactionReference ?? '-'}
+              </Text>
+            </View>
+            <Text style={styles.inputLabel}>Referencia de PayPhone</Text>
+            <TextInput
+              autoCapitalize="characters"
+              editable={!confirmPayphonePayment.isPending}
+              onChangeText={setManualPaymentReference}
+              placeholder="Número de transacción verificado"
+              placeholderTextColor={appTheme.colors.textMuted}
+              style={styles.paymentInput}
+              value={manualPaymentReference}
+            />
+            <Text style={styles.inputLabel}>Nota (opcional)</Text>
+            <TextInput
+              editable={!confirmPayphonePayment.isPending}
+              multiline
+              onChangeText={setManualPaymentNote}
+              placeholder="Detalle de la verificación"
+              placeholderTextColor={appTheme.colors.textMuted}
+              style={[styles.paymentInput, styles.paymentNoteInput]}
+              value={manualPaymentNote}
+            />
+            <Pressable
+              onPress={() => setManualPaymentConfirmed((value) => !value)}
+              style={styles.confirmationCheck}
+            >
+              <Ionicons
+                color={
+                  manualPaymentConfirmed
+                    ? appTheme.colors.accentDark
+                    : appTheme.colors.textMuted
+                }
+                name={
+                  manualPaymentConfirmed ? 'checkbox-outline' : 'square-outline'
+                }
+                size={23}
+              />
+              <Text style={styles.confirmationCheckText}>
+                Confirmo que verifiqué el pago aprobado en PayPhone Business.
+              </Text>
+            </Pressable>
+            <Pressable
+              disabled={
+                !manualPaymentConfirmed ||
+                !manualPaymentReference.trim() ||
+                confirmPayphonePayment.isPending
+              }
+              onPress={() => confirmPayphonePayment.mutate()}
+              style={styles.modalPrimaryAction}
+            >
+              <Text style={styles.modalPrimaryText}>
+                {confirmPayphonePayment.isPending
+                  ? 'Registrando...'
+                  : 'Registrar como pagado'}
+              </Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+      </Modal>
       <Pressable
         accessibilityLabel="Crear cita"
         accessibilityRole="button"
@@ -1243,6 +1442,61 @@ const styles = StyleSheet.create({
     color: appTheme.colors.textMuted,
     fontSize: 15,
     marginTop: 6,
+  },
+  confirmationCheck: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  confirmationCheckText: {
+    color: appTheme.colors.text,
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  modalPayphoneAction: {
+    alignItems: 'center',
+    backgroundColor: '#287247',
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 9,
+    justifyContent: 'center',
+    marginTop: 12,
+    padding: 14,
+  },
+  paymentDetail: { color: appTheme.colors.text, fontSize: 13, lineHeight: 19 },
+  paymentDetails: {
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderRadius: 14,
+    gap: 6,
+    marginTop: 14,
+    padding: 14,
+  },
+  paymentInput: {
+    borderColor: appTheme.colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    color: appTheme.colors.text,
+    fontSize: 15,
+    padding: 12,
+  },
+  paymentNoteInput: { minHeight: 72, textAlignVertical: 'top' },
+  paymentSheet: {
+    backgroundColor: appTheme.colors.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    gap: 10,
+    marginTop: 'auto',
+    padding: 22,
+    paddingBottom: 36,
+  },
+  paymentSheetRoot: { backgroundColor: appTheme.colors.overlay, flex: 1 },
+  paymentWarning: {
+    color: '#7A4300',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 8,
   },
   appointmentModalTitle: {
     color: appTheme.colors.accentDark,
@@ -1497,6 +1751,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     paddingTop: 1,
     width: 50,
+  },
+  inputLabel: {
+    color: appTheme.colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 5,
   },
   hourContent: { flex: 1, minHeight: 89, paddingLeft: 10 },
   hourDivider: {
