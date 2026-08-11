@@ -140,11 +140,28 @@ async function requirePublicLocation(
   organizationSlug: string,
   locationSlug: string,
 ) {
+  const organization = await database.organization.findFirst({
+    select: { id: true },
+    where: {
+      deletedAt: null,
+      OR: [
+        { slug: organizationSlug },
+        { publicBookingToken: organizationSlug },
+      ],
+    },
+  });
+  if (!organization) {
+    throw new ApiError(
+      404,
+      'PUBLIC_LOCATION_NOT_FOUND',
+      'Este enlace de reservas no está disponible.',
+    );
+  }
   const location = await database.location.findFirst({
     include: { organization: true },
     where: {
       isActive: true,
-      organization: { deletedAt: null, slug: organizationSlug },
+      organizationId: organization.id,
       slug: locationSlug,
     },
   });
@@ -814,11 +831,28 @@ export function registerPublicBookingRoutes(
   app.get('/v1/public/:organizationSlug', async (request) => {
     enforceRateLimit(request, 'catalog', 120, 60_000);
     const { organizationSlug } = organizationPathSchema.parse(request.params);
+    const organization = await database.organization.findFirst({
+      select: { id: true },
+      where: {
+        deletedAt: null,
+        OR: [
+          { slug: organizationSlug },
+          { publicBookingToken: organizationSlug },
+        ],
+      },
+    });
+    if (!organization) {
+      throw new ApiError(
+        404,
+        'PUBLIC_ORGANIZATION_NOT_FOUND',
+        'Este enlace de reservas no está disponible.',
+      );
+    }
     const location = await database.location.findFirst({
       orderBy: { createdAt: 'asc' },
       where: {
         isActive: true,
-        organization: { deletedAt: null, slug: organizationSlug },
+        organizationId: organization.id,
       },
     });
     if (!location) {

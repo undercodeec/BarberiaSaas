@@ -41,6 +41,7 @@ export default function SettingsScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isCheckingForUpdate, setIsCheckingForUpdate] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [accountDeleted, setAccountDeleted] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const accountQuery = useQuery({
@@ -61,6 +62,7 @@ export default function SettingsScreen() {
         method: 'DELETE',
       });
       queryClient.clear();
+      setAccountDeleted(true);
       try {
         await signOut();
       } catch {
@@ -68,7 +70,8 @@ export default function SettingsScreen() {
       }
     },
   });
-  if (!session) return <Redirect href="/(auth)/login" />;
+  if (!session)
+    return <Redirect href={accountDeleted ? '/' : '/(auth)/login'} />;
 
   const account = accountQuery.data;
   const businessName = account?.businessName || 'Tu negocio';
@@ -104,7 +107,10 @@ export default function SettingsScreen() {
     try {
       const update = await Updates.checkForUpdateAsync();
       if (!update.isAvailable) {
-        Alert.alert('Nava está actualizada', 'Ya tienes la versión más reciente.');
+        Alert.alert(
+          'Nava está actualizada',
+          'Ya tienes la versión más reciente.',
+        );
         return;
       }
 
@@ -268,7 +274,11 @@ export default function SettingsScreen() {
           {isSigningOut ? (
             <ActivityIndicator color={appTheme.colors.accentDark} />
           ) : (
-            <Ionicons color={appTheme.colors.accentDark} name="log-out-outline" size={21} />
+            <Ionicons
+              color={appTheme.colors.accentDark}
+              name="log-out-outline"
+              size={21}
+            />
           )}
           <Text style={styles.logoutLabel}>
             {isSigningOut ? 'Cerrando sesión…' : 'Cerrar sesión'}
@@ -279,7 +289,11 @@ export default function SettingsScreen() {
           onPress={() => setIsDeleteOpen(true)}
           style={styles.deleteAction}
         >
-          <Ionicons color={appTheme.colors.accentDark} name="trash-outline" size={19} />
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="trash-outline"
+            size={19}
+          />
           <Text style={styles.deleteLabel}>Borrar mi cuenta</Text>
         </Pressable>
         <Pressable
@@ -293,13 +307,22 @@ export default function SettingsScreen() {
           ]}
         >
           {isCheckingForUpdate ? (
-            <ActivityIndicator color={appTheme.colors.accentDark} size="small" />
+            <ActivityIndicator
+              color={appTheme.colors.accentDark}
+              size="small"
+            />
           ) : (
-            <Ionicons color={appTheme.colors.accentDark} name="refresh-outline" size={22} />
+            <Ionicons
+              color={appTheme.colors.accentDark}
+              name="refresh-outline"
+              size={22}
+            />
           )}
           <View>
             <Text style={styles.versionTitle}>
-              {isCheckingForUpdate ? 'Buscando actualización…' : 'Buscar actualización'}
+              {isCheckingForUpdate
+                ? 'Buscando actualización…'
+                : 'Buscar actualización'}
             </Text>
             <Text style={styles.versionCopy}>Versión instalada {version}</Text>
           </View>
@@ -382,7 +405,10 @@ export default function SettingsScreen() {
                 ]}
               >
                 {deleteAccountMutation.isPending ? (
-                  <ActivityIndicator color={appTheme.colors.accentDark} size="small" />
+                  <ActivityIndicator
+                    color={appTheme.colors.accentDark}
+                    size="small"
+                  />
                 ) : (
                   <Ionicons color="#FFFFFF" name="trash-outline" size={18} />
                 )}
@@ -419,7 +445,11 @@ function SettingsCard({
         <Text style={styles.cardTitle}>{title}</Text>
         <Text style={styles.cardDescription}>{description}</Text>
       </View>
-      <Ionicons color={appTheme.colors.accentDark} name="chevron-forward" size={21} />
+      <Ionicons
+        color={appTheme.colors.accentDark}
+        name="chevron-forward"
+        size={21}
+      />
     </Pressable>
   );
 }
@@ -636,7 +666,11 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  logoutLabel: { color: appTheme.colors.accentDark, fontSize: 15, fontWeight: '900' },
+  logoutLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 15,
+    fontWeight: '900',
+  },
   openButton: {
     backgroundColor: appTheme.colors.surface,
     borderRadius: 13,

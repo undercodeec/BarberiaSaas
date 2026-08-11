@@ -3515,11 +3515,11 @@ describeWithDatabase('API con PostgreSQL', () => {
     });
     expect(completed.statusCode).toBe(200);
     const bookingUrl = completed.json<{ bookingUrl: string }>().bookingUrl;
-    const organizationSlug = new URL(bookingUrl).pathname.split('/').at(-1)!;
+    const publicBookingToken = new URL(bookingUrl).pathname.split('/').at(-1)!;
 
     const redirect = await app.inject({
       method: 'GET',
-      url: `/v1/public/${organizationSlug}`,
+      url: `/v1/public/${publicBookingToken}`,
     });
     expect(redirect.statusCode).toBe(200);
     const redirectPath = redirect.json<{ redirectPath: string }>().redirectPath;
@@ -3544,7 +3544,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     const serviceId = catalogBody.services[0]!.id;
     const availability = await app.inject({
       method: 'GET',
-      url: `/v1/public/${organizationSlug}/${catalogBody.location.slug}/availability?date=${localDate}&membershipId=${membershipId}&serviceIds=${serviceId}`,
+      url: `/v1/public/${publicBookingToken}/${catalogBody.location.slug}/availability?date=${localDate}&membershipId=${membershipId}&serviceIds=${serviceId}`,
     });
     expect(availability.statusCode).toBe(200);
     const slots = availability.json<{
@@ -3564,7 +3564,7 @@ describeWithDatabase('API con PostgreSQL', () => {
         serviceIds: [serviceId],
         startsAt: slots[0]!.startsAt,
       },
-      url: `/v1/public/${organizationSlug}/${catalogBody.location.slug}/bookings`,
+      url: `/v1/public/${publicBookingToken}/${catalogBody.location.slug}/bookings`,
     });
     expect(booking.statusCode).toBe(201);
     const bookingBody = booking.json<{

@@ -406,8 +406,8 @@ function minuteForRegistrationTime(
   return hours * 60 + minutes;
 }
 
-function publicBookingUrl(baseUrl: string, slug: string) {
-  return `${baseUrl.replace(/\/$/u, '')}/${slug}`;
+function publicBookingUrl(baseUrl: string, publicBookingToken: string) {
+  return `${baseUrl.replace(/\/$/u, '')}/${publicBookingToken}`;
 }
 
 const onboardingCollaboratorParamsSchema = z.object({
@@ -1652,7 +1652,7 @@ export async function buildApi({
             },
             take: 1,
           },
-          organization: { select: { slug: true } },
+          organization: { select: { publicBookingToken: true, slug: true } },
         },
         where: { status: MembershipStatus.ACTIVE, userId: user.id },
       }),
@@ -1668,7 +1668,7 @@ export async function buildApi({
       bookingUrl: profile
         ? publicBookingUrl(
             config.PUBLIC_WEB_URL,
-            membership?.organization.slug ??
+            membership?.organization.publicBookingToken ??
               createSlug(profile.businessName).slice(0, 80),
           )
         : null,
@@ -1706,7 +1706,7 @@ export async function buildApi({
       const activeMembership = await database.membership.findFirst({
         include: {
           memberLocations: { select: { locationId: true }, take: 1 },
-          organization: { select: { slug: true } },
+          organization: { select: { publicBookingToken: true, slug: true } },
         },
         where: { status: MembershipStatus.ACTIVE, userId: user.id },
       });
@@ -1762,7 +1762,7 @@ export async function buildApi({
         businessName: updatedProfile.businessName,
         bookingUrl: publicBookingUrl(
           config.PUBLIC_WEB_URL,
-          activeMembership?.organization.slug ??
+          activeMembership?.organization.publicBookingToken ??
             createSlug(updatedProfile.businessName).slice(0, 80),
         ),
         city: updatedProfile.city,
@@ -1887,7 +1887,7 @@ export async function buildApi({
       const existingMembership = await transaction.membership.findFirst({
         include: {
           memberLocations: { select: { locationId: true }, take: 1 },
-          organization: { select: { slug: true } },
+          organization: { select: { publicBookingToken: true, slug: true } },
         },
         where: { status: MembershipStatus.ACTIVE, userId: user.id },
       });
@@ -1903,7 +1903,7 @@ export async function buildApi({
         return {
           bookingUrl: publicBookingUrl(
             config.PUBLIC_WEB_URL,
-            existingMembership.organization.slug,
+            existingMembership.organization.publicBookingToken,
           ),
           locationId: existingMembership.memberLocations[0]?.locationId ?? null,
           onboardingCompletedAt:
@@ -2074,7 +2074,10 @@ export async function buildApi({
         },
       });
       return {
-        bookingUrl: publicBookingUrl(config.PUBLIC_WEB_URL, organization.slug),
+        bookingUrl: publicBookingUrl(
+          config.PUBLIC_WEB_URL,
+          organization.publicBookingToken,
+        ),
         locationId: location.id,
         onboardingCompletedAt:
           completedProfile.onboardingCompletedAt!.toISOString(),

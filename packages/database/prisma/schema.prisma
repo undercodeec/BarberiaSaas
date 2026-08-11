@@ -403,6 +403,7 @@ model Organization {
   id                                 String                       @id @default(uuid()) @db.Uuid
   name                               String                       @db.VarChar(120)
   slug                               String                       @unique @db.VarChar(80)
+  publicBookingToken                 String                       @unique @default(uuid()) @map("public_booking_token") @db.VarChar(36)
   status                             OrganizationStatus           @default(TRIAL)
   currencyCode                       String                       @default("USD") @map("currency_code") @db.Char(3)
   defaultTimezone                    String                       @default("America/Guayaquil") @map("default_timezone") @db.VarChar(64)
