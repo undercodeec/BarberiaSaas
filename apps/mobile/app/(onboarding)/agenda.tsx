@@ -14,7 +14,6 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   Animated,
   Alert,
-  Dimensions,
   Easing,
   Linking,
   Modal,
@@ -32,6 +31,7 @@ import {
   appStyles,
   appTheme,
   BottomNavigation,
+  goldButtonShadow,
   goldShadow,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
@@ -146,9 +146,6 @@ function localDateValue(date: Date): string {
     String(date.getDate()).padStart(2, '0'),
   ].join('-');
 }
-
-const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
-const PAGE_SLIDE_DISTANCE = Dimensions.get('window').width;
 
 function timelineMinutes(
   schedules: ReadonlyArray<{
@@ -266,7 +263,7 @@ export default function AgendaScreen() {
   const [manualPaymentReference, setManualPaymentReference] = useState('');
   const [calendarMonth, setCalendarMonth] = useState(today);
   const [dayContentOpacity] = useState(() => new Animated.Value(1));
-  const [schedulePageSlide] = useState(() => new Animated.Value(0));
+  const [timelineTransitionX] = useState(() => new Animated.Value(0));
   const [settingsSheetTranslateY] = useState(() => new Animated.Value(0));
   const [isDayTransitioning, setIsDayTransitioning] = useState(false);
   const dismissAgendaSettings = useCallback(() => {
@@ -307,37 +304,36 @@ export default function AgendaScreen() {
     (offset: number) => {
       if (isDayTransitioning) return;
       setIsDayTransitioning(true);
-      const direction = offset > 0 ? 1 : -1;
       const nextDay = addDays(selectedDay, offset);
+      const exitOffset = offset > 0 ? -28 : 28;
       Animated.parallel([
-        Animated.timing(schedulePageSlide, {
-          duration: 170,
+        Animated.timing(dayContentOpacity, {
+          duration: 140,
           easing: Easing.in(Easing.cubic),
-          toValue: -direction * PAGE_SLIDE_DISTANCE,
+          toValue: 0.28,
           useNativeDriver: true,
         }),
-        Animated.timing(dayContentOpacity, {
-          duration: 150,
+        Animated.timing(timelineTransitionX, {
+          duration: 140,
           easing: Easing.in(Easing.cubic),
-          toValue: 0.22,
+          toValue: exitOffset,
           useNativeDriver: true,
         }),
       ]).start(() => {
         setSelectedDay(nextDay);
         setCalendarMonth(nextDay);
-        schedulePageSlide.setValue(direction * PAGE_SLIDE_DISTANCE);
-        dayContentOpacity.setValue(0.22);
+        timelineTransitionX.setValue(-exitOffset);
         Animated.parallel([
-          Animated.timing(schedulePageSlide, {
-            duration: 300,
-            easing: Easing.out(Easing.cubic),
-            toValue: 0,
-            useNativeDriver: true,
-          }),
           Animated.timing(dayContentOpacity, {
-            duration: 240,
+            duration: 210,
             easing: Easing.out(Easing.cubic),
             toValue: 1,
+            useNativeDriver: true,
+          }),
+          Animated.timing(timelineTransitionX, {
+            duration: 210,
+            easing: Easing.out(Easing.cubic),
+            toValue: 0,
             useNativeDriver: true,
           }),
         ]).start(() => {
@@ -345,63 +341,74 @@ export default function AgendaScreen() {
         });
       });
     },
-    [dayContentOpacity, isDayTransitioning, schedulePageSlide, selectedDay],
+    [
+      dayContentOpacity,
+      isDayTransitioning,
+      selectedDay,
+      timelineTransitionX,
+    ],
   );
   const dayPanResponder = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gesture) =>
-          Math.abs(gesture.dx) > 10 &&
-          Math.abs(gesture.dx) > Math.abs(gesture.dy),
+          Math.abs(gesture.dx) > 28 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
         onPanResponderRelease: (_, gesture) => {
-          if (gesture.dx <= -42) moveSelectedDay(1);
-          if (gesture.dx >= 42) moveSelectedDay(-1);
+          if (gesture.dx <= -56) moveSelectedDay(1);
+          if (gesture.dx >= 56) moveSelectedDay(-1);
         },
       }),
     [moveSelectedDay],
   );
+  const restoreTimelinePosition = useCallback(() => {
+    Animated.parallel([
+      Animated.spring(dayContentOpacity, {
+        bounciness: 0,
+        speed: 18,
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.spring(timelineTransitionX, {
+        bounciness: 0,
+        speed: 18,
+        toValue: 0,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [dayContentOpacity, timelineTransitionX]);
   const timelinePanResponder = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gesture) =>
-          Math.abs(gesture.dx) > 12 &&
-          Math.abs(gesture.dx) > Math.abs(gesture.dy),
-        onMoveShouldSetPanResponderCapture: (_, gesture) =>
-          Math.abs(gesture.dx) > 12 &&
-          Math.abs(gesture.dx) > Math.abs(gesture.dy),
+          Math.abs(gesture.dx) > 20 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.4,
         onPanResponderMove: (_, gesture) => {
-          if (!isDayTransitioning) {
-            schedulePageSlide.setValue(gesture.dx);
-            dayContentOpacity.setValue(
-              Math.max(0.55, 1 - Math.abs(gesture.dx) / 420),
-            );
-          }
+          if (isDayTransitioning) return;
+          const previewOffset = Math.max(-22, Math.min(22, gesture.dx * 0.18));
+          timelineTransitionX.setValue(previewOffset);
+          dayContentOpacity.setValue(
+            Math.max(0.72, 1 - Math.abs(previewOffset) / 100),
+          );
         },
         onPanResponderRelease: (_, gesture) => {
-          if (gesture.dx <= -52) {
-            moveSelectedDay(1);
+          const shouldChangeDay =
+            Math.abs(gesture.dx) >= 64 || Math.abs(gesture.vx) >= 0.42;
+          if (shouldChangeDay) {
+            moveSelectedDay(gesture.dx < 0 ? 1 : -1);
             return;
           }
-          if (gesture.dx >= 52) {
-            moveSelectedDay(-1);
-            return;
-          }
-          Animated.parallel([
-            Animated.spring(schedulePageSlide, {
-              bounciness: 0,
-              speed: 18,
-              toValue: 0,
-              useNativeDriver: true,
-            }),
-            Animated.timing(dayContentOpacity, {
-              duration: 150,
-              toValue: 1,
-              useNativeDriver: true,
-            }),
-          ]).start();
+          restoreTimelinePosition();
         },
+        onPanResponderTerminate: restoreTimelinePosition,
       }),
-    [dayContentOpacity, isDayTransitioning, moveSelectedDay, schedulePageSlide],
+    [
+      dayContentOpacity,
+      isDayTransitioning,
+      moveSelectedDay,
+      restoreTimelinePosition,
+      timelineTransitionX,
+    ],
   );
   const visibleDates = useMemo(() => {
     if (calendarView === 'day') return [selectedDay];
@@ -525,7 +532,11 @@ export default function AgendaScreen() {
         return false;
       if (statusFilter === 'all') return true;
       if (statusFilter === 'active')
-        return ['confirmed', 'checked_in', 'in_progress'].includes(
+        return !['cancelled', 'completed', 'expired', 'no_show'].includes(
+          appointment.status,
+        );
+      if (statusFilter === 'scheduled')
+        return ['awaiting_confirmation', 'pending_verification', 'scheduled'].includes(
           appointment.status,
         );
       if (statusFilter === 'paid') return appointment.paymentStatus === 'paid';
@@ -700,18 +711,20 @@ export default function AgendaScreen() {
         </View>
       </View>
 
-      <View style={styles.timelineWrapper}>
-        <AnimatedScrollView
-          {...timelinePanResponder.panHandlers}
+      <Animated.View
+        {...timelinePanResponder.panHandlers}
+        style={[
+          styles.timelineWrapper,
+          {
+            opacity: dayContentOpacity,
+            transform: [{ translateX: timelineTransitionX }],
+          },
+        ]}
+      >
+        <ScrollView
           contentContainerStyle={styles.timelineContent}
-          style={[
-            styles.timelinePage,
-            {
-              opacity: dayContentOpacity,
-              transform: [{ translateX: schedulePageSlide }],
-            },
-          ]}
           showsVerticalScrollIndicator={false}
+          style={styles.timelinePage}
         >
           <View style={styles.timelineHeader}>
             <Text style={styles.timelineTitle}>Citas y horario</Text>
@@ -786,8 +799,8 @@ export default function AgendaScreen() {
               </Text>
             )}
           </View>
-        </AnimatedScrollView>
-      </View>
+        </ScrollView>
+      </Animated.View>
 
       <Modal
         animationType="fade"
@@ -921,7 +934,12 @@ export default function AgendaScreen() {
           <Animated.View
             style={{ transform: [{ translateY: settingsSheetTranslateY }] }}
           >
-            <ScrollView contentContainerStyle={styles.settingsSheet}>
+            <ScrollView
+              contentContainerStyle={styles.settingsSheet}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              style={styles.settingsScroll}
+            >
               <View
                 {...settingsSheetPanResponder.panHandlers}
                 style={styles.settingsDragArea}
@@ -946,10 +964,14 @@ export default function AgendaScreen() {
                   accessibilityState={{ checked: selected }}
                   key={label}
                   onPress={() => onChange(!selected)}
-                  style={styles.checkboxRow}
+                  style={({ pressed }) => [
+                    styles.checkboxRow,
+                    selected && styles.checkboxRowSelected,
+                    pressed && styles.settingsControlPressed,
+                  ]}
                 >
                   <Ionicons
-                    color={appTheme.colors.accentDark}
+                    color={appTheme.colors.text}
                     name={selected ? 'checkbox' : 'square-outline'}
                     size={23}
                   />
@@ -970,19 +992,18 @@ export default function AgendaScreen() {
                   const selected = calendarView === value;
                   return (
                     <Pressable
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
                       key={value}
                       onPress={() => setCalendarView(value as AgendaView)}
-                      style={[
+                      style={({ pressed }) => [
                         styles.optionTile,
                         selected && styles.optionTileSelected,
+                        pressed && styles.settingsControlPressed,
                       ]}
                     >
                       <Ionicons
-                        color={
-                          selected
-                            ? appTheme.colors.white
-                            : appTheme.colors.accentDark
-                        }
+                        color={appTheme.colors.text}
                         name={
                           value === 'day'
                             ? 'today-outline'
@@ -1042,21 +1063,20 @@ export default function AgendaScreen() {
                                     : 'options-outline';
                   return (
                     <Pressable
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
                       key={value}
                       onPress={() =>
                         setStatusFilter(value as AgendaStatusFilter)
                       }
-                      style={[
+                      style={({ pressed }) => [
                         styles.optionTile,
                         selected && styles.optionTileSelected,
+                        pressed && styles.settingsControlPressed,
                       ]}
                     >
                       <Ionicons
-                        color={
-                          selected
-                            ? appTheme.colors.white
-                            : appTheme.colors.accentDark
-                        }
+                        color={appTheme.colors.text}
                         name={icon}
                         size={23}
                       />
@@ -1079,18 +1099,17 @@ export default function AgendaScreen() {
                 showsHorizontalScrollIndicator={false}
               >
                 <Pressable
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: !selectedMemberId }}
                   onPress={() => setSelectedMemberId(null)}
-                  style={[
+                  style={({ pressed }) => [
                     styles.optionTile,
                     !selectedMemberId && styles.optionTileSelected,
+                    pressed && styles.settingsControlPressed,
                   ]}
                 >
                   <Ionicons
-                    color={
-                      !selectedMemberId
-                        ? appTheme.colors.white
-                        : appTheme.colors.accentDark
-                    }
+                    color={appTheme.colors.text}
                     name="people-outline"
                     size={23}
                   />
@@ -1107,19 +1126,18 @@ export default function AgendaScreen() {
                   const selected = selectedMemberId === member.id;
                   return (
                     <Pressable
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
                       key={member.id}
                       onPress={() => setSelectedMemberId(member.id)}
-                      style={[
+                      style={({ pressed }) => [
                         styles.optionTile,
                         selected && styles.optionTileSelected,
+                        pressed && styles.settingsControlPressed,
                       ]}
                     >
                       <Ionicons
-                        color={
-                          selected
-                            ? appTheme.colors.white
-                            : appTheme.colors.accentDark
-                        }
+                        color={appTheme.colors.text}
                         name="person-outline"
                         size={23}
                       />
@@ -1571,38 +1589,58 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   checkboxLabel: {
-    color: appTheme.colors.accentDark,
+    color: appTheme.colors.text,
     flex: 1,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  checkboxRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 11,
-    marginTop: 16,
-  },
-  optionTile: {
-    alignItems: 'center',
-    backgroundColor: appTheme.colors.surfaceMuted,
-    borderColor: appTheme.colors.border,
-    borderRadius: 13,
-    borderWidth: 1,
-    justifyContent: 'center',
-    marginTop: 9,
-    height: 82,
-    paddingHorizontal: 10,
-    width: 104,
-  },
-  optionTileLabel: {
-    color: appTheme.colors.accentDark,
     fontSize: 14,
     fontWeight: '800',
   },
-  optionTileLabelSelected: { color: '#FFFFFF' },
+  checkboxRow: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 11,
+    marginTop: 12,
+    minHeight: 62,
+    paddingHorizontal: 15,
+    ...goldButtonShadow,
+  },
+  checkboxRowSelected: {
+    backgroundColor: appTheme.colors.accentWash,
+    borderColor: appTheme.colors.accentLight,
+    elevation: 8,
+    shadowOpacity: 0.18,
+  },
+  optionTile: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
+    borderWidth: 1,
+    justifyContent: 'center',
+    marginTop: 9,
+    minHeight: 88,
+    paddingHorizontal: 10,
+    width: 116,
+    ...goldButtonShadow,
+  },
+  optionTileLabel: {
+    color: appTheme.colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 5,
+    textAlign: 'center',
+  },
+  optionTileLabelSelected: { color: appTheme.colors.text },
   optionTileSelected: {
-    backgroundColor: appTheme.colors.accent,
-    borderColor: appTheme.colors.accent,
+    backgroundColor: appTheme.colors.accentWash,
+    borderColor: appTheme.colors.accentLight,
+    elevation: 9,
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    zIndex: 1,
   },
   settingsBackdrop: {
     bottom: 0,
@@ -1611,11 +1649,11 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
-  horizontalOptions: { gap: 10, paddingRight: 22, paddingTop: 11 },
+  horizontalOptions: { gap: 10, paddingHorizontal: 2, paddingTop: 11 },
   settingsDragArea: { paddingBottom: 8 },
   settingsHandle: {
     alignSelf: 'center',
-    backgroundColor: appTheme.colors.accentLight,
+    backgroundColor: '#C8C9CB',
     borderRadius: 3,
     height: 5,
     width: 46,
@@ -1626,22 +1664,33 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   settingsSection: {
-    color: appTheme.colors.accentDark,
+    color: appTheme.colors.text,
     fontSize: 16,
     fontWeight: '900',
-    marginTop: 27,
+    marginTop: 25,
   },
   settingsSheet: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    paddingBottom: 42,
-    paddingHorizontal: 22,
-    paddingTop: 15,
+    backgroundColor: appTheme.colors.surfaceElevated,
+    borderTopLeftRadius: appTheme.radii.sheet,
+    borderTopRightRadius: appTheme.radii.sheet,
+    paddingBottom: 20,
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    ...goldButtonShadow,
+  },
+  settingsScroll: {
+    backgroundColor: appTheme.colors.surfaceElevated,
+    maxHeight: '88%',
+    width: '100%',
+  },
+  settingsControlPressed: {
+    elevation: 9,
+    shadowOpacity: 0.2,
+    transform: [{ translateY: -3 }],
   },
   settingsTitle: {
-    color: appTheme.colors.accentDark,
-    fontSize: 22,
+    color: appTheme.colors.text,
+    fontSize: 23,
     fontWeight: '900',
     marginTop: 17,
   },

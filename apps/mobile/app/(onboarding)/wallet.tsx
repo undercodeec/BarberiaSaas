@@ -776,12 +776,6 @@ export default function WalletScreen() {
                 pagada.
               </Text>
             </View>
-            {!payphoneQuery.data?.encryptionConfigured ? (
-              <Text style={styles.warningCopy}>
-                Falta preparar el cifrado en el servidor. Solicita al
-                administrador configurar PAYPHONE_CREDENTIALS_ENCRYPTION_KEY.
-              </Text>
-            ) : null}
             <Text style={styles.inputLabel}>Ambiente</Text>
 
             <Text style={styles.inputLabel}>StoreID</Text>
