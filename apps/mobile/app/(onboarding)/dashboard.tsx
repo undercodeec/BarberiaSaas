@@ -272,7 +272,7 @@ function subscriptionProgress(
       expiryLabel: hasError
         ? 'No pudimos consultar la vigencia'
         : 'Consultando la vigencia de tu plan',
-      percentage: 100,
+      percentage: 0,
       phase: 'unknown',
       title: 'Tu suscripción',
     };

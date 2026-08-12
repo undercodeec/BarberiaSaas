@@ -161,7 +161,7 @@ export default function ClientsScreen() {
         <Text style={styles.step}>DIRECTORIO</Text>
         <Text style={styles.title}>Gestiona tus clientes</Text>
         <Text style={styles.subtitle}>
-          Encuentra sus datos o registra uno nuevo para tus pr?ximas reservas.
+          Encuentra sus datos o registra uno nuevo para tus proximas reservas.
         </Text>
         <View style={styles.searchBox}>
           <Ionicons color="#69717d" name="search-outline" size={23} />
@@ -257,7 +257,7 @@ export default function ClientsScreen() {
             <Text style={styles.emptyTitle}>
               {search
                 ? 'No encontramos coincidencias'
-                : 'Tu lista a?n est? vac?a'}
+                : 'Tu lista aun esta vacia'}
             </Text>
             <Text style={styles.emptyCopy}>
               {search

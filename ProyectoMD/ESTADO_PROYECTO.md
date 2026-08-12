@@ -2,7 +2,7 @@
 
 Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión posterior documentada en `docs/adr/0003-postgresql-prisma-y-api-en-vps.md`. Se marca `[x]` solo cuando la tarea está implementada y cuenta con la verificación indicada; `[ ]` significa pendiente o aún no demostrada.
 
-Última actualización: 2026-08-10 (reservas, UI móvil y ciclo de suscripciones)
+Última actualización: 2026-08-11 (operación VPS, Neon y PayPhone)
 
 ## Estado operativo actual
 
@@ -139,6 +139,115 @@ pagos online reales.
 - [ ] Pendiente de esta etapa: crear y completar una reserva pública real desde
       `https://reservas.navacloud.app/{organizationSlug}/{locationSlug}`, validar
       el correo/OTP y probar el enlace de gestión de la cita.
+
+### Runbook operativo confirmado: VPS y Neon — 11 de agosto de 2026
+
+Este bloque es la referencia operativa para la VPS actual. No sustituir sus
+valores por supuestos de PM2, Docker o PostgreSQL local.
+
+#### Servicios, rutas y procesos reales
+
+- VPS y repositorio: acceso administrativo y código en `/opt/nava/app`.
+- Servicios systemd activos: `nava-api.service` (API Fastify) y
+  `nava-web.service` (Web pública de reservas). No se usa PM2 ni Docker en
+  esta VPS.
+- Procesos confirmados: API mediante
+  `pnpm --filter @barber-saas/api start` y Web mediante
+  `pnpm --filter @barber-saas/web start`.
+- La API escucha internamente en `127.0.0.1:4000`; la Web en
+  `127.0.0.1:3000`. Nginx expone respectivamente
+  `https://api.navacloud.app` y `https://reservas.navacloud.app`.
+- PostgreSQL no se ejecuta en la VPS. La base productiva está en Neon.
+- `psql` no está instalado. Para operaciones SQL excepcionales se usa Prisma o
+  el paquete `pg` disponible desde `apps/api`; no instalar Docker para estas
+  tareas.
+
+#### Variables de entorno y conexión a Neon
+
+- Los servicios systemd conservan sus secretos en `/etc/nava/api.env`.
+- Prisma CLI (`packages/database/prisma.config.ts`) carga
+  `/opt/nava/app/.env`. Este archivo debe existir en la VPS, tener permisos
+  `600`, estar ignorado por Git y contener la `DATABASE_URL` productiva de
+  Neon. Nunca usar ni editar `.env.example` como archivo operativo; la plantilla
+  debe mantenerse versionada.
+- La conexión de la VPS fue comprobada con el rol propietario
+  `barber_saas_app`. El SQL Editor de Neon usado con otro rol no puede asumirlo
+  (`permission denied to set role`), por lo que las operaciones administrativas
+  de esta base se ejecutan desde la VPS usando la `DATABASE_URL` de dicho rol.
+- No imprimir, compartir ni versionar `DATABASE_URL`, tokens o contraseñas.
+
+#### Despliegue de código y migraciones
+
+Ejecutar desde `/opt/nava/app`, después de que el commit ya esté publicado en
+`origin/main`:
+
+```bash
+git pull --ff-only origin main
+corepack enable
+pnpm install --frozen-lockfile
+pnpm db:migrate:deploy
+pnpm db:status
+pnpm db:generate
+pnpm build
+systemctl restart nava-api.service
+systemctl restart nava-web.service
+systemctl status nava-api.service nava-web.service --no-pager
+```
+
+`pnpm db:migrate:deploy` es el único comando de migraciones permitido en la
+VPS. No ejecutar `pnpm db:migrate:dev` en producción. Para diagnosticar los
+servicios:
+
+```bash
+journalctl -u nava-api.service -n 100 --no-pager
+journalctl -u nava-web.service -n 100 --no-pager
+curl -fsS https://api.navacloud.app/health
+```
+
+#### Reinicio de datos de Neon (destructivo)
+
+La limpieza elimina los datos de la aplicación, incluidas sesiones,
+organizaciones, citas, configuraciones y pagos, pero conserva las tablas y el
+historial `_prisma_migrations`. No requiere reiniciar los servicios: el efecto
+en la base es inmediato y las sesiones existentes quedan invalidadas.
+
+Antes de borrar, verificar sin revelar secretos que la VPS se conecta como el
+rol propietario:
+
+```bash
+cd /opt/nava/app
+set -a
+. ./.env
+set +a
+cd apps/api
+node -e 'const {Client}=require("pg"); const db=new Client({connectionString:process.env.DATABASE_URL}); db.connect().then(async()=>{console.log((await db.query("SELECT current_user")).rows[0].current_user); await db.end()}).catch(e=>{console.error(e.message);process.exit(1)})'
+cd /opt/nava/app
+```
+
+Solo si el resultado es `barber_saas_app`, ejecutar el siguiente bloque completo
+en una sola vez:
+
+```bash
+pnpm --filter @barber-saas/database exec prisma db execute --stdin <<'SQL'
+DO $$
+DECLARE
+  tablas text;
+BEGIN
+  SELECT string_agg(format('%I.%I', schemaname, tablename), ', ')
+  INTO tablas
+  FROM pg_tables
+  WHERE schemaname = 'public'
+    AND tablename <> '_prisma_migrations';
+
+  IF tablas IS NOT NULL THEN
+    EXECUTE 'TRUNCATE TABLE ' || tablas || ' RESTART IDENTITY CASCADE';
+  END IF;
+END $$;
+SQL
+```
+
+Prisma 7 obtiene el esquema desde `prisma.config.ts`: no agregar la opción
+`--schema` a `prisma db execute`.
 
 ## Resumen por fases
 
