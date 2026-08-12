@@ -1,10 +1,20 @@
 # Estado del proyecto
 
+Actualizado: 2026-08-12 (correcciones moviles y nueva compilacion Android pendiente)
+
 Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión posterior documentada en `docs/adr/0003-postgresql-prisma-y-api-en-vps.md`. Se marca `[x]` solo cuando la tarea está implementada y cuenta con la verificación indicada; `[ ]` significa pendiente o aún no demostrada.
 
 Última actualización: 2026-08-11 (operación VPS, Neon y PayPhone)
 
 ## Estado operativo actual
+
+### Correcciones moviles recientes - 12 de agosto de 2026
+
+- [x] Se configuro `apps/mobile/assets/icon.png` como icono de Expo y se regeneraron los recursos Android. El icono Nava quedara incluido en la siguiente compilacion AAB; el bundle ya subido a Play Console no cambia.
+- [x] El cierre de sesion en Ajustes se ejecuta de inmediato, sin dialogo de confirmacion.
+- [x] El formulario tras elegir `Tengo un negocio` o `Solo yo` es desplazable dentro de su panel y conserva los campos de registro visibles en pantallas moviles compactas.
+- [x] Verificado: `pnpm --filter @barber-saas/mobile typecheck` y `expo config --type public` confirmaron el icono configurado.
+- [ ] Para una compilacion nativa local se debe instalar/configurar el Android SDK y definir `ANDROID_HOME` o `sdk.dir`. Para generar el AAB remoto con EAS no es necesario instalarlo localmente.
 
 Este es el único bloque que debe usarse para priorizar trabajo pendiente. Las
 secciones posteriores conservan evidencia, decisiones y cortes cronológicos;

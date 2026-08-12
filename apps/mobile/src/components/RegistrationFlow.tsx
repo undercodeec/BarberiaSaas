@@ -439,6 +439,12 @@ export function RegistrationFlow() {
             >
               <SafeAreaView edges={['bottom']} style={s.sheet}>
                 <View {...panResponder.panHandlers} style={s.handle} />
+                <ScrollView
+                  keyboardDismissMode="on-drag"
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                  style={{ maxHeight: '100%' }}
+                >
                 <View style={s.content}>
                   {step === 'choice' ? (
                     <View style={s.roleContent}>
@@ -827,6 +833,7 @@ export function RegistrationFlow() {
                     </View>
                   )}
                 </View>
+                </ScrollView>
               </SafeAreaView>
             </Animated.View>
           </KeyboardAvoidingView>
@@ -1141,6 +1148,7 @@ const s = StyleSheet.create({
   },
   sheet: {
     backgroundColor: appTheme.colors.surfaceMuted,
+    maxHeight: '86%',
     borderTopLeftRadius: appTheme.radii.sheet,
     borderTopRightRadius: appTheme.radii.sheet,
     overflow: 'hidden',
