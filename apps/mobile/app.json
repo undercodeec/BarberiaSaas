@@ -34,8 +34,7 @@
       "package": "com.barbersaas.mobile",
       "permissions": [
         "android.permission.RECORD_AUDIO",
-        "android.permission.READ_CONTACTS",
-        "android.permission.WRITE_CONTACTS"
+        "android.permission.READ_CONTACTS"
       ]
     },
     "ios": { "bundleIdentifier": "com.barbersaas.mobile" },

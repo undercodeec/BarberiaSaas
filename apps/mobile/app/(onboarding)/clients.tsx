@@ -11,6 +11,7 @@ import { Redirect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -47,11 +48,42 @@ export default function ClientsScreen() {
       );
       return;
     }
-    const permission = await Contacts.requestPermissionsAsync();
-    if (permission.status !== 'granted') {
+    try {
+      const currentPermission = await Contacts.getPermissionsAsync();
+      const permission =
+        currentPermission.status === 'granted'
+          ? currentPermission
+          : await Contacts.requestPermissionsAsync();
+
+      if (permission.status !== 'granted') {
+        if (!permission.canAskAgain) {
+          Alert.alert(
+            'Permiso de contactos desactivado',
+            'Activa Contactos para Nava desde los ajustes del telefono.',
+            [
+              { style: 'cancel', text: 'Ahora no' },
+              {
+                onPress: () => void Linking.openSettings(),
+                text: 'Abrir ajustes',
+              },
+            ],
+          );
+        } else {
+          Alert.alert(
+            'Permiso necesario',
+            'Toca Importar contactos nuevamente y permite el acceso cuando aparezca la ventana del telefono.',
+          );
+        }
+        return;
+      }
+    } catch {
       Alert.alert(
-        'Permiso necesario',
-        'Autoriza el acceso a contactos para importarlos a tu agenda.',
+        'No pudimos solicitar el permiso',
+        'Revisa el permiso de Contactos para Nava en los ajustes del telefono.',
+        [
+          { style: 'cancel', text: 'Cerrar' },
+          { onPress: () => void Linking.openSettings(), text: 'Abrir ajustes' },
+        ],
       );
       return;
     }

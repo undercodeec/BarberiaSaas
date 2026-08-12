@@ -242,6 +242,7 @@ type SubscriptionProgress = {
   readonly daysRemaining: number | null;
   readonly phase: 'active' | 'expired' | 'grace' | 'trial' | 'unknown';
   readonly expiryLabel: string;
+  readonly planLabel: string | null;
   readonly percentage: number;
   readonly title: string;
 };
@@ -272,6 +273,7 @@ function subscriptionProgress(
       expiryLabel: hasError
         ? 'No pudimos consultar la vigencia'
         : 'Consultando la vigencia de tu plan',
+      planLabel: null,
       percentage: 0,
       phase: 'unknown',
       title: 'Tu suscripción',
@@ -288,6 +290,7 @@ function subscriptionProgress(
       caption: 'del limite mensual',
       daysRemaining: null,
       expiryLabel: `${subscription.usage.rolling30DayBookings} reservas en los ultimos 30 dias`,
+      planLabel: null,
       percentage:
         subscription.usage.bookingLimit === null
           ? 0
@@ -351,6 +354,7 @@ function subscriptionProgress(
       expiryLabel: endsAt
         ? `Venció el ${expiryDateLabel(endsAt)}`
         : 'La suscripción no está activa',
+      planLabel: null,
       percentage: 100,
       phase,
       title: 'Suscripción vencida',
@@ -379,17 +383,18 @@ function subscriptionProgress(
       daysRemaining === 0
         ? `Venció el ${expiryDateLabel(endsAt)}`
         : phase === 'trial'
-          ? `Dia ${currentDay} de ${totalDays} restantes`
+          ? `Día ${currentDay} de ${totalDays} restantes`
           : `Día ${currentDay} de ${totalDays}`,
     daysRemaining,
+    planLabel: phase === 'trial' || phase === 'active' ? planName : null,
     percentage,
     phase,
     title:
       phase === 'trial'
-        ? `Prueba gratuita · ${planName}`
+        ? 'Prueba gratuita'
         : phase === 'grace'
           ? 'Período de gracia'
-          : `Suscripción · ${planName}`,
+          : 'Suscripción',
   };
 }
 
@@ -2120,7 +2125,7 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.topRow}>
-          <View>
+          <View style={styles.topCopy}>
             <Text style={styles.greeting}>{greeting()}</Text>
             <Text accessibilityRole="header" style={styles.businessName}>
               {businessName}
@@ -2130,7 +2135,16 @@ export default function DashboardScreen() {
 
         <View style={styles.salesCard}>
           <View style={styles.salesHeader}>
-            <Text style={styles.salesTitle}>{planProgress.title}</Text>
+            <View style={styles.salesTitleColumn}>
+              <Text numberOfLines={1} style={styles.salesTitle}>
+                {planProgress.title}
+              </Text>
+              {planProgress.planLabel ? (
+                <Text numberOfLines={1} style={styles.salesPlanLabel}>
+                  {planProgress.planLabel}
+                </Text>
+              ) : null}
+            </View>
             <Pressable
               accessibilityRole="button"
               onPress={() => router.push('/business-summary')}
@@ -3012,7 +3026,7 @@ const styles = StyleSheet.create({
   salesCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 30,
-    height: 202,
+    minHeight: 202,
     marginTop: 48,
     overflow: 'hidden',
     padding: 21,
@@ -3024,7 +3038,7 @@ const styles = StyleSheet.create({
     shadowRadius: 15,
   },
   salesHeader: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexDirection: 'row',
     justifyContent: 'space-between',
     position: 'relative',
@@ -3039,13 +3053,21 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   salesMetaText: { color: '#000000', fontSize: 15 },
+  salesPlanLabel: {
+    color: '#555555',
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 3,
+  },
   salesTitle: { color: '#1C1C1C', fontSize: 18, fontWeight: '600' },
+  salesTitleColumn: { flex: 1, minWidth: 0, paddingRight: 12 },
   screen: appStyles.screen,
   summaryButton: {
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.88)',
     borderRadius: 22,
     flexDirection: 'row',
+    flexShrink: 0,
     gap: 7,
     minHeight: 48,
     paddingHorizontal: 15,
@@ -3061,6 +3083,7 @@ const styles = StyleSheet.create({
     gap: 12,
     justifyContent: 'space-between',
   },
+  topCopy: { flex: 1, minWidth: 0, paddingRight: 64 },
   welcome: { alignItems: 'center', marginTop: 52 },
   welcomeCopy: {
     color: '#555a63',

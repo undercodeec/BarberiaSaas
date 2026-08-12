@@ -37,7 +37,7 @@ function relativeDate(value: string) {
 }
 
 export function GlobalNotificationsBanner() {
-  const { session, showNotificationsAfterSignIn } = useAuth();
+  const { session } = useAuth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -73,7 +73,7 @@ export function GlobalNotificationsBanner() {
   });
 
   const query = useQuery({
-    enabled: Boolean(session && showNotificationsAfterSignIn),
+    enabled: Boolean(session),
     queryFn: () =>
       requireApiClient().request<AppNotificationsResponse>('/v1/notifications'),
     queryKey: ['notifications'],
@@ -122,7 +122,7 @@ export function GlobalNotificationsBanner() {
     router.push((notification.data.route ?? '/agenda') as never);
   };
 
-  if (!session || !showNotificationsAfterSignIn) return null;
+  if (!session) return null;
   return (
     <>
       <Pressable

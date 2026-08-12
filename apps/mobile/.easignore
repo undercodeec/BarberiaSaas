@@ -11,6 +11,7 @@ android/build/
 android/.gradle/
 
 node_modules/
+.eas-archive/
 .expo/
 .turbo/
 dist/
