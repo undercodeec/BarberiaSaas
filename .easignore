@@ -1,0 +1,32 @@
+node_modules/
+.pnpm-store/
+.tools/
+.turbo/
+dist/
+coverage/
+.next/
+out/
+.expo/
+.expo-home/
+web-build/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+.env
+.env.*
+!.env.example
+
+supabase/.branches/
+supabase/.temp/
+packages/database/src/generated/
+
+.DS_Store
+Thumbs.db
+*.log
+logs.md
+
+# Los artefactos Android generados en Windows contienen rutas absolutas locales.
+# EAS los genera de nuevo en Linux durante cada compilación.
+apps/mobile/android/build/
+apps/mobile/android/.gradle/
