@@ -1934,6 +1934,16 @@ export default function DashboardScreen() {
       };
     }
 
+    // The notification prompt is intentionally only offered after a manual
+    // sign-in. A restored session must still complete this stage; otherwise it
+    // blocks the Welcome and business-location flows forever.
+    if (!canPromptForNotifications) {
+      setNotificationFlowState('completed');
+      return () => {
+        isMounted = false;
+      };
+    }
+
     const checkNotificationPermission = async () => {
       try {
         const { status } = await Notifications.getPermissionsAsync();
@@ -1962,7 +1972,7 @@ export default function DashboardScreen() {
       }
     };
 
-    if (canPromptForNotifications) void checkNotificationPermission();
+    void checkNotificationPermission();
 
     return () => {
       isMounted = false;

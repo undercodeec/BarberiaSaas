@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Linking,
   Modal,
   PanResponder,
   Pressable,
@@ -198,7 +199,17 @@ export function BusinessLocationSheet({
     setIsLocating(true);
     setError(null);
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
+      const currentPermission = await Location.getForegroundPermissionsAsync();
+      const permission =
+        currentPermission.status === 'granted'
+          ? currentPermission
+          : await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== 'granted' && !permission.canAskAgain) {
+        setError(
+          'El permiso de ubicacion esta desactivado. Activalo desde Ajustes para usar tu posicion actual.',
+        );
+        return;
+      }
       if (permission.status !== 'granted') {
         setError(
           'No se concedió el permiso. Puedes buscar el negocio o las calles manualmente.',
@@ -389,6 +400,15 @@ export function BusinessLocationSheet({
             </Text>
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
+            {error?.includes('Ajustes') ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void Linking.openSettings()}
+                style={styles.settingsButton}
+              >
+                <Text style={styles.settingsLabel}>Abrir ajustes</Text>
+              </Pressable>
+            ) : null}
             {isSubmitted ? (
               <Text accessibilityLiveRegion="polite" style={styles.success}>
                 Ubicación guardada
@@ -510,6 +530,8 @@ const styles = StyleSheet.create({
     maxHeight: '91%',
     paddingTop: 0,
   },
+  settingsButton: { alignSelf: 'flex-start', marginTop: 10, paddingVertical: 4 },
+  settingsLabel: { color: '#101C2D', fontSize: 13, fontWeight: '900' },
   success: { color: '#067647', fontSize: 13, fontWeight: '800', marginTop: 10 },
   suggestion: {
     alignItems: 'flex-start',
