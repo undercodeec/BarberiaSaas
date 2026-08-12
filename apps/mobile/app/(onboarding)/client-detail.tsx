@@ -402,7 +402,11 @@ export default function ClientDetailScreen() {
         >
           <Ionicons color="#111827" name="chevron-back" size={25} />
         </Pressable>
-        <Text accessibilityRole="header" style={styles.headerTitle}>
+        <Text
+          accessibilityRole="header"
+          numberOfLines={1}
+          style={styles.headerTitle}
+        >
           Detalle del cliente
         </Text>
         <View style={styles.headerActions}>
@@ -1329,7 +1333,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: appTheme.spacing.page,
     paddingVertical: 13,
   },
-  headerActions: { flexDirection: 'row', gap: 8 },
+  headerActions: { flexDirection: 'row', gap: 8, paddingRight: 64 },
   moreButton: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surface,
@@ -1398,7 +1402,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 46,
   },
-  headerTitle: { color: appTheme.colors.text, fontSize: 17, fontWeight: '900' },
+  headerTitle: {
+    color: appTheme.colors.text,
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '900',
+    marginHorizontal: 10,
+  },
   commentStars: { flexDirection: 'row', gap: 5 },
   commentsEmpty: {
     alignItems: 'center',

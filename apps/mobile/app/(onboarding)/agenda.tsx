@@ -1720,7 +1720,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 48,
   },
-  headerActions: { flexDirection: 'row', gap: 9 },
+  // El acceso global a notificaciones ocupa el extremo superior derecho.
+  // Reservamos ese espacio para que los dos controles de Agenda sigan siendo
+  // visibles y táctiles en pantallas angostas.
+  headerActions: { flexDirection: 'row', gap: 9, paddingRight: 64 },
   floatingButton: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.accent,
@@ -1855,6 +1858,7 @@ const styles = StyleSheet.create({
   },
   calendarCloseLabel: { color: '#ffffff', fontSize: 14, fontWeight: '900' },
   calendarModal: {
+    alignSelf: 'stretch',
     backgroundColor: appTheme.colors.surface,
     borderRadius: 26,
     marginHorizontal: 20,
@@ -1863,7 +1867,6 @@ const styles = StyleSheet.create({
     shadowOffset: { height: 10, width: 0 },
     shadowOpacity: 0.22,
     shadowRadius: 22,
-    width: '100%',
   },
   calendarModalBackdrop: {
     alignItems: 'center',

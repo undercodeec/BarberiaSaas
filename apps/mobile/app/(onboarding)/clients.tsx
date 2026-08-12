@@ -666,6 +666,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     height: 50,
     justifyContent: 'center',
+    marginRight: 64,
     width: 50,
   },
   list: { marginTop: 23 },

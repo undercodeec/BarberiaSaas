@@ -106,7 +106,7 @@ export default function BusinessSummaryScreen() {
           accessibilityLabel="Filtrar reporte"
           accessibilityRole="button"
           onPress={() => setIsFilterOpen(true)}
-          style={styles.headerButton}
+          style={[styles.headerButton, styles.headerButtonTrailing]}
         >
           <Ionicons
             color={appTheme.colors.accentDark}
@@ -672,6 +672,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
   },
+  headerButtonTrailing: { marginRight: 64 },
   headerCaption: {
     color: appTheme.colors.textMuted,
     fontSize: 12,

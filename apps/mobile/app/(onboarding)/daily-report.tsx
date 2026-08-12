@@ -95,6 +95,7 @@ export default function DailyReportScreen() {
           label="Exportar CSV"
           name="share-outline"
           onPress={() => void exportCsv()}
+          trailing
         />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
@@ -253,16 +254,18 @@ function IconButton({
   label,
   name,
   onPress,
+  trailing = false,
 }: {
   readonly label: string;
   readonly name: React.ComponentProps<typeof Ionicons>['name'];
   readonly onPress: () => void;
+  readonly trailing?: boolean;
 }) {
   return (
     <Pressable
       accessibilityLabel={label}
       onPress={onPress}
-      style={styles.headerButton}
+      style={[styles.headerButton, trailing && styles.headerButtonTrailing]}
     >
       <Ionicons color={appTheme.colors.accentDark} name={name} size={24} />
     </Pressable>
@@ -402,6 +405,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
   },
+  headerButtonTrailing: { marginRight: 64 },
   headerCopy: { flex: 1, marginHorizontal: 8 },
   hero: { backgroundColor: '#18202B', borderRadius: 24, padding: 22 },
   heroLabel: { color: '#D5D9E0', fontSize: 14, fontWeight: '700' },
