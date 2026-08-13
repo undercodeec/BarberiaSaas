@@ -21,10 +21,14 @@ import {
   Text,
   TextInput,
   type TextInputProps,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { type ReactNode, useEffect, useState } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
 import {
   appStyles,
@@ -96,6 +100,12 @@ type Values = Omit<SignUpInput, 'accountType' | 'countryCode'> & {
 
 export function RegistrationFlow() {
   const router = useRouter();
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const sheetMaxHeight = Math.min(
+    Math.max(320, height - insets.top - 12),
+    Math.round(height * 0.86),
+  );
   const { inviteToken } = useLocalSearchParams<{ inviteToken?: string }>();
   const { resendVerification, signUp, verifyEmail } = useAuth();
   const [step, setStep] = useState<Step>('choice');
@@ -382,7 +392,9 @@ export function RegistrationFlow() {
       toValue: 720,
       useNativeDriver: true,
     }).start(({ finished }) => {
-      if (finished) router.back();
+      if (!finished) return;
+      if (router.canGoBack()) router.back();
+      else router.replace('/');
     });
   };
   const [panResponder] = useState(() =>
@@ -417,6 +429,7 @@ export function RegistrationFlow() {
       <RegistrationWelcome />
       <Modal
         animationType="fade"
+        navigationBarTranslucent
         onRequestClose={dismissRegistration}
         statusBarTranslucent
         transparent
@@ -430,27 +443,36 @@ export function RegistrationFlow() {
             style={s.backdrop}
           />
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             pointerEvents="box-none"
             style={s.keyboardArea}
           >
             <Animated.View
-              style={{ transform: [{ translateY: sheetTranslateY }] }}
+              style={[
+                s.sheet,
+                {
+                  maxHeight: sheetMaxHeight,
+                  paddingBottom: Math.max(
+                    insets.bottom,
+                    Platform.OS === 'android' ? 12 : 8,
+                  ),
+                  transform: [{ translateY: sheetTranslateY }],
+                },
+              ]}
             >
-              <SafeAreaView edges={['bottom']} style={s.sheet}>
-                <View {...panResponder.panHandlers} style={s.handle} />
-                <ScrollView
-                  keyboardDismissMode="on-drag"
-                  keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={false}
-                  style={{ maxHeight: '100%' }}
-                >
+              <View {...panResponder.panHandlers} style={s.handle} />
+              <ScrollView
+                keyboardDismissMode="on-drag"
+                keyboardShouldPersistTaps="handled"
+                overScrollMode="never"
+                showsVerticalScrollIndicator={false}
+                style={s.scroll}
+              >
                 <View style={s.content}>
                   {step === 'choice' ? (
                     <View style={s.roleContent}>
                       <Text accessibilityRole="header" style={s.title}>
-                        ¿Cómo quieres unirte a Nava
-                        ?
+                        ¿Cómo quieres unirte a Nava?
                       </Text>
                       <Text style={s.description}>
                         Elige una opción para crear tu cuenta.
@@ -833,8 +855,7 @@ export function RegistrationFlow() {
                     </View>
                   )}
                 </View>
-                </ScrollView>
-              </SafeAreaView>
+              </ScrollView>
             </Animated.View>
           </KeyboardAvoidingView>
         </View>
@@ -1131,6 +1152,7 @@ const s = StyleSheet.create({
   reviewValue: { color: appTheme.colors.text, fontSize: 16, marginTop: 3 },
   roleButtons: { flexDirection: 'row', gap: 14, marginTop: 24 },
   roleContent: { paddingBottom: 8, paddingHorizontal: 20 },
+  scroll: { flexShrink: 1 },
   scissors: {
     color: appTheme.colors.accentDark,
     fontSize: 29,
@@ -1148,7 +1170,6 @@ const s = StyleSheet.create({
   },
   sheet: {
     backgroundColor: appTheme.colors.surfaceMuted,
-    maxHeight: '86%',
     borderTopLeftRadius: appTheme.radii.sheet,
     borderTopRightRadius: appTheme.radii.sheet,
     overflow: 'hidden',

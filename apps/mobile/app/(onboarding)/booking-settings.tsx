@@ -85,7 +85,14 @@ export default function BookingSettingsScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.back}>
+        <Pressable
+          onPress={() =>
+            router.canGoBack()
+              ? router.back()
+              : router.replace('/business-settings')
+          }
+          style={styles.back}
+        >
           <Ionicons color="#111827" name="arrow-back" size={23} />
         </Pressable>
         <View style={styles.headerCopy}>

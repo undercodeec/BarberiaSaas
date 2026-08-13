@@ -70,7 +70,11 @@ export default function CashRegisterDetailScreen() {
       <View style={styles.header}>
         <Pressable
           accessibilityLabel="Volver"
-          onPress={() => router.back()}
+          onPress={() =>
+            router.canGoBack()
+              ? router.back()
+              : router.replace('/cash-register')
+          }
           style={styles.back}
         >
           <Ionicons color="#111827" name="chevron-back" size={28} />

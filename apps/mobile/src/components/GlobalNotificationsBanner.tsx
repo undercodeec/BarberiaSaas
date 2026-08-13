@@ -151,6 +151,7 @@ export function GlobalNotificationsBanner() {
       </Pressable>
       <Modal
         animationType="none"
+        navigationBarTranslucent
         onRequestClose={closeBanner}
         statusBarTranslucent
         transparent
@@ -166,7 +167,11 @@ export function GlobalNotificationsBanner() {
             accessibilityViewIsModal
             style={[
               styles.banner,
-              { paddingTop: insets.top + 14, transform: [{ translateX }] },
+              {
+                paddingBottom: Math.max(insets.bottom, 12),
+                paddingTop: insets.top + 14,
+                transform: [{ translateX }],
+              },
             ]}
           >
             <View style={styles.header}>
@@ -198,6 +203,7 @@ export function GlobalNotificationsBanner() {
             </View>
             <ScrollView
               contentContainerStyle={styles.list}
+              overScrollMode="never"
               showsVerticalScrollIndicator={false}
             >
               {query.isLoading ? (

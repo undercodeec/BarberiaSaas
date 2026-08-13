@@ -12,7 +12,9 @@ import { Redirect, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,6 +29,7 @@ import {
   appTheme,
   BottomNavigation,
   goldShadow,
+  useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -53,6 +56,7 @@ function movementIsIncome(type: CashMovementRecord['type']) {
 
 export default function CashRegisterScreen() {
   const { session, user } = useAuth();
+  const layout = useNativeLayoutMetrics(0.92);
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -287,7 +291,12 @@ export default function CashRegisterScreen() {
         <Ionicons color="#111827" name="receipt-outline" size={27} />
       </View>
       {sessionData ? (
-        <ScrollView contentContainerStyle={styles.openContent}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.openContent,
+            { paddingBottom: layout.bottomInset + 84 },
+          ]}
+        >
           <View style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>Saldo en caja</Text>
             <Text style={styles.balanceAmount}>
@@ -454,19 +463,28 @@ export default function CashRegisterScreen() {
       )}
       <Modal
         animationType="slide"
+        navigationBarTranslucent
         onRequestClose={() => setIsSheetOpen(false)}
+        statusBarTranslucent
         transparent
         visible={isSheetOpen}
       >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalKeyboard}
+        >
         <View style={styles.overlay}>
           <Pressable
             onPress={() => setIsSheetOpen(false)}
             style={styles.backdrop}
           />
           <ScrollView
-            contentContainerStyle={styles.sheetContent}
+            contentContainerStyle={[
+              styles.sheetContent,
+              { paddingBottom: layout.bottomInset + 22 },
+            ]}
             keyboardShouldPersistTaps="handled"
-            style={styles.sheet}
+            style={[styles.sheet, { maxHeight: layout.sheetMaxHeight }]}
           >
             <View style={styles.handle} />
             {sheetMode === 'open' ? (
@@ -926,6 +944,7 @@ export default function CashRegisterScreen() {
             )}
           </ScrollView>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
       <BottomNavigation active="cash" />
     </SafeAreaView>
@@ -1140,6 +1159,7 @@ const styles = StyleSheet.create({
   },
   primaryText: { color: '#FFFFFF', fontWeight: '900' },
   screen: appStyles.screen,
+  modalKeyboard: { flex: 1 },
   secondary: {
     alignItems: 'center',
     borderColor: '#111827',
@@ -1162,7 +1182,6 @@ const styles = StyleSheet.create({
     backgroundColor: appTheme.colors.surfaceMuted,
     borderTopLeftRadius: appTheme.radii.sheet,
     borderTopRightRadius: appTheme.radii.sheet,
-    maxHeight: '92%',
   },
   sheetContent: {
     paddingBottom: 34,

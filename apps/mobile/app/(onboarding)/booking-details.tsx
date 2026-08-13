@@ -27,6 +27,7 @@ import { useAuth } from '../../src/providers/AuthProvider';
 import {
   appTheme,
   goldButtonShadow,
+  useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 
 type BookingStep = 'professional' | 'services' | 'schedule';
@@ -95,6 +96,7 @@ function futureDates() {
 
 export default function BookingDetailsScreen() {
   const { session } = useAuth();
+  const layout = useNativeLayoutMetrics();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { clientId } = useLocalSearchParams<{ clientId: string }>();
@@ -318,7 +320,8 @@ export default function BookingDetailsScreen() {
           onPress={() => {
             if (step === 'schedule') setStep('services');
             else if (step === 'services') setStep('professional');
-            else router.back();
+            else if (router.canGoBack()) router.back();
+            else router.replace('/new-booking');
           }}
           style={styles.backButton}
         >
@@ -667,11 +670,21 @@ export default function BookingDetailsScreen() {
       </View>
       <Modal
         animationType="fade"
+        navigationBarTranslucent
         onRequestClose={() => setCreatedAppointment(null)}
+        statusBarTranslucent
         transparent
         visible={createdAppointment !== null}
       >
-        <View style={styles.successOverlay}>
+        <View
+          style={[
+            styles.successOverlay,
+            {
+              paddingBottom: layout.bottomInset,
+              paddingTop: layout.topInset,
+            },
+          ]}
+        >
           <View accessibilityRole="alert" style={styles.successCard}>
             <View style={styles.successIcon}>
               <Ionicons

@@ -11,8 +11,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -26,12 +28,14 @@ import {
   appStyles,
   appTheme,
   goldButtonShadow,
+  useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 export default function WalletScreen() {
   const router = useRouter();
+  const layout = useNativeLayoutMetrics();
   const searchParams = useLocalSearchParams<{ tab?: string | string[] }>();
   const { session } = useAuth();
   const queryClient = useQueryClient();
@@ -319,7 +323,9 @@ export default function WalletScreen() {
       <View style={styles.header}>
         <Pressable
           accessibilityLabel="Volver"
-          onPress={() => router.back()}
+          onPress={() =>
+            router.canGoBack() ? router.back() : router.replace('/dashboard')
+          }
           style={styles.back}
         >
           <Ionicons
@@ -720,17 +726,33 @@ export default function WalletScreen() {
       </ScrollView>
       <Modal
         animationType="slide"
+        navigationBarTranslucent
         onRequestClose={() => setPayphoneSheetOpen(false)}
+        statusBarTranslucent
         transparent
         visible={payphoneSheetOpen}
       >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalKeyboard}
+        >
         <View style={styles.modalRoot}>
           <Pressable
             accessibilityLabel="Cerrar configuracion PayPhone"
             onPress={() => setPayphoneSheetOpen(false)}
             style={styles.modalBackdrop}
           />
-          <ScrollView contentContainerStyle={styles.payphoneSheet}>
+          <ScrollView
+            contentContainerStyle={[
+              styles.payphoneSheet,
+              { paddingBottom: layout.bottomInset + 20 },
+            ]}
+            keyboardShouldPersistTaps="handled"
+            style={[
+              styles.sheetViewport,
+              { maxHeight: layout.sheetMaxHeight },
+            ]}
+          >
             <Text style={styles.sheetTitle}>Configurar PayPhone</Text>
             <Text style={styles.sheetCopy}>
               Ingresa las credenciales de PayPhone Business de este negocio. El
@@ -872,20 +894,37 @@ export default function WalletScreen() {
             ) : null}
           </ScrollView>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
       <Modal
         animationType="slide"
+        navigationBarTranslucent
         onRequestClose={() => setSheetMode(null)}
+        statusBarTranslucent
         transparent
         visible={sheetMode !== null}
       >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalKeyboard}
+        >
         <View style={styles.modalRoot}>
           <Pressable
             accessibilityLabel="Cerrar formulario"
             onPress={() => setSheetMode(null)}
             style={styles.modalBackdrop}
           />
-          <View style={styles.sheet}>
+          <ScrollView
+            contentContainerStyle={[
+              styles.sheet,
+              { paddingBottom: layout.bottomInset + 18 },
+            ]}
+            keyboardShouldPersistTaps="handled"
+            style={[
+              styles.sheetViewport,
+              { maxHeight: layout.sheetMaxHeight },
+            ]}
+          >
             <Text style={styles.sheetTitle}>
               {sheetMode === 'advance'
                 ? 'Registrar anticipo'
@@ -994,8 +1033,9 @@ export default function WalletScreen() {
                   : 'Confirmar'}
               </Text>
             </Pressable>
-          </View>
+          </ScrollView>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -1142,6 +1182,7 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: { flex: 1 },
   modalRoot: { backgroundColor: 'rgba(0,0,0,0.35)', flex: 1 },
+  modalKeyboard: { flex: 1 },
   notesInput: { minHeight: 70, textAlignVertical: 'top' },
   payphoneAction: {
     alignItems: 'center',
@@ -1263,6 +1304,12 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 22,
     paddingBottom: 30,
+  },
+  sheetViewport: {
+    backgroundColor: appTheme.colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    marginTop: 'auto',
   },
   sheetCopy: { color: appTheme.colors.textMuted, fontSize: 13 },
   sheetTitle: { color: appTheme.colors.text, fontSize: 22, fontWeight: '900' },

@@ -18,7 +18,7 @@ export default function RootLayout() {
     <View style={styles.root}>
       <AppProviders>
         <SessionLock>
-          <StatusBar style={showPreloader ? 'dark' : 'light'} />
+          <StatusBar style="dark" />
           <Stack screenOptions={{ headerShown: false }} />
           <GlobalNotificationsBanner />
         </SessionLock>

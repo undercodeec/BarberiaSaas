@@ -55,7 +55,9 @@ export default function WaitlistScreen() {
         <Pressable
           accessibilityLabel="Volver a agenda"
           accessibilityRole="button"
-          onPress={() => router.back()}
+          onPress={() =>
+            router.canGoBack() ? router.back() : router.replace('/dashboard')
+          }
           style={styles.backButton}
         >
           <Ionicons

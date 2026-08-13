@@ -1,4 +1,5 @@
 import { render, userEvent } from '@testing-library/react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ServiceFormSheet } from './ServiceFormSheet';
 
@@ -8,7 +9,14 @@ describe('ServiceFormSheet', () => {
     const onSave = jest.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
     const view = await render(
-      <ServiceFormSheet onClose={onClose} onSave={onSave} visible />,
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { height: 844, width: 390, x: 0, y: 0 },
+          insets: { bottom: 24, left: 0, right: 0, top: 24 },
+        }}
+      >
+        <ServiceFormSheet onClose={onClose} onSave={onSave} visible />
+      </SafeAreaProvider>,
     );
 
     await user.press(view.getByRole('button', { name: 'Guardar servicio' }));
@@ -23,11 +31,13 @@ describe('ServiceFormSheet', () => {
     await user.type(view.getByLabelText('Precio del servicio'), '15');
     await user.press(view.getByRole('button', { name: 'Guardar servicio' }));
 
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-      description: '',
-      durationMinutes: 30,
-      name: 'Corte',
-      price: 15,
-    }));
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: '',
+        durationMinutes: 30,
+        name: 'Corte',
+        price: 15,
+      }),
+    );
   });
 });

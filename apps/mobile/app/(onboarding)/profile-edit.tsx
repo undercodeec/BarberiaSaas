@@ -22,6 +22,7 @@ import {
   appTheme,
   BottomNavigation,
   goldButtonShadow,
+  useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { CountryCityFields } from '../../src/components/RegistrationSelectors';
 import { requireApiClient } from '../../src/lib/api';
@@ -43,6 +44,7 @@ function initials(name: string) {
 
 export default function ProfileEditScreen() {
   const { session, user } = useAuth();
+  const layout = useNativeLayoutMetrics();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [fullName, setFullName] = useState('');
@@ -196,7 +198,12 @@ export default function ProfileEditScreen() {
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: layout.bottomInset + 84 },
+        ]}
+      >
         <View style={styles.header}>
           <Pressable
             accessibilityLabel="Volver a ajustes"
@@ -341,7 +348,9 @@ export default function ProfileEditScreen() {
 
       <Modal
         animationType="slide"
+        navigationBarTranslucent
         onRequestClose={() => setPhotoSheetTarget(null)}
+        statusBarTranslucent
         transparent
         visible={photoSheetTarget !== null}
       >
@@ -351,7 +360,10 @@ export default function ProfileEditScreen() {
         >
           <Pressable
             onPress={(event) => event.stopPropagation()}
-            style={styles.sheet}
+            style={[
+              styles.sheet,
+              { paddingBottom: layout.bottomInset + 16 },
+            ]}
           >
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>Añadir foto</Text>

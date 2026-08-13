@@ -112,7 +112,12 @@ export default function RescheduleBookingScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.back}>
+      <Pressable
+        onPress={() =>
+          router.canGoBack() ? router.back() : router.replace('/agenda')
+        }
+        style={styles.back}
+      >
           <Ionicons color="#111827" name="arrow-back" size={23} />
         </Pressable>
         <Text style={styles.headerTitle}>Reprogramar cita</Text>

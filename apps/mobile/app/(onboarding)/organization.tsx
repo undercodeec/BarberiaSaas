@@ -143,7 +143,11 @@ export default function OrganizationOnboardingScreen() {
         <Pressable
           accessibilityLabel="Regresar"
           accessibilityRole="button"
-          onPress={() => router.back()}
+          onPress={() =>
+            router.canGoBack()
+              ? router.back()
+              : router.replace('/(onboarding)/account-setup')
+          }
           style={styles.backButton}
         >
           <Ionicons color="#101c2d" name="arrow-back" size={23} />

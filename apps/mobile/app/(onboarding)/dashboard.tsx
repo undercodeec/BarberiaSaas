@@ -49,6 +49,7 @@ import {
   appTheme,
   BottomNavigation,
   goldButtonShadow,
+  useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { BookingLinkSheet } from '../../src/components/BookingLinkSheet';
@@ -1063,6 +1064,7 @@ function ExtraQuickActionsSheet({
   readonly onSelect: (id: ExtraQuickActionId) => void;
   readonly visible: boolean;
 }) {
+  const layout = useNativeLayoutMetrics(0.72);
   const availableActions = EXTRA_QUICK_ACTIONS.filter(
     (action) => !selectedIds.includes(action.id),
   );
@@ -1070,7 +1072,9 @@ function ExtraQuickActionsSheet({
   return (
     <Modal
       animationType="fade"
+      navigationBarTranslucent
       onRequestClose={onClose}
+      statusBarTranslucent
       transparent
       visible={visible}
     >
@@ -1081,7 +1085,16 @@ function ExtraQuickActionsSheet({
           onPress={onClose}
           style={styles.quickActionsPickerBackdrop}
         />
-        <View accessibilityViewIsModal style={styles.quickActionsPicker}>
+        <View
+          accessibilityViewIsModal
+          style={[
+            styles.quickActionsPicker,
+            {
+              maxHeight: layout.sheetMaxHeight,
+              paddingBottom: layout.bottomInset + 8,
+            },
+          ]}
+        >
           <View style={styles.quickActionsPickerHandle} />
           <Text
             accessibilityRole="header"
@@ -1092,7 +1105,10 @@ function ExtraQuickActionsSheet({
           <Text style={styles.quickActionsPickerCopy}>
             Elige una herramienta para tenerla siempre a la vista.
           </Text>
-          <View style={styles.quickActionsPickerList}>
+          <ScrollView
+            contentContainerStyle={styles.quickActionsPickerList}
+            showsVerticalScrollIndicator={false}
+          >
             {availableActions.map((action) => (
               <Pressable
                 accessibilityRole="button"
@@ -1114,7 +1130,7 @@ function ExtraQuickActionsSheet({
                 Ya agregaste todos los accesos disponibles.
               </Text>
             ) : null}
-          </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -1257,6 +1273,7 @@ function NotificationPermissionSheet({
   return (
     <Modal
       animationType="none"
+      navigationBarTranslucent
       onRequestClose={dismissWithAnimation}
       statusBarTranslucent
       transparent
@@ -1278,7 +1295,7 @@ function NotificationPermissionSheet({
           style={[
             styles.permissionSheet,
             {
-              paddingBottom: Math.max(insets.bottom, 20) + 16,
+              paddingBottom: Math.max(insets.bottom, 12),
               transform: [{ translateY: sheetTranslateY }],
             },
           ]}
@@ -1418,6 +1435,7 @@ function WelcomeSurveySheet({
   return (
     <Modal
       animationType="slide"
+      navigationBarTranslucent
       onRequestClose={dismissWithAnimation}
       statusBarTranslucent
       transparent
@@ -1435,7 +1453,7 @@ function WelcomeSurveySheet({
           style={[
             styles.welcomeSurveySheet,
             {
-              paddingBottom: Math.max(insets.bottom, 20) + 16,
+              paddingBottom: Math.max(insets.bottom, 12),
               transform: [{ translateY: sheetTranslateY }],
             },
           ]}
@@ -1623,6 +1641,7 @@ export function LegacyLocationBannerSheet({
   return (
     <Modal
       animationType="slide"
+      navigationBarTranslucent
       onRequestClose={dismissWithAnimation}
       statusBarTranslucent
       transparent
@@ -1640,7 +1659,7 @@ export function LegacyLocationBannerSheet({
           style={[
             styles.locationSheet,
             {
-              paddingBottom: Math.max(insets.bottom, 20) + 16,
+              paddingBottom: Math.max(insets.bottom, 12),
               transform: [{ translateY: sheetTranslateY }],
             },
           ]}
@@ -1744,6 +1763,7 @@ export function LegacyLocationBannerSheet({
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const layout = useNativeLayoutMetrics();
   const { session, showNotificationsAfterSignIn, user } = useAuth();
   const canPromptForNotifications = Boolean(
     session && user && showNotificationsAfterSignIn,
@@ -2124,14 +2144,14 @@ export default function DashboardScreen() {
 
   if (!session) return <Redirect href="/(auth)/login" />;
   return (
-    <SafeAreaView
-      edges={['bottom', 'left', 'right', 'top']}
-      style={styles.screen}
-    >
+    <SafeAreaView edges={['left', 'right', 'top']} style={styles.screen}>
       <StatusBar style="dark" />
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: layout.bottomInset + 84 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.topRow}>
@@ -2713,8 +2733,12 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255, 244, 214, 0.42)',
     borderTopWidth: 1,
     elevation: 4,
-    experimental_backgroundImage:
-      'linear-gradient(135deg, #C79532 0%, #E1B85B 50%, #B47D17 100%)',
+    ...Platform.select({
+      web: {
+        experimental_backgroundImage:
+          'linear-gradient(135deg, #C79532 0%, #E1B85B 50%, #B47D17 100%)',
+      },
+    }),
     justifyContent: 'center',
     minHeight: 51,
     overflow: 'visible',
@@ -2728,8 +2752,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFDF2',
     borderRadius: 3,
     bottom: -1,
-    boxShadow:
-      '0 0 3px 1px rgba(255, 255, 255, 0.96), 0 0 8px 4px rgba(255, 231, 163, 0.64), 0 2px 14px 7px rgba(225, 184, 91, 0.28)',
+    ...Platform.select({
+      android: { elevation: 2 },
+      default: {
+        shadowColor: '#FFE7A3',
+        shadowOpacity: 0.64,
+        shadowRadius: 8,
+      },
+      web: {
+        boxShadow:
+          '0 0 3px 1px rgba(255, 255, 255, 0.96), 0 0 8px 4px rgba(255, 231, 163, 0.64), 0 2px 14px 7px rgba(225, 184, 91, 0.28)',
+      },
+    }),
     height: 3,
     position: 'absolute',
     width: 6,
@@ -2740,7 +2774,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 2,
     bottom: 1,
-    boxShadow: '0 -1px 5px 1px rgba(255, 246, 218, 0.2)',
+    ...Platform.select({
+      android: { elevation: 1 },
+      default: {
+        shadowColor: '#FFF6DA',
+        shadowOpacity: 0.2,
+        shadowRadius: 5,
+      },
+      web: { boxShadow: '0 -1px 5px 1px rgba(255, 246, 218, 0.2)' },
+    }),
     height: 1,
     left: 10,
     position: 'absolute',
@@ -2849,7 +2891,6 @@ const styles = StyleSheet.create({
     backgroundColor: appTheme.colors.surfaceElevated,
     borderRadius: 28,
     marginHorizontal: 24,
-    maxHeight: '72%',
     paddingBottom: 20,
     paddingHorizontal: 18,
     paddingTop: 12,

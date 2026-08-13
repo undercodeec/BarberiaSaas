@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Barbería",
+    "name": "Nava",
     "slug": "barber-saas-mobile",
     "version": "0.1.0",
     "runtimeVersion": "0.1.0",
@@ -10,7 +10,7 @@
     },
     "orientation": "portrait",
     "scheme": "barbersaas",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "plugins": [
       "expo-router",
       "expo-notifications",

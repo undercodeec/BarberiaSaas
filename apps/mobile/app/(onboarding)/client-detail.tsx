@@ -11,9 +11,11 @@ import {
   Alert,
   Animated,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Modal,
   PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,6 +30,7 @@ import { useAuth } from '../../src/providers/AuthProvider';
 import {
   appTheme,
   goldButtonShadow,
+  useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 
 type Tab = 'comments' | 'history' | 'information' | 'notes';
@@ -73,6 +76,7 @@ function statusLabel(
 
 export default function ClientDetailScreen() {
   const { session } = useAuth();
+  const layout = useNativeLayoutMetrics();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { clientId } = useLocalSearchParams<{ clientId: string }>();
@@ -377,7 +381,12 @@ export default function ClientDetailScreen() {
         <View style={styles.missing}>
           <Ionicons color="#101c2d" name="person-outline" size={42} />
           <Text style={styles.missingTitle}>Cliente no disponible</Text>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Pressable
+            onPress={() =>
+              router.canGoBack() ? router.back() : router.replace('/clients')
+            }
+            style={styles.backButton}
+          >
             <Text style={styles.backLabel}>Volver a clientes</Text>
           </Pressable>
         </View>
@@ -397,7 +406,9 @@ export default function ClientDetailScreen() {
         <Pressable
           accessibilityLabel="Volver"
           accessibilityRole="button"
-          onPress={() => router.back()}
+          onPress={() =>
+            router.canGoBack() ? router.back() : router.replace('/clients')
+          }
           style={styles.headerButton}
         >
           <Ionicons color="#111827" name="chevron-back" size={25} />
@@ -773,7 +784,9 @@ export default function ClientDetailScreen() {
       </ScrollView>
       <Modal
         animationType="fade"
+        navigationBarTranslucent
         onRequestClose={() => setIsOptionsOpen(false)}
+        statusBarTranslucent
         transparent
         visible={isOptionsOpen}
       >
@@ -783,7 +796,12 @@ export default function ClientDetailScreen() {
             onPress={() => setIsOptionsOpen(false)}
             style={styles.backdrop}
           />
-          <View style={styles.optionsSheet}>
+          <View
+            style={[
+              styles.optionsSheet,
+              { paddingBottom: layout.bottomInset + 14 },
+            ]}
+          >
             <View style={styles.handle} />
             <Text style={styles.optionsTitle}>Más opciones</Text>
             <Pressable
@@ -845,16 +863,26 @@ export default function ClientDetailScreen() {
       </Modal>
       <Modal
         animationType="slide"
+        navigationBarTranslucent
         onRequestClose={closeNoteSheet}
+        statusBarTranslucent
         transparent
         visible={isNoteOpen}
       >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalKeyboard}
+        >
         <View style={styles.overlay}>
           <Pressable onPress={closeNoteSheet} style={styles.backdrop} />
           <Animated.View
             style={[
               styles.noteSheet,
-              { transform: [{ translateY: noteSheetTranslateY }] },
+              {
+                maxHeight: layout.sheetMaxHeight,
+                paddingBottom: layout.bottomInset + 20,
+                transform: [{ translateY: noteSheetTranslateY }],
+              },
             ]}
           >
             <View
@@ -912,19 +940,31 @@ export default function ClientDetailScreen() {
             </Pressable>
           </Animated.View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
       <Modal
         animationType="slide"
+        navigationBarTranslucent
         onRequestClose={() => setIsLabelOpen(false)}
+        statusBarTranslucent
         transparent
         visible={isLabelOpen}
       >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalKeyboard}
+        >
         <View style={styles.overlay}>
           <Pressable
             onPress={() => setIsLabelOpen(false)}
             style={styles.backdrop}
           />
-          <View style={styles.labelSheet}>
+          <View
+            style={[
+              styles.labelSheet,
+              { paddingBottom: layout.bottomInset + 20 },
+            ]}
+          >
             <View style={styles.handle} />
             <Text style={styles.sheetTitle}>Nueva etiqueta</Text>
             <Text style={styles.sheetCopy}>
@@ -976,23 +1016,33 @@ export default function ClientDetailScreen() {
             </Pressable>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
       <Modal
         animationType="slide"
+        navigationBarTranslucent
         onRequestClose={() => setIsEditing(false)}
+        statusBarTranslucent
         transparent
         visible={isEditing}
       >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalKeyboard}
+        >
         <View style={styles.overlay}>
           <Pressable
             onPress={() => setIsEditing(false)}
             style={styles.backdrop}
           />
           <ScrollView
-            contentContainerStyle={styles.sheetContent}
+            contentContainerStyle={[
+              styles.sheetContent,
+              { paddingBottom: layout.bottomInset + 20 },
+            ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-            style={styles.sheet}
+            style={[styles.sheet, { maxHeight: layout.sheetMaxHeight }]}
           >
             <View style={styles.handle} />
             <Text style={styles.sheetTitle}>Editar cliente</Text>
@@ -1105,6 +1155,7 @@ export default function ClientDetailScreen() {
             </View>
           </ScrollView>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -1637,6 +1688,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
+  modalKeyboard: { flex: 1 },
   phone: { color: appTheme.colors.textMuted, fontSize: 14, marginTop: 4 },
   profileCard: {
     alignItems: 'center',
@@ -1682,7 +1734,6 @@ const styles = StyleSheet.create({
     marginTop: 27,
   },
   sheet: {
-    maxHeight: '88%',
     backgroundColor: appTheme.colors.surfaceElevated,
     borderTopLeftRadius: appTheme.radii.sheet,
     borderTopRightRadius: appTheme.radii.sheet,

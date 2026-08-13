@@ -1,10 +1,45 @@
 # Estado del proyecto
 
-Actualizado: 2026-08-12 (correcciones moviles y nueva compilacion Android pendiente)
+Actualizado: 2026-08-13 (auditoria Android de UI, navegacion y modales completada)
 
 Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión posterior documentada en `docs/adr/0003-postgresql-prisma-y-api-en-vps.md`. Se marca `[x]` solo cuando la tarea está implementada y cuenta con la verificación indicada; `[ ]` significa pendiente o aún no demostrada.
 
 Última actualización: 2026-08-11 (operación VPS, Neon y PayPhone)
+
+## Actualizacion movil Android - 13 de agosto de 2026
+
+- [x] Se corrigio el nombre visible del aplicativo a **Nava** en Expo y en los
+      recursos nativos de Android.
+- [x] Se auditaron 44 pantallas y 69 archivos TypeScript/TSX de la aplicacion
+      movil. No se encontraron etiquetas HTML reales en las pantallas nativas;
+      la unica dependencia de Google Maps para Web queda aislada en
+      `BusinessLocationMap.web.tsx` y Android usa su contraparte `.native.tsx`.
+- [x] Los accesos a `localStorage` se ejecutan solo en ramas
+      `Platform.OS === 'web'`; Android utiliza `expo-secure-store`.
+- [x] Los 34 modales incluyen cierre Android y barras de sistema translucidas.
+      Los paneles de registro, Agenda, Caja, Clientes, Inventario, Billetera,
+      Equipo, Servicios y configuracion ahora calculan altura y espaciado con
+      las zonas seguras reales del dispositivo.
+- [x] Se eliminaron alturas porcentuales de paneles y sombras CSS sin respaldo
+      nativo. Android utiliza `elevation`; las sombras y gradientes CSS quedan
+      limitados a Web mediante `Platform.select`.
+- [x] Los botones inferiores, flotantes y formularios respetan la barra de
+      navegacion y el teclado Android. En particular, los botones de guardar o
+      continuar no quedan ocultos al crear servicios, clientes, colaboradores,
+      productos, movimientos de Caja o configuraciones de PayPhone.
+- [x] Los botones de regreso revisados incluyen una ruta alternativa cuando
+      Android restaura la actividad o abre una ruta profunda sin historial de
+      navegacion.
+- [x] Verificado: `pnpm --filter @barber-saas/mobile typecheck`, las 3 suites
+      Jest moviles (5 pruebas) y `expo export --platform android` con Hermes
+      completaron correctamente.
+- [ ] La compilacion local completa del APK sigue bloqueada por una limitacion
+      de Windows/CMake/Ninja con las rutas profundas creadas por `pnpm` en
+      `react-native-worklets` y `react-native-reanimated`; no corresponde a
+      una falla del codigo Nava. Para compilar localmente se recomienda abrir
+      el repositorio desde una ruta corta, por ejemplo `D:\Nava`, y abrir
+      `apps/mobile/android` en Android Studio. No habia dispositivo ADB
+      conectado para la prueba fisica final.
 
 ## Estado operativo actual
 

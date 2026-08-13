@@ -9,7 +9,9 @@ import { Redirect, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,6 +26,7 @@ import {
   appStyles,
   appTheme,
   goldButtonShadow,
+  useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -55,6 +58,7 @@ const INVITATION_ROLES: ReadonlyArray<{
 
 export default function TeamManagementScreen() {
   const router = useRouter();
+  const layout = useNativeLayoutMetrics();
   const queryClient = useQueryClient();
   const { session, user } = useAuth();
   const organizationQuery = useCurrentOrganization();
@@ -388,10 +392,16 @@ export default function TeamManagementScreen() {
 
       <Modal
         animationType="slide"
+        navigationBarTranslucent
         onRequestClose={closeInvite}
+        statusBarTranslucent
         transparent
         visible={inviteOpen}
       >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalKeyboard}
+        >
         <View style={styles.modalLayer}>
           <Pressable
             accessibilityLabel="Cerrar invitación"
@@ -399,7 +409,18 @@ export default function TeamManagementScreen() {
             onPress={closeInvite}
             style={styles.modalBackdrop}
           />
-          <View style={styles.inviteSheet}>
+          <ScrollView
+            contentContainerStyle={[
+              styles.inviteSheetContent,
+              { paddingBottom: layout.bottomInset + 16 },
+            ]}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            style={[
+              styles.inviteSheet,
+              { maxHeight: layout.sheetMaxHeight },
+            ]}
+          >
             <View style={styles.sheetHeader}>
               <View style={styles.headerCopy}>
                 <Text accessibilityRole="header" style={styles.sheetTitle}>
@@ -544,8 +565,9 @@ export default function TeamManagementScreen() {
                 </Text>
               </Pressable>
             ) : null}
-          </View>
+          </ScrollView>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -662,9 +684,9 @@ const styles = StyleSheet.create({
     backgroundColor: appTheme.colors.surfaceElevated,
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
-    padding: 22,
     ...goldButtonShadow,
   },
+  inviteSheetContent: { padding: 22 },
   input: {
     backgroundColor: appTheme.colors.background,
     borderColor: COLORS.border,
@@ -710,6 +732,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16, 28, 45, 0.5)',
   },
   modalLayer: { flex: 1, justifyContent: 'flex-end' },
+  modalKeyboard: { flex: 1 },
   permissionHint: {
     color: COLORS.muted,
     fontSize: 13,

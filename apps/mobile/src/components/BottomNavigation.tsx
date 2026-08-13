@@ -4,18 +4,17 @@ import { useEffect, useRef } from 'react';
 import {
   Animated,
   Easing,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export type NavigationTab =
-  | 'agenda'
-  | 'cash'
-  | 'clients'
-  | 'dashboard'
-  | 'settings';
+  'agenda' | 'cash' | 'clients' | 'dashboard' | 'settings';
 
 /** Tema visual global basado en el dashboard. */
 export const appTheme = {
@@ -68,14 +67,35 @@ export const goldShadow = {
 } as const;
 
 export const goldButtonShadow = {
-  boxShadow:
-    '0 12px 24px rgba(180, 125, 23, 0.07), 0 3px 8px rgba(225, 184, 91, 0.04)',
-  elevation: 5,
-  shadowColor: appTheme.colors.accentDark,
-  shadowOffset: { height: 8, width: 0 },
-  shadowOpacity: 0.07,
-  shadowRadius: 14,
+  ...Platform.select({
+    android: {
+      elevation: 5,
+    },
+    default: {
+      shadowColor: appTheme.colors.accentDark,
+      shadowOffset: { height: 8, width: 0 },
+      shadowOpacity: 0.07,
+      shadowRadius: 14,
+    },
+    web: {
+      boxShadow:
+        '0 12px 24px rgba(180, 125, 23, 0.07), 0 3px 8px rgba(225, 184, 91, 0.04)',
+    },
+  }),
 } as const;
+
+/** Medidas de paneles que respetan barras del sistema y tamaños Android reales. */
+export function useNativeLayoutMetrics(sheetRatio = 0.88) {
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const availableHeight = Math.max(1, height - insets.top - insets.bottom - 12);
+
+  return {
+    bottomInset: Math.max(insets.bottom, 12),
+    sheetMaxHeight: Math.floor(Math.min(height * sheetRatio, availableHeight)),
+    topInset: Math.max(insets.top, 12),
+  } as const;
+}
 
 function GoldIndicator() {
   const translateX = useRef(new Animated.Value(-14)).current;
@@ -131,6 +151,7 @@ export function BottomNavigation({
   readonly active: NavigationTab;
 }) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const items: ReadonlyArray<{
     readonly icon: React.ComponentProps<typeof Ionicons>['name'];
     readonly label: string;
@@ -169,7 +190,10 @@ export function BottomNavigation({
     },
   ];
   return (
-    <View accessibilityRole="tablist" style={styles.navigation}>
+    <View
+      accessibilityRole="tablist"
+      style={[styles.navigation, { bottom: Math.max(insets.bottom, 12) }]}
+    >
       {items.map((item) => {
         const selected = item.value === active;
         return (
@@ -186,9 +210,7 @@ export function BottomNavigation({
           >
             <Ionicons
               color={
-                selected
-                  ? appTheme.colors.accentActive
-                  : appTheme.colors.icon
+                selected ? appTheme.colors.accentActive : appTheme.colors.icon
               }
               name={item.icon}
               size={25}
@@ -229,8 +251,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFDF2',
     borderRadius: 3,
     bottom: -1,
-    boxShadow:
-      '0 0 3px 1px rgba(255, 255, 255, 0.96), 0 0 8px 4px rgba(255, 231, 163, 0.64), 0 2px 14px 7px rgba(225, 184, 91, 0.28)',
+    ...Platform.select({
+      android: { elevation: 2 },
+      default: {
+        shadowColor: '#FFE7A3',
+        shadowOpacity: 0.64,
+        shadowRadius: 8,
+      },
+      web: {
+        boxShadow:
+          '0 0 3px 1px rgba(255, 255, 255, 0.96), 0 0 8px 4px rgba(255, 231, 163, 0.64), 0 2px 14px 7px rgba(225, 184, 91, 0.28)',
+      },
+    }),
     height: 3,
     position: 'absolute',
     width: 6,
@@ -253,21 +285,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.98)',
     borderRadius: appTheme.radii.navigation,
-    bottom: 12,
-    boxShadow:
-      '0 14px 32px rgba(235, 216, 170, 0.06), 0 5px 14px rgba(248, 238, 211, 0.05)',
+    ...Platform.select({
+      android: { elevation: 20 },
+      default: {
+        shadowColor: '#F3E6C8',
+        shadowOffset: { height: 12, width: 0 },
+        shadowOpacity: 0.06,
+        shadowRadius: 18,
+      },
+      web: {
+        boxShadow:
+          '0 14px 32px rgba(235, 216, 170, 0.06), 0 5px 14px rgba(248, 238, 211, 0.05)',
+      },
+    }),
     flexDirection: 'row',
-    elevation: 20,
     left: 16,
     paddingBottom: 7,
     paddingHorizontal: 6,
     paddingTop: 7,
     position: 'absolute',
     right: 16,
-    shadowColor: '#F3E6C8',
-    shadowOffset: { height: 12, width: 0 },
-    shadowOpacity: 0.06,
-    shadowRadius: 18,
     zIndex: 1000,
   },
   pressedItem: { opacity: 0.72, transform: [{ scale: 0.96 }] },

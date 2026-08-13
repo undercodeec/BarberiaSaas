@@ -16,7 +16,7 @@ module.exports = ({ config }) => {
 
   return {
     ...config,
-    name: config.name ?? 'Barbería',
+    name: config.name ?? 'Nava',
     plugins: [
       ...(config.plugins ?? []),
       [

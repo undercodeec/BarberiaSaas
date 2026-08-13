@@ -1,6 +1,21 @@
 import { render, userEvent } from '@testing-library/react-native';
+import type { PropsWithChildren } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { CollaboratorFormSheet } from './CollaboratorFormSheet';
+
+function TestSafeArea({ children }: PropsWithChildren) {
+  return (
+    <SafeAreaProvider
+      initialMetrics={{
+        frame: { height: 844, width: 390, x: 0, y: 0 },
+        insets: { bottom: 24, left: 0, right: 0, top: 24 },
+      }}
+    >
+      {children}
+    </SafeAreaProvider>
+  );
+}
 
 describe('CollaboratorFormSheet', () => {
   it('valida los campos obligatorios y permite crear un tipo personalizado', async () => {
@@ -8,7 +23,9 @@ describe('CollaboratorFormSheet', () => {
     const onSave = jest.fn();
     const user = userEvent.setup();
     const view = await render(
-      <CollaboratorFormSheet onClose={onClose} onSave={onSave} visible />,
+      <TestSafeArea>
+        <CollaboratorFormSheet onClose={onClose} onSave={onSave} visible />
+      </TestSafeArea>,
     );
 
     await user.press(view.getByRole('button', { name: 'Guardar colaborador' }));
@@ -48,24 +65,26 @@ describe('CollaboratorFormSheet', () => {
     const onSave = jest.fn();
     const user = userEvent.setup();
     const view = await render(
-      <CollaboratorFormSheet
-        initialValue={{
-          agendaColor: '#2464E8',
-          canPerformServices: true,
-          customRoleDescription: '',
-          customRoleName: '',
-          description: '',
-          identification: '0102030405',
-          name: 'Carlos',
-          phone: '0991234567',
-          photoUri: null,
-          role: 'barber',
-        }}
-        onClose={jest.fn()}
-        onDelete={jest.fn().mockResolvedValue(undefined)}
-        onSave={onSave}
-        visible
-      />,
+      <TestSafeArea>
+        <CollaboratorFormSheet
+          initialValue={{
+            agendaColor: '#2464E8',
+            canPerformServices: true,
+            customRoleDescription: '',
+            customRoleName: '',
+            description: '',
+            identification: '0102030405',
+            name: 'Carlos',
+            phone: '0991234567',
+            photoUri: null,
+            role: 'barber',
+          }}
+          onClose={jest.fn()}
+          onDelete={jest.fn().mockResolvedValue(undefined)}
+          onSave={onSave}
+          visible
+        />
+      </TestSafeArea>,
     );
 
     expect(view.getByText('Color en la agenda')).toBeOnTheScreen();
@@ -90,24 +109,26 @@ describe('CollaboratorFormSheet', () => {
     const onDelete = jest.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
     const view = await render(
-      <CollaboratorFormSheet
-        initialValue={{
-          agendaColor: '#2464E8',
-          canPerformServices: false,
-          customRoleDescription: '',
-          customRoleName: '',
-          description: '',
-          identification: '',
-          name: 'Carlos',
-          phone: '',
-          photoUri: null,
-          role: 'administrator',
-        }}
-        onClose={jest.fn()}
-        onDelete={onDelete}
-        onSave={jest.fn()}
-        visible
-      />,
+      <TestSafeArea>
+        <CollaboratorFormSheet
+          initialValue={{
+            agendaColor: '#2464E8',
+            canPerformServices: false,
+            customRoleDescription: '',
+            customRoleName: '',
+            description: '',
+            identification: '',
+            name: 'Carlos',
+            phone: '',
+            photoUri: null,
+            role: 'administrator',
+          }}
+          onClose={jest.fn()}
+          onDelete={onDelete}
+          onSave={jest.fn()}
+          visible
+        />
+      </TestSafeArea>,
     );
 
     await user.press(

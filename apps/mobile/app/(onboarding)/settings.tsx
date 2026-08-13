@@ -9,6 +9,7 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
@@ -27,6 +28,7 @@ import {
   appTheme,
   BottomNavigation,
   goldButtonShadow,
+  useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -36,6 +38,7 @@ type IconName = ComponentProps<typeof Ionicons>['name'];
 
 export default function SettingsScreen() {
   const { session, signOut } = useAuth();
+  const layout = useNativeLayoutMetrics(0.92);
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -177,11 +180,13 @@ export default function SettingsScreen() {
     deletePassword.length >= 8 && deleteConfirmation === 'ELIMINAR';
 
   return (
-    <SafeAreaView
-      edges={['top', 'left', 'right', 'bottom']}
-      style={styles.screen}
-    >
-      <ScrollView contentContainerStyle={styles.content}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: layout.bottomInset + 84 },
+        ]}
+      >
         <View style={styles.header}>
           <View>
             <Text style={styles.eyebrow}>
@@ -333,92 +338,105 @@ export default function SettingsScreen() {
       <BottomNavigation active="settings" />
       <Modal
         animationType="fade"
+        navigationBarTranslucent
         onRequestClose={closeDeleteModal}
+        statusBarTranslucent
         transparent
         visible={isDeleteOpen}
       >
-        <View style={styles.modalBackdrop}>
-          <ScrollView
-            contentContainerStyle={styles.deleteModalContent}
-            keyboardShouldPersistTaps="handled"
-            style={styles.deleteModal}
-          >
-            <View style={styles.deleteIcon}>
-              <Ionicons color="#B93838" name="warning-outline" size={28} />
-            </View>
-            <Text style={styles.deleteTitle}>Borrar mi cuenta</Text>
-            <Text style={styles.deleteCopy}>
-              Esta acción anonimiza tu perfil y revoca todas tus sesiones. Los
-              registros de citas, Caja, comisiones y auditoría se conservan por
-              integridad del negocio.
-            </Text>
-            <View style={styles.warningBox}>
-              <Text style={styles.warningText}>
-                Si eres propietario, primero debes retirar colaboradores
-                activos, cerrar Caja y resolver citas futuras. Al continuar, tu
-                negocio y enlace de reservas quedarán cancelados.
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardArea}
+        >
+          <View style={styles.modalBackdrop}>
+            <ScrollView
+              contentContainerStyle={[
+                styles.deleteModalContent,
+                { paddingBottom: layout.bottomInset + 10 },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              style={[
+                styles.deleteModal,
+                { maxHeight: layout.sheetMaxHeight },
+              ]}
+            >
+              <View style={styles.deleteIcon}>
+                <Ionicons color="#B93838" name="warning-outline" size={28} />
+              </View>
+              <Text style={styles.deleteTitle}>Borrar mi cuenta</Text>
+              <Text style={styles.deleteCopy}>
+                Esta acción anonimiza tu perfil y revoca todas tus sesiones. Los
+                registros de citas, Caja, comisiones y auditoría se conservan
+                por integridad del negocio.
               </Text>
-            </View>
-            <Text style={styles.inputLabel}>Contraseña actual</Text>
-            <TextInput
-              autoCapitalize="none"
-              autoComplete="password"
-              onChangeText={setDeletePassword}
-              placeholder="Ingresa tu contraseña"
-              secureTextEntry
-              style={styles.input}
-              value={deletePassword}
-            />
-            <Text style={styles.inputLabel}>
-              Escribe ELIMINAR para confirmar
-            </Text>
-            <TextInput
-              autoCapitalize="characters"
-              autoCorrect={false}
-              onChangeText={setDeleteConfirmation}
-              placeholder="ELIMINAR"
-              style={styles.input}
-              value={deleteConfirmation}
-            />
-            {deleteAccountMutation.error ? (
-              <Text style={styles.deleteError}>
-                {deleteAccountMutation.error instanceof Error
-                  ? deleteAccountMutation.error.message
-                  : 'No pudimos borrar la cuenta.'}
+              <View style={styles.warningBox}>
+                <Text style={styles.warningText}>
+                  Si eres propietario, primero debes retirar colaboradores
+                  activos, cerrar Caja y resolver citas futuras. Al continuar,
+                  tu negocio y enlace de reservas quedarán cancelados.
+                </Text>
+              </View>
+              <Text style={styles.inputLabel}>Contraseña actual</Text>
+              <TextInput
+                autoCapitalize="none"
+                autoComplete="password"
+                onChangeText={setDeletePassword}
+                placeholder="Ingresa tu contraseña"
+                secureTextEntry
+                style={styles.input}
+                value={deletePassword}
+              />
+              <Text style={styles.inputLabel}>
+                Escribe ELIMINAR para confirmar
               </Text>
-            ) : null}
-            <View style={styles.modalActions}>
-              <Pressable
-                accessibilityRole="button"
-                disabled={deleteAccountMutation.isPending}
-                onPress={closeDeleteModal}
-                style={styles.cancelButton}
-              >
-                <Text style={styles.cancelLabel}>Cancelar</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                disabled={!canDelete || deleteAccountMutation.isPending}
-                onPress={() => deleteAccountMutation.mutate()}
-                style={[
-                  styles.confirmDeleteButton,
-                  (!canDelete || deleteAccountMutation.isPending) &&
-                    styles.disabled,
-                ]}
-              >
-                {deleteAccountMutation.isPending ? (
-                  <ActivityIndicator
-                    color={appTheme.colors.accentDark}
-                    size="small"
-                  />
-                ) : (
-                  <Ionicons color="#FFFFFF" name="trash-outline" size={18} />
-                )}
-                <Text style={styles.confirmDeleteLabel}>Borrar cuenta</Text>
-              </Pressable>
-            </View>
-          </ScrollView>
-        </View>
+              <TextInput
+                autoCapitalize="characters"
+                autoCorrect={false}
+                onChangeText={setDeleteConfirmation}
+                placeholder="ELIMINAR"
+                style={styles.input}
+                value={deleteConfirmation}
+              />
+              {deleteAccountMutation.error ? (
+                <Text style={styles.deleteError}>
+                  {deleteAccountMutation.error instanceof Error
+                    ? deleteAccountMutation.error.message
+                    : 'No pudimos borrar la cuenta.'}
+                </Text>
+              ) : null}
+              <View style={styles.modalActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={deleteAccountMutation.isPending}
+                  onPress={closeDeleteModal}
+                  style={styles.cancelButton}
+                >
+                  <Text style={styles.cancelLabel}>Cancelar</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={!canDelete || deleteAccountMutation.isPending}
+                  onPress={() => deleteAccountMutation.mutate()}
+                  style={[
+                    styles.confirmDeleteButton,
+                    (!canDelete || deleteAccountMutation.isPending) &&
+                      styles.disabled,
+                  ]}
+                >
+                  {deleteAccountMutation.isPending ? (
+                    <ActivityIndicator
+                      color={appTheme.colors.accentDark}
+                      size="small"
+                    />
+                  ) : (
+                    <Ionicons color="#FFFFFF" name="trash-outline" size={18} />
+                  )}
+                  <Text style={styles.confirmDeleteLabel}>Borrar cuenta</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -530,7 +548,6 @@ const styles = StyleSheet.create({
   deleteModal: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    maxHeight: '92%',
     maxWidth: 520,
     width: '100%',
   },
@@ -558,6 +575,7 @@ const styles = StyleSheet.create({
     marginBottom: 7,
     marginTop: 15,
   },
+  keyboardArea: { flex: 1 },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 20 },
   modalBackdrop: {
     alignItems: 'center',

@@ -79,7 +79,9 @@ export default function DailyReportScreen() {
         <IconButton
           label="Volver a reportes"
           name="arrow-back"
-          onPress={() => router.back()}
+          onPress={() =>
+            router.canGoBack() ? router.back() : router.replace('/reports')
+          }
         />
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={styles.title}>

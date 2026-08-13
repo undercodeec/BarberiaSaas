@@ -18,6 +18,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -66,6 +67,11 @@ export function BusinessLocationSheet({
   readonly visible: boolean;
 }) {
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
+  const sheetMaxHeight = Math.min(
+    Math.max(320, height - insets.top - 12),
+    Math.round(height * 0.91),
+  );
   const initial = initialCandidate(initialLocation);
   const [address, setAddress] = useState(
     initial?.formattedAddress ?? initialLocation?.addressLine ?? '',
@@ -292,6 +298,7 @@ export function BusinessLocationSheet({
   return (
     <Modal
       animationType="slide"
+      navigationBarTranslucent
       onRequestClose={dismissWithAnimation}
       statusBarTranslucent
       transparent
@@ -308,7 +315,8 @@ export function BusinessLocationSheet({
           style={[
             styles.sheet,
             {
-              paddingBottom: Math.max(insets.bottom, 20) + 16,
+              maxHeight: sheetMaxHeight,
+              paddingBottom: Math.max(insets.bottom, 12),
               transform: [{ translateY: sheetTranslateY }],
             },
           ]}
@@ -319,7 +327,9 @@ export function BusinessLocationSheet({
           <ScrollView
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
+            overScrollMode="never"
             showsVerticalScrollIndicator={false}
+            style={styles.scroll}
           >
             <Text accessibilityRole="header" style={styles.title}>
               Ubicación del negocio
@@ -523,14 +533,18 @@ const styles = StyleSheet.create({
     minHeight: 50,
   },
   secondaryLabel: { color: '#101C2D', fontSize: 15, fontWeight: '800' },
+  scroll: { flexShrink: 1 },
   sheet: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    maxHeight: '91%',
     paddingTop: 0,
   },
-  settingsButton: { alignSelf: 'flex-start', marginTop: 10, paddingVertical: 4 },
+  settingsButton: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    paddingVertical: 4,
+  },
   settingsLabel: { color: '#101C2D', fontSize: 13, fontWeight: '900' },
   success: { color: '#067647', fontSize: 13, fontWeight: '800', marginTop: 10 },
   suggestion: {

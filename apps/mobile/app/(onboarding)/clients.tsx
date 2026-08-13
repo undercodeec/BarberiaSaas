@@ -11,6 +11,7 @@ import { Redirect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
@@ -28,12 +29,14 @@ import {
   appTheme,
   BottomNavigation,
   goldShadow,
+  useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 export default function ClientsScreen() {
   const { session } = useAuth();
+  const layout = useNativeLayoutMetrics();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -187,7 +190,10 @@ export default function ClientsScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: layout.bottomInset + 84 },
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.step}>DIRECTORIO</Text>
@@ -317,7 +323,10 @@ export default function ClientsScreen() {
         accessibilityLabel="Agregar cliente"
         accessibilityRole="button"
         onPress={() => setIsCreateOpen(true)}
-        style={styles.floatingAdd}
+        style={[
+          styles.floatingAdd,
+          { bottom: layout.bottomInset + 84 },
+        ]}
       >
         <Ionicons color="#ffffff" name="add" size={29} />
       </Pressable>
@@ -341,6 +350,7 @@ export function ClientFormSheet({
   readonly visible: boolean;
 }) {
   const queryClient = useQueryClient();
+  const layout = useNativeLayoutMetrics();
   const [fullName, setFullName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
@@ -395,7 +405,18 @@ export function ClientFormSheet({
   };
 
   return (
-    <Modal animationType="slide" onRequestClose={close} transparent visible={visible}>
+    <Modal
+      animationType="slide"
+      navigationBarTranslucent
+      onRequestClose={close}
+      statusBarTranslucent
+      transparent
+      visible={visible}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalKeyboard}
+      >
       <View style={styles.overlay}>
         <Pressable
           accessibilityLabel="Cerrar formulario"
@@ -403,7 +424,15 @@ export function ClientFormSheet({
           onPress={close}
           style={styles.backdrop}
         />
-        <View style={styles.sheet}>
+        <View
+          style={[
+            styles.sheet,
+            {
+              maxHeight: layout.sheetMaxHeight,
+              paddingBottom: layout.bottomInset + 20,
+            },
+          ]}
+        >
           <View style={styles.sheetDragArea}>
             <View style={styles.handle} />
           </View>
@@ -473,6 +502,7 @@ export function ClientFormSheet({
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -675,6 +705,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
+  modalKeyboard: { flex: 1 },
   saveButton: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.accent,
@@ -703,7 +734,6 @@ const styles = StyleSheet.create({
     backgroundColor: appTheme.colors.surfaceMuted,
     borderTopLeftRadius: appTheme.radii.sheet,
     borderTopRightRadius: appTheme.radii.sheet,
-    maxHeight: '88%',
     paddingHorizontal: 24,
     paddingBottom: 38,
   },

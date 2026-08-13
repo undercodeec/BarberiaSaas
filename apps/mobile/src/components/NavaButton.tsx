@@ -40,10 +40,12 @@ export function NavaButton({
 
   return (
     <Pressable
+      android_ripple={{ color: 'rgba(180, 125, 23, 0.12)' }}
       accessibilityLabel={label}
       accessibilityRole="button"
       accessibilityState={{ busy: loading, disabled: isDisabled }}
       disabled={isDisabled}
+      hitSlop={4}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
@@ -61,6 +63,7 @@ export function NavaButton({
           <Ionicons color={foreground} name={icon} size={compact ? 23 : 27} />
           <Text
             adjustsFontSizeToFit
+            maxFontSizeMultiplier={1.3}
             minimumFontScale={0.65}
             numberOfLines={1}
             style={[
@@ -84,9 +87,10 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     gap: 10,
-    height: 72,
     justifyContent: 'center',
+    minHeight: 64,
     paddingHorizontal: 18,
+    paddingVertical: 10,
     shadowColor: NAVY,
     shadowOffset: { height: 2, width: 0 },
     shadowOpacity: 0.08,
@@ -102,9 +106,11 @@ const styles = StyleSheet.create({
   },
   disabled: { opacity: 0.55 },
   label: {
+    flexShrink: 1,
     fontFamily: 'sans-serif',
     fontSize: 17,
     fontWeight: '700',
+    textAlign: 'center',
   },
   outline: {
     backgroundColor: '#FFFFFF',

@@ -11,7 +11,9 @@ import { useMemo, useState } from 'react';
 import {
   Alert,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,6 +26,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   appTheme,
   goldButtonShadow,
+  useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -60,6 +63,7 @@ function movementLabel(type: string) {
 
 export default function InventoryScreen() {
   const { session } = useAuth();
+  const layout = useNativeLayoutMetrics();
   const router = useRouter();
   const queryClient = useQueryClient();
   const params = useLocalSearchParams<{ filter?: string }>();
@@ -278,7 +282,9 @@ export default function InventoryScreen() {
       <View style={styles.header}>
         <Pressable
           accessibilityLabel="Volver"
-          onPress={() => router.back()}
+          onPress={() =>
+            router.canGoBack() ? router.back() : router.replace('/dashboard')
+          }
           style={styles.headerButton}
         >
           <Ionicons color="#111827" name="arrow-back" size={24} />
@@ -521,6 +527,7 @@ export default function InventoryScreen() {
           onPress={() => resetProductForm()}
           style={({ pressed }) => [
             styles.floatingAddButton,
+            { bottom: layout.bottomInset + 12 },
             pressed && styles.pressed,
           ]}
         >
@@ -529,19 +536,28 @@ export default function InventoryScreen() {
       ) : null}
       <Modal
         animationType="slide"
+        navigationBarTranslucent
         onRequestClose={() => setIsSheetOpen(false)}
+        statusBarTranslucent
         transparent
         visible={isSheetOpen}
       >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalKeyboard}
+        >
         <View style={styles.overlay}>
           <Pressable
             onPress={() => setIsSheetOpen(false)}
             style={styles.backdrop}
           />
           <ScrollView
-            contentContainerStyle={styles.sheetContent}
+            contentContainerStyle={[
+              styles.sheetContent,
+              { paddingBottom: layout.bottomInset + 24 },
+            ]}
             keyboardShouldPersistTaps="handled"
-            style={styles.sheet}
+            style={[styles.sheet, { maxHeight: layout.sheetMaxHeight }]}
           >
             <View style={styles.handle} />
             {sheetMode === 'product' ? (
@@ -656,6 +672,7 @@ export default function InventoryScreen() {
             )}
           </ScrollView>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -955,11 +972,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   screen: { backgroundColor: '#F5F6F8', flex: 1 },
+  modalKeyboard: { flex: 1 },
   sheet: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    maxHeight: '88%',
   },
   sheetActions: { flexDirection: 'row', gap: 12, marginTop: 24 },
   sheetContent: { padding: 22, paddingBottom: 36 },

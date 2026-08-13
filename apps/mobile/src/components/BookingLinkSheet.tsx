@@ -12,6 +12,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { appTheme, goldButtonShadow } from './BottomNavigation';
 
@@ -30,6 +31,7 @@ export function BookingLinkSheet({
   url,
   visible,
 }: BookingLinkSheetProps) {
+  const insets = useSafeAreaInsets();
   const [copied, setCopied] = useState(false);
   const translateY = useRef(new Animated.Value(540)).current;
 
@@ -76,6 +78,7 @@ export function BookingLinkSheet({
   return (
     <Modal
       animationType="none"
+      navigationBarTranslucent
       onRequestClose={close}
       statusBarTranslucent
       transparent
@@ -90,7 +93,13 @@ export function BookingLinkSheet({
         />
         <Animated.View
           accessibilityViewIsModal
-          style={[styles.sheet, { transform: [{ translateY }] }]}
+          style={[
+            styles.sheet,
+            {
+              paddingBottom: Math.max(insets.bottom, 16),
+              transform: [{ translateY }],
+            },
+          ]}
         >
           <View style={styles.handle} />
           <Text accessibilityRole="header" style={styles.title}>
@@ -228,7 +237,6 @@ const styles = StyleSheet.create({
     backgroundColor: appTheme.colors.surfaceElevated,
     borderTopLeftRadius: appTheme.radii.sheet,
     borderTopRightRadius: appTheme.radii.sheet,
-    paddingBottom: 34,
     paddingHorizontal: 24,
     paddingTop: 12,
     ...goldButtonShadow,

@@ -12,9 +12,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NavaButton } from './NavaButton';
 
@@ -97,6 +98,12 @@ export function CollaboratorFormSheet({
   onSave,
   visible,
 }: CollaboratorFormSheetProps) {
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const sheetMaxHeight = Math.min(
+    Math.max(320, height - insets.top - 12),
+    Math.round(height * 0.91),
+  );
   const [photoUri, setPhotoUri] = useState<string | null>(
     initialValue?.photoUri ?? null,
   );
@@ -241,6 +248,7 @@ export function CollaboratorFormSheet({
   return (
     <Modal
       animationType="fade"
+      navigationBarTranslucent
       onRequestClose={close}
       statusBarTranslucent
       transparent
@@ -255,16 +263,19 @@ export function CollaboratorFormSheet({
         />
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           pointerEvents="box-none"
           style={styles.keyboardArea}
         >
-          <SafeAreaView edges={['bottom']} style={styles.sheet}>
+          <View style={[styles.sheet, { maxHeight: sheetMaxHeight }]}>
             <View style={styles.handle} />
             <ScrollView
               contentContainerStyle={styles.content}
+              keyboardDismissMode="on-drag"
               keyboardShouldPersistTaps="handled"
+              overScrollMode="never"
               showsVerticalScrollIndicator={false}
+              style={styles.scroll}
             >
               <View style={styles.header}>
                 <View>
@@ -581,7 +592,18 @@ export function CollaboratorFormSheet({
                   </Pressable>
                 </View>
               ) : null}
-
+            </ScrollView>
+            <View
+              style={[
+                styles.sheetFooter,
+                {
+                  paddingBottom: Math.max(
+                    insets.bottom,
+                    Platform.OS === 'android' ? 12 : 8,
+                  ),
+                },
+              ]}
+            >
               <NavaButton
                 disabled={isSaving || isDeleting}
                 icon="checkmark-outline"
@@ -591,8 +613,8 @@ export function CollaboratorFormSheet({
                 style={styles.saveButton}
                 variant="primary"
               />
-            </ScrollView>
-          </SafeAreaView>
+            </View>
+          </View>
         </KeyboardAvoidingView>
       </View>
     </Modal>
@@ -832,8 +854,7 @@ const styles = StyleSheet.create({
   saveButton: {
     flexBasis: 'auto',
     flexGrow: 0,
-    height: 66,
-    marginTop: 18,
+    height: 58,
     width: '100%',
   },
   select: {
@@ -852,12 +873,19 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
   },
+  scroll: { flexShrink: 1 },
   sheet: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-    maxHeight: '91%',
     overflow: 'hidden',
+  },
+  sheetFooter: {
+    backgroundColor: '#fff',
+    borderTopColor: '#e6e8eb',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 22,
+    paddingTop: 10,
   },
   subtitle: {
     color: '#667080',

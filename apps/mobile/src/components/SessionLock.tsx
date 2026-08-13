@@ -53,7 +53,7 @@ export function SessionLock({ children }: PropsWithChildren) {
       const result = await LocalAuthentication.authenticateAsync({
         biometricsSecurityLevel: 'strong',
         disableDeviceFallback: false,
-        promptMessage: 'Desbloquea Barberia para continuar',
+        promptMessage: 'Desbloquea Nava para continuar',
       });
 
       if (result.success) {
@@ -115,6 +115,7 @@ export function SessionLock({ children }: PropsWithChildren) {
       {children}
       <Modal
         animationType="fade"
+        navigationBarTranslucent
         onRequestClose={() => undefined}
         statusBarTranslucent
         transparent
@@ -126,7 +127,7 @@ export function SessionLock({ children }: PropsWithChildren) {
               Aplicacion bloqueada
             </Text>
             <Text style={styles.description}>
-              Verifica tu identidad para continuar usando Barberia.
+              Verifica tu identidad para continuar usando Nava.
             </Text>
             {unlockError ? (
               <Text style={styles.error}>{unlockError}</Text>

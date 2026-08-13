@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   appTheme,
   goldButtonShadow,
+  useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { InlineMessage } from '../../src/components/InlineMessage';
 import { requireApiClient } from '../../src/lib/api';
@@ -53,6 +54,7 @@ function percentage(value: number, total: number) {
 
 export default function BusinessSummaryScreen() {
   const router = useRouter();
+  const layout = useNativeLayoutMetrics();
   const { session } = useAuth();
   const [preset, setPreset] = useState<Preset>('this_month');
   const [locationId, setLocationId] = useState<string | null>(null);
@@ -285,7 +287,9 @@ export default function BusinessSummaryScreen() {
 
       <Modal
         animationType="fade"
+        navigationBarTranslucent
         onRequestClose={() => setIsFilterOpen(false)}
+        statusBarTranslucent
         transparent
         visible={isFilterOpen}
       >
@@ -294,7 +298,16 @@ export default function BusinessSummaryScreen() {
           onPress={() => setIsFilterOpen(false)}
           style={styles.modalBackdrop}
         >
-          <Pressable onPress={() => undefined} style={styles.filterSheet}>
+          <Pressable
+            onPress={() => undefined}
+            style={[
+              styles.filterSheet,
+              {
+                maxHeight: layout.sheetMaxHeight,
+                paddingBottom: layout.bottomInset + 16,
+              },
+            ]}
+          >
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>Filtrar resumen</Text>
             <Text style={styles.filterLabel}>Período</Text>
@@ -633,7 +646,6 @@ const styles = StyleSheet.create({
     backgroundColor: appTheme.colors.surfaceElevated,
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
-    maxHeight: '88%',
     paddingBottom: 28,
     paddingHorizontal: 20,
     paddingTop: 10,

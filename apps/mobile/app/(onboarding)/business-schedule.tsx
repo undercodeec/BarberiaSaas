@@ -25,6 +25,7 @@ import {
   appStyles,
   appTheme,
   goldButtonShadow,
+  useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -375,6 +376,7 @@ function ScheduleSheet({
   readonly onClose: () => void;
   readonly onSave: (day: BusinessScheduleDay) => void;
 }) {
+  const layout = useNativeLayoutMetrics();
   const [translateY] = useState(() => new Animated.Value(0));
   const [openingTime, setOpeningTime] = useState(() =>
     formatMinute(day.startMinute),
@@ -429,7 +431,9 @@ function ScheduleSheet({
   return (
     <Modal
       animationType="fade"
+      navigationBarTranslucent
       onRequestClose={closeAnimated}
+      statusBarTranslucent
       transparent
       visible
     >
@@ -439,7 +443,16 @@ function ScheduleSheet({
           onPress={closeAnimated}
           style={styles.sheetBackdrop}
         />
-        <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+        <Animated.View
+          style={[
+            styles.sheet,
+            {
+              maxHeight: layout.sheetMaxHeight,
+              paddingBottom: layout.bottomInset + 16,
+              transform: [{ translateY }],
+            },
+          ]}
+        >
           <View style={styles.sheetDragArea} {...panResponder.panHandlers}>
             <View style={styles.sheetHandle} />
           </View>

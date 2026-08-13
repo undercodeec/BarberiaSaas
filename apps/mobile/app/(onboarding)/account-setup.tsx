@@ -4,17 +4,14 @@ import { Redirect, useRouter } from 'expo-router';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { AccountSetupWelcomeScreen } from '../../src/components/AccountSetupWelcomeScreen';
-import {
-  appStyles,
-  appTheme,
-} from '../../src/components/BottomNavigation';
+import { appStyles, appTheme } from '../../src/components/BottomNavigation';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 export default function AccountSetupScreen() {
   const router = useRouter();
-  const { isLoading: isLoadingSession, session, user } = useAuth();
+  const { isLoading: isLoadingSession, session, signOut, user } = useAuth();
   const organizationQuery = useCurrentOrganization();
   const accountQuery = useQuery({
     enabled: Boolean(session),
@@ -36,11 +33,23 @@ export default function AccountSetupScreen() {
   if (!session || !user) return <Redirect href="/(auth)/login" />;
   if (organizationQuery.data) return <Redirect href="/dashboard" />;
 
+  const returnToHome = async () => {
+    try {
+      await signOut();
+    } catch {
+      // signOut limpia la sesión local en finally aunque la API no responda.
+    } finally {
+      // La raíz redirige sesiones incompletas al onboarding; cerrar la sesión
+      // permite que "Regresar al inicio" llegue realmente a la portada.
+      router.replace('/');
+    }
+  };
+
   return (
     <AccountSetupWelcomeScreen
       accountType={accountQuery.data?.accountType ?? 'professional'}
       fullName={user.fullName}
-      onBack={() => router.replace('/')}
+      onBack={() => void returnToHome()}
       onContinue={() => router.push('/(onboarding)/services')}
     />
   );

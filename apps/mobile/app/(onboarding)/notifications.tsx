@@ -63,7 +63,9 @@ export default function NotificationsScreen() {
       <View style={styles.header}>
         <Pressable
           accessibilityLabel="Volver"
-          onPress={() => router.back()}
+          onPress={() =>
+            router.canGoBack() ? router.back() : router.replace('/dashboard')
+          }
           style={styles.back}
         >
           <Ionicons color="#101c2d" name="chevron-back" size={24} />

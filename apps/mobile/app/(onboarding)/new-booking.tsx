@@ -61,7 +61,9 @@ export default function NewBookingScreen() {
       <View style={styles.header}>
         <Pressable
           accessibilityLabel="Salir"
-          onPress={() => router.back()}
+          onPress={() =>
+            router.canGoBack() ? router.back() : router.replace('/dashboard')
+          }
           style={styles.backButton}
         >
           <Ionicons color={appTheme.colors.icon} name="close" size={24} />
@@ -156,7 +158,12 @@ export default function NewBookingScreen() {
           <View style={styles.progressValue} />
         </View>
         <View style={styles.footerActions}>
-          <Pressable onPress={() => router.back()} style={styles.exitButton}>
+          <Pressable
+            onPress={() =>
+              router.canGoBack() ? router.back() : router.replace('/dashboard')
+            }
+            style={styles.exitButton}
+          >
             <Text style={styles.exitLabel}>Salir</Text>
           </Pressable>
           <Pressable

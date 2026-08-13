@@ -33,6 +33,7 @@ import {
   BottomNavigation,
   goldButtonShadow,
   goldShadow,
+  useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -168,6 +169,7 @@ function timelineMinutes(
 
 export default function AgendaScreen() {
   const { session } = useAuth();
+  const layout = useNativeLayoutMetrics();
   const router = useRouter();
   const queryClient = useQueryClient();
   const organizationQuery = useQuery({
@@ -722,7 +724,10 @@ export default function AgendaScreen() {
         ]}
       >
         <ScrollView
-          contentContainerStyle={styles.timelineContent}
+          contentContainerStyle={[
+            styles.timelineContent,
+            { paddingBottom: layout.bottomInset + 84 },
+          ]}
           showsVerticalScrollIndicator={false}
           style={styles.timelinePage}
         >
@@ -804,11 +809,21 @@ export default function AgendaScreen() {
 
       <Modal
         animationType="fade"
+        navigationBarTranslucent
         onRequestClose={() => setIsCalendarOpen(false)}
+        statusBarTranslucent
         transparent
         visible={isCalendarOpen}
       >
-        <View style={styles.calendarModalBackdrop}>
+        <View
+          style={[
+            styles.calendarModalBackdrop,
+            {
+              paddingBottom: layout.bottomInset,
+              paddingTop: layout.topInset,
+            },
+          ]}
+        >
           <View style={styles.calendarModal}>
             <View style={styles.calendarModalHeader}>
               <Pressable
@@ -922,7 +937,9 @@ export default function AgendaScreen() {
 
       <Modal
         animationType="fade"
+        navigationBarTranslucent
         onRequestClose={dismissAgendaSettings}
+        statusBarTranslucent
         transparent
         visible={isAgendaSettingsOpen}
       >
@@ -935,10 +952,16 @@ export default function AgendaScreen() {
             style={{ transform: [{ translateY: settingsSheetTranslateY }] }}
           >
             <ScrollView
-              contentContainerStyle={styles.settingsSheet}
+              contentContainerStyle={[
+                styles.settingsSheet,
+                { paddingBottom: layout.bottomInset + 8 },
+              ]}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
-              style={styles.settingsScroll}
+              style={[
+                styles.settingsScroll,
+                { maxHeight: layout.sheetMaxHeight },
+              ]}
             >
               <View
                 {...settingsSheetPanResponder.panHandlers}
@@ -1161,7 +1184,9 @@ export default function AgendaScreen() {
 
       <Modal
         animationType="fade"
+        navigationBarTranslucent
         onRequestClose={() => setSelectedAppointment(null)}
+        statusBarTranslucent
         transparent
         visible={Boolean(selectedAppointment)}
       >
@@ -1171,7 +1196,10 @@ export default function AgendaScreen() {
         >
           <Pressable
             onPress={(event) => event.stopPropagation()}
-            style={styles.appointmentModal}
+            style={[
+              styles.appointmentModal,
+              { paddingBottom: layout.bottomInset + 12 },
+            ]}
           >
             <View style={styles.modalHandle} />
             <Text style={styles.appointmentModalTitle}>
@@ -1281,7 +1309,9 @@ export default function AgendaScreen() {
 
       <Modal
         animationType="slide"
+        navigationBarTranslucent
         onRequestClose={() => setManualPaymentSheetOpen(false)}
+        statusBarTranslucent
         transparent
         visible={manualPaymentSheetOpen}
       >
@@ -1290,7 +1320,13 @@ export default function AgendaScreen() {
             onPress={() => setManualPaymentSheetOpen(false)}
             style={styles.appointmentModalBackdrop}
           />
-          <ScrollView contentContainerStyle={styles.paymentSheet}>
+          <ScrollView
+            contentContainerStyle={[
+              styles.paymentSheet,
+              { paddingBottom: layout.bottomInset + 20 },
+            ]}
+            style={{ maxHeight: layout.sheetMaxHeight }}
+          >
             <Text style={styles.appointmentModalTitle}>
               Confirmar cobro PayPhone
             </Text>
@@ -1680,7 +1716,6 @@ const styles = StyleSheet.create({
   },
   settingsScroll: {
     backgroundColor: appTheme.colors.surfaceElevated,
-    maxHeight: '88%',
     width: '100%',
   },
   settingsControlPressed: {

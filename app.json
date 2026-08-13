@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "bb058560-b0ef-4f73-ac66-91d6c2638cfc"
+      }
+    },
+    "android": {
+      "package": "com.undercodeec.barbersaas"
+    }
+  }
+}
