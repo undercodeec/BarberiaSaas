@@ -32,6 +32,7 @@
     "web": { "bundler": "metro" },
     "android": {
       "package": "com.barbersaas.mobile",
+      "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_CONTACTS"

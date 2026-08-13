@@ -462,6 +462,7 @@ export function RegistrationFlow() {
             >
               <View {...panResponder.panHandlers} style={s.handle} />
               <ScrollView
+                automaticallyAdjustKeyboardInsets
                 keyboardDismissMode="on-drag"
                 keyboardShouldPersistTaps="handled"
                 overScrollMode="never"
@@ -1171,6 +1172,7 @@ const s = StyleSheet.create({
   sheet: {
     backgroundColor: appTheme.colors.surfaceMuted,
     borderTopLeftRadius: appTheme.radii.sheet,
+    flexShrink: 1,
     borderTopRightRadius: appTheme.radii.sheet,
     overflow: 'hidden',
     ...goldShadow,

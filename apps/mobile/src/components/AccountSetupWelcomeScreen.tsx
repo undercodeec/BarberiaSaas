@@ -291,7 +291,6 @@ const styles = StyleSheet.create({
   },
   actionFooter: {
     alignItems: 'center',
-    backgroundColor: appTheme.colors.surfaceElevated,
     borderTopWidth: 0,
     paddingBottom: 8,
     paddingHorizontal: 22,

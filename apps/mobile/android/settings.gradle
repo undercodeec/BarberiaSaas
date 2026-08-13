@@ -37,3 +37,19 @@ expoAutolinking.useExpoVersionCatalog()
 
 include ':app'
 includeBuild(expoAutolinking.reactNativeGradlePlugin)
+
+// Register this before Android projects are evaluated. CMake 3.22 can enter a
+// build.ninja regeneration loop for React Native native modules on Windows.
+gradle.beforeProject { project ->
+  ["com.android.application", "com.android.library"].each { pluginId ->
+    project.plugins.withId(pluginId) {
+      project.android {
+        externalNativeBuild {
+          cmake {
+            version = "3.31.6"
+          }
+        }
+      }
+    }
+  }
+}

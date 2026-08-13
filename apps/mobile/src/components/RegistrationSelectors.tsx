@@ -3,7 +3,12 @@ import { City, Country } from 'country-state-city';
 import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, type NativeScrollEvent, type NativeSyntheticEvent, View } from 'react-native';
 import { useState } from 'react';
 
-import { useNativeLayoutMetrics } from './BottomNavigation';
+import {
+  appTheme,
+  goldButtonShadow,
+  useNativeLayoutMetrics,
+} from './BottomNavigation';
+import { NavaButton } from './NavaButton';
 
 export interface CountryOption {
   readonly code: string;
@@ -263,12 +268,22 @@ function TimeWheelModal({ label, onClose, onConfirm, value }: { readonly label: 
             {hour}:{minute}
           </Text>
           <View style={styles.timeActions}>
-            <Pressable onPress={onClose} style={styles.cancelButton}>
-              <Text style={styles.cancelText}>Cancelar</Text>
-            </Pressable>
-            <Pressable onPress={() => onConfirm(`${hour}:${minute}`)} style={styles.confirmButton}>
-              <Text style={styles.confirmText}>Confirmar</Text>
-            </Pressable>
+            <NavaButton
+              foregroundColor={appTheme.colors.accentDark}
+              icon="close-outline"
+              label="Cancelar"
+              onPress={onClose}
+              style={styles.timeActionButton}
+              variant="outline"
+            />
+            <NavaButton
+              foregroundColor={appTheme.colors.accentDark}
+              icon="checkmark-outline"
+              label="Confirmar"
+              onPress={() => onConfirm(`${hour}:${minute}`)}
+              style={styles.timeActionButton}
+              variant="outline"
+            />
           </View>
         </View>
       </View>
@@ -377,10 +392,16 @@ const styles = StyleSheet.create({
   },
   selectionText: { color: '#101c2d', flex: 1, fontSize: 16 },
   timeActions: { flexDirection: 'row', gap: 12, marginTop: 18 },
+  timeActionButton: {
+    backgroundColor: appTheme.colors.surface,
+    borderWidth: 0,
+    minHeight: 58,
+    ...goldButtonShadow,
+  },
   timeCard: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderTopLeftRadius: appTheme.radii.sheet,
+    borderTopRightRadius: appTheme.radii.sheet,
     paddingBottom: 24,
     paddingHorizontal: 22,
     paddingTop: 22,
@@ -401,8 +422,8 @@ const styles = StyleSheet.create({
   },
   wheelContent: { paddingVertical: 52 },
   wheelHighlight: {
-    backgroundColor: '#eaf0f7',
-    borderRadius: 14,
+    backgroundColor: appTheme.colors.accentWash,
+    borderRadius: appTheme.radii.control,
     height: 52,
     left: 0,
     position: 'absolute',
