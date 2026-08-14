@@ -309,13 +309,13 @@ export function BookingExperience({
                       className={`flex min-w-0 items-center gap-4 rounded-2xl border p-4 text-left transition ${
                         professionalId === item.id
                           ? 'border-[#B47D17] bg-[#EBD8AA] text-[#1C1C1C]'
-                          : 'border-black/10 hover:border-black/30'
+                          : 'border-[#E4E1DA] bg-white hover:border-[#C79532]'
                       }`}
                       key={item.id}
                       onClick={() => chooseProfessional(item.id)}
                       type="button"
                     >
-                      <span className="grid h-12 w-12 place-items-center rounded-full bg-[#ecebe6] font-black text-black">
+                      <span className="grid h-12 w-12 place-items-center rounded-full bg-[#F4F4F3] font-black text-[#1C1C1C]">
                         {item.name.slice(0, 1)}
                       </span>
                       <span className="min-w-0">
@@ -326,7 +326,7 @@ export function BookingExperience({
                           className={`mt-1 block truncate text-sm ${
                             professionalId === item.id
                               ? 'text-white/65'
-                              : 'text-black/50'
+                              : 'text-[#555A63]'
                           }`}
                         >
                           {item.bio || 'Profesional de Nava'}
@@ -357,8 +357,8 @@ export function BookingExperience({
                       <button
                         className={`flex w-full min-w-0 items-center justify-between gap-3 rounded-2xl border p-4 text-left ${
                           selected
-                            ? 'border-black bg-[#f0efe9]'
-                            : 'border-black/10'
+                            ? 'border-[#B47D17] bg-[#FFF9EE]'
+                            : 'border-[#E4E1DA] bg-white hover:border-[#C79532]'
                         }`}
                         key={service.id}
                         onClick={() => toggleService(service.id)}
@@ -377,7 +377,7 @@ export function BookingExperience({
                           ) : (
                             <span
                               aria-hidden="true"
-                              className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-[#ecebe6] text-xl"
+                              className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-[#F4F4F3] text-xl text-[#B47D17]"
                             >
                               S
                             </span>
@@ -385,7 +385,7 @@ export function BookingExperience({
                           <span className="block truncate font-black">
                             {service.name}
                           </span>
-                          <span className="mt-1 block truncate text-sm text-black/50">
+                          <span className="mt-1 block truncate text-sm text-[#555A63]">
                             {service.durationMinutes} min
                             {service.description
                               ? ` · ${service.description}`
@@ -428,7 +428,7 @@ export function BookingExperience({
                         className={`min-w-16 shrink-0 rounded-2xl border px-3 py-3 ${
                           selected
                             ? 'border-[#B47D17] bg-[#EBD8AA] text-[#1C1C1C]'
-                            : 'border-black/10'
+                            : 'border-[#E4E1DA] bg-white hover:border-[#C79532]'
                         }`}
                         key={dateKey(item)}
                         onClick={() => {
@@ -462,7 +462,7 @@ export function BookingExperience({
                         className={`min-w-0 rounded-xl border px-2 py-2.5 text-xs font-black transition sm:text-sm ${
                           selected
                             ? 'border-[#B47D17] bg-[#EBD8AA] text-[#1C1C1C]'
-                            : 'border-black/10 bg-white text-black hover:border-black/30'
+                            : 'border-[#E4E1DA] bg-white text-[#555A63] hover:border-[#C79532] hover:text-[#1C1C1C]'
                         }`}
                         key={option.id}
                         onClick={() => {
@@ -477,7 +477,7 @@ export function BookingExperience({
                   })}
                 </div>
                 {loading ? (
-                  <p className="py-8 text-center text-black/50">
+                  <p className="py-8 text-center text-[#555A63]">
                     Consultando disponibilidad...
                   </p>
                 ) : (
@@ -487,7 +487,7 @@ export function BookingExperience({
                         className={`w-full min-w-0 rounded-xl border px-2 py-3 text-sm font-black whitespace-nowrap ${
                           startsAt === slot.startsAt
                             ? 'border-[#B47D17] bg-[#EBD8AA] text-[#1C1C1C]'
-                            : 'border-black/10'
+                            : 'border-[#E4E1DA] bg-white hover:border-[#C79532]'
                         }`}
                         key={slot.startsAt}
                         onClick={() => setStartsAt(slot.startsAt)}
@@ -503,7 +503,7 @@ export function BookingExperience({
                   </div>
                 )}
                 {!loading && !visibleSlots.length ? (
-                  <p className="rounded-2xl bg-[#f4f3ef] p-5 text-center text-sm text-black/55">
+                  <p className="rounded-2xl bg-[#F4F4F3] p-5 text-center text-sm text-[#555A63]">
                     No hay horarios disponibles durante la{' '}
                     {TIME_OF_DAY_OPTIONS.find(
                       (item) => item.id === timeOfDay,
@@ -545,7 +545,7 @@ export function BookingExperience({
                     </span>
                     <div className="grid gap-2 sm:grid-cols-[210px_1fr]">
                       <select
-                        className="min-h-12 rounded-xl border border-black/15 bg-white px-3"
+                        className="min-h-12 rounded-xl border border-[#E4E1DA] bg-white px-3 outline-none focus:border-[#B47D17]"
                         onChange={(event) => setCountryCode(event.target.value)}
                         value={countryCode}
                       >
@@ -555,8 +555,8 @@ export function BookingExperience({
                           </option>
                         ))}
                       </select>
-                      <div className="flex min-h-12 items-center rounded-xl border border-black/15 px-3">
-                        <span className="border-r border-black/10 pr-3 text-sm font-bold">
+                      <div className="flex min-h-12 items-center rounded-xl border border-[#E4E1DA] px-3 focus-within:border-[#B47D17]">
+                        <span className="border-r border-[#E4E1DA] pr-3 text-sm font-bold">
                           +{selectedCountry?.phonecode}
                         </span>
                         <input
@@ -569,16 +569,16 @@ export function BookingExperience({
                       </div>
                     </div>
                   </label>
-                  <label className="flex cursor-pointer gap-3 rounded-2xl bg-[#f4f3ef] p-4">
+                  <label className="flex cursor-pointer gap-3 rounded-2xl bg-[#F4F4F3] p-4">
                     <input
                       checked={policyAccepted}
-                      className="mt-1 h-4 w-4 accent-black"
+                      className="mt-1 h-4 w-4 accent-[#B47D17]"
                       onChange={(event) =>
                         setPolicyAccepted(event.target.checked)
                       }
                       type="checkbox"
                     />
-                    <span className="text-sm leading-6 text-black/65">
+                    <span className="text-sm leading-6 text-[#555A63]">
                       {catalog.policy.policyText}
                     </span>
                   </label>
@@ -606,7 +606,7 @@ export function BookingExperience({
                 />
                 <input
                   autoComplete="one-time-code"
-                  className="mx-auto block w-full max-w-xs rounded-2xl border border-black/15 px-4 py-4 text-center text-3xl font-black tracking-[0.35em]"
+                  className="mx-auto block w-full max-w-xs rounded-2xl border border-[#E4E1DA] bg-[#FFFEFB] px-4 py-4 text-center text-3xl font-black tracking-[0.35em] outline-none focus:border-[#B47D17]"
                   inputMode="numeric"
                   maxLength={6}
                   onChange={(event) =>
@@ -617,7 +617,7 @@ export function BookingExperience({
                   value={verificationCode}
                 />
                 {developmentCode ? (
-                  <p className="mt-3 text-center text-xs text-black/40">
+                  <p className="mt-3 text-center text-xs text-[#555A63]">
                     Código local: {developmentCode}
                   </p>
                 ) : null}
@@ -632,33 +632,33 @@ export function BookingExperience({
 
             {step === 'confirmed' ? (
               <div className="py-8 text-center">
-                <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-black text-3xl text-white">
+                <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[#EBD8AA] text-3xl text-[#B47D17] shadow-[0_8px_20px_rgba(180,125,23,.14)]">
                   ✓
                 </span>
                 <h1 className="mt-6 text-4xl font-black tracking-[-0.04em]">
                   Cita agendada
                 </h1>
-                <p className="mx-auto mt-3 max-w-md text-black/55">
+                <p className="mx-auto mt-3 max-w-md text-[#555A63]">
                   Enviamos los detalles a tu correo. Conserva el enlace privado
                   para confirmar asistencia, reprogramar o cancelar.
                 </p>
                 {paymentUrl ? (
                   <a
-                    className="mt-7 inline-flex rounded-full bg-[#ffbd00] px-6 py-3 font-black text-black"
+                    className="mt-7 inline-flex min-h-12 items-center justify-center rounded-[17px] border border-white/40 bg-[linear-gradient(135deg,#C79532_0%,#E1B85B_50%,#B47D17_100%)] px-6 font-black text-white shadow-[0_10px_22px_rgba(180,125,23,.24)]"
                     href={paymentUrl}
                   >
                     Pagar ahora con PayPhone
                   </a>
                 ) : null}
                 {paymentUrl ? (
-                  <p className="mx-auto mt-3 max-w-md text-sm text-black/55">
+                  <p className="mx-auto mt-3 max-w-md text-sm text-[#555A63]">
                     El pago será verificado por el negocio. Conserva tu
                     comprobante de PayPhone.
                   </p>
                 ) : null}
                 {managementUrl ? (
                   <a
-                    className="mt-4 inline-flex rounded-full bg-black px-6 py-3 font-black text-white"
+                    className="mt-4 inline-flex min-h-12 items-center justify-center rounded-[17px] border border-[#E1B85B] bg-white px-6 font-black text-[#B47D17] shadow-[0_8px_18px_rgba(180,125,23,.09)]"
                     href={managementUrl}
                   >
                     Ver mi cita
@@ -879,7 +879,7 @@ function Progress({ step }: { step: Step }) {
   ];
   const value = Math.max(order.indexOf(step) + 1, 1);
   return (
-    <div className="mb-8 h-1.5 overflow-hidden rounded-full bg-black/8">
+    <div className="mb-8 h-1.5 overflow-hidden rounded-full bg-[#F1E7D0]">
       <div
         className="h-full rounded-full bg-[#C79532] transition-all"
         style={{ width: `${(value / order.length) * 100}%` }}
@@ -894,7 +894,7 @@ function Heading({ copy, title }: { copy: string; title: string }) {
       <h1 className="text-3xl font-black tracking-[-0.04em] sm:text-4xl">
         {title}
       </h1>
-      <p className="mt-2 text-black/50">{copy}</p>
+      <p className="mt-2 text-[#555A63]">{copy}</p>
     </div>
   );
 }
@@ -902,7 +902,7 @@ function Heading({ copy, title }: { copy: string; title: string }) {
 function Back({ onClick }: { onClick: () => void }) {
   return (
     <button
-      className="mb-6 text-sm font-black text-black/50 hover:text-black"
+      className="mb-6 text-sm font-black text-[#555A63] transition hover:text-[#B47D17]"
       onClick={onClick}
       type="button"
     >
@@ -922,7 +922,7 @@ function NextButton({
 }) {
   return (
     <button
-      className="mt-8 w-full rounded-2xl bg-[#E1B85B] px-5 py-4 font-black text-[#1C1C1C] shadow-[0_12px_24px_rgba(180,125,23,.12)] transition hover:bg-[#EBD8AA] disabled:cursor-not-allowed disabled:opacity-30"
+      className="mt-8 w-full min-h-14 rounded-[17px] border border-white/40 bg-[linear-gradient(135deg,#C79532_0%,#E1B85B_50%,#B47D17_100%)] px-5 py-4 font-black text-white shadow-[0_12px_24px_rgba(180,125,23,.2)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-30"
       disabled={disabled}
       onClick={onClick}
       type="button"
@@ -947,7 +947,7 @@ function Field({
     <label className="block">
       <span className="mb-2 block text-sm font-bold">{label}</span>
       <input
-        className="min-h-12 w-full rounded-xl border border-black/15 px-4 outline-none focus:border-black"
+        className="min-h-12 w-full rounded-xl border border-[#E4E1DA] bg-white px-4 outline-none transition focus:border-[#B47D17] focus:ring-4 focus:ring-[#EBD8AA]/35"
         onChange={(event) => onChange(event.target.value)}
         required
         type={type}
@@ -1045,7 +1045,7 @@ function PublicBookingLanding({
         onBook={startBooking}
         scrollProgress={heroScrollProgress}
       />
-      <div className="relative z-20 -mt-12 sm:-mt-16">
+      <div className="relative z-20 -mt-4 sm:-mt-6">
         <div className="sticky top-0 z-30 border-b border-[#E4E1DA] bg-[#FAF9F6]/95 shadow-[0_8px_24px_rgba(28,28,28,.05)] backdrop-blur">
           <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-5 lg:px-8">
             <div className="flex max-w-xl items-center gap-3">
@@ -1061,7 +1061,7 @@ function PublicBookingLanding({
               ) : (
                 <span
                   aria-hidden="true"
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#1C1C1C] text-base font-black text-white"
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#EBD8AA] text-base font-black text-[#B47D17] shadow-[0_5px_14px_rgba(180,125,23,.16)]"
                 >
                   {catalog.organization.name.slice(0, 1).toUpperCase()}
                 </span>
@@ -1089,7 +1089,7 @@ function PublicBookingLanding({
 
           <section className="py-7">
             <SectionHeading>Sobre nosotros</SectionHeading>
-            <p className="max-w-2xl text-sm leading-6 text-black/60 sm:text-base">
+            <p className="max-w-2xl text-sm leading-6 text-[#555A63] sm:text-base">
               {catalog.organization.name} es un espacio para cuidar tu estilo
               {catalog.location.city ? ` en ${catalog.location.city}` : ''}.
               Elige el servicio y el profesional que mejor se adapten a tu
@@ -1113,13 +1113,13 @@ function PublicBookingLanding({
             ) : null}
 
             <div className="mt-7">
-              <label className="flex min-h-11 items-center gap-3 rounded-xl border border-black/15 bg-white px-3">
-                <span aria-hidden="true" className="text-black/45">
+              <label className="flex min-h-11 items-center gap-3 rounded-xl border border-[#E4E1DA] bg-white px-3 shadow-[0_6px_16px_rgba(180,125,23,.04)] focus-within:border-[#B47D17]">
+                <span aria-hidden="true" className="text-[#B47D17]">
                   ⌕
                 </span>
                 <span className="sr-only">Buscar servicios</span>
                 <input
-                  className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-black/40"
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#8A8D92]"
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Buscar servicios..."
                   type="search"
@@ -1139,10 +1139,10 @@ function PublicBookingLanding({
                 ].map((category) => (
                   <button
                     aria-pressed={activeCategory === category.id}
-                    className={`min-h-9 shrink-0 rounded-full px-3 text-xs font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black ${
+                    className={`min-h-9 shrink-0 rounded-full border px-3 text-xs font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B47D17] ${
                       activeCategory === category.id
                         ? 'bg-[#EBD8AA] text-[#1C1C1C]'
-                        : 'bg-white text-black/60 hover:text-black'
+                        : 'border-[#E4E1DA] bg-white text-[#555A63] hover:border-[#C79532] hover:text-[#1C1C1C]'
                     }`}
                     key={category.id}
                     onClick={() => setActiveCategory(category.id)}
@@ -1168,7 +1168,7 @@ function PublicBookingLanding({
                 ))}
               </div>
             ) : (
-              <p className="mt-5 rounded-xl bg-white p-4 text-sm text-black/55">
+              <p className="mt-5 rounded-xl bg-white p-4 text-sm text-[#555A63]">
                 No encontramos servicios con esos filtros.
               </p>
             )}
@@ -1176,11 +1176,11 @@ function PublicBookingLanding({
 
           {catalog.products.length ? (
             <section
-              className="scroll-mt-20 border-t border-black/8 py-7"
+              className="scroll-mt-20 border-t border-[#E4E1DA] py-7"
               id="products"
             >
               <SectionHeading>Productos disponibles</SectionHeading>
-              <p className="-mt-2 mb-5 text-sm text-black/55">
+              <p className="-mt-2 mb-5 text-sm text-[#555A63]">
                 Puedes adquirirlos durante tu visita al local.
               </p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1196,14 +1196,14 @@ function PublicBookingLanding({
           ) : null}
 
           <section
-            className="scroll-mt-20 border-t border-black/8 py-7"
+            className="scroll-mt-20 border-t border-[#E4E1DA] py-7"
             id="team"
           >
             <SectionHeading>Colaboradores</SectionHeading>
             <div className="-mr-4 flex snap-x [scrollbar-width:none] gap-3 overflow-x-auto pr-4 pb-2 sm:-mr-5 sm:pr-5 lg:-mr-8 lg:pr-8">
               {catalog.professionals.map((professional) => (
                 <article
-                  className="min-w-36 snap-start rounded-xl border border-black/10 bg-white p-4 text-center"
+                  className="min-w-36 snap-start rounded-[20px] border border-[#E4E1DA] bg-white p-4 text-center shadow-[0_8px_20px_rgba(180,125,23,.05)]"
                   key={professional.id}
                 >
                   {professional.photoData ? (
@@ -1218,7 +1218,7 @@ function PublicBookingLanding({
                   ) : (
                     <span
                       aria-hidden="true"
-                      className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[#ecebe6] text-lg font-black"
+                      className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[#F4F4F3] text-lg font-black text-[#B47D17]"
                     >
                       {professional.name.slice(0, 1)}
                     </span>
@@ -1226,13 +1226,13 @@ function PublicBookingLanding({
                   <h3 className="mt-3 truncate text-sm font-black">
                     {professional.name}
                   </h3>
-                  <p className="mt-1 line-clamp-2 text-xs leading-4 text-black/50">
+                  <p className="mt-1 line-clamp-2 text-xs leading-4 text-[#555A63]">
                     {professional.bio || 'Profesional del equipo'}
                   </p>
                 </article>
               ))}
               {!catalog.professionals.length ? (
-                <p className="rounded-xl bg-white p-4 text-sm text-black/55">
+                <p className="rounded-xl bg-white p-4 text-sm text-[#555A63]">
                   Próximamente conocerás al equipo.
                 </p>
               ) : null}
@@ -1240,7 +1240,7 @@ function PublicBookingLanding({
           </section>
 
           <section
-            className="scroll-mt-20 border-t border-black/8 py-7"
+            className="scroll-mt-20 border-t border-[#E4E1DA] py-7"
             id="reviews"
           >
             <SectionHeading>Reseñas</SectionHeading>
@@ -1251,7 +1251,7 @@ function PublicBookingLanding({
           <BusinessInformation catalog={catalog} onNavigate={navigate} />
         </main>
       </div>
-      <footer className="border-t border-black/10 px-4 py-6 text-center text-xs text-black/45 sm:px-5">
+      <footer className="border-t border-[#E4E1DA] px-4 py-6 text-center text-xs text-[#555A63] sm:px-5">
         Desarrollado con Nava
         <br />© {new Date().getFullYear()} Nava. Todos los derechos reservados.
       </footer>
@@ -1274,7 +1274,7 @@ function BusinessHero({
   const coverImage = catalog.organization.coverImageUri;
   return (
     <section
-      className="relative isolate mx-auto h-[min(132vw,34rem)] min-h-96 max-w-6xl overflow-hidden bg-[#1C1C1C] shadow-[0_20px_56px_rgba(180,125,23,.16)] transition-opacity duration-150 sm:h-[31rem] sm:rounded-b-[2rem]"
+      className="relative isolate mx-auto h-[min(156vw,39rem)] min-h-[34rem] max-w-6xl overflow-hidden bg-[#574015] shadow-[0_20px_56px_rgba(180,125,23,.16)] transition-opacity duration-150 sm:h-[35rem] sm:rounded-b-[2rem]"
       style={{
         opacity: 1 - scrollProgress * 0.78,
         transform: `translateY(${scrollProgress * -16}px)`,
@@ -1292,14 +1292,14 @@ function BusinessHero({
       />
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-gradient-to-t from-[#1C1C1C]/90 via-[#1C1C1C]/38 to-[#1C1C1C]/16"
+        className="absolute inset-0 bg-gradient-to-t from-[#30230E]/94 via-[#4F3814]/48 to-[#4F3814]/12"
       />
-      <div className="absolute inset-x-0 bottom-0 p-5 text-white sm:p-8">
+      <div className="absolute inset-x-0 bottom-0 p-5 pb-9 text-white sm:p-8 sm:pb-11">
         <p className="text-xs font-black tracking-[0.18em] text-white/75 uppercase">
           {catalog.location.name}
         </p>
         <h2 className="sr-only">{catalog.organization.name}</h2>
-        <span className="mt-4 inline-flex rounded-full border border-[#EBD8AA]/70 bg-[#1C1C1C]/25 px-3 py-1 text-xs font-bold">
+        <span className="mt-4 inline-flex rounded-full border border-[#EBD8AA]/70 bg-[#FFF9EE]/15 px-3 py-1 text-xs font-bold">
           Barbería
         </span>
         <div className="mt-4 grid max-w-xl gap-2 text-sm text-white/85 sm:grid-cols-2">
@@ -1307,7 +1307,7 @@ function BusinessHero({
           <MetaItem icon="clock" value="Reservas online disponibles" />
         </div>
         <button
-          className="mt-5 min-h-11 rounded-full bg-[#E1B85B] px-5 text-sm font-black text-[#1C1C1C] shadow-[0_10px_22px_rgba(180,125,23,.28)] transition hover:bg-[#EBD8AA] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          className="mt-6 inline-flex min-h-13 items-center justify-center rounded-[17px] border border-white/45 bg-[linear-gradient(135deg,#C79532_0%,#E1B85B_50%,#B47D17_100%)] px-6 text-sm font-black text-white shadow-[0_12px_24px_rgba(180,125,23,.34)] transition hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           onClick={onBook}
           type="button"
         >
@@ -1353,10 +1353,10 @@ function SectionNavigation({
         {sections.map((section) => (
           <button
             aria-current={active === section.id ? 'page' : undefined}
-            className={`relative min-h-12 flex-1 text-sm font-bold transition focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-black ${
+            className={`relative min-h-12 flex-1 text-sm font-bold transition focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#B47D17] ${
               active === section.id
-                ? 'text-black'
-                : 'text-black/45 hover:text-black'
+                ? 'text-[#B47D17]'
+                : 'text-[#555A63] hover:text-[#1C1C1C]'
             }`}
             key={section.id}
             onClick={() => onSelect(section.id)}
@@ -1366,7 +1366,7 @@ function SectionNavigation({
             {active === section.id ? (
               <span
                 aria-hidden="true"
-                className="absolute inset-x-5 bottom-0 h-0.5 bg-black"
+                className="absolute inset-x-5 bottom-0 h-0.5 bg-[#C79532] shadow-[0_0_8px_rgba(225,184,91,.7)]"
               />
             ) : null}
           </button>
@@ -1392,7 +1392,7 @@ function SectionHeading({
       </h2>
       {action && onAction ? (
         <button
-          className="shrink-0 text-xs font-black text-black/60 hover:text-black focus-visible:outline-2 focus-visible:outline-black"
+          className="shrink-0 text-xs font-black text-[#B47D17] hover:text-[#956816] focus-visible:outline-2 focus-visible:outline-[#B47D17]"
           onClick={onAction}
           type="button"
         >
@@ -1413,8 +1413,8 @@ function FeaturedService({
   service: PublicBookingCatalog['services'][number];
 }) {
   return (
-    <article className="grid gap-4 rounded-2xl border border-black/10 bg-white p-3 shadow-[0_12px_36px_rgba(0,0,0,.06)] sm:grid-cols-[9rem_1fr] sm:p-4">
-      <div className="relative min-h-36 overflow-hidden rounded-xl bg-black sm:min-h-full">
+    <article className="grid gap-4 rounded-[20px] border border-[#E4E1DA] bg-white p-3 shadow-[0_12px_36px_rgba(180,125,23,.08)] sm:grid-cols-[9rem_1fr] sm:p-4">
+      <div className="relative min-h-36 overflow-hidden rounded-[16px] bg-[#F4F4F3] sm:min-h-full">
         <Image
           alt="Ambiente de barbería"
           className="object-cover"
@@ -1425,13 +1425,13 @@ function FeaturedService({
         />
       </div>
       <div className="min-w-0">
-        <p className="text-[11px] font-black tracking-[0.12em] text-black/45 uppercase">
+        <p className="text-[11px] font-black tracking-[0.12em] text-[#B47D17] uppercase">
           Reserva online
         </p>
         <div className="mt-1 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="truncate text-lg font-black">{service.name}</h3>
-            <p className="mt-1 line-clamp-2 text-sm leading-5 text-black/55">
+            <p className="mt-1 line-clamp-2 text-sm leading-5 text-[#555A63]">
               {service.description ||
                 'Un servicio preparado para tu próxima cita.'}
             </p>
@@ -1441,18 +1441,18 @@ function FeaturedService({
           </strong>
         </div>
         <div className="mt-4 flex items-center justify-between gap-3">
-          <span className="text-xs font-bold text-black/50">
+          <span className="text-xs font-bold text-[#555A63]">
             ◷ {service.durationMinutes} min
           </span>
           <button
-            className="min-h-10 rounded-lg bg-black px-4 text-sm font-black text-white transition hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+            className="min-h-10 rounded-[14px] border border-white/40 bg-[linear-gradient(135deg,#C79532_0%,#E1B85B_50%,#B47D17_100%)] px-4 text-sm font-black text-white shadow-[0_7px_16px_rgba(180,125,23,.18)] transition hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B47D17]"
             onClick={onBook}
             type="button"
           >
             Reservar
           </button>
         </div>
-        <p className="mt-3 border-t border-black/8 pt-3 text-xs text-black/45">
+        <p className="mt-3 border-t border-[#E4E1DA] pt-3 text-xs text-[#555A63]">
           Disponible para reservar online
         </p>
       </div>
@@ -1472,8 +1472,8 @@ function ServiceCard({
   service: PublicBookingCatalog['services'][number];
 }) {
   return (
-    <article className="grid min-h-32 grid-cols-[4.75rem_minmax(0,1fr)] gap-3 rounded-xl border border-black/10 bg-white p-3">
-      <div className="relative h-[6.5rem] w-[4.75rem] overflow-hidden rounded-lg bg-[#ecebe6]">
+    <article className="grid min-h-32 grid-cols-[4.75rem_minmax(0,1fr)] gap-3 rounded-[18px] border border-[#E4E1DA] bg-white p-3 shadow-[0_8px_20px_rgba(180,125,23,.05)]">
+      <div className="relative h-[6.5rem] w-[4.75rem] overflow-hidden rounded-[14px] bg-[#F4F4F3]">
         <Image
           alt={`Servicio ${service.name}`}
           className="object-cover"
@@ -1485,7 +1485,7 @@ function ServiceCard({
       </div>
       <div className="flex min-w-0 flex-col">
         {popular ? (
-          <span className="w-fit rounded-full bg-[#f4f3ef] px-2 py-0.5 text-[10px] font-bold text-black/55">
+          <span className="w-fit rounded-full bg-[#FFF4D9] px-2 py-0.5 text-[10px] font-bold text-[#956816]">
             Popular
           </span>
         ) : null}
@@ -1497,15 +1497,15 @@ function ServiceCard({
             {money(service.priceCents, currency)}
           </strong>
         </div>
-        <p className="mt-1 line-clamp-2 text-xs leading-4 text-black/50">
+        <p className="mt-1 line-clamp-2 text-xs leading-4 text-[#555A63]">
           {service.description || 'Servicio disponible para reserva online.'}
         </p>
         <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-          <span className="text-[11px] font-bold text-black/45">
+          <span className="text-[11px] font-bold text-[#555A63]">
             ◷ {service.durationMinutes} min
           </span>
           <button
-            className="min-h-8 rounded-md bg-black px-3 text-xs font-black text-white transition hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+            className="min-h-8 rounded-[10px] border border-white/40 bg-[linear-gradient(135deg,#C79532_0%,#E1B85B_50%,#B47D17_100%)] px-3 text-xs font-black text-white transition hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B47D17]"
             onClick={onBook}
             type="button"
           >
@@ -1525,8 +1525,8 @@ function ProductCard({
   product: PublicBookingCatalog['products'][number];
 }) {
   return (
-    <article className="overflow-hidden rounded-xl border border-black/10 bg-white">
-      <div className="relative aspect-[4/3] bg-[#ecebe6]">
+    <article className="overflow-hidden rounded-[18px] border border-[#E4E1DA] bg-white shadow-[0_8px_20px_rgba(180,125,23,.05)]">
+      <div className="relative aspect-[4/3] bg-[#F4F4F3]">
         {product.imageData ? (
           <Image
             alt={`Producto ${product.name}`}
@@ -1546,7 +1546,7 @@ function ProductCard({
         )}
       </div>
       <div className="p-4">
-        <p className="text-[10px] font-black tracking-[0.12em] text-black/45 uppercase">
+        <p className="text-[10px] font-black tracking-[0.12em] text-[#B47D17] uppercase">
           Producto
         </p>
         <h3 className="mt-1 truncate text-base font-black">{product.name}</h3>
@@ -1556,13 +1556,13 @@ function ProductCard({
             className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
               product.isAvailable
                 ? 'bg-emerald-50 text-emerald-700'
-                : 'bg-black/5 text-black/45'
+                : 'bg-[#F4F4F3] text-[#555A63]'
             }`}
           >
             {product.isAvailable ? 'Disponible' : 'Agotado'}
           </span>
         </div>
-        <p className="mt-3 text-xs leading-4 text-black/50">
+        <p className="mt-3 text-xs leading-4 text-[#555A63]">
           Disponible para comprar en el local.
         </p>
       </div>
@@ -1587,8 +1587,8 @@ function RatingsSummary({
         <p className="text-4xl font-black">
           {average ? average.toFixed(1) : '—'}
         </p>
-        <p className="mt-1 text-sm tracking-[0.12em] text-black/70">★★★★★</p>
-        <p className="mt-2 text-xs text-black/45">
+        <p className="mt-1 text-sm tracking-[0.12em] text-[#B47D17]">★★★★★</p>
+        <p className="mt-2 text-xs text-[#555A63]">
           {reviews.length} reseñas verificadas
         </p>
       </div>
@@ -1601,16 +1601,16 @@ function RatingsSummary({
             <span>{item.rating}★</span>
             <span
               aria-hidden="true"
-              className="h-1.5 overflow-hidden rounded-full bg-black/8"
+              className="h-1.5 overflow-hidden rounded-full bg-[#F1E7D0]"
             >
               <span
-                className="block h-full rounded-full bg-black"
+                className="block h-full rounded-full bg-[#C79532]"
                 style={{
                   width: `${reviews.length ? (item.count / reviews.length) * 100 : 0}%`,
                 }}
               />
             </span>
-            <span className="text-right text-black/45">{item.count}</span>
+            <span className="text-right text-[#555A63]">{item.count}</span>
           </div>
         ))}
       </div>
@@ -1626,21 +1626,21 @@ function FeaturedReview({
   const review = reviews.find((item) => item.comment) ?? reviews[0];
   if (!review) {
     return (
-      <p className="mt-4 rounded-xl border border-black/10 p-4 text-sm text-black/55">
+      <p className="mt-4 rounded-xl border border-[#E4E1DA] bg-white p-4 text-sm text-[#555A63]">
         Las reseñas verificadas aparecerán después de citas completadas.
       </p>
     );
   }
   return (
-    <blockquote className="mt-4 rounded-2xl border border-black/10 bg-white p-5">
-      <p aria-hidden="true" className="text-2xl leading-none text-black/35">
+    <blockquote className="mt-4 rounded-[20px] border border-[#E4E1DA] bg-white p-5 shadow-[0_8px_20px_rgba(180,125,23,.05)]">
+      <p aria-hidden="true" className="text-2xl leading-none text-[#C79532]">
         “
       </p>
       <p className="mt-2 text-base leading-7 font-bold">
         {review.comment || 'Gracias por confiar en nuestro equipo.'}
       </p>
-      <footer className="mt-4 text-sm text-black/55">
-        <strong className="text-black">{review.clientName}</strong> · cita con{' '}
+      <footer className="mt-4 text-sm text-[#555A63]">
+        <strong className="text-[#1C1C1C]">{review.clientName}</strong> · cita con{' '}
         {review.professionalName}
       </footer>
     </blockquote>
@@ -1658,11 +1658,11 @@ function BusinessInformation({
     .filter(Boolean)
     .join(', ');
   return (
-    <section className="border-t border-black/8 py-7">
+    <section className="border-t border-[#E4E1DA] py-7">
       <h2 className="text-xl font-black tracking-[-0.03em]">
         {catalog.organization.name}
       </h2>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-black/60">
+      <p className="mt-2 max-w-xl text-sm leading-6 text-[#555A63]">
         Reserva tu próximo servicio de forma simple y recibe la confirmación por
         correo.
       </p>
@@ -1671,21 +1671,21 @@ function BusinessInformation({
           <h3 className="font-black">Navegación</h3>
           <div className="mt-3 flex flex-col items-start gap-2">
             <button
-              className="text-black/60 hover:text-black"
+              className="text-[#555A63] hover:text-[#B47D17]"
               onClick={() => onNavigate('services')}
               type="button"
             >
               Servicios
             </button>
             <button
-              className="text-black/60 hover:text-black"
+              className="text-[#555A63] hover:text-[#B47D17]"
               onClick={() => onNavigate('team')}
               type="button"
             >
               Colaboradores
             </button>
             <button
-              className="text-black/60 hover:text-black"
+              className="text-[#555A63] hover:text-[#B47D17]"
               onClick={() => onNavigate('reviews')}
               type="button"
             >
@@ -1695,15 +1695,15 @@ function BusinessInformation({
         </div>
         <div>
           <h3 className="font-black">Más información</h3>
-          <p className="mt-3 flex gap-2 text-black/60">
+          <p className="mt-3 flex gap-2 text-[#555A63]">
             <span aria-hidden="true">•</span>
             {address || 'Ubicación por confirmar'}
           </p>
-          <p className="mt-2 flex gap-2 text-black/60">
+          <p className="mt-2 flex gap-2 text-[#555A63]">
             <span aria-hidden="true">◷</span>Reservas online disponibles
           </p>
           {catalog.location.phone ? (
-            <p className="mt-2 text-black/60">{catalog.location.phone}</p>
+            <p className="mt-2 text-[#555A63]">{catalog.location.phone}</p>
           ) : null}
         </div>
       </div>

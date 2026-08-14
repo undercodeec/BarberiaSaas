@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
     width: 31,
   },
   actionButton: {
-    backgroundColor: 'transparent',
+    backgroundColor: appTheme.colors.surface,
     borderWidth: 0,
     flexBasis: 'auto',
     flexGrow: 0,
@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   nextButton: {
-    backgroundColor: 'transparent',
+    backgroundColor: appTheme.colors.surface,
     borderWidth: 0,
     flexBasis: 'auto',
     flexGrow: 0,

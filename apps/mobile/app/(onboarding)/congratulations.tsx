@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   footer: {
-    backgroundColor: 'transparent',
+    backgroundColor: appTheme.colors.surfaceElevated,
     flexDirection: 'row',
     gap: 12,
     paddingHorizontal: 24,
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
   },
   helpRow: {
     alignItems: 'center',
-    backgroundColor: 'transparent',
+    backgroundColor: appTheme.colors.surface,
     borderColor: appTheme.colors.border,
     borderRadius: 18,
     borderWidth: 1,
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   homeButton: {
-    backgroundColor: 'transparent',
+    backgroundColor: appTheme.colors.surface,
     borderWidth: 0,
     flexBasis: 0,
     height: 58,
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
   linkValue: { color: appTheme.colors.text, flex: 1, fontSize: 14, fontWeight: '700' },
   openButton: {
     alignItems: 'center',
-    backgroundColor: 'transparent',
+    backgroundColor: appTheme.colors.surface,
     borderRadius: 13,
     justifyContent: 'center',
     minHeight: 42,
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   openLabel: { color: appTheme.colors.text, fontSize: 14, fontWeight: '900' },
   screen: appStyles.screen,
   shareButton: {
-    backgroundColor: 'transparent',
+    backgroundColor: appTheme.colors.surface,
     borderWidth: 0,
     flexBasis: 0,
     height: 58,
