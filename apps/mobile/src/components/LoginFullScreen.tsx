@@ -7,6 +7,7 @@ import { Controller, useForm } from 'react-hook-form';
 import {
   Image,
   ImageBackground,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,7 +18,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -37,13 +38,33 @@ export function LoginFullScreen() {
   const { inviteToken } = useLocalSearchParams<{ inviteToken?: string }>();
   const { signIn } = useAuth();
   const { height, width } = useWindowDimensions();
-  const compact = height < 760;
+  const scrollRef = useRef<ScrollView>(null);
+  const passwordInputRef = useRef<TextInput>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const compact = height < 760 || keyboardVisible;
   const [formError, setFormError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const { control, handleSubmit, formState } = useForm<SignInInput>({
     defaultValues: { email: '', password: '' },
     resolver: zodResolver(signInSchema),
   });
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', () =>
+      setKeyboardVisible(true),
+    );
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () =>
+      setKeyboardVisible(false),
+    );
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+  const keepFieldVisible = () => {
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ animated: true, y: 160 });
+    });
+  };
   const submit = handleSubmit(async (input) => {
     setFormError(null);
     try {
@@ -75,11 +96,18 @@ export function LoginFullScreen() {
         style={styles.safeArea}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboard}
         >
           <ScrollView
-            contentContainerStyle={[styles.content, { minHeight: height }]}
+            ref={scrollRef}
+            automaticallyAdjustKeyboardInsets
+            contentContainerStyle={[
+              styles.content,
+              { minHeight: height },
+              keyboardVisible ? styles.contentWithKeyboard : null,
+            ]}
+            keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
@@ -139,8 +167,11 @@ export function LoginFullScreen() {
                         keyboardType="email-address"
                         onBlur={field.onBlur}
                         onChangeText={field.onChange}
+                        onFocus={keepFieldVisible}
+                        onSubmitEditing={() => passwordInputRef.current?.focus()}
                         placeholder="correo@ejemplo.com"
                         placeholderTextColor={appTheme.colors.textMuted}
+                        returnKeyType="next"
                         style={styles.input}
                         value={field.value}
                       />
@@ -174,8 +205,12 @@ export function LoginFullScreen() {
                         autoComplete="current-password"
                         onBlur={field.onBlur}
                         onChangeText={field.onChange}
+                        onFocus={keepFieldVisible}
+                        onSubmitEditing={() => void submit()}
                         placeholder="Ingresa tu contraseña"
                         placeholderTextColor={appTheme.colors.textMuted}
+                        ref={passwordInputRef}
+                        returnKeyType="done"
                         secureTextEntry={!showPassword}
                         style={styles.input}
                         value={field.value}
@@ -272,6 +307,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 480,
   },
+  contentWithKeyboard: { paddingBottom: 56 },
   field: { marginBottom: 17 },
   fieldError: {
     color: appTheme.colors.dangerBorder,

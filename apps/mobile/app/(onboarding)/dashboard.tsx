@@ -22,11 +22,11 @@ import {
   Animated,
   Easing,
   Image,
+  KeyboardAvoidingView,
   Modal,
   PanResponder,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -43,6 +43,7 @@ import Svg, {
   Rect,
   Stop,
 } from 'react-native-svg';
+import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 
 import {
   appStyles,
@@ -1654,16 +1655,21 @@ export function LegacyLocationBannerSheet({
           onPress={dismissWithAnimation}
           style={styles.locationBackdrop}
         />
-        <Animated.View
-          {...panResponder.panHandlers}
-          style={[
-            styles.locationSheet,
-            {
-              paddingBottom: Math.max(insets.bottom, 12),
-              transform: [{ translateY: sheetTranslateY }],
-            },
-          ]}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          pointerEvents="box-none"
+          style={styles.locationKeyboardArea}
         >
+          <Animated.View
+            {...panResponder.panHandlers}
+            style={[
+              styles.locationSheet,
+              {
+                paddingBottom: Math.max(insets.bottom, 12),
+                transform: [{ translateY: sheetTranslateY }],
+              },
+            ]}
+          >
           <View style={styles.locationHandle} />
           <Text accessibilityRole="header" style={styles.locationTitle}>
             {'Ubicaci\u00f3n del negocio'}
@@ -1755,7 +1761,8 @@ export function LegacyLocationBannerSheet({
               </Text>
             </Pressable>
           </View>
-        </Animated.View>
+          </Animated.View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
@@ -2572,6 +2579,7 @@ const styles = StyleSheet.create({
     width: 36,
   },
   locationOverlay: { flex: 1, justifyContent: 'flex-end' },
+  locationKeyboardArea: { flex: 1, justifyContent: 'flex-end' },
   locationPrimaryButton: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surface,

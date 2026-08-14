@@ -15,11 +15,12 @@ import {
   Animated,
   Alert,
   Easing,
+  KeyboardAvoidingView,
   Linking,
   Modal,
   PanResponder,
+  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -35,6 +36,7 @@ import {
   goldShadow,
   useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
+import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -1315,7 +1317,10 @@ export default function AgendaScreen() {
         transparent
         visible={manualPaymentSheetOpen}
       >
-        <View style={styles.paymentSheetRoot}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.paymentSheetRoot}
+        >
           <Pressable
             onPress={() => setManualPaymentSheetOpen(false)}
             style={styles.appointmentModalBackdrop}
@@ -1426,7 +1431,7 @@ export default function AgendaScreen() {
               </Text>
             </Pressable>
           </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
       <Pressable
         accessibilityLabel="Crear cita"

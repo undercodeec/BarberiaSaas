@@ -3,7 +3,6 @@ import { Redirect, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -17,6 +16,7 @@ import {
   appTheme,
   goldShadow,
 } from '../../src/components/BottomNavigation';
+import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 
 import { useAuth } from '../../src/providers/AuthProvider';
 

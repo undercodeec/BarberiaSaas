@@ -11,6 +11,7 @@ import {
   Animated,
   Easing,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   PanResponder,
@@ -24,7 +25,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -102,6 +103,8 @@ export function RegistrationFlow() {
   const router = useRouter();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const sheetMaxHeight = Math.min(
     Math.max(320, height - insets.top - 12),
     Math.round(height * 0.86),
@@ -136,6 +139,29 @@ export function RegistrationFlow() {
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
   }, [step, verificationExpiresAt]);
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', () =>
+      setKeyboardVisible(true),
+    );
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () =>
+      setKeyboardVisible(false),
+    );
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+  const keepFocusedFieldVisible: NonNullable<TextInputProps['onFocus']> = (
+    event,
+  ) => {
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollResponderScrollNativeHandleToKeyboard(
+        event.target,
+        28,
+        true,
+      );
+    });
+  };
   const verificationExpired = remainingSeconds === 0;
   const defaultCountry =
     COUNTRIES.find((country) => country.code === countryCode) ?? COUNTRIES[0]!;
@@ -463,9 +489,13 @@ export function RegistrationFlow() {
               <View {...panResponder.panHandlers} style={s.handle} />
               <ScrollView
                 automaticallyAdjustKeyboardInsets
+                contentContainerStyle={
+                  keyboardVisible ? s.scrollContentWithKeyboard : undefined
+                }
                 keyboardDismissMode="on-drag"
                 keyboardShouldPersistTaps="handled"
                 overScrollMode="never"
+                ref={scrollRef}
                 showsVerticalScrollIndicator={false}
                 style={s.scroll}
               >
@@ -532,6 +562,7 @@ export function RegistrationFlow() {
                                 label="Nombre"
                                 onBlur={field.onBlur}
                                 onChangeText={field.onChange}
+                                onFocus={keepFocusedFieldVisible}
                                 value={field.value}
                               />
                             )}
@@ -552,6 +583,7 @@ export function RegistrationFlow() {
                                   clearErrors('businessName');
                                   field.onChange(value);
                                 }}
+                                onFocus={keepFocusedFieldVisible}
                                 value={field.value}
                               />
                             )}
@@ -571,6 +603,7 @@ export function RegistrationFlow() {
                                   clearErrors('phone');
                                   field.onChange(value);
                                 }}
+                                onFocus={keepFocusedFieldVisible}
                                 value={field.value}
                               />
                             )}
@@ -684,6 +717,7 @@ export function RegistrationFlow() {
                                   clearErrors('email');
                                   field.onChange(value);
                                 }}
+                                onFocus={keepFocusedFieldVisible}
                                 value={field.value}
                               />
                             )}
@@ -698,6 +732,7 @@ export function RegistrationFlow() {
                                 label="Contraseña"
                                 onBlur={field.onBlur}
                                 onChangeText={field.onChange}
+                                onFocus={keepFocusedFieldVisible}
                                 secureTextEntry
                                 value={field.value}
                               />
@@ -713,6 +748,7 @@ export function RegistrationFlow() {
                                 label="Confirmar contraseña"
                                 onBlur={field.onBlur}
                                 onChangeText={field.onChange}
+                                onFocus={keepFocusedFieldVisible}
                                 secureTextEntry
                                 value={field.value}
                               />
@@ -821,6 +857,7 @@ export function RegistrationFlow() {
                               onChangeText={(code) =>
                                 setVerificationCode(code.replace(/\D/g, ''))
                               }
+                              onFocus={keepFocusedFieldVisible}
                               placeholder="000000"
                               placeholderTextColor={appTheme.colors.textMuted}
                               style={verificationStyles.codeInput}
@@ -1154,6 +1191,7 @@ const s = StyleSheet.create({
   roleButtons: { flexDirection: 'row', gap: 14, marginTop: 24 },
   roleContent: { paddingBottom: 8, paddingHorizontal: 20 },
   scroll: { flexShrink: 1 },
+  scrollContentWithKeyboard: { paddingBottom: 40 },
   scissors: {
     color: appTheme.colors.accentDark,
     fontSize: 29,

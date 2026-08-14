@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   continueButton: {
-    backgroundColor: appTheme.colors.surface,
+    backgroundColor: 'transparent',
     borderWidth: 0,
     flexBasis: 'auto',
     flexGrow: 0,

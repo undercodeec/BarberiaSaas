@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
     width: 31,
   },
   actionButton: {
-    backgroundColor: appTheme.colors.surface,
+    backgroundColor: 'transparent',
     borderWidth: 0,
     flexBasis: 'auto',
     flexGrow: 0,
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   footer: {
-    backgroundColor: appTheme.colors.surfaceElevated,
+    backgroundColor: 'transparent',
     borderTopWidth: 0,
     flexShrink: 0,
     paddingHorizontal: 24,
@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   nextButton: {
-    backgroundColor: appTheme.colors.surface,
+    backgroundColor: 'transparent',
     borderWidth: 0,
     flexBasis: 'auto',
     flexGrow: 0,

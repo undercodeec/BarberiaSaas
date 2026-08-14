@@ -10,11 +10,12 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  KeyboardAvoidingView,
   Linking,
   Modal,
   PanResponder,
+  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -24,6 +25,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { requireApiClient } from '../lib/api';
+import { KeyboardAwareScrollView as ScrollView } from './KeyboardAwareScrollView';
 import { BusinessLocationMap, type MapCoordinate } from './BusinessLocationMap';
 import { appTheme, goldButtonShadow } from './BottomNavigation';
 
@@ -311,16 +313,21 @@ export function BusinessLocationSheet({
           onPress={dismissWithAnimation}
           style={styles.backdrop}
         />
-        <Animated.View
-          style={[
-            styles.sheet,
-            {
-              maxHeight: sheetMaxHeight,
-              paddingBottom: Math.max(insets.bottom, 12),
-              transform: [{ translateY: sheetTranslateY }],
-            },
-          ]}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          pointerEvents="box-none"
+          style={styles.keyboardArea}
         >
+          <Animated.View
+            style={[
+              styles.sheet,
+              {
+                maxHeight: sheetMaxHeight,
+                paddingBottom: Math.max(insets.bottom, 12),
+                transform: [{ translateY: sheetTranslateY }],
+              },
+            ]}
+          >
           <View {...panResponder.panHandlers} style={styles.dragArea}>
             <View style={styles.handle} />
           </View>
@@ -449,7 +456,8 @@ export function BusinessLocationSheet({
               </Text>
             </Pressable>
           </View>
-        </Animated.View>
+          </Animated.View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
@@ -492,6 +500,7 @@ const styles = StyleSheet.create({
     gap: 9,
     paddingHorizontal: 14,
   },
+  keyboardArea: { flex: 1, justifyContent: 'flex-end' },
   locateButton: {
     alignItems: 'center',
     alignSelf: 'flex-start',

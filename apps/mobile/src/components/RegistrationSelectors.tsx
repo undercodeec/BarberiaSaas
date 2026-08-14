@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { City, Country } from 'country-state-city';
-import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, type NativeScrollEvent, type NativeSyntheticEvent, View } from 'react-native';
+import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, type NativeScrollEvent, type NativeSyntheticEvent, type TextInputProps, View } from 'react-native';
 import { useState } from 'react';
 
 import {
@@ -50,7 +50,7 @@ export function detectCountryCode() {
   }
 }
 
-export function PhoneCountryField({ countryCode, error, onChangeCountry, onChangeText, value }: { readonly countryCode: string; readonly error?: string | undefined; readonly onChangeCountry: (code: string) => void; readonly onChangeText: (value: string) => void; readonly value: string }) {
+export function PhoneCountryField({ countryCode, error, onChangeCountry, onChangeText, onFocus, value }: { readonly countryCode: string; readonly error?: string | undefined; readonly onChangeCountry: (code: string) => void; readonly onChangeText: (value: string) => void; readonly onFocus?: TextInputProps['onFocus']; readonly value: string }) {
   const [open, setOpen] = useState(false);
   const country = COUNTRIES.find((item) => item.code === countryCode) ?? COUNTRIES[0]!;
   return (
@@ -62,7 +62,7 @@ export function PhoneCountryField({ countryCode, error, onChangeCountry, onChang
           <Text style={styles.dial}>{country.dial}</Text>
           <Ionicons color="#667080" name="chevron-down" size={18} />
         </Pressable>
-        <TextInput accessibilityLabel="Número telefónico" keyboardType="phone-pad" onChangeText={onChangeText} placeholder="Número telefónico" placeholderTextColor="#98a0ab" style={styles.phoneInput} value={value} />
+        <TextInput accessibilityLabel="Número telefónico" keyboardType="phone-pad" onChangeText={onChangeText} onFocus={onFocus} placeholder="Número telefónico" placeholderTextColor="#98a0ab" style={styles.phoneInput} value={value} />
       </View>
       {error ? (
         <Text accessibilityRole="alert" style={styles.error}>

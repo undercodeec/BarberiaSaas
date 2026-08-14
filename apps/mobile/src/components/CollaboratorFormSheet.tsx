@@ -8,7 +8,6 @@ import {
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -18,6 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NavaButton } from './NavaButton';
+import { KeyboardAwareScrollView as ScrollView } from './KeyboardAwareScrollView';
 
 type CollaboratorRole = 'administrator' | 'barber' | 'custom';
 
