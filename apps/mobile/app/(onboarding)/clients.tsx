@@ -72,29 +72,6 @@ function normalizedPhone(value: string | undefined) {
   return digits.length >= 5 ? digits : null;
 }
 
-function csvCell(value: string | null) {
-  return `"${(value ?? '').replace(/"/gu, '""')}"`;
-}
-
-function clientsCsv(clients: readonly ClientRecord[]) {
-  return [
-    'Nombre,Apellido,Teléfono,Correo,Dirección,Documento,Notas',
-    ...clients.map((client) =>
-      [
-        client.fullName,
-        client.lastName,
-        client.phone,
-        client.email,
-        client.addressLine,
-        client.documentNumber,
-        client.notes,
-      ]
-        .map(csvCell)
-        .join(','),
-    ),
-  ].join('\n');
-}
-
 export default function ClientsScreen() {
   const { session } = useAuth();
   const layout = useNativeLayoutMetrics();
@@ -249,7 +226,7 @@ export default function ClientsScreen() {
     } finally {
       setIsImporting(false);
     }
-  }, [openDialog, queryClient]);
+  }, [openDialog]);
   const selectedImportContacts = useMemo(() => {
     const selectedIds = new Set(selectedImportContactIds);
     return importCandidates.filter((contact) => selectedIds.has(contact.id));

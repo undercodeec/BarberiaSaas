@@ -80,6 +80,7 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+def googleMapsAndroidApiKey = System.getenv("GOOGLE_MAPS_ANDROID_API_KEY") ?: findProperty("GOOGLE_MAPS_ANDROID_API_KEY") ?: ""
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -94,6 +95,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "0.1.0"
+        manifestPlaceholders = [GOOGLE_MAPS_ANDROID_API_KEY: googleMapsAndroidApiKey]
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }

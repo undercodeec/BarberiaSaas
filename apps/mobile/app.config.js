@@ -19,6 +19,7 @@ module.exports = ({ config }) => {
     name: config.name ?? 'Nava',
     plugins: [
       ...(config.plugins ?? []),
+      'expo-font',
       [
         'expo-location',
         {
