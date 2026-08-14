@@ -81,6 +81,13 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 def googleMapsAndroidApiKey = System.getenv("GOOGLE_MAPS_ANDROID_API_KEY") ?: findProperty("GOOGLE_MAPS_ANDROID_API_KEY") ?: ""
+def uploadStoreFile = findProperty('NAVA_UPLOAD_STORE_FILE')
+def hasUploadSigning = [
+    uploadStoreFile,
+    findProperty('NAVA_UPLOAD_KEY_ALIAS'),
+    findProperty('NAVA_UPLOAD_STORE_PASSWORD'),
+    findProperty('NAVA_UPLOAD_KEY_PASSWORD'),
+].every { it != null && !it.toString().trim().isEmpty() }
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -93,7 +100,7 @@ android {
         applicationId 'com.barbersaas.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        versionCode((findProperty('NAVA_VERSION_CODE') ?: '22').toInteger())
         versionName "0.1.0"
         manifestPlaceholders = [GOOGLE_MAPS_ANDROID_API_KEY: googleMapsAndroidApiKey]
 
@@ -106,15 +113,28 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            if (hasUploadSigning) {
+                storeFile file(uploadStoreFile)
+                storePassword findProperty('NAVA_UPLOAD_STORE_PASSWORD')
+                keyAlias findProperty('NAVA_UPLOAD_KEY_ALIAS')
+                keyPassword findProperty('NAVA_UPLOAD_KEY_PASSWORD')
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            if (hasUploadSigning) {
+                signingConfig signingConfigs.release
+            } else if (System.getenv('EAS_BUILD') == 'true') {
+                // EAS replaces the signing config with its managed credentials.
+                signingConfig signingConfigs.debug
+            } else {
+                throw new GradleException('Faltan las propiedades NAVA_UPLOAD_* para firmar el AAB de lanzamiento.')
+            }
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
