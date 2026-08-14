@@ -13,21 +13,24 @@ import type {
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  FlatList,
   KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
   Pressable,
-  Share,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as XLSX from 'xlsx';
 
 import {
   appStyles,
@@ -38,16 +41,31 @@ import {
 } from '../../src/components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { requireApiClient } from '../../src/lib/api';
-import {
-  normalizeClientRecord,
-  normalizeClientsResponse,
-} from '../../src/lib/client-record';
+import { normalizeClientsResponse } from '../../src/lib/client-record';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const CONTACT_IMPORT_FIELDS = [
   ContactField.FULL_NAME,
   ContactField.PHONES,
 ] as const;
+
+type ContactsDialogAction = {
+  readonly label: string;
+  readonly onPress?: () => void;
+  readonly tone?: 'default' | 'destructive';
+};
+
+type ContactsDialogState = {
+  readonly actions?: readonly ContactsDialogAction[];
+  readonly message: string;
+  readonly title: string;
+};
+
+type ImportContactCandidate = {
+  readonly fullName: string;
+  readonly id: string;
+  readonly phone: string;
+};
 
 function normalizedPhone(value: string | undefined) {
   const digits = value?.replace(/\D/gu, '') ?? '';
@@ -86,11 +104,32 @@ export default function ClientsScreen() {
   const [activeLabelId, setActiveLabelId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isContactImportOpen, setIsContactImportOpen] = useState(false);
+  const [importCandidates, setImportCandidates] = useState<
+    readonly ImportContactCandidate[]
+  >([]);
+  const [selectedImportContactIds, setSelectedImportContactIds] = useState<
+    string[]
+  >([]);
   const [isDeletingSelected, setIsDeletingSelected] = useState(false);
+  const [deletionProgress, setDeletionProgress] = useState<{
+    readonly completed: number;
+    readonly total: number;
+  } | null>(null);
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
+  const didLongPressClient = useRef(false);
+  const [dialog, setDialog] = useState<ContactsDialogState | null>(null);
+  const openDialog = useCallback(
+    (
+      title: string,
+      message: string,
+      actions?: readonly ContactsDialogAction[],
+    ) => setDialog(actions ? { actions, message, title } : { message, title }),
+    [],
+  );
   const importContacts = useCallback(async () => {
     if (Platform.OS === 'web') {
-      Alert.alert(
+      openDialog(
         'Importaci?n disponible en el tel?fono',
         'Por privacidad, los contactos solo se pueden sincronizar desde Android o iPhone.',
       );
@@ -105,19 +144,19 @@ export default function ClientsScreen() {
 
       if (permission.status !== 'granted') {
         if (!permission.canAskAgain) {
-          Alert.alert(
+          openDialog(
             'Permiso de contactos desactivado',
             'Activa Contactos para Nava desde los ajustes del telefono.',
             [
-              { style: 'cancel', text: 'Ahora no' },
+              { label: 'Ahora no' },
               {
+                label: 'Abrir ajustes',
                 onPress: () => void Linking.openSettings(),
-                text: 'Abrir ajustes',
               },
             ],
           );
         } else {
-          Alert.alert(
+          openDialog(
             'Permiso necesario',
             'Toca Importar contactos nuevamente y permite el acceso cuando aparezca la ventana del telefono.',
           );
@@ -125,34 +164,21 @@ export default function ClientsScreen() {
         return;
       }
     } catch {
-      Alert.alert(
+      openDialog(
         'No pudimos solicitar el permiso',
         'Revisa el permiso de Contactos para Nava en los ajustes del telefono.',
         [
-          { style: 'cancel', text: 'Cerrar' },
-          { onPress: () => void Linking.openSettings(), text: 'Abrir ajustes' },
+          { label: 'Cerrar' },
+          { label: 'Abrir ajustes', onPress: () => void Linking.openSettings() },
         ],
       );
       return;
     }
     setIsImporting(true);
     try {
-      const supportsMultipleNativeSelection =
-        Platform.OS === 'ios' &&
-        Number.parseInt(String(Platform.Version), 10) >= 18;
-      const selectedContacts = supportsMultipleNativeSelection
-        ? await Contact.presentAccessPicker()
-        : [await Contact.presentPicker()].filter(
-            (contact): contact is Contact => contact !== null,
-          );
-      if (!selectedContacts.length) return;
-      const contacts = await Promise.all(
-        selectedContacts.map((contact) =>
-          contact.getDetails(CONTACT_IMPORT_FIELDS),
-        ),
-      );
+      const contacts = await Contact.getAllDetails(CONTACT_IMPORT_FIELDS);
       if (!contacts.length) {
-        Alert.alert(
+        openDialog(
           'Contactos importados',
           'No encontramos contactos en tu telÃ©fono para importar.',
         );
@@ -176,8 +202,20 @@ export default function ClientsScreen() {
           return [];
         }
         knownPhones.add(phoneKey);
-        return [{ fullName, phone }];
+        return [{ fullName, id: contact.id, phone }];
       });
+      if (!importable.length) {
+        openDialog(
+          'Contactos disponibles',
+          'No encontramos contactos nuevos con nombre y teléfono para importar.',
+        );
+        return;
+      }
+      setImportCandidates(importable);
+      setSelectedImportContactIds(importable.map((contact) => contact.id));
+      setIsContactImportOpen(true);
+      return;
+      /* Legacy single-picker import flow retained only for source history.
       const importedClients: ClientRecord[] = [];
       for (const contact of importable) {
         const response = await requireApiClient().request<{
@@ -193,24 +231,97 @@ export default function ClientsScreen() {
         if (!importedClient) {
           throw new Error('El contacto importado no recibió datos válidos.');
         }
-        importedClients.push(importedClient);
+        importedClients.push(importedClient!);
       }
       await queryClient.invalidateQueries({ queryKey: ['clients'] });
-      Alert.alert(
+      openDialog(
         'Contactos importados',
         importedClients.length
           ? 'Tus contactos ya est?n disponibles en Nava.'
           : 'No encontramos contactos con nombre y tel?fono para importar.',
       );
+      */
     } catch (error) {
-      Alert.alert(
+      openDialog(
         'No pudimos importar los contactos',
         error instanceof Error ? error.message : 'Int?ntalo nuevamente.',
       );
     } finally {
       setIsImporting(false);
     }
-  }, [queryClient]);
+  }, [openDialog, queryClient]);
+  const selectedImportContacts = useMemo(() => {
+    const selectedIds = new Set(selectedImportContactIds);
+    return importCandidates.filter((contact) => selectedIds.has(contact.id));
+  }, [importCandidates, selectedImportContactIds]);
+  const toggleImportContact = useCallback((contactId: string) => {
+    setSelectedImportContactIds((current) =>
+      current.includes(contactId)
+        ? current.filter((id) => id !== contactId)
+        : [...current, contactId],
+    );
+  }, []);
+  const toggleAllImportContacts = useCallback(() => {
+    setSelectedImportContactIds((current) =>
+      current.length === importCandidates.length
+        ? []
+        : importCandidates.map((contact) => contact.id),
+    );
+  }, [importCandidates]);
+  const importSelectedContacts = useCallback(async () => {
+    if (!selectedImportContacts.length) return;
+    let nextContactIndex = 0;
+    let importedCount = 0;
+    const failureMessages: string[] = [];
+    setIsImporting(true);
+    try {
+      const importContact = async () => {
+        while (true) {
+          const contact = selectedImportContacts[nextContactIndex];
+          nextContactIndex += 1;
+          if (!contact) return;
+          try {
+            await requireApiClient().request<{ readonly client: ClientRecord }>(
+              '/v1/clients',
+              {
+                body: { fullName: contact.fullName, phone: contact.phone },
+                method: 'POST',
+              },
+            );
+            importedCount += 1;
+          } catch (error) {
+            failureMessages.push(
+              `${contact.fullName}: ${
+                error instanceof Error ? error.message : 'Error desconocido.'
+              }`,
+            );
+          }
+        }
+      };
+      await Promise.all(
+        Array.from(
+          { length: Math.min(4, selectedImportContacts.length) },
+          () => importContact(),
+        ),
+      );
+      await queryClient.invalidateQueries({ queryKey: ['clients'] });
+      setIsContactImportOpen(false);
+      setImportCandidates([]);
+      setSelectedImportContactIds([]);
+      openDialog(
+        failureMessages.length ? 'Importación parcial' : 'Contactos importados',
+        failureMessages.length
+          ? `${importedCount} importados. ${failureMessages.length} no pudieron importarse.\n\n${failureMessages
+              .slice(0, 2)
+              .join('\n')}`
+          : `${importedCount} contacto${
+              importedCount === 1 ? '' : 's'
+            } importado${importedCount === 1 ? '' : 's'} correctamente.`,
+      );
+    } finally {
+      setIsImporting(false);
+    }
+  }, [openDialog, queryClient, selectedImportContacts]);
   const clientsQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<ClientsResponse>('/v1/clients'),
@@ -244,6 +355,12 @@ export default function ClientsScreen() {
     );
   }, [clientsQuery.data?.clients, selectedClientIds]);
   const isSelectingClients = selectedClients.length > 0;
+  const areAllVisibleClientsSelected =
+    visibleClients.length > 0 &&
+    visibleClients.every((client) => selectedClientIds.includes(client.id));
+  const deletionPercentage = deletionProgress
+    ? Math.round((deletionProgress.completed / deletionProgress.total) * 100)
+    : 0;
 
   const toggleClientSelection = useCallback((clientId: string) => {
     setSelectedClientIds((current) =>
@@ -253,60 +370,185 @@ export default function ClientsScreen() {
     );
   }, []);
 
+  const toggleVisibleClientSelection = useCallback(() => {
+    const visibleIds = visibleClients.map((client) => client.id);
+    setSelectedClientIds((current) => {
+      const selectedIds = new Set(current);
+      if (visibleIds.every((clientId) => selectedIds.has(clientId))) {
+        visibleIds.forEach((clientId) => selectedIds.delete(clientId));
+      } else {
+        visibleIds.forEach((clientId) => selectedIds.add(clientId));
+      }
+      return [...selectedIds];
+    });
+  }, [visibleClients]);
+
   const exportSelectedClients = useCallback(async () => {
     if (!selectedClients.length) return;
     try {
-      await Share.share({
-        message: clientsCsv(selectedClients),
-        title: 'Clientes de Nava.csv',
+      const worksheet = XLSX.utils.json_to_sheet(
+        selectedClients.map((client) => ({
+          Apellido: client.lastName ?? '',
+          Correo: client.email ?? '',
+          Dirección: client.addressLine ?? '',
+          Documento: client.documentNumber ?? '',
+          Nombre: client.fullName,
+          Notas: client.notes ?? '',
+          Teléfono: client.phone ?? '',
+        })),
+        {
+          header: [
+            'Nombre',
+            'Apellido',
+            'Teléfono',
+            'Correo',
+            'Dirección',
+            'Documento',
+            'Notas',
+          ],
+        },
+      );
+      worksheet['!cols'] = [
+        { wch: 24 },
+        { wch: 20 },
+        { wch: 18 },
+        { wch: 30 },
+        { wch: 34 },
+        { wch: 18 },
+        { wch: 40 },
+      ];
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Clientes');
+      const filename = `clientes-nava-${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      if (Platform.OS === 'web') {
+        XLSX.writeFile(workbook, filename, { bookType: 'xlsx' });
+        return;
+      }
+
+      const directory = FileSystem.cacheDirectory;
+      if (!directory) throw new Error('No pudimos preparar el archivo Excel.');
+      const fileUri = `${directory}${filename}`;
+      const contents = XLSX.write(workbook, {
+        bookType: 'xlsx',
+        compression: true,
+        type: 'base64',
+      });
+      await FileSystem.writeAsStringAsync(fileUri, contents, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      if (!(await Sharing.isAvailableAsync())) {
+        throw new Error('No hay una aplicación disponible para compartir archivos.');
+      }
+      await Sharing.shareAsync(fileUri, {
+        dialogTitle: 'Exportar clientes de Nava',
+        mimeType:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
     } catch (error) {
-      Alert.alert(
+      openDialog(
         'No pudimos exportar los clientes',
         error instanceof Error ? error.message : 'Inténtalo nuevamente.',
       );
     }
-  }, [selectedClients]);
+  }, [openDialog, selectedClients]);
 
   const deleteSelectedClients = useCallback(async () => {
     if (!selectedClients.length) return;
+    const clientsToDelete = [...selectedClients];
+    const deletedClientIds = new Set<string>();
+    const failedClientIds = new Set<string>();
+    const failureMessages: string[] = [];
+    let completed = 0;
     setIsDeletingSelected(true);
+    setDeletionProgress({ completed, total: clientsToDelete.length });
     try {
-      for (const client of selectedClients) {
-        await requireApiClient().request<void>(`/v1/clients/${client.id}`, {
-          method: 'DELETE',
-        });
-      }
-      setSelectedClientIds([]);
+      let nextClientIndex = 0;
+      const deleteClient = async () => {
+        while (true) {
+          const client = clientsToDelete[nextClientIndex];
+          nextClientIndex += 1;
+          if (!client) return;
+          try {
+            await requireApiClient().request<void>(`/v1/clients/${client.id}`, {
+              method: 'DELETE',
+            });
+            deletedClientIds.add(client.id);
+            queryClient.setQueryData<ClientsResponse>(['clients'], (current) =>
+              current
+                ? {
+                    ...current,
+                    clients: current.clients.filter(
+                      (currentClient) => currentClient.id !== client.id,
+                    ),
+                  }
+                : current,
+            );
+          } catch (error) {
+            failedClientIds.add(client.id);
+            failureMessages.push(
+              `${client.fullName}: ${
+                error instanceof Error ? error.message : 'Error desconocido.'
+              }`,
+            );
+          } finally {
+            completed += 1;
+            setDeletionProgress({ completed, total: clientsToDelete.length });
+          }
+        }
+      };
+      await Promise.all(
+        Array.from(
+          { length: Math.min(4, clientsToDelete.length) },
+          () => deleteClient(),
+        ),
+      );
+      setSelectedClientIds([...failedClientIds]);
       await queryClient.invalidateQueries({ queryKey: ['clients'] });
+      if (failureMessages.length) {
+        openDialog(
+          'Algunos contactos no se eliminaron',
+          `${failureMessages.length} de ${clientsToDelete.length} no pudieron eliminarse.\n\n${failureMessages
+            .slice(0, 2)
+            .join('\n')}`,
+        );
+      } else {
+        openDialog(
+          'Contactos eliminados',
+          `${deletedClientIds.size} contacto${
+            deletedClientIds.size === 1 ? '' : 's'
+          } eliminado${deletedClientIds.size === 1 ? '' : 's'}.`,
+        );
+      }
     } catch (error) {
-      Alert.alert(
+      openDialog(
         'No pudimos eliminar todos los clientes',
         error instanceof Error ? error.message : 'Inténtalo nuevamente.',
       );
       await queryClient.invalidateQueries({ queryKey: ['clients'] });
     } finally {
       setIsDeletingSelected(false);
+      setDeletionProgress(null);
     }
-  }, [queryClient, selectedClients]);
+  }, [openDialog, queryClient, selectedClients]);
 
   const confirmDeleteSelectedClients = useCallback(() => {
     if (!selectedClients.length) return;
-    Alert.alert(
+    openDialog(
       'Eliminar clientes',
       `Eliminarás ${selectedClients.length} cliente${
         selectedClients.length === 1 ? '' : 's'
       } del directorio.`,
       [
-        { style: 'cancel', text: 'Cancelar' },
+        { label: 'Cancelar' },
         {
+          label: 'Eliminar',
           onPress: () => void deleteSelectedClients(),
-          style: 'destructive',
-          text: 'Eliminar',
+          tone: 'destructive',
         },
       ],
     );
-  }, [deleteSelectedClients, selectedClients.length]);
+  }, [deleteSelectedClients, openDialog, selectedClients.length]);
   if (!session) return <Redirect href="/(auth)/login" />;
 
   return (
@@ -363,6 +605,40 @@ export default function ClientsScreen() {
         )}
       </View>
 
+      {isDeletingSelected && deletionProgress ? (
+        <View
+          accessibilityLiveRegion="polite"
+          accessibilityRole="progressbar"
+          accessibilityValue={{
+            max: 100,
+            min: 0,
+            now: deletionPercentage,
+          }}
+          style={styles.deletionProgress}
+        >
+          <View style={styles.deletionProgressHeader}>
+            <Text style={styles.deletionProgressLabel}>
+              Eliminando contactos
+            </Text>
+            <Text style={styles.deletionProgressValue}>
+              {deletionPercentage}%
+            </Text>
+          </View>
+          <View style={styles.deletionProgressTrack}>
+            <View
+              style={[
+                styles.deletionProgressFill,
+                { width: `${deletionPercentage}%` },
+              ]}
+            />
+          </View>
+          <Text style={styles.deletionProgressCopy}>
+            {deletionProgress.completed} de {deletionProgress.total}{' '}
+            contactos procesados
+          </Text>
+        </View>
+      ) : null}
+
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -386,6 +662,42 @@ export default function ClientsScreen() {
             value={search}
           />
         </View>
+        {visibleClients.length ? (
+          <Pressable
+            accessibilityLabel={
+              areAllVisibleClientsSelected
+                ? 'Deseleccionar todos los contactos visibles'
+                : 'Seleccionar todos los contactos visibles'
+            }
+            accessibilityRole="button"
+            accessibilityState={{
+              disabled: isDeletingSelected,
+              selected: areAllVisibleClientsSelected,
+            }}
+            disabled={isDeletingSelected}
+            onPress={toggleVisibleClientSelection}
+            style={[
+              styles.selectAllButton,
+              isDeletingSelected && styles.disabled,
+            ]}
+          >
+            <Ionicons
+              color="#101c2d"
+              name={
+                areAllVisibleClientsSelected
+                  ? 'checkmark-circle'
+                  : 'ellipse-outline'
+              }
+              size={21}
+            />
+            <Text style={styles.selectAllLabel}>
+              {areAllVisibleClientsSelected
+                ? 'Deseleccionar todos'
+                : 'Seleccionar todos'}
+            </Text>
+            <Text style={styles.selectAllCount}>{visibleClients.length}</Text>
+          </Pressable>
+        ) : null}
         {labelsQuery.data?.labels.length ? (
           <View style={styles.filterSection}>
             <Text style={styles.filterTitle}>Filtrar por etiqueta</Text>
@@ -420,10 +732,21 @@ export default function ClientsScreen() {
                   accessibilityLabel={`Ver cliente ${client.fullName}`}
                   accessibilityRole="button"
                   key={client.id}
-                  accessibilityState={{ selected: isSelected }}
+                  accessibilityState={{
+                    disabled: isDeletingSelected,
+                    selected: isSelected,
+                  }}
                   delayLongPress={350}
-                  onLongPress={() => toggleClientSelection(client.id)}
+                  disabled={isDeletingSelected}
+                  onLongPress={() => {
+                    didLongPressClient.current = true;
+                    toggleClientSelection(client.id);
+                  }}
                   onPress={() => {
+                    if (didLongPressClient.current) {
+                      didLongPressClient.current = false;
+                      return;
+                    }
                     if (isSelectingClients) {
                       toggleClientSelection(client.id);
                       return;
@@ -498,8 +821,8 @@ export default function ClientsScreen() {
             </Text>
             <Text style={styles.emptyCopy}>
               {search
-                ? 'Prueba con otro nombre o tel?fono.'
-                : 'Agrega tu primer cliente para guardar sus datos y agilizar las pr?ximas reservas.'}
+                ? 'Prueba con otro nombre o teléfono.'
+                : 'Agrega tu primer cliente para guardar sus datos y agilizar las próximas reservas.'}
             </Text>
             {!search ? (
               <Pressable
@@ -531,18 +854,295 @@ export default function ClientsScreen() {
       <ClientFormSheet
         onClose={() => setIsCreateOpen(false)}
         visible={isCreateOpen}
+        onError={(title, message) => openDialog(title, message)}
       />
+      <ContactImportSheet
+        contacts={importCandidates}
+        importing={isImporting}
+        onClose={() => {
+          if (isImporting) return;
+          setIsContactImportOpen(false);
+          setImportCandidates([]);
+          setSelectedImportContactIds([]);
+        }}
+        onConfirm={() => void importSelectedContacts()}
+        onToggleAll={toggleAllImportContacts}
+        onToggleContact={toggleImportContact}
+        selectedContactIds={selectedImportContactIds}
+        visible={isContactImportOpen}
+      />
+      <ContactsDialog dialog={dialog} onClose={() => setDialog(null)} />
     </SafeAreaView>
+  );
+}
+
+function ContactsDialog({
+  dialog,
+  onClose,
+}: {
+  readonly dialog: ContactsDialogState | null;
+  readonly onClose: () => void;
+}) {
+  const actions = dialog?.actions?.length
+    ? dialog.actions
+    : [{ label: 'Entendido' }];
+  return (
+    <Modal
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+      transparent
+      visible={Boolean(dialog)}
+    >
+      <View accessibilityViewIsModal style={styles.dialogOverlay}>
+        <Pressable
+          accessibilityLabel="Cerrar aviso"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={styles.dialogBackdrop}
+        />
+        <View style={styles.dialogCard}>
+          <View style={styles.dialogIcon}>
+            <Ionicons color="#B47D17" name="information" size={26} />
+          </View>
+          <Text accessibilityRole="header" style={styles.dialogTitle}>
+            {dialog?.title}
+          </Text>
+          <Text style={styles.dialogMessage}>{dialog?.message}</Text>
+          <View style={styles.dialogActions}>
+            {actions.map((action, index) => {
+              const isDestructive = action.tone === 'destructive';
+              const isPrimary = !isDestructive && index === actions.length - 1;
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  key={action.label}
+                  onPress={() => {
+                    onClose();
+                    action.onPress?.();
+                  }}
+                  style={[
+                    styles.dialogAction,
+                    isDestructive
+                      ? styles.dialogActionDestructive
+                      : isPrimary
+                        ? styles.dialogActionPrimary
+                        : styles.dialogActionDefault,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.dialogActionLabel,
+                      isDestructive || isPrimary
+                        ? styles.dialogActionLabelOnAccent
+                        : styles.dialogActionLabelDefault,
+                    ]}
+                  >
+                    {action.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function ContactImportSheet({
+  contacts,
+  importing,
+  onClose,
+  onConfirm,
+  onToggleAll,
+  onToggleContact,
+  selectedContactIds,
+  visible,
+}: {
+  readonly contacts: readonly ImportContactCandidate[];
+  readonly importing: boolean;
+  readonly onClose: () => void;
+  readonly onConfirm: () => void;
+  readonly onToggleAll: () => void;
+  readonly onToggleContact: (contactId: string) => void;
+  readonly selectedContactIds: readonly string[];
+  readonly visible: boolean;
+}) {
+  const [search, setSearch] = useState('');
+  const selectedIds = useMemo(
+    () => new Set(selectedContactIds),
+    [selectedContactIds],
+  );
+  const searchValue = search.trim().toLocaleLowerCase('es-EC');
+  const visibleContacts = useMemo(
+    () =>
+      contacts.filter(
+        (contact) =>
+          !searchValue ||
+          contact.fullName.toLocaleLowerCase('es-EC').includes(searchValue) ||
+          contact.phone.includes(searchValue),
+      ),
+    [contacts, searchValue],
+  );
+  const areAllContactsSelected =
+    contacts.length > 0 && selectedContactIds.length === contacts.length;
+
+  return (
+    <Modal
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+      transparent
+      visible={visible}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalKeyboard}
+      >
+        <View style={styles.importOverlay}>
+          <Pressable
+            accessibilityLabel="Cerrar importación de contactos"
+            accessibilityRole="button"
+            disabled={importing}
+            onPress={onClose}
+            style={styles.importBackdrop}
+          />
+          <View style={styles.importSheet}>
+            <View style={styles.sheetDragArea}>
+              <View style={styles.handle} />
+            </View>
+            <Text accessibilityRole="header" style={styles.importTitle}>
+              Importar contactos
+            </Text>
+            <Text style={styles.importCopy}>
+              Selecciona los contactos que quieres guardar en Nava.
+            </Text>
+            <View style={styles.importSearchBox}>
+              <Ionicons color="#69717D" name="search-outline" size={20} />
+              <TextInput
+                accessibilityLabel="Buscar contacto para importar"
+                onChangeText={setSearch}
+                placeholder="Buscar contacto"
+                placeholderTextColor="#7B838D"
+                style={styles.importSearchInput}
+                value={search}
+              />
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: areAllContactsSelected }}
+              disabled={importing}
+              onPress={onToggleAll}
+              style={styles.importSelectAll}
+            >
+              <Ionicons
+                color="#101C2D"
+                name={
+                  areAllContactsSelected
+                    ? 'checkmark-circle'
+                    : 'ellipse-outline'
+                }
+                size={21}
+              />
+              <Text style={styles.importSelectAllLabel}>
+                {areAllContactsSelected
+                  ? 'Deseleccionar todos'
+                  : 'Seleccionar todos'}
+              </Text>
+              <Text style={styles.importSelectAllCount}>{contacts.length}</Text>
+            </Pressable>
+            <FlatList
+              contentContainerStyle={styles.importList}
+              data={visibleContacts}
+              extraData={selectedContactIds}
+              initialNumToRender={16}
+              keyboardShouldPersistTaps="handled"
+              keyExtractor={(contact) => contact.id}
+              ListEmptyComponent={
+                <Text style={styles.importEmpty}>No hay coincidencias.</Text>
+              }
+              maxToRenderPerBatch={16}
+              renderItem={({ item: contact }) => {
+                const isSelected = selectedIds.has(contact.id);
+                return (
+                  <Pressable
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: isSelected }}
+                    disabled={importing}
+                    onPress={() => onToggleContact(contact.id)}
+                    style={[
+                      styles.importContactRow,
+                      isSelected && styles.importContactRowSelected,
+                    ]}
+                  >
+                    <View style={styles.importContactAvatar}>
+                      <Text style={styles.importContactAvatarLabel}>
+                        {contact.fullName.slice(0, 1).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.importContactCopy}>
+                      <Text numberOfLines={1} style={styles.importContactName}>
+                        {contact.fullName}
+                      </Text>
+                      <Text numberOfLines={1} style={styles.importContactPhone}>
+                        {contact.phone}
+                      </Text>
+                    </View>
+                    <Ionicons
+                      color={isSelected ? '#B47D17' : '#69717D'}
+                      name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={24}
+                    />
+                  </Pressable>
+                );
+              }}
+              removeClippedSubviews={Platform.OS === 'android'}
+              showsVerticalScrollIndicator={false}
+              style={styles.importListScroll}
+              windowSize={7}
+            />
+            <View style={styles.importActions}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={importing}
+                onPress={onClose}
+                style={styles.importCancelButton}
+              >
+                <Text style={styles.importCancelLabel}>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={importing || selectedContactIds.length === 0}
+                onPress={onConfirm}
+                style={[
+                  styles.importConfirmButton,
+                  (importing || selectedContactIds.length === 0) && styles.disabled,
+                ]}
+              >
+                <Text style={styles.importConfirmLabel}>
+                  {importing
+                    ? 'Importando...'
+                    : `Importar (${selectedContactIds.length})`}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
 export function ClientFormSheet({
   onClose,
   onCreated,
+  onError,
   visible,
 }: {
   readonly onClose: () => void;
   readonly onCreated?: (client: ClientRecord) => void | Promise<void>;
+  readonly onError?: (title: string, message: string) => void;
   readonly visible: boolean;
 }) {
   const queryClient = useQueryClient();
@@ -585,11 +1185,15 @@ export function ClientFormSheet({
         },
       );
     },
-    onError: (error) =>
-      Alert.alert(
-        'No pudimos guardar el cliente',
-        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
-      ),
+    onError: (error) => {
+      const message =
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.';
+      if (onError) {
+        onError('No pudimos guardar el cliente', message);
+        return;
+      }
+      Alert.alert('No pudimos guardar el cliente', message);
+    },
     onSuccess: async ({ client }) => {
       await queryClient.invalidateQueries({ queryKey: ['clients'] });
       await onCreated?.(client);
@@ -868,7 +1472,92 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   content: { paddingBottom: 128, paddingHorizontal: 24, paddingTop: 28 },
+  deletionProgress: {
+    backgroundColor: '#FFF7E5',
+    borderColor: '#E3B553',
+    borderRadius: 16,
+    borderWidth: 1,
+    marginHorizontal: 24,
+    marginTop: 12,
+    padding: 14,
+  },
+  deletionProgressCopy: {
+    color: '#5D6672',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 8,
+  },
+  deletionProgressFill: {
+    backgroundColor: appTheme.colors.accent,
+    borderRadius: 4,
+    height: '100%',
+  },
+  deletionProgressHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  deletionProgressLabel: { color: '#101C2D', fontSize: 14, fontWeight: '900' },
+  deletionProgressTrack: {
+    backgroundColor: '#E7DDC9',
+    borderRadius: 4,
+    height: 8,
+    marginTop: 10,
+    overflow: 'hidden',
+  },
+  deletionProgressValue: { color: '#8D620C', fontSize: 14, fontWeight: '900' },
   disabled: { opacity: 0.55 },
+  dialogAction: {
+    alignItems: 'center',
+    borderRadius: 15,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: 12,
+  },
+  dialogActionDefault: { backgroundColor: '#F2F3F4' },
+  dialogActionDestructive: { backgroundColor: '#B42318' },
+  dialogActionPrimary: { backgroundColor: appTheme.colors.accent },
+  dialogActionLabel: { fontSize: 14, fontWeight: '900' },
+  dialogActionLabelDefault: { color: '#101C2D' },
+  dialogActionLabelOnAccent: { color: '#FFFFFF' },
+  dialogActions: { flexDirection: 'row', gap: 10, marginTop: 24 },
+  dialogBackdrop: {
+    backgroundColor: 'rgba(16, 28, 45, 0.52)',
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 0,
+  },
+  dialogCard: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E4E1DA',
+    borderRadius: 26,
+    borderWidth: 1,
+    marginHorizontal: 24,
+    maxWidth: 420,
+    padding: 22,
+    width: '88%',
+    zIndex: 1,
+  },
+  dialogIcon: {
+    alignItems: 'center',
+    backgroundColor: '#FFF1CC',
+    borderRadius: 18,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  dialogMessage: {
+    color: '#5D6672',
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 9,
+  },
+  dialogOverlay: { alignItems: 'center', flex: 1, justifyContent: 'center' },
+  dialogTitle: { color: '#101C2D', fontSize: 21, fontWeight: '900', marginTop: 16 },
   empty: { alignItems: 'center', marginHorizontal: 20, marginTop: 76 },
   emptyAction: {
     color: '#101c2d',
@@ -941,6 +1630,113 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   headerTitle: { color: '#101c2d', fontSize: 22, fontWeight: '900' },
+  importActions: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  importBackdrop: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 0,
+  },
+  importCancelButton: {
+    alignItems: 'center',
+    backgroundColor: '#F2F3F4',
+    borderRadius: 15,
+    flex: 0.8,
+    justifyContent: 'center',
+    minHeight: 50,
+  },
+  importCancelLabel: { color: '#101C2D', fontSize: 14, fontWeight: '900' },
+  importConfirmButton: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.accent,
+    borderRadius: 15,
+    flex: 1.2,
+    justifyContent: 'center',
+    minHeight: 50,
+  },
+  importConfirmLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  importContactAvatar: {
+    alignItems: 'center',
+    backgroundColor: '#E8EAED',
+    borderRadius: 19,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  importContactAvatarLabel: { color: '#101C2D', fontSize: 15, fontWeight: '900' },
+  importContactCopy: { flex: 1 },
+  importContactName: { color: '#101C2D', fontSize: 14, fontWeight: '900' },
+  importContactPhone: { color: '#69717D', fontSize: 12, marginTop: 2 },
+  importContactRow: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E4E5E7',
+    borderRadius: 15,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    padding: 11,
+  },
+  importContactRowSelected: { backgroundColor: '#FFF7E5', borderColor: '#C79532' },
+  importCopy: { color: '#5D6672', fontSize: 14, lineHeight: 20, marginTop: 7 },
+  importEmpty: {
+    color: '#69717D',
+    fontSize: 14,
+    fontWeight: '700',
+    paddingVertical: 28,
+    textAlign: 'center',
+  },
+  importList: { gap: 8, paddingBottom: 4 },
+  importListScroll: { marginTop: 5, maxHeight: 340 },
+  importOverlay: {
+    backgroundColor: 'rgba(16, 28, 45, 0.48)',
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  importSearchBox: {
+    alignItems: 'center',
+    backgroundColor: '#F2F3F4',
+    borderColor: '#E4E5E7',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 16,
+    paddingHorizontal: 12,
+  },
+  importSearchInput: { color: '#101C2D', flex: 1, fontSize: 14, paddingVertical: 13 },
+  importSelectAll: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 11,
+  },
+  importSelectAllCount: {
+    backgroundColor: '#E8EAED',
+    borderRadius: 10,
+    color: '#5D6672',
+    fontSize: 11,
+    fontWeight: '900',
+    minWidth: 22,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    textAlign: 'center',
+  },
+  importSelectAllLabel: { color: '#101C2D', fontSize: 13, fontWeight: '900' },
+  importSheet: {
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderTopLeftRadius: appTheme.radii.sheet,
+    borderTopRightRadius: appTheme.radii.sheet,
+    elevation: 2,
+    maxHeight: '88%',
+    paddingBottom: 26,
+    paddingHorizontal: 24,
+    zIndex: 1,
+  },
+  importTitle: { color: '#101C2D', fontSize: 23, fontWeight: '900', marginTop: 10 },
   iconButton: {
     alignItems: 'center',
     backgroundColor: '#ffffff',
@@ -990,6 +1786,29 @@ const styles = StyleSheet.create({
     ...goldShadow,
   },
   searchInput: { color: '#101c2d', flex: 1, fontSize: 16 },
+  selectAllButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+    paddingHorizontal: 2,
+    paddingVertical: 7,
+  },
+  selectAllCount: {
+    backgroundColor: '#E8EAED',
+    borderRadius: 11,
+    color: '#5D6672',
+    fontSize: 12,
+    fontWeight: '900',
+    marginLeft: 2,
+    minWidth: 23,
+    overflow: 'hidden',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    textAlign: 'center',
+  },
+  selectAllLabel: { color: '#101C2D', fontSize: 14, fontWeight: '900' },
   sheet: {
     backgroundColor: appTheme.colors.surfaceMuted,
     borderTopLeftRadius: appTheme.radii.sheet,

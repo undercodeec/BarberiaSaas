@@ -100,7 +100,7 @@ export default function BusinessSummaryScreen() {
         </Pressable>
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={styles.title}>
-            Resumen de mi negocio
+            Resumen negocio
           </Text>
           <Text style={styles.headerCaption}>{periodLabel}</Text>
         </View>

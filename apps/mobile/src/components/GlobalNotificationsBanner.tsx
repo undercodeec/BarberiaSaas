@@ -5,15 +5,18 @@ import type {
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Animated,
   Easing,
   Modal,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +24,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { appTheme, goldButtonShadow, goldShadow } from './BottomNavigation';
 import { requireApiClient } from '../lib/api';
 import { useAuth } from '../providers/AuthProvider';
+
+const NOTIFICATION_POSITION_KEY = 'nava.notification-trigger-position-v2';
+const TRIGGER_MARGIN = 10;
+const TRIGGER_SIZE = 52;
+
+interface TriggerPosition {
+  readonly x: number;
+  readonly y: number;
+}
 
 function relativeDate(value: string) {
   const minutes = Math.max(
@@ -39,11 +51,121 @@ function relativeDate(value: string) {
 export function GlobalNotificationsBanner() {
   const { session } = useAuth();
   const insets = useSafeAreaInsets();
+  const { height, width } = useWindowDimensions();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
-  const borderDotProgress = useRef(new Animated.Value(0)).current;
+  const [isTriggerPositionReady, setIsTriggerPositionReady] = useState(false);
+  const [borderDotProgress] = useState(() => new Animated.Value(0));
   const [translateX] = useState(() => new Animated.Value(-520));
+  const [triggerPosition] = useState(() => new Animated.ValueXY());
+  const clampTriggerPosition = useCallback(
+    ({ x, y }: TriggerPosition): TriggerPosition => ({
+      x: Math.max(
+        TRIGGER_MARGIN,
+        Math.min(
+          x,
+          Math.max(TRIGGER_MARGIN, width - TRIGGER_SIZE - TRIGGER_MARGIN),
+        ),
+      ),
+      y: Math.max(
+        insets.top + TRIGGER_MARGIN,
+        Math.min(
+          y,
+          Math.max(
+            insets.top + TRIGGER_MARGIN,
+            height - insets.bottom - TRIGGER_SIZE - TRIGGER_MARGIN,
+          ),
+        ),
+      ),
+    }),
+    [height, insets.bottom, insets.top, width],
+  );
+  const setTriggerPosition = useCallback(
+    (nextPosition: TriggerPosition) => {
+      const clamped = clampTriggerPosition(nextPosition);
+      triggerPosition.setValue(clamped);
+      return clamped;
+    },
+    [clampTriggerPosition, triggerPosition],
+  );
+
+  useEffect(() => {
+    if (isTriggerPositionReady) {
+      triggerPosition.stopAnimation((currentPosition) => {
+        setTriggerPosition(currentPosition);
+      });
+      return;
+    }
+    let isActive = true;
+    const restorePosition = async () => {
+      let restored: TriggerPosition | null = null;
+      try {
+        const stored = await SecureStore.getItemAsync(
+          NOTIFICATION_POSITION_KEY,
+        );
+        if (stored) {
+          const parsed = JSON.parse(stored) as Partial<TriggerPosition>;
+          if (typeof parsed.x === 'number' && typeof parsed.y === 'number')
+            restored = { x: parsed.x, y: parsed.y };
+        }
+      } catch {
+        // Una preferencia dañada no debe ocultar el acceso a notificaciones.
+      }
+      if (!isActive) return;
+      setTriggerPosition(
+        restored ?? {
+          x: width - TRIGGER_SIZE - 18,
+          y: insets.top + 14,
+        },
+      );
+      setIsTriggerPositionReady(true);
+    };
+    void restorePosition();
+    return () => {
+      isActive = false;
+    };
+  }, [
+    insets.top,
+    isTriggerPositionReady,
+    setTriggerPosition,
+    triggerPosition,
+    width,
+  ]);
+
+  const triggerPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponderCapture: (_, gesture) =>
+          Math.abs(gesture.dx) > 5 || Math.abs(gesture.dy) > 5,
+        onPanResponderMove: (_, gesture) => {
+          setTriggerPosition({
+            x: gesture.moveX - TRIGGER_SIZE / 2,
+            y: gesture.moveY - TRIGGER_SIZE / 2,
+          });
+        },
+        onPanResponderRelease: () => {
+          triggerPosition.stopAnimation((currentPosition) => {
+            const clamped = setTriggerPosition(currentPosition);
+            void SecureStore.setItemAsync(
+              NOTIFICATION_POSITION_KEY,
+              JSON.stringify(clamped),
+            ).catch(() => undefined);
+          });
+        },
+        onPanResponderTerminate: () => {
+          triggerPosition.stopAnimation((currentPosition) => {
+            const clamped = setTriggerPosition(currentPosition);
+            void SecureStore.setItemAsync(
+              NOTIFICATION_POSITION_KEY,
+              JSON.stringify(clamped),
+            ).catch(() => undefined);
+          });
+        },
+      }),
+    [setTriggerPosition, triggerPosition],
+  );
+
   useEffect(() => {
     let isActive = true;
 
@@ -125,30 +247,42 @@ export function GlobalNotificationsBanner() {
   if (!session) return null;
   return (
     <>
-      <Pressable
-        accessibilityLabel={
-          unread ? `Notificaciones, ${unread} sin leer` : 'Notificaciones'
-        }
-        accessibilityRole="button"
-        onPress={openBanner}
-        style={[styles.trigger, { top: insets.top + 14 }]}
+      <Animated.View
+        {...triggerPanResponder.panHandlers}
+        style={[
+          styles.triggerPosition,
+          {
+            opacity: isTriggerPositionReady ? 1 : 0,
+            transform: triggerPosition.getTranslateTransform(),
+          },
+        ]}
       >
-        <Ionicons color="#B47D17" name="notifications-outline" size={24} />
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.borderDotOrbit,
-            { transform: [{ rotate: borderDotRotation }] },
-          ]}
+        <Pressable
+          accessibilityHint="Mantén presionado y arrastra para cambiar su posición"
+          accessibilityLabel={
+            unread ? `Notificaciones, ${unread} sin leer` : 'Notificaciones'
+          }
+          accessibilityRole="button"
+          onPress={openBanner}
+          style={styles.trigger}
         >
-          <View style={styles.borderDot} />
-        </Animated.View>
-        {unread ? (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
-          </View>
-        ) : null}
-      </Pressable>
+          <Ionicons color="#B47D17" name="notifications-outline" size={24} />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.borderDotOrbit,
+              { transform: [{ rotate: borderDotRotation }] },
+            ]}
+          >
+            <View style={styles.borderDot} />
+          </Animated.View>
+          {unread ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+      </Animated.View>
       <Modal
         animationType="none"
         navigationBarTranslucent
@@ -390,14 +524,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 26,
     elevation: 16,
+    flex: 1,
     height: 52,
     justifyContent: 'center',
-    position: 'absolute',
-    right: 18,
     shadowColor: '#B47D17',
     shadowOpacity: 0.22,
     shadowRadius: 10,
     width: 52,
+  },
+  triggerPosition: {
+    height: TRIGGER_SIZE,
+    left: 0,
+    position: 'absolute',
+    top: 0,
+    width: TRIGGER_SIZE,
     zIndex: 9999,
   },
 });

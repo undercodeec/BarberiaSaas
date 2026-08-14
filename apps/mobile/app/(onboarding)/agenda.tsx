@@ -269,18 +269,32 @@ export default function AgendaScreen() {
   const [dayContentOpacity] = useState(() => new Animated.Value(1));
   const [timelineTransitionX] = useState(() => new Animated.Value(0));
   const [settingsSheetTranslateY] = useState(() => new Animated.Value(0));
+  const [settingsBackdropOpacity] = useState(() => new Animated.Value(1));
+  const [isDismissingSettings, setIsDismissingSettings] = useState(false);
   const [isDayTransitioning, setIsDayTransitioning] = useState(false);
   const dismissAgendaSettings = useCallback(() => {
-    Animated.timing(settingsSheetTranslateY, {
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
-      toValue: 520,
-      useNativeDriver: true,
-    }).start(() => {
+    if (isDismissingSettings) return;
+    setIsDismissingSettings(true);
+    Animated.parallel([
+      Animated.timing(settingsSheetTranslateY, {
+        duration: 210,
+        easing: Easing.in(Easing.cubic),
+        toValue: 520,
+        useNativeDriver: true,
+      }),
+      Animated.timing(settingsBackdropOpacity, {
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+        toValue: 0,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
       setIsAgendaSettingsOpen(false);
       settingsSheetTranslateY.setValue(0);
+      settingsBackdropOpacity.setValue(1);
+      setIsDismissingSettings(false);
     });
-  }, [settingsSheetTranslateY]);
+  }, [isDismissingSettings, settingsBackdropOpacity, settingsSheetTranslateY]);
   const settingsSheetPanResponder = useMemo(
     () =>
       PanResponder.create({
@@ -349,6 +363,9 @@ export default function AgendaScreen() {
       dayContentOpacity,
       isDayTransitioning,
       selectedDay,
+      setCalendarMonth,
+      setIsDayTransitioning,
+      setSelectedDay,
       timelineTransitionX,
     ],
   );
@@ -540,9 +557,11 @@ export default function AgendaScreen() {
           appointment.status,
         );
       if (statusFilter === 'scheduled')
-        return ['awaiting_confirmation', 'pending_verification', 'scheduled'].includes(
-          appointment.status,
-        );
+        return [
+          'awaiting_confirmation',
+          'pending_verification',
+          'scheduled',
+        ].includes(appointment.status);
       if (statusFilter === 'paid') return appointment.paymentStatus === 'paid';
       return appointment.status === statusFilter;
     });
@@ -562,7 +581,7 @@ export default function AgendaScreen() {
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerCopy}>
           <Text style={styles.eyebrow}>Tu calendario</Text>
           <Text accessibilityRole="header" style={styles.title}>
             Agenda
@@ -586,6 +605,8 @@ export default function AgendaScreen() {
             accessibilityLabel="Ajustes agenda"
             accessibilityRole="button"
             onPress={() => {
+              setIsDismissingSettings(false);
+              settingsBackdropOpacity.setValue(1);
               settingsSheetTranslateY.setValue(0);
               setIsAgendaSettingsOpen(true);
             }}
@@ -688,7 +709,7 @@ export default function AgendaScreen() {
       </View>
 
       <View style={styles.summary}>
-        <View>
+        <View style={styles.summaryPrimary}>
           <Text style={styles.summaryValue}>
             {filteredAppointments.length} citas
           </Text>
@@ -702,9 +723,11 @@ export default function AgendaScreen() {
               size={22}
             />
           </View>
-          <View>
-            <Text style={styles.availabilityLabel}>Agenda disponible</Text>
-            <Text style={styles.availabilityCopy}>
+          <View style={styles.availabilityText}>
+            <Text numberOfLines={2} style={styles.availabilityLabel}>
+              Agenda disponible
+            </Text>
+            <Text numberOfLines={2} style={styles.availabilityCopy}>
               {appointmentsQuery.isLoading
                 ? 'Cargando reservas'
                 : filteredAppointments.length
@@ -938,7 +961,7 @@ export default function AgendaScreen() {
       </Modal>
 
       <Modal
-        animationType="fade"
+        animationType="none"
         navigationBarTranslucent
         onRequestClose={dismissAgendaSettings}
         statusBarTranslucent
@@ -948,22 +971,28 @@ export default function AgendaScreen() {
         <View style={styles.settingsOverlay}>
           <Pressable
             onPress={dismissAgendaSettings}
-            style={styles.settingsBackdrop}
+            style={[
+              styles.settingsBackdrop,
+              { opacity: settingsBackdropOpacity },
+            ]}
           />
           <Animated.View
-            style={{ transform: [{ translateY: settingsSheetTranslateY }] }}
+            style={[
+              styles.settingsSheet,
+              {
+                maxHeight: layout.sheetMaxHeight,
+                transform: [{ translateY: settingsSheetTranslateY }],
+              },
+            ]}
           >
             <ScrollView
               contentContainerStyle={[
-                styles.settingsSheet,
+                styles.settingsContent,
                 { paddingBottom: layout.bottomInset + 8 },
               ]}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
-              style={[
-                styles.settingsScroll,
-                { maxHeight: layout.sheetMaxHeight },
-              ]}
+              style={styles.settingsScroll}
             >
               <View
                 {...settingsSheetPanResponder.panHandlers}
@@ -1649,10 +1678,9 @@ const styles = StyleSheet.create({
     ...goldButtonShadow,
   },
   checkboxRowSelected: {
-    backgroundColor: appTheme.colors.accentWash,
-    borderColor: appTheme.colors.accentLight,
-    elevation: 8,
-    shadowOpacity: 0.18,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.accent,
+    borderWidth: 2,
   },
   optionTile: {
     alignItems: 'center',
@@ -1676,14 +1704,13 @@ const styles = StyleSheet.create({
   },
   optionTileLabelSelected: { color: appTheme.colors.text },
   optionTileSelected: {
-    backgroundColor: appTheme.colors.accentWash,
-    borderColor: appTheme.colors.accentLight,
-    elevation: 9,
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.accent,
+    borderWidth: 2,
     zIndex: 1,
   },
   settingsBackdrop: {
+    backgroundColor: appTheme.colors.overlay,
     bottom: 0,
     left: 0,
     position: 'absolute',
@@ -1700,7 +1727,6 @@ const styles = StyleSheet.create({
     width: 46,
   },
   settingsOverlay: {
-    backgroundColor: appTheme.colors.overlay,
     flex: 1,
     justifyContent: 'flex-end',
   },
@@ -1711,16 +1737,19 @@ const styles = StyleSheet.create({
     marginTop: 25,
   },
   settingsSheet: {
-    backgroundColor: appTheme.colors.surfaceElevated,
+    backgroundColor: appTheme.colors.surface,
     borderTopLeftRadius: appTheme.radii.sheet,
     borderTopRightRadius: appTheme.radii.sheet,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  settingsContent: {
     paddingBottom: 20,
     paddingHorizontal: 24,
     paddingTop: 14,
-    ...goldButtonShadow,
   },
   settingsScroll: {
-    backgroundColor: appTheme.colors.surfaceElevated,
+    backgroundColor: appTheme.colors.surface,
     width: '100%',
   },
   settingsControlPressed: {
@@ -1734,7 +1763,14 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginTop: 17,
   },
-  availability: { alignItems: 'center', flexDirection: 'row', gap: 10 },
+  availability: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexShrink: 1,
+    gap: 10,
+    maxWidth: '58%',
+    minWidth: 0,
+  },
   availabilityCopy: {
     color: appTheme.colors.textMuted,
     fontSize: 12,
@@ -1742,9 +1778,12 @@ const styles = StyleSheet.create({
   },
   availabilityLabel: {
     color: appTheme.colors.accentDark,
+    flexShrink: 1,
     fontSize: 13,
     fontWeight: '800',
+    lineHeight: 17,
   },
+  availabilityText: { flex: 1, minWidth: 0 },
   availabilityRing: {
     alignItems: 'center',
     borderColor: appTheme.colors.accent,
@@ -1812,7 +1851,8 @@ const styles = StyleSheet.create({
   // El acceso global a notificaciones ocupa el extremo superior derecho.
   // Reservamos ese espacio para que los dos controles de Agenda sigan siendo
   // visibles y táctiles en pantallas angostas.
-  headerActions: { flexDirection: 'row', gap: 9, paddingRight: 64 },
+  headerActions: { flexDirection: 'row', gap: 14, paddingRight: 72 },
+  headerCopy: { flex: 1, minWidth: 0, paddingRight: 14 },
   floatingButton: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.accent,
@@ -1873,6 +1913,7 @@ const styles = StyleSheet.create({
     padding: 16,
     ...goldShadow,
   },
+  summaryPrimary: { flex: 1, minWidth: 0, paddingRight: 12 },
   summaryLabel: {
     color: appTheme.colors.textMuted,
     fontSize: 13,
@@ -1924,7 +1965,7 @@ const styles = StyleSheet.create({
   viewControls: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    gap: 14,
     justifyContent: 'flex-end',
     marginHorizontal: 22,
     marginTop: -36,
