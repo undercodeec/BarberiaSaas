@@ -37,5 +37,11 @@ module.exports = ({ config }) => {
       ],
     ],
     slug: config.slug ?? 'barber-saas-mobile',
+    extra: {
+      ...(config.extra ?? {}),
+      googleMaps: {
+        nativeEnabled: Boolean(androidMapsApiKey || iosMapsApiKey),
+      },
+    },
   };
 };
