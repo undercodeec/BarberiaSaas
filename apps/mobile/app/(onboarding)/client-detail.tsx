@@ -25,6 +25,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requireApiClient } from '../../src/lib/api';
+import { normalizeClientRecord } from '../../src/lib/client-record';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { useAuth } from '../../src/providers/AuthProvider';
 import {
@@ -109,11 +110,37 @@ export default function ClientDetailScreen() {
         `/v1/clients/${clientId}`,
       ),
     queryKey: ['client-detail', clientId],
+    select: (response) => {
+      const client = normalizeClientRecord(response.client);
+      if (!client) throw new Error('El cliente recibido no es válido.');
+
+      return {
+        ...response,
+        client,
+        history: Array.isArray(response.history) ? response.history : [],
+        metrics: {
+          accumulatedCents:
+            typeof response.metrics?.accumulatedCents === 'number'
+              ? response.metrics.accumulatedCents
+              : 0,
+          appointmentsCount:
+            typeof response.metrics?.appointmentsCount === 'number'
+              ? response.metrics.appointmentsCount
+              : 0,
+          lastVisitAt:
+            typeof response.metrics?.lastVisitAt === 'string'
+              ? response.metrics.lastVisitAt
+              : null,
+        },
+      };
+    },
   });
   const client = detailQuery.data?.client;
   const visibleHistory = useMemo(() => {
-    const history = detailQuery.data?.history ?? [];
-    return history
+    const history = Array.isArray(detailQuery.data?.history)
+      ? detailQuery.data.history
+      : [];
+    return [...history]
       .filter((item) => {
         if (historyStatus === 'all') return true;
         if (historyStatus === 'paid') return item.paymentStatus === 'paid';
@@ -123,13 +150,13 @@ export default function ClientDetailScreen() {
           item.status,
         );
       })
-      .toSorted((left, right) => {
+      .sort((left, right) => {
         const difference =
           new Date(left.startsAt).getTime() -
           new Date(right.startsAt).getTime();
         return historyOrder === 'newest' ? -difference : difference;
       });
-  }, [detailQuery.data?.history, historyOrder, historyStatus]);
+  }, [detailQuery.data, historyOrder, historyStatus]);
   const notesQuery = useQuery({
     enabled: Boolean(session && clientId),
     queryFn: () =>
@@ -873,73 +900,73 @@ export default function ClientDetailScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalKeyboard}
         >
-        <View style={styles.overlay}>
-          <Pressable onPress={closeNoteSheet} style={styles.backdrop} />
-          <Animated.View
-            style={[
-              styles.noteSheet,
-              {
-                maxHeight: layout.sheetMaxHeight,
-                paddingBottom: layout.bottomInset + 20,
-                transform: [{ translateY: noteSheetTranslateY }],
-              },
-            ]}
-          >
-            <View
-              {...noteSheetPanResponder.panHandlers}
-              style={styles.noteDragArea}
-            >
-              <View style={styles.handle} />
-            </View>
-            <Text style={styles.sheetTitle}>Nueva nota</Text>
-            <TextInput
-              accessibilityLabel="Descripción de la nota"
-              maxLength={500}
-              multiline
-              onChangeText={setNoteDescription}
-              placeholder="Descripción"
-              placeholderTextColor="#8B96A5"
-              style={[styles.field, styles.notesField]}
-              textAlignVertical="top"
-              value={noteDescription}
-            />
-            {notePhotoData ? (
-              <Image
-                source={{ uri: notePhotoData }}
-                style={styles.notePreview}
-              />
-            ) : null}
-            <View style={styles.notePhotoActions}>
-              <Pressable
-                onPress={() => void chooseNotePhoto('library')}
-                style={styles.photoAction}
-              >
-                <Ionicons color="#101c2d" name="images-outline" size={20} />
-                <Text style={styles.photoActionLabel}>Cargar foto</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => void chooseNotePhoto('camera')}
-                style={styles.photoAction}
-              >
-                <Ionicons color="#101c2d" name="camera-outline" size={20} />
-                <Text style={styles.photoActionLabel}>Tomar foto</Text>
-              </Pressable>
-            </View>
-            <Pressable
-              disabled={createNote.isPending || !noteDescription.trim()}
-              onPress={() => createNote.mutate()}
+          <View style={styles.overlay}>
+            <Pressable onPress={closeNoteSheet} style={styles.backdrop} />
+            <Animated.View
               style={[
-                styles.noteSaveButton,
-                (createNote.isPending || !noteDescription.trim()) &&
-                  styles.disabled,
+                styles.noteSheet,
+                {
+                  maxHeight: layout.sheetMaxHeight,
+                  paddingBottom: layout.bottomInset + 20,
+                  transform: [{ translateY: noteSheetTranslateY }],
+                },
               ]}
             >
-              <Text style={styles.saveLabel}>
-                {createNote.isPending ? 'Guardando...' : 'Guardar nota'}
-              </Text>
-            </Pressable>
-          </Animated.View>
-        </View>
+              <View
+                {...noteSheetPanResponder.panHandlers}
+                style={styles.noteDragArea}
+              >
+                <View style={styles.handle} />
+              </View>
+              <Text style={styles.sheetTitle}>Nueva nota</Text>
+              <TextInput
+                accessibilityLabel="Descripción de la nota"
+                maxLength={500}
+                multiline
+                onChangeText={setNoteDescription}
+                placeholder="Descripción"
+                placeholderTextColor="#8B96A5"
+                style={[styles.field, styles.notesField]}
+                textAlignVertical="top"
+                value={noteDescription}
+              />
+              {notePhotoData ? (
+                <Image
+                  source={{ uri: notePhotoData }}
+                  style={styles.notePreview}
+                />
+              ) : null}
+              <View style={styles.notePhotoActions}>
+                <Pressable
+                  onPress={() => void chooseNotePhoto('library')}
+                  style={styles.photoAction}
+                >
+                  <Ionicons color="#101c2d" name="images-outline" size={20} />
+                  <Text style={styles.photoActionLabel}>Cargar foto</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => void chooseNotePhoto('camera')}
+                  style={styles.photoAction}
+                >
+                  <Ionicons color="#101c2d" name="camera-outline" size={20} />
+                  <Text style={styles.photoActionLabel}>Tomar foto</Text>
+                </Pressable>
+              </View>
+              <Pressable
+                disabled={createNote.isPending || !noteDescription.trim()}
+                onPress={() => createNote.mutate()}
+                style={[
+                  styles.noteSaveButton,
+                  (createNote.isPending || !noteDescription.trim()) &&
+                    styles.disabled,
+                ]}
+              >
+                <Text style={styles.saveLabel}>
+                  {createNote.isPending ? 'Guardando...' : 'Guardar nota'}
+                </Text>
+              </Pressable>
+            </Animated.View>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
       <Modal
@@ -954,68 +981,69 @@ export default function ClientDetailScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalKeyboard}
         >
-        <View style={styles.overlay}>
-          <Pressable
-            onPress={() => setIsLabelOpen(false)}
-            style={styles.backdrop}
-          />
-          <View
-            style={[
-              styles.labelSheet,
-              { paddingBottom: layout.bottomInset + 20 },
-            ]}
-          >
-            <View style={styles.handle} />
-            <Text style={styles.sheetTitle}>Nueva etiqueta</Text>
-            <Text style={styles.sheetCopy}>
-              Úsala para identificar y filtrar tus clientes.
-            </Text>
-            <TextInput
-              autoFocus
-              accessibilityLabel="Nombre de la etiqueta"
-              maxLength={60}
-              onChangeText={setLabelName}
-              placeholder="Ej. Cliente frecuente"
-              placeholderTextColor="#8B96A5"
-              style={styles.field}
-              value={labelName}
-            />
-            <Text style={styles.colorLabel}>Color</Text>
-            <View style={styles.colorList}>
-              {[
-                '#101C2D',
-                '#2563EB',
-                '#16A34A',
-                '#CA8A04',
-                '#DB2777',
-                '#7C3AED',
-              ].map((color) => (
-                <Pressable
-                  accessibilityLabel={`Seleccionar color ${color}`}
-                  key={color}
-                  onPress={() => setLabelColor(color)}
-                  style={[
-                    styles.colorOption,
-                    { backgroundColor: color },
-                    labelColor === color && styles.colorOptionSelected,
-                  ]}
-                />
-              ))}
-            </View>
+          <View style={styles.overlay}>
             <Pressable
-              disabled={createLabel.isPending || !labelName.trim()}
-              onPress={() => createLabel.mutate()}
+              onPress={() => setIsLabelOpen(false)}
+              style={styles.backdrop}
+            />
+            <View
               style={[
-                styles.saveButton,
-                (createLabel.isPending || !labelName.trim()) && styles.disabled,
+                styles.labelSheet,
+                { paddingBottom: layout.bottomInset + 20 },
               ]}
             >
-              <Text style={styles.saveLabel}>
-                {createLabel.isPending ? 'Guardando...' : 'Guardar etiqueta'}
+              <View style={styles.handle} />
+              <Text style={styles.sheetTitle}>Nueva etiqueta</Text>
+              <Text style={styles.sheetCopy}>
+                Úsala para identificar y filtrar tus clientes.
               </Text>
-            </Pressable>
+              <TextInput
+                autoFocus
+                accessibilityLabel="Nombre de la etiqueta"
+                maxLength={60}
+                onChangeText={setLabelName}
+                placeholder="Ej. Cliente frecuente"
+                placeholderTextColor="#8B96A5"
+                style={styles.field}
+                value={labelName}
+              />
+              <Text style={styles.colorLabel}>Color</Text>
+              <View style={styles.colorList}>
+                {[
+                  '#101C2D',
+                  '#2563EB',
+                  '#16A34A',
+                  '#CA8A04',
+                  '#DB2777',
+                  '#7C3AED',
+                ].map((color) => (
+                  <Pressable
+                    accessibilityLabel={`Seleccionar color ${color}`}
+                    key={color}
+                    onPress={() => setLabelColor(color)}
+                    style={[
+                      styles.colorOption,
+                      { backgroundColor: color },
+                      labelColor === color && styles.colorOptionSelected,
+                    ]}
+                  />
+                ))}
+              </View>
+              <Pressable
+                disabled={createLabel.isPending || !labelName.trim()}
+                onPress={() => createLabel.mutate()}
+                style={[
+                  styles.saveButton,
+                  (createLabel.isPending || !labelName.trim()) &&
+                    styles.disabled,
+                ]}
+              >
+                <Text style={styles.saveLabel}>
+                  {createLabel.isPending ? 'Guardando...' : 'Guardar etiqueta'}
+                </Text>
+              </Pressable>
+            </View>
           </View>
-        </View>
         </KeyboardAvoidingView>
       </Modal>
       <Modal
@@ -1030,131 +1058,137 @@ export default function ClientDetailScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalKeyboard}
         >
-        <View style={styles.overlay}>
-          <Pressable
-            onPress={() => setIsEditing(false)}
-            style={styles.backdrop}
-          />
-          <ScrollView
-            contentContainerStyle={[
-              styles.sheetContent,
-              { paddingBottom: layout.bottomInset + 20 },
-            ]}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            style={[styles.sheet, { maxHeight: layout.sheetMaxHeight }]}
-          >
-            <View style={styles.handle} />
-            <Text style={styles.sheetTitle}>Editar cliente</Text>
-            <Text style={styles.sheetCopy}>
-              Actualiza su información de contacto.
-            </Text>
-            <TextInput
-              accessibilityLabel="Nombre del cliente"
-              onChangeText={setFullName}
-              placeholder="Nombre completo"
-              placeholderTextColor="#8B96A5"
-              style={styles.field}
-              value={fullName}
+          <View style={styles.overlay}>
+            <Pressable
+              onPress={() => setIsEditing(false)}
+              style={styles.backdrop}
             />
-            <TextInput
-              accessibilityLabel="Teléfono del cliente"
-              keyboardType="phone-pad"
-              onChangeText={setPhone}
-              placeholder="Teléfono"
-              placeholderTextColor="#8B96A5"
-              style={styles.field}
-              value={phone}
-            />
-            <TextInput
-              accessibilityLabel="Correo del cliente"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              onChangeText={setEmail}
-              placeholder="Correo electrónico"
-              placeholderTextColor="#8B96A5"
-              style={styles.field}
-              value={email}
-            />
-            {!showAdditionalFields ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setShowAdditionalFields(true)}
-                style={styles.additionalTrigger}
-              >
-                <Ionicons color="#101c2d" name="add-circle-outline" size={20} />
-                <Text style={styles.additionalLabel}>Campos adicionales</Text>
-                <Ionicons color="#69717d" name="chevron-down" size={19} />
-              </Pressable>
-            ) : (
-              <View style={styles.additionalFields}>
-                <Text style={styles.additionalHeading}>Campos adicionales</Text>
-                <TextInput
-                  accessibilityLabel="Apellido del cliente"
-                  onChangeText={setLastName}
-                  placeholder="Apellido"
-                  placeholderTextColor="#8B96A5"
-                  style={styles.field}
-                  value={lastName}
-                />
-                <TextInput
-                  accessibilityLabel="Fecha de nacimiento"
-                  onChangeText={setBirthDate}
-                  placeholder="Fecha de nacimiento (AAAA-MM-DD)"
-                  placeholderTextColor="#8B96A5"
-                  style={styles.field}
-                  value={birthDate}
-                />
-                <TextInput
-                  accessibilityLabel="Dirección del cliente"
-                  onChangeText={setAddressLine}
-                  placeholder="Dirección"
-                  placeholderTextColor="#8B96A5"
-                  style={styles.field}
-                  value={addressLine}
-                />
-                <TextInput
-                  accessibilityLabel="Documento del cliente"
-                  onChangeText={setDocumentNumber}
-                  placeholder="Documento de identidad"
-                  placeholderTextColor="#8B96A5"
-                  style={styles.field}
-                  value={documentNumber}
-                />
-                <TextInput
-                  accessibilityLabel="Notas del cliente"
-                  multiline
-                  onChangeText={setNotes}
-                  placeholder="Notas o preferencias"
-                  placeholderTextColor="#8B96A5"
-                  style={[styles.field, styles.notesField]}
-                  textAlignVertical="top"
-                  value={notes}
-                />
+            <ScrollView
+              contentContainerStyle={[
+                styles.sheetContent,
+                { paddingBottom: layout.bottomInset + 20 },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              style={[styles.sheet, { maxHeight: layout.sheetMaxHeight }]}
+            >
+              <View style={styles.handle} />
+              <Text style={styles.sheetTitle}>Editar cliente</Text>
+              <Text style={styles.sheetCopy}>
+                Actualiza su información de contacto.
+              </Text>
+              <TextInput
+                accessibilityLabel="Nombre del cliente"
+                onChangeText={setFullName}
+                placeholder="Nombre completo"
+                placeholderTextColor="#8B96A5"
+                style={styles.field}
+                value={fullName}
+              />
+              <TextInput
+                accessibilityLabel="Teléfono del cliente"
+                keyboardType="phone-pad"
+                onChangeText={setPhone}
+                placeholder="Teléfono"
+                placeholderTextColor="#8B96A5"
+                style={styles.field}
+                value={phone}
+              />
+              <TextInput
+                accessibilityLabel="Correo del cliente"
+                autoCapitalize="none"
+                keyboardType="email-address"
+                onChangeText={setEmail}
+                placeholder="Correo electrónico"
+                placeholderTextColor="#8B96A5"
+                style={styles.field}
+                value={email}
+              />
+              {!showAdditionalFields ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setShowAdditionalFields(true)}
+                  style={styles.additionalTrigger}
+                >
+                  <Ionicons
+                    color="#101c2d"
+                    name="add-circle-outline"
+                    size={20}
+                  />
+                  <Text style={styles.additionalLabel}>Campos adicionales</Text>
+                  <Ionicons color="#69717d" name="chevron-down" size={19} />
+                </Pressable>
+              ) : (
+                <View style={styles.additionalFields}>
+                  <Text style={styles.additionalHeading}>
+                    Campos adicionales
+                  </Text>
+                  <TextInput
+                    accessibilityLabel="Apellido del cliente"
+                    onChangeText={setLastName}
+                    placeholder="Apellido"
+                    placeholderTextColor="#8B96A5"
+                    style={styles.field}
+                    value={lastName}
+                  />
+                  <TextInput
+                    accessibilityLabel="Fecha de nacimiento"
+                    onChangeText={setBirthDate}
+                    placeholder="Fecha de nacimiento (AAAA-MM-DD)"
+                    placeholderTextColor="#8B96A5"
+                    style={styles.field}
+                    value={birthDate}
+                  />
+                  <TextInput
+                    accessibilityLabel="Dirección del cliente"
+                    onChangeText={setAddressLine}
+                    placeholder="Dirección"
+                    placeholderTextColor="#8B96A5"
+                    style={styles.field}
+                    value={addressLine}
+                  />
+                  <TextInput
+                    accessibilityLabel="Documento del cliente"
+                    onChangeText={setDocumentNumber}
+                    placeholder="Documento de identidad"
+                    placeholderTextColor="#8B96A5"
+                    style={styles.field}
+                    value={documentNumber}
+                  />
+                  <TextInput
+                    accessibilityLabel="Notas del cliente"
+                    multiline
+                    onChangeText={setNotes}
+                    placeholder="Notas o preferencias"
+                    placeholderTextColor="#8B96A5"
+                    style={[styles.field, styles.notesField]}
+                    textAlignVertical="top"
+                    value={notes}
+                  />
+                </View>
+              )}
+              <View style={styles.sheetActions}>
+                <Pressable
+                  onPress={() => setIsEditing(false)}
+                  style={styles.cancelButton}
+                >
+                  <Text style={styles.cancelLabel}>Cancelar</Text>
+                </Pressable>
+                <Pressable
+                  disabled={updateClient.isPending}
+                  onPress={() => updateClient.mutate()}
+                  style={[
+                    styles.saveButton,
+                    updateClient.isPending && styles.disabled,
+                  ]}
+                >
+                  <Text style={styles.saveLabel}>
+                    {updateClient.isPending ? 'Guardando...' : 'Guardar'}
+                  </Text>
+                </Pressable>
               </View>
-            )}
-            <View style={styles.sheetActions}>
-              <Pressable
-                onPress={() => setIsEditing(false)}
-                style={styles.cancelButton}
-              >
-                <Text style={styles.cancelLabel}>Cancelar</Text>
-              </Pressable>
-              <Pressable
-                disabled={updateClient.isPending}
-                onPress={() => updateClient.mutate()}
-                style={[
-                  styles.saveButton,
-                  updateClient.isPending && styles.disabled,
-                ]}
-              >
-                <Text style={styles.saveLabel}>
-                  {updateClient.isPending ? 'Guardando...' : 'Guardar'}
-                </Text>
-              </Pressable>
-            </View>
-          </ScrollView>
-        </View>
+            </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>

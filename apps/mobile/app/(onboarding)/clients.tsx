@@ -1,5 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import * as Contacts from 'expo-contacts';
+import {
+  Contact,
+  ContactField,
+  getPermissionsAsync,
+  requestPermissionsAsync,
+} from 'expo-contacts';
 import type {
   ClientLabelRecord,
   ClientLabelsResponse,
@@ -16,6 +21,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -32,7 +38,44 @@ import {
 } from '../../src/components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { requireApiClient } from '../../src/lib/api';
+import {
+  normalizeClientRecord,
+  normalizeClientsResponse,
+} from '../../src/lib/client-record';
 import { useAuth } from '../../src/providers/AuthProvider';
+
+const CONTACT_IMPORT_FIELDS = [
+  ContactField.FULL_NAME,
+  ContactField.PHONES,
+] as const;
+
+function normalizedPhone(value: string | undefined) {
+  const digits = value?.replace(/\D/gu, '') ?? '';
+  return digits.length >= 5 ? digits : null;
+}
+
+function csvCell(value: string | null) {
+  return `"${(value ?? '').replace(/"/gu, '""')}"`;
+}
+
+function clientsCsv(clients: readonly ClientRecord[]) {
+  return [
+    'Nombre,Apellido,Teléfono,Correo,Dirección,Documento,Notas',
+    ...clients.map((client) =>
+      [
+        client.fullName,
+        client.lastName,
+        client.phone,
+        client.email,
+        client.addressLine,
+        client.documentNumber,
+        client.notes,
+      ]
+        .map(csvCell)
+        .join(','),
+    ),
+  ].join('\n');
+}
 
 export default function ClientsScreen() {
   const { session } = useAuth();
@@ -43,6 +86,8 @@ export default function ClientsScreen() {
   const [activeLabelId, setActiveLabelId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isDeletingSelected, setIsDeletingSelected] = useState(false);
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const importContacts = useCallback(async () => {
     if (Platform.OS === 'web') {
       Alert.alert(
@@ -52,11 +97,11 @@ export default function ClientsScreen() {
       return;
     }
     try {
-      const currentPermission = await Contacts.getPermissionsAsync();
+      const currentPermission = await getPermissionsAsync();
       const permission =
         currentPermission.status === 'granted'
           ? currentPermission
-          : await Contacts.requestPermissionsAsync();
+          : await requestPermissionsAsync();
 
       if (permission.status !== 'granted') {
         if (!permission.canAskAgain) {
@@ -92,47 +137,68 @@ export default function ClientsScreen() {
     }
     setIsImporting(true);
     try {
-      const result = await Contacts.getContactsAsync({
-        fields: [
-          Contacts.Fields.Name,
-          Contacts.Fields.PhoneNumbers,
-          Contacts.Fields.Emails,
-        ],
-      });
-      const existingClients =
-        await requireApiClient().request<ClientsResponse>('/v1/clients');
+      const supportsMultipleNativeSelection =
+        Platform.OS === 'ios' &&
+        Number.parseInt(String(Platform.Version), 10) >= 18;
+      const selectedContacts = supportsMultipleNativeSelection
+        ? await Contact.presentAccessPicker()
+        : [await Contact.presentPicker()].filter(
+            (contact): contact is Contact => contact !== null,
+          );
+      if (!selectedContacts.length) return;
+      const contacts = await Promise.all(
+        selectedContacts.map((contact) =>
+          contact.getDetails(CONTACT_IMPORT_FIELDS),
+        ),
+      );
+      if (!contacts.length) {
+        Alert.alert(
+          'Contactos importados',
+          'No encontramos contactos en tu telÃ©fono para importar.',
+        );
+        return;
+      }
+      const existingClients = normalizeClientsResponse(
+        await requireApiClient().request<ClientsResponse>('/v1/clients'),
+      );
       const knownPhones = new Set(
         existingClients.clients
-          .map((client) => client.phone?.replace(/\D/gu, ''))
+          .map((client) => normalizedPhone(client.phone ?? undefined))
           .filter((phone): phone is string => Boolean(phone)),
       );
-      const importable = result.data.filter((contact) => {
-        const phone = contact.phoneNumbers?.[0]?.number?.replace(/\D/gu, '');
-        return (
-          Boolean(contact.name || contact.firstName) &&
-          Boolean(phone) &&
-          !knownPhones.has(phone as string)
-        );
+      const importable = contacts.flatMap((contact) => {
+        const fullName = contact.fullName?.trim();
+        const phone = contact.phones
+          .find((item) => normalizedPhone(item.number))
+          ?.number?.trim();
+        const phoneKey = normalizedPhone(phone);
+        if (!fullName || !phone || !phoneKey || knownPhones.has(phoneKey)) {
+          return [];
+        }
+        knownPhones.add(phoneKey);
+        return [{ fullName, phone }];
       });
+      const importedClients: ClientRecord[] = [];
       for (const contact of importable) {
-        const fullName = (contact.firstName || contact.name || '').trim();
-        knownPhones.add(
-          (contact.phoneNumbers?.[0]?.number ?? '').replace(/\D/gu, ''),
-        );
-        await requireApiClient().request('/v1/clients', {
+        const response = await requireApiClient().request<{
+          readonly client: ClientRecord;
+        }>('/v1/clients', {
           body: {
-            email: contact.emails?.[0]?.email || undefined,
-            fullName,
-            lastName: contact.lastName || undefined,
-            phone: contact.phoneNumbers?.[0]?.number || '',
+            fullName: contact.fullName,
+            phone: contact.phone,
           },
           method: 'POST',
         });
+        const importedClient = normalizeClientRecord(response.client);
+        if (!importedClient) {
+          throw new Error('El contacto importado no recibió datos válidos.');
+        }
+        importedClients.push(importedClient);
       }
       await queryClient.invalidateQueries({ queryKey: ['clients'] });
       Alert.alert(
         'Contactos importados',
-        importable.length
+        importedClients.length
           ? 'Tus contactos ya est?n disponibles en Nava.'
           : 'No encontramos contactos con nombre y tel?fono para importar.',
       );
@@ -149,6 +215,7 @@ export default function ClientsScreen() {
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<ClientsResponse>('/v1/clients'),
     queryKey: ['clients'],
+    select: normalizeClientsResponse,
   });
   const labelsQuery = useQuery({
     enabled: Boolean(session),
@@ -170,23 +237,130 @@ export default function ClientsScreen() {
       return matchesLabel && matchesSearch;
     });
   }, [activeLabelId, clientsQuery.data?.clients, search]);
+  const selectedClients = useMemo(() => {
+    const selectedIds = new Set(selectedClientIds);
+    return (clientsQuery.data?.clients ?? []).filter((client) =>
+      selectedIds.has(client.id),
+    );
+  }, [clientsQuery.data?.clients, selectedClientIds]);
+  const isSelectingClients = selectedClients.length > 0;
+
+  const toggleClientSelection = useCallback((clientId: string) => {
+    setSelectedClientIds((current) =>
+      current.includes(clientId)
+        ? current.filter((id) => id !== clientId)
+        : [...current, clientId],
+    );
+  }, []);
+
+  const exportSelectedClients = useCallback(async () => {
+    if (!selectedClients.length) return;
+    try {
+      await Share.share({
+        message: clientsCsv(selectedClients),
+        title: 'Clientes de Nava.csv',
+      });
+    } catch (error) {
+      Alert.alert(
+        'No pudimos exportar los clientes',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      );
+    }
+  }, [selectedClients]);
+
+  const deleteSelectedClients = useCallback(async () => {
+    if (!selectedClients.length) return;
+    setIsDeletingSelected(true);
+    try {
+      for (const client of selectedClients) {
+        await requireApiClient().request<void>(`/v1/clients/${client.id}`, {
+          method: 'DELETE',
+        });
+      }
+      setSelectedClientIds([]);
+      await queryClient.invalidateQueries({ queryKey: ['clients'] });
+    } catch (error) {
+      Alert.alert(
+        'No pudimos eliminar todos los clientes',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      );
+      await queryClient.invalidateQueries({ queryKey: ['clients'] });
+    } finally {
+      setIsDeletingSelected(false);
+    }
+  }, [queryClient, selectedClients]);
+
+  const confirmDeleteSelectedClients = useCallback(() => {
+    if (!selectedClients.length) return;
+    Alert.alert(
+      'Eliminar clientes',
+      `Eliminarás ${selectedClients.length} cliente${
+        selectedClients.length === 1 ? '' : 's'
+      } del directorio.`,
+      [
+        { style: 'cancel', text: 'Cancelar' },
+        {
+          onPress: () => void deleteSelectedClients(),
+          style: 'destructive',
+          text: 'Eliminar',
+        },
+      ],
+    );
+  }, [deleteSelectedClients, selectedClients.length]);
   if (!session) return <Redirect href="/(auth)/login" />;
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
       <View style={styles.header}>
         <Text accessibilityRole="header" style={styles.headerTitle}>
-          Clientes
+          {isSelectingClients
+            ? `${selectedClients.length} seleccionado${
+                selectedClients.length === 1 ? '' : 's'
+              }`
+            : 'Clientes'}
         </Text>
-        <Pressable
-          accessibilityLabel="Sincronizar contactos del teléfono"
-          accessibilityRole="button"
-          disabled={isImporting}
-          onPress={() => void importContacts()}
-          style={[styles.iconButton, isImporting && { opacity: 0.55 }]}
-        >
-          <Ionicons color="#101c2d" name="sync-outline" size={23} />
-        </Pressable>
+        {isSelectingClients ? (
+          <View style={styles.selectionActions}>
+            <Pressable
+              accessibilityLabel="Exportar clientes seleccionados"
+              accessibilityRole="button"
+              onPress={() => void exportSelectedClients()}
+              style={styles.selectionAction}
+            >
+              <Ionicons color="#101c2d" name="share-outline" size={22} />
+            </Pressable>
+            <Pressable
+              accessibilityLabel="Eliminar clientes seleccionados"
+              accessibilityRole="button"
+              disabled={isDeletingSelected}
+              onPress={confirmDeleteSelectedClients}
+              style={[
+                styles.selectionAction,
+                isDeletingSelected && styles.disabled,
+              ]}
+            >
+              <Ionicons color="#B42318" name="trash-outline" size={22} />
+            </Pressable>
+            <Pressable
+              accessibilityLabel="Cancelar selección"
+              accessibilityRole="button"
+              onPress={() => setSelectedClientIds([])}
+              style={styles.selectionAction}
+            >
+              <Ionicons color="#101c2d" name="close" size={24} />
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            accessibilityLabel="Sincronizar contactos del teléfono"
+            accessibilityRole="button"
+            disabled={isImporting}
+            onPress={() => void importContacts()}
+            style={[styles.iconButton, isImporting && { opacity: 0.55 }]}
+          >
+            <Ionicons color="#101c2d" name="sync-outline" size={23} />
+          </Pressable>
+        )}
       </View>
 
       <ScrollView
@@ -238,54 +412,79 @@ export default function ClientsScreen() {
         ) : null}
         {visibleClients.length ? (
           <View style={styles.list}>
-            {visibleClients.map((client) => (
-              <Pressable
-                accessibilityHint="Abre la ficha y edición del cliente"
-                accessibilityLabel={`Ver cliente ${client.fullName}`}
-                accessibilityRole="button"
-                key={client.id}
-                onPress={() =>
-                  router.push({
-                    pathname: '/client-detail',
-                    params: { clientId: client.id },
-                  })
-                }
-                style={styles.clientRow}
-              >
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarLabel}>
-                    {client.fullName.slice(0, 1).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={styles.clientCopy}>
-                  <Text style={styles.clientName}>
-                    {client.fullName}
-                    {client.lastName ? ' ' + client.lastName : ''}
-                  </Text>
-                  <Text style={styles.clientPhone}>
-                    {client.phone || 'Sin tel?fono registrado'}
-                  </Text>
-                  {client.labels.length ? (
-                    <View style={styles.clientLabels}>
-                      {client.labels.slice(0, 2).map((label) => (
-                        <View
-                          key={label.id}
-                          style={[
-                            styles.clientLabel,
-                            { backgroundColor: label.color },
-                          ]}
-                        >
-                          <Text style={styles.clientLabelText}>
-                            {label.name}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  ) : null}
-                </View>
-                <Ionicons color="#69717d" name="chevron-forward" size={20} />
-              </Pressable>
-            ))}
+            {visibleClients.map((client) => {
+              const isSelected = selectedClientIds.includes(client.id);
+              return (
+                <Pressable
+                  accessibilityHint="Abre la ficha y edición del cliente"
+                  accessibilityLabel={`Ver cliente ${client.fullName}`}
+                  accessibilityRole="button"
+                  key={client.id}
+                  accessibilityState={{ selected: isSelected }}
+                  delayLongPress={350}
+                  onLongPress={() => toggleClientSelection(client.id)}
+                  onPress={() => {
+                    if (isSelectingClients) {
+                      toggleClientSelection(client.id);
+                      return;
+                    }
+                    router.push({
+                      pathname: '/client-detail',
+                      params: { clientId: client.id },
+                    });
+                  }}
+                  style={[
+                    styles.clientRow,
+                    isSelected && styles.clientRowSelected,
+                  ]}
+                >
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarLabel}>
+                      {client.fullName.slice(0, 1).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.clientCopy}>
+                    <Text style={styles.clientName}>
+                      {client.fullName}
+                      {client.lastName ? ' ' + client.lastName : ''}
+                    </Text>
+                    <Text style={styles.clientPhone}>
+                      {client.phone || 'Sin tel?fono registrado'}
+                    </Text>
+                    {client.labels.length ? (
+                      <View style={styles.clientLabels}>
+                        {client.labels.slice(0, 2).map((label) => (
+                          <View
+                            key={label.id}
+                            style={[
+                              styles.clientLabel,
+                              { backgroundColor: label.color },
+                            ]}
+                          >
+                            <Text style={styles.clientLabelText}>
+                              {label.name}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
+                  {isSelectingClients ? (
+                    <Ionicons
+                      color={isSelected ? '#101c2d' : '#69717d'}
+                      name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={24}
+                    />
+                  ) : (
+                    <Ionicons
+                      color="#69717d"
+                      name="chevron-forward"
+                      size={20}
+                    />
+                  )}
+                </Pressable>
+              );
+            })}
           </View>
         ) : (
           <View style={styles.empty}>
@@ -323,10 +522,7 @@ export default function ClientsScreen() {
         accessibilityLabel="Agregar cliente"
         accessibilityRole="button"
         onPress={() => setIsCreateOpen(true)}
-        style={[
-          styles.floatingAdd,
-          { bottom: layout.bottomInset + 84 },
-        ]}
+        style={[styles.floatingAdd, { bottom: layout.bottomInset + 84 }]}
       >
         <Ionicons color="#ffffff" name="add" size={29} />
       </Pressable>
@@ -373,18 +569,21 @@ export function ClientFormSheet({
     mutationFn: () => {
       if (!fullName.trim() || !phone.trim())
         throw new Error('Ingresa el nombre y teléfono del cliente.');
-      return requireApiClient().request<{ client: ClientRecord }>('/v1/clients', {
-        body: {
-          addressLine: addressLine.trim() || undefined,
-          birthDate: birthDate.trim() || undefined,
-          documentNumber: documentNumber.trim() || undefined,
-          email: email.trim() || undefined,
-          fullName: fullName.trim(),
-          lastName: lastName.trim() || undefined,
-          phone: phone.trim(),
+      return requireApiClient().request<{ client: ClientRecord }>(
+        '/v1/clients',
+        {
+          body: {
+            addressLine: addressLine.trim() || undefined,
+            birthDate: birthDate.trim() || undefined,
+            documentNumber: documentNumber.trim() || undefined,
+            email: email.trim() || undefined,
+            fullName: fullName.trim(),
+            lastName: lastName.trim() || undefined,
+            phone: phone.trim(),
+          },
+          method: 'POST',
         },
-        method: 'POST',
-      });
+      );
     },
     onError: (error) =>
       Alert.alert(
@@ -417,91 +616,137 @@ export function ClientFormSheet({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.modalKeyboard}
       >
-      <View style={styles.overlay}>
-        <Pressable
-          accessibilityLabel="Cerrar formulario"
-          accessibilityRole="button"
-          onPress={close}
-          style={styles.backdrop}
-        />
-        <View
-          style={[
-            styles.sheet,
-            {
-              maxHeight: layout.sheetMaxHeight,
-              paddingBottom: layout.bottomInset + 20,
-            },
-          ]}
-        >
-          <View style={styles.sheetDragArea}>
-            <View style={styles.handle} />
-          </View>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
+        <View style={styles.overlay}>
+          <Pressable
+            accessibilityLabel="Cerrar formulario"
+            accessibilityRole="button"
+            onPress={close}
+            style={styles.backdrop}
+          />
+          <View
+            style={[
+              styles.sheet,
+              {
+                maxHeight: layout.sheetMaxHeight,
+                paddingBottom: layout.bottomInset + 20,
+              },
+            ]}
           >
-            <Text style={styles.sheetTitle}>Nuevo cliente</Text>
-            <Text style={styles.sheetCopy}>
-              Guarda sus datos para encontrarlo al crear una reserva.
-            </Text>
-            <TextInput
-              autoFocus
-              accessibilityLabel="Nombre del cliente"
-              onChangeText={setFullName}
-              placeholder="Nombre"
-              placeholderTextColor="#7b838d"
-              style={styles.field}
-              value={fullName}
-            />
-            <TextInput
-              accessibilityLabel="Apellido del cliente"
-              onChangeText={setLastName}
-              placeholder="Apellido (opcional)"
-              placeholderTextColor="#7b838d"
-              style={styles.field}
-              value={lastName}
-            />
-            <TextInput
-              accessibilityLabel="Teléfono del cliente"
-              keyboardType="phone-pad"
-              onChangeText={setPhone}
-              placeholder="Teléfono"
-              placeholderTextColor="#7b838d"
-              style={styles.field}
-              value={phone}
-            />
-            {!showAdditionalFields ? (
+            <View style={styles.sheetDragArea}>
+              <View style={styles.handle} />
+            </View>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.sheetTitle}>Nuevo cliente</Text>
+              <Text style={styles.sheetCopy}>
+                Guarda sus datos para encontrarlo al crear una reserva.
+              </Text>
+              <TextInput
+                autoFocus
+                accessibilityLabel="Nombre del cliente"
+                onChangeText={setFullName}
+                placeholder="Nombre"
+                placeholderTextColor="#7b838d"
+                style={styles.field}
+                value={fullName}
+              />
+              <TextInput
+                accessibilityLabel="Apellido del cliente"
+                onChangeText={setLastName}
+                placeholder="Apellido (opcional)"
+                placeholderTextColor="#7b838d"
+                style={styles.field}
+                value={lastName}
+              />
+              <TextInput
+                accessibilityLabel="Teléfono del cliente"
+                keyboardType="phone-pad"
+                onChangeText={setPhone}
+                placeholder="Teléfono"
+                placeholderTextColor="#7b838d"
+                style={styles.field}
+                value={phone}
+              />
+              {!showAdditionalFields ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setShowAdditionalFields(true)}
+                  style={styles.additionalTrigger}
+                >
+                  <Ionicons
+                    color="#101c2d"
+                    name="add-circle-outline"
+                    size={20}
+                  />
+                  <Text style={styles.additionalLabel}>
+                    Agregar campos adicionales
+                  </Text>
+                  <Ionicons color="#69717d" name="chevron-down" size={19} />
+                </Pressable>
+              ) : (
+                <View style={styles.additionalFields}>
+                  <Text style={styles.additionalHeading}>
+                    Información adicional
+                  </Text>
+                  <TextInput
+                    accessibilityLabel="Fecha de nacimiento"
+                    onChangeText={setBirthDate}
+                    placeholder="Fecha de nacimiento (AAAA-MM-DD)"
+                    placeholderTextColor="#7b838d"
+                    style={styles.field}
+                    value={birthDate}
+                  />
+                  <TextInput
+                    accessibilityLabel="Dirección"
+                    onChangeText={setAddressLine}
+                    placeholder="Dirección"
+                    placeholderTextColor="#7b838d"
+                    style={styles.field}
+                    value={addressLine}
+                  />
+                  <TextInput
+                    accessibilityLabel="Documento"
+                    onChangeText={setDocumentNumber}
+                    placeholder="Documento de identidad"
+                    placeholderTextColor="#7b838d"
+                    style={styles.field}
+                    value={documentNumber}
+                  />
+                  <TextInput
+                    accessibilityLabel="Email"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    onChangeText={setEmail}
+                    placeholder="Correo electrónico"
+                    placeholderTextColor="#7b838d"
+                    style={styles.field}
+                    value={email}
+                  />
+                </View>
+              )}
               <Pressable
                 accessibilityRole="button"
-                onPress={() => setShowAdditionalFields(true)}
-                style={styles.additionalTrigger}
+                disabled={
+                  createClient.isPending || !fullName.trim() || !phone.trim()
+                }
+                onPress={() => createClient.mutate()}
+                style={[
+                  styles.saveButton,
+                  (!fullName.trim() ||
+                    !phone.trim() ||
+                    createClient.isPending) &&
+                    styles.saveButtonDisabled,
+                ]}
               >
-                <Ionicons color="#101c2d" name="add-circle-outline" size={20} />
-                <Text style={styles.additionalLabel}>Agregar campos adicionales</Text>
-                <Ionicons color="#69717d" name="chevron-down" size={19} />
+                <Text style={styles.saveLabel}>
+                  {createClient.isPending ? 'Guardando...' : 'Guardar cliente'}
+                </Text>
               </Pressable>
-            ) : (
-              <View style={styles.additionalFields}>
-                <Text style={styles.additionalHeading}>Información adicional</Text>
-                <TextInput accessibilityLabel="Fecha de nacimiento" onChangeText={setBirthDate} placeholder="Fecha de nacimiento (AAAA-MM-DD)" placeholderTextColor="#7b838d" style={styles.field} value={birthDate} />
-                <TextInput accessibilityLabel="Dirección" onChangeText={setAddressLine} placeholder="Dirección" placeholderTextColor="#7b838d" style={styles.field} value={addressLine} />
-                <TextInput accessibilityLabel="Documento" onChangeText={setDocumentNumber} placeholder="Documento de identidad" placeholderTextColor="#7b838d" style={styles.field} value={documentNumber} />
-                <TextInput accessibilityLabel="Email" autoCapitalize="none" keyboardType="email-address" onChangeText={setEmail} placeholder="Correo electrónico" placeholderTextColor="#7b838d" style={styles.field} value={email} />
-              </View>
-            )}
-            <Pressable
-              accessibilityRole="button"
-              disabled={createClient.isPending || !fullName.trim() || !phone.trim()}
-              onPress={() => createClient.mutate()}
-              style={[styles.saveButton, (!fullName.trim() || !phone.trim() || createClient.isPending) && styles.saveButtonDisabled]}
-            >
-              <Text style={styles.saveLabel}>
-                {createClient.isPending ? 'Guardando...' : 'Guardar cliente'}
-              </Text>
-            </Pressable>
-          </ScrollView>
+            </ScrollView>
+          </View>
         </View>
-      </View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -617,7 +862,13 @@ const styles = StyleSheet.create({
     padding: 14,
     ...goldShadow,
   },
+  clientRowSelected: {
+    backgroundColor: '#FFF7E5',
+    borderColor: appTheme.colors.accent,
+    borderWidth: 2,
+  },
   content: { paddingBottom: 128, paddingHorizontal: 24, paddingTop: 28 },
+  disabled: { opacity: 0.55 },
   empty: { alignItems: 'center', marginHorizontal: 20, marginTop: 76 },
   emptyAction: {
     color: '#101c2d',
@@ -699,6 +950,15 @@ const styles = StyleSheet.create({
     marginRight: 64,
     width: 50,
   },
+  selectionAction: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  selectionActions: { flexDirection: 'row', gap: 8 },
   list: { marginTop: 23 },
   overlay: {
     backgroundColor: 'rgba(16, 28, 45, 0.48)',

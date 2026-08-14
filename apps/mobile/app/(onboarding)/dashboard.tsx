@@ -61,6 +61,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const SUBSCRIPTION_NOTICE_TRIAL_DAYS = 3;
 const SUBSCRIPTION_NOTICE_ACTIVE_DAYS = 7;
 const DASHBOARD_BANNER_DELAY_MS = 10_000;
+const LOCATION_BANNER_DELAY_MS = 500;
 const WELCOME_SURVEY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 const WELCOME_SURVEY_RESPONSE_KEY = 'barber-saas.welcome-survey-response';
 const QUICK_ACTIONS_STORAGE_KEY = 'barber-saas.dashboard-quick-actions';
@@ -185,9 +186,15 @@ async function storeWelcomeSurveyResponse(
   await SecureStore.setItemAsync(key, value);
 }
 
-async function markWelcomeSurveyDismissed(userId: string) {
+async function markWelcomeSurveyDismissed(
+  userId: string,
+  sessionExpiresAt: string | null,
+) {
   const key = welcomeSurveyStorageKey(userId);
-  const value = JSON.stringify({ dismissedAt: new Date().toISOString() });
+  const value = JSON.stringify({
+    dismissedAt: new Date().toISOString(),
+    sessionExpiresAt,
+  });
 
   if (Platform.OS === 'web') {
     globalThis.localStorage.setItem(key, value);
@@ -196,14 +203,23 @@ async function markWelcomeSurveyDismissed(userId: string) {
   await SecureStore.setItemAsync(key, value);
 }
 
-function shouldShowWelcomeSurvey(storedResponse: string | null) {
+function shouldShowWelcomeSurvey(
+  storedResponse: string | null,
+  sessionExpiresAt: string | null,
+) {
   if (storedResponse === null) return true;
 
   try {
     const response = JSON.parse(storedResponse) as {
       readonly dismissedAt?: unknown;
+      readonly sessionExpiresAt?: unknown;
       readonly submittedAt?: unknown;
     };
+
+    if (typeof response.dismissedAt === 'string') {
+      return response.sessionExpiresAt !== sessionExpiresAt;
+    }
+
     const interactedAt = response.submittedAt ?? response.dismissedAt;
 
     if (typeof interactedAt !== 'string') return true;
@@ -1951,6 +1967,15 @@ export default function DashboardScreen() {
       };
     }
 
+    // A pending business location is required for the booking experience, so
+    // show that prompt before optional notification permissions.
+    if (needsLocationBanner === null || needsLocationBanner) {
+      if (needsLocationBanner) setNotificationFlowState('completed');
+      return () => {
+        isMounted = false;
+      };
+    }
+
     // Expo Web can report the browser permission as undetermined after a
     // refresh or sign-out. Push registration is native-only, so do not start
     // the permission flow in the web build.
@@ -2005,7 +2030,7 @@ export default function DashboardScreen() {
       isMounted = false;
       if (notificationPromptTimer) clearTimeout(notificationPromptTimer);
     };
-  }, [canPromptForNotifications, isDashboardFocused]);
+  }, [canPromptForNotifications, isDashboardFocused, needsLocationBanner]);
 
   useEffect(() => {
     let isMounted = true;
@@ -2016,7 +2041,11 @@ export default function DashboardScreen() {
       if (!user) return;
       try {
         const response = await getWelcomeSurveyResponse(user.id);
-        if (isMounted) setNeedsWelcomeSurvey(shouldShowWelcomeSurvey(response));
+        if (isMounted) {
+          setNeedsWelcomeSurvey(
+            shouldShowWelcomeSurvey(response, session?.expiresAt ?? null),
+          );
+        }
       } catch {
         if (isMounted) setNeedsWelcomeSurvey(true);
       }
@@ -2030,10 +2059,14 @@ export default function DashboardScreen() {
   }, [session, user]);
 
   useEffect(() => {
-    if (notificationFlowState === 'completed' && needsWelcomeSurvey) {
+    if (
+      notificationFlowState === 'completed' &&
+      needsWelcomeSurvey &&
+      !needsLocationBanner
+    ) {
       setIsWelcomeSurveyOpen(true);
     }
-  }, [needsWelcomeSurvey, notificationFlowState]);
+  }, [needsLocationBanner, needsWelcomeSurvey, notificationFlowState]);
 
   useEffect(() => {
     setNeedsLocationBanner(null);
@@ -2041,12 +2074,13 @@ export default function DashboardScreen() {
 
     if (!session || !user || !accountQuery.isSuccess) return;
     const location = accountQuery.data?.businessLocation;
-    setNeedsLocationBanner(
-      location?.latitude === null ||
-        location?.latitude === undefined ||
-        location.longitude === null ||
-        location.longitude === undefined,
-    );
+    const hasCompleteLocation =
+      Boolean(location?.formattedAddress?.trim()) &&
+      typeof location?.latitude === 'number' &&
+      Number.isFinite(location.latitude) &&
+      typeof location.longitude === 'number' &&
+      Number.isFinite(location.longitude);
+    setNeedsLocationBanner(!hasCompleteLocation);
   }, [
     accountQuery.data?.businessLocation,
     accountQuery.isSuccess,
@@ -2059,14 +2093,13 @@ export default function DashboardScreen() {
 
     if (
       isDashboardFocused &&
-      notificationFlowState === 'completed' &&
-      needsWelcomeSurvey === false &&
+      !isNotificationSheetOpen &&
       !isWelcomeSurveyOpen &&
       needsLocationBanner
     ) {
       locationBannerTimer = setTimeout(
         () => setIsLocationBannerOpen(true),
-        DASHBOARD_BANNER_DELAY_MS,
+        LOCATION_BANNER_DELAY_MS,
       );
     }
 
@@ -2075,10 +2108,9 @@ export default function DashboardScreen() {
     };
   }, [
     isDashboardFocused,
+    isNotificationSheetOpen,
     isWelcomeSurveyOpen,
     needsLocationBanner,
-    needsWelcomeSurvey,
-    notificationFlowState,
   ]);
 
   const completeNotificationFlow = () => {
@@ -2109,7 +2141,9 @@ export default function DashboardScreen() {
   const dismissWelcomeSurvey = () => {
     setIsWelcomeSurveyOpen(false);
     setNeedsWelcomeSurvey(false);
-    if (user) void markWelcomeSurveyDismissed(user.id);
+    if (user) {
+      void markWelcomeSurveyDismissed(user.id, session?.expiresAt ?? null);
+    }
   };
 
   const dismissLocationBanner = () => {

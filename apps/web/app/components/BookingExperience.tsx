@@ -282,7 +282,7 @@ export function BookingExperience({
   };
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#FAF9F6] text-[#1C1C1C] [color-scheme:light]">
+    <main className="min-h-screen overflow-x-clip bg-[#FAF9F6] text-[#1C1C1C] [color-scheme:light]">
       {step === 'landing' ? (
         <Landing catalog={catalog} onBook={() => setStep('professional')} />
       ) : (
@@ -978,25 +978,15 @@ function PublicBookingLanding({
     useState<LandingSection>('services');
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
-  const [heroScrollProgress, setHeroScrollProgress] = useState(0);
+  const [heroScrolled, setHeroScrolled] = useState(false);
 
   useEffect(() => {
-    let animationFrame = 0;
-    const updateHeroProgress = () => {
-      const progress = Math.min(1, Math.max(0, window.scrollY / 300));
-      setHeroScrollProgress(progress);
-    };
-    updateHeroProgress();
-    const onScroll = () => {
-      animationFrame = window.requestAnimationFrame(updateHeroProgress);
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      if (animationFrame) window.cancelAnimationFrame(animationFrame);
-    };
-  }, []);
+    const updateHeroState = () => setHeroScrolled(window.scrollY > 8);
 
+    updateHeroState();
+    window.addEventListener('scroll', updateHeroState, { passive: true });
+    return () => window.removeEventListener('scroll', updateHeroState);
+  }, []);
   const categories = useMemo(
     () =>
       Array.from(
@@ -1043,9 +1033,9 @@ function PublicBookingLanding({
       <BusinessHero
         catalog={catalog}
         onBook={startBooking}
-        scrollProgress={heroScrollProgress}
+        scrolled={heroScrolled}
       />
-      <div className="relative z-20 -mt-4 sm:-mt-6">
+      <div className="relative z-20 -mt-4 bg-[#FAF9F6] sm:-mt-6">
         <div className="sticky top-0 z-30 border-b border-[#E4E1DA] bg-[#FAF9F6]/95 shadow-[0_8px_24px_rgba(28,28,28,.05)] backdrop-blur">
           <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-5 lg:px-8">
             <div className="flex max-w-xl items-center gap-3">
@@ -1262,11 +1252,11 @@ function PublicBookingLanding({
 function BusinessHero({
   catalog,
   onBook,
-  scrollProgress,
+  scrolled,
 }: {
   catalog: PublicBookingCatalog;
   onBook: () => void;
-  scrollProgress: number;
+  scrolled: boolean;
 }) {
   const address = [catalog.location.addressLine, catalog.location.city]
     .filter(Boolean)
@@ -1274,11 +1264,7 @@ function BusinessHero({
   const coverImage = catalog.organization.coverImageUri;
   return (
     <section
-      className="relative isolate mx-auto h-[min(156vw,39rem)] min-h-[34rem] max-w-6xl overflow-hidden bg-[#574015] shadow-[0_20px_56px_rgba(180,125,23,.16)] transition-opacity duration-150 sm:h-[35rem] sm:rounded-b-[2rem]"
-      style={{
-        opacity: 1 - scrollProgress * 0.78,
-        transform: `translateY(${scrollProgress * -16}px)`,
-      }}
+      className="sticky top-0 z-0 isolate mx-auto h-[min(156vw,39rem)] min-h-[34rem] max-w-6xl overflow-hidden bg-[#574015] shadow-[0_20px_56px_rgba(0,0,0,.28)] sm:h-[35rem] sm:rounded-b-[2rem]"
     >
       <Image
         alt="Interior de una barbería"
@@ -1292,7 +1278,9 @@ function BusinessHero({
       />
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-gradient-to-t from-[#30230E]/94 via-[#4F3814]/48 to-[#4F3814]/12"
+        className={`absolute inset-0 bg-gradient-to-t from-[#171411]/92 via-[#171411]/62 to-[#171411]/18 transition-opacity duration-500 ease-out motion-reduce:transition-none ${
+          scrolled ? 'opacity-100' : 'opacity-0'
+        }`}
       />
       <div className="absolute inset-x-0 bottom-0 p-5 pb-9 text-white sm:p-8 sm:pb-11">
         <p className="text-xs font-black tracking-[0.18em] text-white/75 uppercase">
