@@ -493,6 +493,29 @@ export interface CurrentOrganizationResponse {
   };
 }
 
+export interface ManagedLocation {
+  readonly addressLine: string | null;
+  readonly city: string | null;
+  readonly countryCode: string;
+  readonly currencyCode: string;
+  readonly formattedAddress: string | null;
+  readonly googlePlaceId: string | null;
+  readonly id: string;
+  readonly latitude: number | null;
+  readonly longitude: number | null;
+  readonly name: string;
+  readonly phone: string;
+  readonly slug: string;
+  readonly timezone: string;
+}
+
+export interface ManagedLocationsResponse {
+  readonly canAdd: boolean;
+  readonly limit: number;
+  readonly locations: readonly ManagedLocation[];
+  readonly used: number;
+}
+
 export interface OnboardingCollaboratorRecord {
   readonly agendaColor: string;
   readonly canPerformServices: boolean;
@@ -570,7 +593,7 @@ export interface SubscriptionFeatureFlags {
 
 export interface SubscriptionPlanRecord {
   readonly available: boolean;
-  readonly code: 'essential' | 'free' | 'local';
+  readonly code: 'essential' | 'free' | 'local' | 'multi';
   readonly currencyCode: string;
   readonly featureFlags: SubscriptionFeatureFlags;
   readonly features: readonly string[];
@@ -591,7 +614,7 @@ export interface SubscriptionResponse {
     readonly currentPeriodStart: string;
     readonly featureFlags: SubscriptionFeatureFlags;
     readonly graceEndsAt: string | null;
-    readonly planCode: 'essential' | 'free' | 'local';
+    readonly planCode: 'essential' | 'free' | 'local' | 'multi';
     readonly readOnly: boolean;
     readonly simulationAvailable: boolean;
     readonly status:
@@ -787,7 +810,11 @@ export interface PublicBookingCatalog {
     readonly countryCode: string;
     readonly currencyCode: string;
     readonly email: string | null;
+    readonly formattedAddress: string | null;
+    readonly googlePlaceId: string | null;
     readonly id: string;
+    readonly latitude: number | null;
+    readonly longitude: number | null;
     readonly name: string;
     readonly phone: string;
     readonly slug: string;
@@ -797,6 +824,9 @@ export interface PublicBookingCatalog {
     readonly profilePhotoData: string | null;
     readonly id: string;
     readonly coverImageUri: string | null;
+    readonly description: string | null;
+    readonly facebookUrl: string | null;
+    readonly instagramUrl: string | null;
     readonly name: string;
     readonly slug: string;
   };

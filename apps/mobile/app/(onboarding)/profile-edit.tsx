@@ -105,18 +105,18 @@ export default function ProfileEditScreen() {
       const updatedProfile = await requireApiClient().request<UserProfileResponse>(
         '/v1/profile',
         {
-          body: JSON.stringify({
+          body: {
             bio: bio.trim() || null,
             fullName: fullName.trim(),
             phone: phone.trim() || null,
             photoData,
-          }),
+          },
           method: 'PATCH',
         },
       );
       if (accountDetails) {
         await requireApiClient().request('/v1/onboarding/account-details', {
-          body: JSON.stringify({
+          body: {
             addressLine: businessAddress.trim() || null,
             businessName:
               businessName.trim() || accountDetails.businessName || fullName.trim(),
@@ -127,7 +127,7 @@ export default function ProfileEditScreen() {
             facebookUrl: facebookUrl.trim() || null,
             instagramUrl: instagramUrl.trim() || null,
             phone: phone.trim() || accountDetails.phone || '',
-          }),
+          },
           method: 'PATCH',
         });
       }
@@ -316,7 +316,7 @@ export default function ProfileEditScreen() {
           </View>
         ) : null}
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Cambios adicionales</Text>
+          <Text style={styles.sectionTitle}>Descripción negocio</Text>
           <Text style={styles.fieldLabel}>Sobre mí</Text>
           <TextInput
             maxLength={500}

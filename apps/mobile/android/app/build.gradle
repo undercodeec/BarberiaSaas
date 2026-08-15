@@ -134,9 +134,6 @@ android {
             keyPassword 'android'
         }
         release {
-            if (googleMapsAndroidApiKey.trim().isEmpty()) {
-                throw new GradleException('Falta GOOGLE_MAPS_ANDROID_API_KEY para compilar el AAB de lanzamiento.')
-            }
             if (hasUploadSigning) {
                 storeFile file(uploadStoreFile)
                 storePassword findProperty('NAVA_UPLOAD_STORE_PASSWORD')
@@ -152,11 +149,11 @@ android {
         release {
             if (hasUploadSigning) {
                 signingConfig signingConfigs.release
-            } else if (System.getenv('EAS_BUILD') == 'true') {
-                // EAS replaces the signing config with its managed credentials.
-                signingConfig signingConfigs.debug
             } else {
-                throw new GradleException('Faltan las propiedades NAVA_UPLOAD_* para firmar el AAB de lanzamiento.')
+                // Permite instalar builds locales de desarrollo sin las credenciales
+                // privadas de lanzamiento. EAS sustituye esta firma con sus
+                // credenciales administradas al generar una distribución.
+                signingConfig signingConfigs.debug
             }
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()

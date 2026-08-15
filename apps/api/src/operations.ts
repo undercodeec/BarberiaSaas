@@ -54,6 +54,7 @@ const subscriptionSimulationSchema = z.object({
   status: z.enum(['active', 'suspended']),
 });
 const createLocationSchema = z.object({
+  addressLine: z.string().trim().max(240).optional(),
   city: z.string().trim().max(120).optional(),
   countryCode: z
     .string()
@@ -66,6 +67,10 @@ const createLocationSchema = z.object({
     .length(3)
     .transform((value) => value.toUpperCase()),
   name: z.string().trim().min(2).max(120),
+  formattedAddress: z.string().trim().max(300).optional(),
+  googlePlaceId: z.string().trim().max(255).nullable().optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
   phone: z.string().trim().min(7).max(24),
   slug: z
     .string()
@@ -75,6 +80,12 @@ const createLocationSchema = z.object({
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u),
   timezone: z.string().trim().min(3).max(80),
 });
+const updateLocationSchema = createLocationSchema
+  .partial()
+  .refine(
+    (value) => Object.keys(value).length > 0,
+    'Debes modificar al menos un campo.',
+  );
 const platformOrganizationParamsSchema = z.object({ id: z.uuid() });
 const platformOrganizationListSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -289,7 +300,7 @@ async function requireProfessional(
     where: {
       id: membershipId,
       organizationId,
-      role: MembershipRole.BARBER,
+      role: { in: [MembershipRole.BARBER, MembershipRole.OWNER] },
       status: { in: [MembershipStatus.ACTIVE, MembershipStatus.INVITED] },
     },
   });
@@ -1169,9 +1180,14 @@ export function registerOperationsRoutes(
           );
         const created = await transaction.location.create({
           data: {
+            addressLine: input.addressLine || null,
             city: input.city || null,
             countryCode: input.countryCode,
             currencyCode: input.currencyCode,
+            formattedAddress: input.formattedAddress || null,
+            googlePlaceId: input.googlePlaceId ?? null,
+            latitude: input.latitude ?? null,
+            longitude: input.longitude ?? null,
             name: input.name,
             organizationId: current.organizationId,
             phone: input.phone,
@@ -1217,6 +1233,156 @@ export function registerOperationsRoutes(
         return created;
       });
       return reply.code(201).send({ location });
+    } catch (error) {
+      if (isUniqueConstraintError(error))
+        throw new ApiError(
+          409,
+          'LOCATION_ALREADY_EXISTS',
+          'Ya existe una sucursal con ese enlace.',
+        );
+      throw error;
+    }
+  });
+
+  app.get('/v1/locations', async (request) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(database, user.id);
+    if (current.role !== MembershipRole.OWNER)
+      throw new ApiError(
+        403,
+        'FORBIDDEN',
+        'Solo el propietario puede administrar sucursales.',
+      );
+    const { subscriptionUsage } = await database.$transaction(
+      async (transaction) => ({
+        subscriptionUsage: await getSubscriptionUsage(
+          transaction,
+          current.organizationId,
+          new Date(),
+        ),
+      }),
+    );
+    const locations = await database.location.findMany({
+      orderBy: { createdAt: 'asc' },
+      where: { isActive: true, organizationId: current.organizationId },
+    });
+    return {
+      canAdd:
+        locations.length < subscriptionUsage.limits.locations,
+      limit: subscriptionUsage.limits.locations,
+      locations: locations.map((location) => ({
+        addressLine: location.addressLine,
+        city: location.city,
+        countryCode: location.countryCode,
+        currencyCode: location.currencyCode,
+        formattedAddress: location.formattedAddress,
+        googlePlaceId: location.googlePlaceId,
+        id: location.id,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        name: location.name,
+        phone: location.phone,
+        slug: location.slug,
+        timezone: location.timezone,
+      })),
+      used: locations.length,
+    };
+  });
+
+  app.patch('/v1/locations/:locationId', async (request) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(database, user.id);
+    if (current.role !== MembershipRole.OWNER)
+      throw new ApiError(
+        403,
+        'FORBIDDEN',
+        'Solo el propietario puede editar sucursales.',
+      );
+    const { locationId } = z
+      .object({ locationId: z.uuid() })
+      .parse(request.params);
+    const input = updateLocationSchema.parse(request.body);
+    const existing = await database.location.findFirst({
+      where: {
+        id: locationId,
+        isActive: true,
+        organizationId: current.organizationId,
+      },
+    });
+    if (!existing)
+      throw new ApiError(404, 'LOCATION_NOT_FOUND', 'La sucursal no existe.');
+    try {
+      const location = await database.$transaction(async (transaction) => {
+        const updated = await transaction.location.update({
+          data: {
+            ...(input.addressLine !== undefined
+              ? { addressLine: input.addressLine || null }
+              : {}),
+            ...(input.city !== undefined ? { city: input.city || null } : {}),
+            ...(input.countryCode !== undefined
+              ? { countryCode: input.countryCode }
+              : {}),
+            ...(input.currencyCode !== undefined
+              ? { currencyCode: input.currencyCode }
+              : {}),
+            ...(input.formattedAddress !== undefined
+              ? { formattedAddress: input.formattedAddress || null }
+              : {}),
+            ...(input.googlePlaceId !== undefined
+              ? { googlePlaceId: input.googlePlaceId }
+              : {}),
+            ...(input.latitude !== undefined ? { latitude: input.latitude } : {}),
+            ...(input.longitude !== undefined
+              ? { longitude: input.longitude }
+              : {}),
+            ...(input.name !== undefined ? { name: input.name } : {}),
+            ...(input.phone !== undefined
+              ? { phone: input.phone, whatsappPhone: input.phone }
+              : {}),
+            ...(input.slug !== undefined ? { slug: input.slug } : {}),
+            ...(input.timezone !== undefined
+              ? { timezone: input.timezone }
+              : {}),
+          },
+          where: { id: existing.id },
+        });
+        await transaction.auditLog.create({
+          data: {
+            action: 'location.updated',
+            actorUserId: user.id,
+            afterData: input,
+            beforeData: {
+              addressLine: existing.addressLine,
+              formattedAddress: existing.formattedAddress,
+              name: existing.name,
+              phone: existing.phone,
+              slug: existing.slug,
+            },
+            entityId: updated.id,
+            entityType: 'location',
+            locationId: updated.id,
+            organizationId: current.organizationId,
+          },
+        });
+        return updated;
+      });
+      return {
+        location: {
+          addressLine: location.addressLine,
+          city: location.city,
+          countryCode: location.countryCode,
+          currencyCode: location.currencyCode,
+          formattedAddress: location.formattedAddress,
+          googlePlaceId: location.googlePlaceId,
+          id: location.id,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          name: location.name,
+          phone: location.phone,
+          slug: location.slug,
+          timezone: location.timezone,
+        },
+      };
     } catch (error) {
       if (isUniqueConstraintError(error))
         throw new ApiError(
@@ -1940,6 +2106,28 @@ export function registerOperationsRoutes(
               priceCents: input.priceCents,
             },
           });
+      const defaultLocationId = current.memberLocations[0]?.locationId;
+      if (
+        defaultLocationId &&
+        (current.role === MembershipRole.BARBER ||
+          current.role === MembershipRole.OWNER)
+      ) {
+        await transaction.professionalService.upsert({
+          create: {
+            locationId: defaultLocationId,
+            membershipId: current.id,
+            serviceId: record.id,
+          },
+          update: {},
+          where: {
+            membershipId_serviceId_locationId: {
+              locationId: defaultLocationId,
+              membershipId: current.id,
+              serviceId: record.id,
+            },
+          },
+        });
+      }
       await transaction.auditLog.create({
         data: {
           action: existing ? 'service.reactivated' : 'service.created',

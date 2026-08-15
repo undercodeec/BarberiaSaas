@@ -194,9 +194,10 @@ describe('política de suscripciones', () => {
     expect(result.subscription.trialEndsAt).toBeNull();
   });
 
-  it('define Esencial en USD 9.83 y Local en USD 29.99 con limites distintos', () => {
+  it('define los planes Esencial, Local y Multi con sus limites y precios', () => {
     const essential = planDefinition('essential');
     const local = planDefinition('local');
+    const multi = planDefinition('multi');
 
     expect(essential).toMatchObject({
       limits: {
@@ -216,17 +217,29 @@ describe('política de suscripciones', () => {
     expect(local).toMatchObject({
       limits: {
         clients: null,
-        locations: 1,
+        locations: 3,
         rolling30DayBookings: null,
         teamMembers: null,
       },
-      monthlyPriceCents: 2999,
+      monthlyPriceCents: 2983,
       name: 'Nava Local',
     });
     expect(local?.featureFlags).toMatchObject({
       commissions: true,
       inventory: true,
+      multiLocation: true,
       team: true,
     });
+    expect(multi).toMatchObject({
+      limits: {
+        clients: null,
+        locations: 6,
+        rolling30DayBookings: null,
+        teamMembers: null,
+      },
+      monthlyPriceCents: 4883,
+      name: 'Nava Multi',
+    });
+    expect(multi?.featureFlags).toMatchObject({ multiLocation: true });
   });
 });

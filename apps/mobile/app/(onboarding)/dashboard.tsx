@@ -79,6 +79,7 @@ type ExtraQuickActionId =
   | 'booking-settings'
   | 'cash-register'
   | 'clients'
+  | 'collaborators'
   | 'notifications'
   | 'reviews-management';
 
@@ -100,6 +101,12 @@ const EXTRA_QUICK_ACTIONS: ReadonlyArray<{
     id: 'clients',
     label: 'Clientes',
     route: '/clients',
+  },
+  {
+    icon: 'people-circle-outline',
+    id: 'collaborators',
+    label: 'Colaboradores',
+    route: '/team-management',
   },
   {
     icon: 'options-outline',
@@ -2158,6 +2165,12 @@ export default function DashboardScreen() {
     setIsQuickActionsPickerOpen(false);
     void storeExtraQuickActionIds(user.id, nextIds);
   };
+  const removeExtraQuickAction = (id: ExtraQuickActionId) => {
+    if (!user) return;
+    const nextIds = extraQuickActionIds.filter((actionId) => actionId !== id);
+    setExtraQuickActionIds(nextIds);
+    void storeExtraQuickActionIds(user.id, nextIds);
+  };
 
   const saveLocation = async (location: GoogleMapsLocationCandidate) => {
     const account = accountQuery.data;
@@ -2265,6 +2278,15 @@ export default function DashboardScreen() {
                   label={action.label}
                   onPress={() => router.push(action.route as never)}
                 />
+                <Pressable
+                  accessibilityLabel={`Quitar acceso rápido ${action.label}`}
+                  accessibilityRole="button"
+                  hitSlop={6}
+                  onPress={() => removeExtraQuickAction(action.id)}
+                  style={styles.extraQuickActionRemove}
+                >
+                  <Ionicons color="#9C3D36" name="remove" size={19} />
+                </Pressable>
               </View>
             ))}
           </View>
@@ -2276,7 +2298,9 @@ export default function DashboardScreen() {
             onPress={() => setIsQuickActionsPickerOpen(true)}
             style={styles.addQuickAction}
           >
-            <Ionicons color="#B47D17" name="add" size={25} />
+            <View style={styles.addQuickActionIcon}>
+              <Ionicons color="#FFFFFF" name="add" size={17} />
+            </View>
             <Text style={styles.addQuickActionLabel}>Agregar acceso</Text>
           </Pressable>
         </View>
@@ -2437,13 +2461,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderColor: 'rgba(199, 149, 50, 0.28)',
-    borderRadius: 22,
-    borderStyle: 'dashed',
+    borderRadius: 17,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 7,
-    minHeight: 46,
-    paddingHorizontal: 16,
+    gap: 9,
+    minHeight: 48,
+    paddingHorizontal: 14,
+    ...goldButtonShadow,
+  },
+  addQuickActionIcon: {
+    alignItems: 'center',
+    backgroundColor: '#B47D17',
+    borderRadius: 11,
+    height: 22,
+    justifyContent: 'center',
+    width: 22,
   },
   addQuickActionLabel: {
     color: '#B47D17',
@@ -2922,7 +2954,21 @@ const styles = StyleSheet.create({
   operationsList: { gap: 10, marginTop: 13 },
   operationsSection: { marginTop: 28 },
   operationsTitle: { color: '#1C1C1C', fontSize: 21, fontWeight: '900' },
-  extraQuickActionSlot: { width: '25%' },
+  extraQuickActionRemove: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: '#E6C1BE',
+    borderRadius: 14,
+    borderWidth: 1,
+    height: 28,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 3,
+    top: -3,
+    width: 28,
+    zIndex: 2,
+  },
+  extraQuickActionSlot: { position: 'relative', width: '25%' },
   extraQuickActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',

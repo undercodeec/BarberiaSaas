@@ -1080,10 +1080,10 @@ function PublicBookingLanding({
           <section className="py-7">
             <SectionHeading>Sobre nosotros</SectionHeading>
             <p className="max-w-2xl text-sm leading-6 text-[#555A63] sm:text-base">
-              {catalog.organization.name} es un espacio para cuidar tu estilo
-              {catalog.location.city ? ` en ${catalog.location.city}` : ''}.
-              Elige el servicio y el profesional que mejor se adapten a tu
-              próxima cita.
+              {catalog.organization.description ||
+                `${catalog.organization.name} es un espacio para cuidar tu estilo${
+                  catalog.location.city ? ` en ${catalog.location.city}` : ''
+                }. Elige el servicio y el profesional que mejor se adapten a tu próxima cita.`}
             </p>
           </section>
 
@@ -1645,6 +1645,18 @@ function BusinessInformation({
   const address = [catalog.location.addressLine, catalog.location.city]
     .filter(Boolean)
     .join(', ');
+  const hasCoordinates =
+    typeof catalog.location.latitude === 'number' &&
+    typeof catalog.location.longitude === 'number';
+  const mapQuery = hasCoordinates
+    ? `${catalog.location.latitude},${catalog.location.longitude}`
+    : (catalog.location.formattedAddress ?? address);
+  const mapEmbedUrl = `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&z=16&output=embed`;
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`;
+  const socialLinks = [
+    { label: 'Facebook', url: catalog.organization.facebookUrl },
+    { label: 'Instagram', url: catalog.organization.instagramUrl },
+  ].filter((social): social is { label: string; url: string } => Boolean(social.url));
   return (
     <section className="border-t border-[#E4E1DA] py-7">
       <h2 className="text-xl font-black tracking-[-0.03em]">
@@ -1692,6 +1704,44 @@ function BusinessInformation({
           </p>
           {catalog.location.phone ? (
             <p className="mt-2 text-[#555A63]">{catalog.location.phone}</p>
+          ) : null}
+          {mapQuery ? (
+            <div className="mt-5 overflow-hidden rounded-2xl border border-[#E4E1DA] bg-[#F8F7F3]">
+              <iframe
+                className="h-52 w-full border-0"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                src={mapEmbedUrl}
+                title={`Mapa de ${catalog.location.name}`}
+              />
+              <a
+                className="flex items-center justify-center gap-2 px-4 py-3 text-xs font-black text-[#805A12] hover:bg-[#FFF9EE]"
+                href={mapsUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Ver cómo llegar
+                <span aria-hidden="true">↗</span>
+              </a>
+            </div>
+          ) : null}
+          {socialLinks.length > 0 ? (
+            <div className="mt-5">
+              <h3 className="font-black">SÃ­guenos</h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {socialLinks.map((social) => (
+                  <a
+                    className="rounded-full border border-[#D6C28E] bg-[#FFF9EE] px-3 py-1.5 text-xs font-black text-[#805A12] transition hover:bg-[#F3E5C1]"
+                    href={social.url}
+                    key={social.label}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    {social.label}
+                  </a>
+                ))}
+              </div>
+            </div>
           ) : null}
         </div>
       </div>

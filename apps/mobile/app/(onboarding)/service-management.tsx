@@ -18,7 +18,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InlineMessage } from '../../src/components/InlineMessage';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
-import { NavaButton } from '../../src/components/NavaButton';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import {
   appStyles,
@@ -422,15 +421,31 @@ export default function ServiceManagementScreen() {
             </View>
             <Switch onValueChange={setOnlineBooking} value={onlineBooking} />
           </View>
-          <NavaButton
-            disabled={!canCreateService}
-            icon="add-circle-outline"
-            label={editingService ? 'Guardar cambios' : 'Crear servicio'}
-            loading={serviceMutation.isPending}
+          <Pressable
+            accessibilityLabel={
+              editingService ? 'Guardar cambios del servicio' : 'Crear servicio'
+            }
+            accessibilityRole="button"
+            disabled={!canCreateService || serviceMutation.isPending}
             onPress={() => serviceMutation.mutate()}
-            style={styles.primaryButton}
-            variant="primary"
-          />
+            style={[
+              styles.primaryButton,
+              (!canCreateService || serviceMutation.isPending) && styles.buttonMuted,
+            ]}
+          >
+            <Ionicons
+              color={appTheme.colors.accentDark}
+              name={editingService ? 'checkmark-outline' : 'add-circle-outline'}
+              size={21}
+            />
+            <Text style={styles.primaryButtonLabel}>
+              {serviceMutation.isPending
+                ? 'Guardando…'
+                : editingService
+                  ? 'Guardar cambios'
+                  : 'Crear servicio'}
+            </Text>
+          </Pressable>
           {editingService ? (
             <View style={styles.editActions}>
               <Pressable
@@ -635,14 +650,23 @@ const styles = StyleSheet.create({
   removePhoto: { alignSelf: 'flex-start', marginTop: 8 },
   removePhotoLabel: { color: appTheme.colors.danger, fontSize: 13, fontWeight: '800' },
   primaryButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
     backgroundColor: appTheme.colors.surface,
-    flexBasis: 'auto',
-    flexGrow: 0,
-    height: 58,
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
     marginTop: 18,
-    width: '100%',
+    minHeight: 48,
+    paddingHorizontal: 16,
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
+  },
+  primaryButtonLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 14,
+    fontWeight: '900',
   },
   secondaryAction: {
     backgroundColor: appTheme.colors.surface,

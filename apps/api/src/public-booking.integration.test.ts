@@ -51,6 +51,7 @@ integrationDescribe('reservas públicas', () => {
   beforeAll(async () => {
     const user = await database.user.create({
       data: {
+        profileBio: 'Especialistas en cortes y cuidado de tu estilo.',
         profilePhotoData: 'data:image/jpeg;base64,cGVyZmls',
         email: `owner-${suffix}@example.com`,
         emailVerifiedAt: new Date(),
@@ -68,6 +69,9 @@ integrationDescribe('reservas públicas', () => {
     organizationId = organization.id;
     const location = await database.location.create({
       data: {
+        formattedAddress: 'Av. República y Amazonas, Quito, Ecuador',
+        latitude: -0.19,
+        longitude: -78.49,
         countryCode: 'EC',
         currencyCode: 'USD',
         name: 'Principal',
@@ -96,6 +100,8 @@ integrationDescribe('reservas públicas', () => {
         city: 'Quito',
         countryCode: 'EC',
         coverImageUri: 'data:image/jpeg;base64,aGVsbG8=',
+        facebookUrl: 'https://facebook.com/nava-test',
+        instagramUrl: 'https://instagram.com/nava-test',
         openingTime: '09:00',
         closingTime: '18:00',
         phoneKey: `+59398${String(Date.now()).slice(-7)}`,
@@ -267,11 +273,25 @@ integrationDescribe('reservas públicas', () => {
       url: `/v1/public/${organizationSlug}/principal`,
     });
     expect(catalog.statusCode).toBe(200);
+    expect(catalog.json().location).toMatchObject({
+      formattedAddress: 'Av. República y Amazonas, Quito, Ecuador',
+      latitude: -0.19,
+      longitude: -78.49,
+    });
     expect(catalog.json().organization.profilePhotoData).toBe(
       'data:image/jpeg;base64,cGVyZmls',
     );
     expect(catalog.json().organization.coverImageUri).toBe(
       'data:image/jpeg;base64,aGVsbG8=',
+    );
+    expect(catalog.json().organization.description).toBe(
+      'Especialistas en cortes y cuidado de tu estilo.',
+    );
+    expect(catalog.json().organization.facebookUrl).toBe(
+      'https://facebook.com/nava-test',
+    );
+    expect(catalog.json().organization.instagramUrl).toBe(
+      'https://instagram.com/nava-test',
     );
     expect(catalog.json().professionals).toHaveLength(1);
     expect(catalog.json().services).toHaveLength(1);

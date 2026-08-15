@@ -82,6 +82,14 @@ const settingsSections: readonly SettingsSection[] = [
       },
       {
         description:
+          'Crea y configura las sucursales incluidas en tu plan.',
+        icon: 'business-outline',
+        id: 'locations',
+        route: '/location-management',
+        title: 'Sucursales',
+      },
+      {
+        description:
           'Configuraci\u00f3n adicional para hacer funcionar tu negocio.',
         icon: 'settings-outline',
         id: 'advanced-settings',

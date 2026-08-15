@@ -1,5 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { OnboardingAccountDetailsResponse } from '@barber-saas/api-client';
+import type {
+  OnboardingAccountDetailsResponse,
+  UserProfileResponse,
+} from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { Redirect, useRouter } from 'expo-router';
@@ -9,6 +12,7 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -55,6 +59,12 @@ export default function SettingsScreen() {
       ),
     queryKey: ['onboarding-account-details'],
   });
+  const profileQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<UserProfileResponse>('/v1/profile'),
+    queryKey: ['user-profile'],
+  });
   const deleteAccountMutation = useMutation({
     mutationFn: async () => {
       await requireApiClient().request<void>('/v1/account', {
@@ -77,6 +87,7 @@ export default function SettingsScreen() {
     return <Redirect href={accountDeleted ? '/' : '/(auth)/login'} />;
 
   const account = accountQuery.data;
+  const profilePhoto = profileQuery.data?.profile.photoData;
   const businessName = account?.businessName || 'Tu negocio';
   const bookingUrl = account?.bookingUrl ?? '';
   const isSolo = account?.accountType === 'professional';
@@ -200,11 +211,19 @@ export default function SettingsScreen() {
 
         <View style={styles.profile}>
           <View style={styles.avatar}>
-            <Ionicons
-              color={PRIMARY}
-              name={isSolo ? 'person-outline' : 'storefront-outline'}
-              size={48}
-            />
+            {profilePhoto ? (
+              <Image
+                accessibilityLabel="Foto de perfil"
+                source={{ uri: profilePhoto }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <Ionicons
+                color={PRIMARY}
+                name={isSolo ? 'person-outline' : 'storefront-outline'}
+                size={48}
+              />
+            )}
             <Pressable
               accessibilityLabel="Editar perfil del negocio"
               onPress={() => router.push('/profile-edit')}
@@ -600,6 +619,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: 104,
   },
+  avatarImage: { borderRadius: 52, height: 104, width: 104 },
   businessName: {
     color: '#111827',
     fontSize: 22,

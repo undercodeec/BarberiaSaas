@@ -256,8 +256,15 @@ async function publicCatalog(
         include: {
           user: {
             select: {
+              profileBio: true,
               profilePhotoData: true,
-              registrationProfile: { select: { coverImageUri: true } },
+              registrationProfile: {
+                select: {
+                  coverImageUri: true,
+                  facebookUrl: true,
+                  instagramUrl: true,
+                },
+              },
             },
           },
         },
@@ -338,7 +345,11 @@ async function publicCatalog(
       countryCode: location.countryCode,
       currencyCode: location.currencyCode,
       email: location.email,
+      formattedAddress: location.formattedAddress,
+      googlePlaceId: location.googlePlaceId,
       id: location.id,
+      latitude: location.latitude,
+      longitude: location.longitude,
       name: location.name,
       phone: location.phone,
       slug: location.slug,
@@ -349,6 +360,11 @@ async function publicCatalog(
       name: location.organization.name,
       coverImageUri:
         ownerMembership?.user.registrationProfile?.coverImageUri ?? null,
+      description: ownerMembership?.user.profileBio ?? null,
+      facebookUrl:
+        ownerMembership?.user.registrationProfile?.facebookUrl ?? null,
+      instagramUrl:
+        ownerMembership?.user.registrationProfile?.instagramUrl ?? null,
       profilePhotoData: ownerMembership?.user.profilePhotoData ?? null,
       slug: location.organization.slug,
     },

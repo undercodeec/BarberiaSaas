@@ -129,7 +129,10 @@ export default function InventoryScreen() {
         sku: sku.trim() || undefined,
         stockTrackingEnabled: true,
         ...(editingProduct
-          ? {}
+          ? {
+              initialStock: units(initialStock, 'una existencia inicial'),
+              locationId: resolvedLocationId ?? undefined,
+            }
           : {
               initialStock: units(initialStock, 'una existencia inicial'),
               locationId: resolvedLocationId ?? undefined,
@@ -220,6 +223,24 @@ export default function InventoryScreen() {
       ]);
     },
   });
+  const deleteProduct = useMutation({
+    mutationFn: (productId: string) =>
+      requireApiClient().request(`/v1/inventory/products/${productId}`, {
+        body: { isActive: false },
+        method: 'PATCH',
+      }),
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos eliminar el producto',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['inventory'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-movements'] }),
+      ]);
+    },
+  });
 
   if (!session) return <Redirect href="/(auth)/login" />;
 
@@ -263,7 +284,7 @@ export default function InventoryScreen() {
     setCost(((product?.costCents ?? 0) / 100).toFixed(2));
     setPrice(product ? (product.salePriceCents / 100).toFixed(2) : '');
     setMinimumStock(String(product?.minimumStock ?? 0));
-    setInitialStock('0');
+    setInitialStock(String(product?.quantityOnHand ?? 0));
     setSheetMode('product');
     setIsSheetOpen(true);
   };
@@ -430,6 +451,27 @@ export default function InventoryScreen() {
                       style={styles.smallButton}
                     >
                       <Ionicons color="#805E21" name="pencil" size={18} />
+                    </Pressable>
+                    <Pressable
+                      accessibilityLabel={`Eliminar ${product.name}`}
+                      disabled={deleteProduct.isPending}
+                      onPress={() =>
+                        Alert.alert(
+                          'Eliminar producto',
+                          `¿Quieres eliminar ${product.name}? Dejará de estar disponible, pero su historial se conservará.`,
+                          [
+                            { style: 'cancel', text: 'Cancelar' },
+                            {
+                              onPress: () => deleteProduct.mutate(product.id),
+                              style: 'destructive',
+                              text: 'Eliminar',
+                            },
+                          ],
+                        )
+                      }
+                      style={[styles.smallButton, styles.deleteSmallButton]}
+                    >
+                      <Ionicons color="#B54747" name="trash-outline" size={18} />
                     </Pressable>
                   </View>
                 </View>
@@ -604,14 +646,12 @@ export default function InventoryScreen() {
                   onChange={setMinimumStock}
                   value={minimumStock}
                 />
-                {!editingProduct ? (
-                  <Field
-                    keyboardType="number-pad"
-                    label="Existencia inicial"
-                    onChange={setInitialStock}
-                    value={initialStock}
-                  />
-                ) : null}
+                <Field
+                  keyboardType="number-pad"
+                  label="Existencia inicial"
+                  onChange={setInitialStock}
+                  value={initialStock}
+                />
                 <SheetActions
                   isPending={saveProduct.isPending}
                   onCancel={() => setIsSheetOpen(false)}
@@ -938,6 +978,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     overflow: 'hidden',
   },
+  deleteSmallButton: { backgroundColor: '#FDECEC' },
   photoPickerImage: { height: '100%', width: '100%' },
   photoPickerLabel: { color: '#805E21', fontSize: 13, fontWeight: '800', marginTop: 7 },
   productActions: { gap: 8 },

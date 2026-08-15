@@ -1116,7 +1116,7 @@ describeWithDatabase('API con PostgreSQL', () => {
       }>(),
     ).toMatchObject({
       current: {
-        featureFlags: { inventory: true, multiLocation: false },
+        featureFlags: { inventory: true, multiLocation: true },
         planCode: 'local',
         status: 'trial',
       },
@@ -1124,6 +1124,7 @@ describeWithDatabase('API con PostgreSQL', () => {
         expect.objectContaining({ available: true, code: 'free' }),
         expect.objectContaining({ available: true, code: 'essential' }),
         expect.objectContaining({ available: true, code: 'local' }),
+        expect.objectContaining({ available: true, code: 'multi' }),
       ]),
       usage: { locations: 1, teamMembers: 1 },
     });
@@ -2775,6 +2776,21 @@ describeWithDatabase('API con PostgreSQL', () => {
       purchased.json<{ movement: { resultingQuantity: number } }>().movement
         .resultingQuantity,
     ).toBe(5);
+
+    const edited = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'PATCH',
+      payload: {
+        initialStock: 8,
+        locationId: organization.locationId,
+      },
+      url: `/v1/inventory/products/${productId}`,
+    });
+    expect(edited.statusCode).toBe(200);
+    expect(
+      edited.json<{ product: { quantityOnHand: number } }>().product
+        .quantityOnHand,
+    ).toBe(8);
 
     const secondToken = await register('inventory-other@example.com');
     await onboard(secondToken, 'inventario-aislado');

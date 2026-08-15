@@ -113,9 +113,14 @@ export default function SubscriptionScreen() {
   if (!session) return <Redirect href="/(auth)/login" />;
 
   const subscription = subscriptionQuery.data;
-  const currentPlan = subscription?.plans.find(
+  const subscriptionPlan = subscription?.plans.find(
     ({ code }) => code === subscription.current.planCode,
   );
+  const isDemoAccount = subscription?.current.status === 'trial';
+  const currentPlan =
+    isDemoAccount && subscriptionPlan
+      ? { ...subscriptionPlan, monthlyPriceCents: 0, name: 'Cuenta demo' }
+      : subscriptionPlan;
   const trialEnd = subscription?.current.trialEndsAt
     ? new Date(subscription.current.trialEndsAt).toLocaleDateString()
     : null;
@@ -175,7 +180,9 @@ export default function SubscriptionScreen() {
             ) : null}
           </View>
           <Text style={styles.priceLabel}>
-            {currentPlan
+            {isDemoAccount
+              ? 'Gratis durante la prueba'
+              : currentPlan
               ? formatPrice(
                   currentPlan.monthlyPriceCents,
                   currentPlan.currencyCode,
@@ -465,6 +472,7 @@ const styles = StyleSheet.create({
   backButton: {
     backgroundColor: appTheme.colors.surface,
     alignItems: 'center',
+    borderRadius: 22,
     height: 44,
     justifyContent: 'center',
     width: 44,

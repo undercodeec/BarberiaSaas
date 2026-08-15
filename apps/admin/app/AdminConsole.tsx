@@ -879,7 +879,8 @@ function OperationModal({
                   >
                     <option value="free">Nava Free</option>
                     <option value="essential">Nava Esencial - $9.83</option>
-                    <option value="local">Nava Local - $29.99</option>
+                    <option value="local">Nava Local - $29.83</option>
+                    <option value="multi">Nava Multi - $48.83</option>
                   </select>
                 </label>
               </>

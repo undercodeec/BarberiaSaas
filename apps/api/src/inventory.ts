@@ -44,7 +44,11 @@ const createProductSchema = productFieldsSchema
   });
 const updateProductSchema = productFieldsSchema
   .partial()
-  .extend({ isActive: z.boolean().optional() })
+  .extend({
+    initialStock: z.number().int().min(0).max(1_000_000).optional(),
+    isActive: z.boolean().optional(),
+    locationId: z.uuid().optional(),
+  })
   .refine(
     (value) => Object.keys(value).length > 0,
     'Debes modificar al menos un campo.',
@@ -352,6 +356,7 @@ export function registerInventoryRoutes(
       .parse(request.params);
     const input = updateProductSchema.parse(request.body);
     const currentScope = await inventoryScope(database, user.id);
+    const location = selectedLocation(currentScope.locations, input.locationId);
     const existing = await database.product.findFirst({
       where: {
         id: productId,
@@ -360,6 +365,16 @@ export function registerInventoryRoutes(
     });
     if (!existing)
       throw new ApiError(404, 'PRODUCT_NOT_FOUND', 'El producto no existe.');
+    if (
+      input.initialStock !== undefined &&
+      input.stockTrackingEnabled !== true &&
+      !existing.stockTrackingEnabled
+    )
+      throw new ApiError(
+        409,
+        'STOCK_TRACKING_DISABLED',
+        'Activa el control de existencias antes de modificar la existencia inicial.',
+      );
     try {
       const product = await database.$transaction(async (transaction) => {
         const updated = await transaction.product.update({
@@ -390,6 +405,50 @@ export function registerInventoryRoutes(
           },
           where: { id: existing.id },
         });
+        if (input.initialStock !== undefined) {
+          await lockInventory(transaction, location.id, existing.id);
+          const inventory = await transaction.locationInventory.upsert({
+            create: {
+              locationId: location.id,
+              productId: existing.id,
+              quantityOnHand: 0,
+            },
+            update: {},
+            where: {
+              locationId_productId: {
+                locationId: location.id,
+                productId: existing.id,
+              },
+            },
+          });
+          const quantityDelta = input.initialStock - inventory.quantityOnHand;
+          if (quantityDelta !== 0) {
+            await transaction.locationInventory.update({
+              data: { quantityOnHand: input.initialStock },
+              where: {
+                locationId_productId: {
+                  locationId: location.id,
+                  productId: existing.id,
+                },
+              },
+            });
+            await transaction.stockMovement.create({
+              data: {
+                createdByUserId: user.id,
+                direction:
+                  quantityDelta > 0 ? StockDirection.IN : StockDirection.OUT,
+                locationId: location.id,
+                notes: 'Actualización de existencia inicial',
+                organizationId: currentScope.membership.organizationId,
+                productId: existing.id,
+                quantity: Math.abs(quantityDelta),
+                resultingQuantity: input.initialStock,
+                type: StockMovementType.ADJUSTMENT,
+                unitCostCents: input.costCents ?? existing.costCents,
+              },
+            });
+          }
+        }
         await transaction.auditLog.create({
           data: {
             action: 'inventory.product_updated',
@@ -400,6 +459,7 @@ export function registerInventoryRoutes(
               isActive: existing.isActive,
               minimumStock: existing.minimumStock,
               name: existing.name,
+              quantityOnHand: input.initialStock,
               salePriceCents: existing.salePriceCents,
             },
             entityId: existing.id,
@@ -413,7 +473,7 @@ export function registerInventoryRoutes(
         });
       });
       return {
-        product: productResponse(product, currentScope.locations[0]!.id),
+        product: productResponse(product, location.id),
       };
     } catch (error) {
       if (isUniqueConstraintError(error))
