@@ -272,6 +272,14 @@ export default function AgendaScreen() {
   const [settingsBackdropOpacity] = useState(() => new Animated.Value(1));
   const [isDismissingSettings, setIsDismissingSettings] = useState(false);
   const [isDayTransitioning, setIsDayTransitioning] = useState(false);
+  const openAgendaSettings = useCallback(() => {
+    settingsSheetTranslateY.stopAnimation();
+    settingsBackdropOpacity.stopAnimation();
+    setIsDismissingSettings(false);
+    settingsBackdropOpacity.setValue(1);
+    settingsSheetTranslateY.setValue(0);
+    setIsAgendaSettingsOpen(true);
+  }, [settingsBackdropOpacity, settingsSheetTranslateY]);
   const dismissAgendaSettings = useCallback(() => {
     if (isDismissingSettings) return;
     setIsDismissingSettings(true);
@@ -602,14 +610,9 @@ export default function AgendaScreen() {
             />
           </Pressable>
           <Pressable
-            accessibilityLabel="Ajustes agenda"
-            accessibilityRole="button"
-            onPress={() => {
-              setIsDismissingSettings(false);
-              settingsBackdropOpacity.setValue(1);
-              settingsSheetTranslateY.setValue(0);
-              setIsAgendaSettingsOpen(true);
-            }}
+          accessibilityLabel="Ajustes agenda"
+          accessibilityRole="button"
+            onPress={openAgendaSettings}
             style={styles.filterButton}
           >
             <Ionicons
@@ -964,6 +967,7 @@ export default function AgendaScreen() {
         animationType="none"
         navigationBarTranslucent
         onRequestClose={dismissAgendaSettings}
+        onShow={openAgendaSettings}
         statusBarTranslucent
         transparent
         visible={isAgendaSettingsOpen}
@@ -980,7 +984,7 @@ export default function AgendaScreen() {
             style={[
               styles.settingsSheet,
               {
-                maxHeight: layout.sheetMaxHeight,
+                height: layout.sheetMaxHeight,
                 transform: [{ translateY: settingsSheetTranslateY }],
               },
             ]}

@@ -80,7 +80,27 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
-def googleMapsAndroidApiKey = System.getenv("GOOGLE_MAPS_ANDROID_API_KEY") ?: findProperty("GOOGLE_MAPS_ANDROID_API_KEY") ?: ""
+def isEasBuild = System.getenv('EAS_BUILD') == 'true'
+def localEnvFile = rootProject.file('../.env')
+def localEnvValue = { String name ->
+    if (!localEnvFile.exists()) return null
+    def prefix = "${name}="
+    def line = localEnvFile.readLines('UTF-8').find {
+        def trimmed = it.trim()
+        !trimmed.startsWith('#') && trimmed.startsWith(prefix)
+    }
+    if (line == null) return null
+    def value = line.trim().substring(prefix.length()).trim()
+    if (value.size() >= 2 && ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))) {
+        value = value.substring(1, value.size() - 1)
+    }
+    return value.isEmpty() ? null : value
+}
+// En local, .env es la fuente de verdad para impedir que una variable antigua
+// del sistema se incruste en el AAB. En EAS se usa exclusivamente su secreto.
+def googleMapsAndroidApiKey = isEasBuild
+    ? (System.getenv('GOOGLE_MAPS_ANDROID_API_KEY') ?: findProperty('GOOGLE_MAPS_ANDROID_API_KEY') ?: '')
+    : (localEnvValue('GOOGLE_MAPS_ANDROID_API_KEY') ?: System.getenv('GOOGLE_MAPS_ANDROID_API_KEY') ?: findProperty('GOOGLE_MAPS_ANDROID_API_KEY') ?: '')
 def uploadStoreFile = findProperty('NAVA_UPLOAD_STORE_FILE')
 def hasUploadSigning = [
     uploadStoreFile,
@@ -100,8 +120,8 @@ android {
         applicationId 'com.barbersaas.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode((findProperty('NAVA_VERSION_CODE') ?: '22').toInteger())
-        versionName "0.1.0"
+        versionCode((findProperty('NAVA_VERSION_CODE') ?: '24').toInteger())
+        versionName "0.1.2"
         manifestPlaceholders = [GOOGLE_MAPS_ANDROID_API_KEY: googleMapsAndroidApiKey]
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
@@ -114,6 +134,9 @@ android {
             keyPassword 'android'
         }
         release {
+            if (googleMapsAndroidApiKey.trim().isEmpty()) {
+                throw new GradleException('Falta GOOGLE_MAPS_ANDROID_API_KEY para compilar el AAB de lanzamiento.')
+            }
             if (hasUploadSigning) {
                 storeFile file(uploadStoreFile)
                 storePassword findProperty('NAVA_UPLOAD_STORE_PASSWORD')

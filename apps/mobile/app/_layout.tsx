@@ -6,7 +6,6 @@ import { StyleSheet, View } from 'react-native';
 import { GlobalNotificationsBanner } from '../src/components/GlobalNotificationsBanner';
 import { NavaPreloader } from '../src/components/NavaPreloader';
 import { AppProviders } from '../src/providers/AppProviders';
-import { SessionLock } from '../src/components/SessionLock';
 
 export default function RootLayout() {
   const [showPreloader, setShowPreloader] = useState(true);
@@ -17,11 +16,9 @@ export default function RootLayout() {
   return (
     <View style={styles.root}>
       <AppProviders>
-        <SessionLock>
-          <StatusBar style="dark" />
-          <Stack screenOptions={{ headerShown: false }} />
-          <GlobalNotificationsBanner />
-        </SessionLock>
+        <StatusBar style="dark" />
+        <Stack screenOptions={{ headerShown: false }} />
+        <GlobalNotificationsBanner />
       </AppProviders>
       {showPreloader ? <NavaPreloader onFinish={finishPreloader} /> : null}
     </View>

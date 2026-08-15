@@ -1,10 +1,197 @@
 # Estado del proyecto
 
-Actualizado: 2026-08-13 (auditoria Android de UI, navegacion y modales completada)
+> Actualización de continuidad: 2026-08-15 — diagnóstico de Google Maps en VPS
+> y configuración de clave de servidor estabilizada.
+
+## Corrección Agenda y bloqueo de sesión — 15 de agosto de 2026
+
+### Implementado y verificado en código
+
+- [x] El botón de tuerca de Agenda conserva su panel de ajustes interno, pero
+      ahora restablece sus animaciones al abrirse y el panel usa una altura
+      acotada explícita. Esto evita que Android presente únicamente la capa
+      vacía del modal cuando no calcula altura para el contenido desplazable.
+- [x] Se retiró el bloqueo global de sesión: ya no se muestra ni se ejecuta
+      `Aplicacion bloqueada`, la autenticación biométrica ni el cierre de
+      sesión automático después de dejar Nava en segundo plano.
+- [x] El botón `Guardar ubicación` usa una acción dorada con texto blanco,
+      diferenciada de los controles de salida o cancelación. Se retiró el
+      icono decorativo sin acción del encabezado de Caja.
+- [x] Verificado: typecheck móvil, Jest móvil (3 suites, 5 pruebas) y
+      `expo export --platform android` completaron correctamente.
+
+### Pendiente obligatorio antes de publicar
+
+- [ ] Generar manualmente el AAB de reemplazo con `versionCode` 24,
+      `versionName`/`runtimeVersion` 0.1.2 y la clave Android correcta. Antes
+      de subirlo a Play, inspeccionar el bundle interno y comprobar que incluye
+      `Ajustes de agenda` y no contiene `Aplicacion bloqueada`; confirmar en
+      el teléfono que la versión instalada es la nueva.
+
+## Suscripciones web y cumplimiento de Google Play — 15 de agosto de 2026
+
+- [x] La aplicación móvil ya no muestra botones, enlaces ni mensajes para
+      pagar la suscripción con PayPhone. El flujo anterior era obsoleto y
+      llamaba a una ruta de API inexistente.
+- [x] La pantalla de Suscripción queda como consumo: muestra el estado, límites
+      y capacidades del plan, e informa que las funciones se habilitan cuando
+      una suscripción se activa fuera de la aplicación.
+- [ ] Para usuarios de Ecuador distribuidos mediante Google Play, no añadir un
+      enlace de checkout web dentro de la app. Las suscripciones SaaS son
+      servicios digitales y la política de pagos de Play no permite dirigir a
+      un método externo salvo programas regionales inscritos.
+- [ ] El checkout web de `navacloud.app` deberá implementarse fuera de la app:
+      autenticación del negocio, proveedor de pago elegido, webhook verificado,
+      activación transaccional de plan y renovación/período en API. La app solo
+      debe refrescar `/v1/subscription` y reflejar los entitlements resultantes.
+- [ ] El programa de ofertas externas de Play Console (`Configuración > Enlazar
+      a ofertas externas`) es actualmente aplicable a usuarios del EEE, no a
+      Ecuador. No se declara ni enlaza checkout desde Android hasta cumplir un
+      programa que cubra el país objetivo.
+
+## Incidente Google Maps en VPS — 15 de agosto de 2026
+
+### Diagnóstico confirmado
+
+- [x] La aplicación móvil llega correctamente a la API de producción:
+      `POST /v1/maps/autocomplete` y `POST /v1/maps/reverse-geocode` aparecen
+      en `journalctl` de `nava-api.service`. El problema no era que el AAB
+      omitiera las rutas ni que la API estuviera caída.
+- [x] Se detectó deriva de configuración: al inicio,
+      `/etc/nava/api.env` no contenía una
+      `GOOGLE_MAPS_SERVER_API_KEY` con valor, mientras que el proceso activo
+      de `nava-api.service` sí tenía una clave de 39 caracteres en memoria.
+- [x] Se recuperó esa clave desde el entorno del proceso sin imprimirla, se
+      guardó en `/etc/nava/api.env` con permisos `root:root` y modo `0600`, y
+      se reinició el servicio. La verificación posterior devolvió
+      `CONFIGURADA` y `systemctl is-active nava-api.service` devolvió
+      `active`.
+- [x] La consulta directa desde la VPS contra Geocoding devolvió:
+      `HTTP 200`, `status: REQUEST_DENIED`, cero resultados y el mensaje de
+      que la clave no está autorizada para usar esa API. Esto identifica la
+      causa actual de que tocar/arrastrar el mapa no resuelva una dirección.
+- [x] Un `404` de `/v1/maps/reverse-geocode` no implica que la ruta no exista:
+      la API actual traduce respuestas JSON de Google sin resultados o con
+      errores de negocio a `404`. En este caso ocultaba el
+      `REQUEST_DENIED` de Geocoding.
+
+### Estado pendiente y siguiente sesión
+
+- [ ] En Google Cloud, abrir exclusivamente la clave
+      `nava-backend-places-geocoding` y confirmar que sus **restricciones de
+      API** permiten **Places API (New)** y **Geocoding API**; ambas APIs deben
+      estar habilitadas en la biblioteca del proyecto y la facturación activa.
+- [ ] Confirmar la **IP pública de salida de la VPS** con
+      `curl -4 -s https://api.ipify.org; echo` y agregarla a las restricciones
+      por dirección IP de esa clave de servidor. No usar restricciones Android,
+      iOS ni HTTP referrer para la clave de backend.
+- [ ] Asegurar que el valor en `/etc/nava/api.env` sea el de
+      `nava-backend-places-geocoding`; no copiar ni reutilizar las claves
+      `nava-web-maps-js`, `nava-ios-maps-sdk` o `nava-android-maps-sdk`.
+      Nunca registrar claves en Git, logs ni documentación.
+- [ ] Tras guardar las restricciones en Google Cloud y esperar su propagación,
+      repetir la prueba directa de Geocoding. El resultado esperado es
+      `HTTP 200`, `GOOGLE_STATUS=OK` y al menos un resultado para
+      `-0.1807,-78.4678`; luego probar búsqueda, selección y toque del mapa
+      desde el AAB instalado.
+- [ ] Si `autocomplete` continúa devolviendo `502`, capturar el `reqId` y
+      revisar que la misma clave tenga autorizada Places API (New). El backend
+      convierte rechazos HTTP del proveedor en `502`.
+
+### Correcciones técnicas pendientes
+
+- [ ] Corregir `apps/api/src/google-maps.ts` para inspeccionar el campo
+      `status` de la respuesta de Geocoding. Un `REQUEST_DENIED`,
+      `OVER_QUERY_LIMIT` u otro error de Google devuelto con HTTP 200 debe
+      registrarse de forma segura y traducirse a `502`, no a
+      `GOOGLE_MAPS_ADDRESS_NOT_FOUND`/`404`.
+- [ ] Revisar `apps/api/src/index.ts`: actualmente llama a `dotenv` con la
+      ruta relativa `../../.env`. En producción el origen de secretos debe ser
+      solo `EnvironmentFile=/etc/nava/api.env` de `nava-api.service`; evitar
+      cargas relativas que oculten claves efímeras o generen deriva de
+      configuración.
+- [ ] Añadir una comprobación de despliegue que valide, sin revelar valores,
+      que `GOOGLE_MAPS_SERVER_API_KEY` existe en `/etc/nava/api.env` y en el
+      entorno del proceso después de reiniciar el servicio.
+
+Actualizado: 2026-08-15 (diagnóstico de Google Maps en VPS, configuración de clave de servidor estabilizada y pendientes de Google Cloud registrados)
 
 Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión posterior documentada en `docs/adr/0003-postgresql-prisma-y-api-en-vps.md`. Se marca `[x]` solo cuando la tarea está implementada y cuenta con la verificación indicada; `[ ]` significa pendiente o aún no demostrada.
 
 Última actualización: 2026-08-11 (operación VPS, Neon y PayPhone)
+
+## Incidente AAB/Google Play y Expo Updates — 14 de agosto de 2026
+
+### Resumen y causa
+
+- [x] Se investigó la diferencia entre la app probada localmente y la que se
+      veía desde Google Play: el AAB `Nava-0.1.0-build22-completo.aab` sí
+      contenía los cambios recientes, incluidos el botón de notificaciones
+      arrastrable y la exportación/eliminación de clientes seleccionados.
+- [x] El canal EAS Update `production` seguía entregando un bundle OTA con
+      `runtimeVersion` `0.1.0`, publicado el 12 de agosto. Ese bundle no
+      contenía los cambios mencionados. Una instalación que conservaba una
+      versión/actualización anterior podía ejecutar ese código, mientras que
+      la prueba local con Metro ejecutaba el código actual directamente.
+- [x] La misma versión visible (`0.1.0`) y el mismo runtime para builds con
+      contenido diferente impedían identificar de forma clara qué código había
+      recibido el teléfono desde Play.
+
+### Corrección aplicada
+
+- [x] Se creó el AAB de reemplazo
+      `apps/mobile/Nava-0.1.1-build23-corregido.aab`, firmado con el mismo
+      certificado de carga que los builds anteriores.
+- [x] El release nuevo usa `versionCode` **23**, `versionName` **0.1.1** y
+      `runtimeVersion` **0.1.1**. Un OTA `0.1.0` ya no es compatible con él.
+- [x] Se declaró explícitamente el canal `production` en `app.json` y en el
+      manifiesto nativo de Android mediante
+      `expo.modules.updates.UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY`.
+- [x] Se consultó el endpoint de actualizaciones para Android/production y
+      runtime `0.1.1`: respondió `204`, por lo que el build 23 arranca con el
+      bundle embebido verificado hasta que se publique un OTA compatible.
+- [x] El bundle interno del build 23 fue inspeccionado después de compilar:
+      contiene la clave de posición persistente del botón de notificaciones,
+      la exportación XLSX, y las acciones de exportar/eliminar clientes
+      seleccionados. También contiene `EXPO_PUBLIC_API_URL` de producción.
+- [x] Verificaciones: `pnpm --filter @barber-saas/mobile typecheck`, Jest
+      móvil (3 suites, 5 pruebas) y verificación de firma con `jarsigner`.
+
+### Procedimiento obligatorio para próximos builds Android
+
+1. Antes de compilar, confirmar que los cambios locales están en Git y revisar
+   `git status`. El build debe generarse desde `apps/mobile` y no desde la
+   configuración Expo ubicada en la raíz del monorepo.
+2. Si hay cambios nativos, de Expo Updates o se necesita aislar una entrega,
+   incrementar juntos `versionCode`/`versionName` en
+   `android/app/build.gradle`, `version`/`runtimeVersion` en `app.json` y
+   `expo_runtime_version` en `android/app/src/main/res/values/strings.xml`.
+3. Compilar un AAB limpio, con `TEMP`, `TMP`, `GRADLE_USER_HOME` y
+   `java.io.tmpdir` apuntando a una unidad con espacio suficiente. En este
+   equipo C: se llenó durante el empaquetado; se usó D: para temporales y
+   cachés. La caché regenerable `C:\Users\USUARIO\.gradle\caches` puede
+   limpiarse únicamente después de comprobar que es esa ruta exacta.
+4. No validar solo por fecha, nombre o tamaño del AAB. Extraer
+   `base/assets/index.android.bundle` y buscar al menos una cadena o clave
+   exclusiva de cada función entregada. Revisar también `app.config` embebido,
+   el `versionCode` y la firma.
+5. Consultar el canal EAS Update con `expo-platform`, `expo-channel-name` y
+   `expo-runtime-version`. Si existe un OTA para el mismo runtime, comprobar
+   que contiene los cambios o publicar uno nuevo antes del rollout.
+6. Subir solo el AAB con `versionCode` superior, habilitarlo en el track de
+   Play correspondiente y confirmar en el teléfono que la versión instalada
+   coincide. Si el comportamiento no coincide, comprobar primero el track,
+   rollout, `versionCode` instalado y OTA antes de concluir que el AAB omitió
+   código.
+
+### Artefactos de referencia
+
+- No usar ni volver a subir `Nava-0.1.0-build17.aab`: es un artefacto previo.
+- El build 22 contenía cambios, pero comparte el runtime `0.1.0` con el OTA
+  antiguo y no debe usarse como validación final de este incidente.
+- Artefacto de corrección: `Nava-0.1.1-build23-corregido.aab`.
+- SHA-256 del build 23:
+  `5779567FA7332A06E608FB9E97D0927FF95FB22C4E553B84C43B382FEB3539E3`.
 
 ## Actualizacion movil Android - 13 de agosto de 2026
 
@@ -33,13 +220,12 @@ Seguimiento basado en `INSTRUCCIONES_CODEX_BARBER_SAAS.md` y en la decisión pos
 - [x] Verificado: `pnpm --filter @barber-saas/mobile typecheck`, las 3 suites
       Jest moviles (5 pruebas) y `expo export --platform android` con Hermes
       completaron correctamente.
-- [ ] La compilacion local completa del APK sigue bloqueada por una limitacion
-      de Windows/CMake/Ninja con las rutas profundas creadas por `pnpm` en
-      `react-native-worklets` y `react-native-reanimated`; no corresponde a
-      una falla del codigo Nava. Para compilar localmente se recomienda abrir
-      el repositorio desde una ruta corta, por ejemplo `D:\Nava`, y abrir
-      `apps/mobile/android` en Android Studio. No habia dispositivo ADB
-      conectado para la prueba fisica final.
+- [x] La compilación local del AAB de release fue completada el 14 de agosto
+      para el build 23. La incidencia observada fue falta de espacio en C:
+      durante el empaquetado, resuelta usando D: para temporales y caché de
+      Gradle; el procedimiento preventivo está documentado en el incidente
+      AAB/Expo Updates de este archivo. La prueba física final sigue pendiente
+      cuando haya un dispositivo ADB conectado.
 
 ## Estado operativo actual
 

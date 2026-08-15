@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#D4AF37',
+    backgroundColor: appTheme.colors.accentDark,
     borderRadius: 15,
     flex: 1.45,
     justifyContent: 'center',
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
     ...goldButtonShadow,
   },
   primaryLabel: {
-    color: appTheme.colors.accentDark,
+    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '900',
   },

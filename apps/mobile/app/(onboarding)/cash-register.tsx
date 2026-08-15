@@ -288,7 +288,6 @@ export default function CashRegisterScreen() {
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
       <View style={styles.header}>
         <Text style={styles.title}>Caja</Text>
-        <Ionicons color="#111827" name="receipt-outline" size={27} />
       </View>
       {sessionData ? (
         <ScrollView
