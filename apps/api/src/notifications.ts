@@ -107,6 +107,7 @@ export function createAppointmentNotifier(
         const content = copyFor(kind, appointment.clientName);
         const data = {
           appointmentId: appointment.id,
+          appointmentStartsAt: appointment.startsAt.toISOString(),
           route: '/agenda',
           type: kind,
         };
@@ -143,7 +144,9 @@ export function createAppointmentNotifier(
             body: JSON.stringify(
               tokens.map((token) => ({
                 body: content.body,
+                channelId: 'appointments',
                 data,
+                priority: 'high',
                 sound: 'default',
                 title: content.title,
                 to: token.token,

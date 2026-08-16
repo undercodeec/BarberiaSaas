@@ -9,8 +9,8 @@ import type {
   TeamResponse,
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Redirect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Animated,
   Alert,
@@ -59,13 +59,16 @@ function sameDate(first: Date, second: Date): boolean {
   );
 }
 
-function calendarDateForTimeZone(timeZone: string): Date {
+function calendarDateForTimeZone(
+  timeZone: string,
+  dateValue = new Date(),
+): Date {
   const parts = new Intl.DateTimeFormat('en-US', {
     day: '2-digit',
     month: '2-digit',
     timeZone,
     year: 'numeric',
-  }).formatToParts(new Date());
+  }).formatToParts(dateValue);
   const value = (type: Intl.DateTimeFormatPartTypes) =>
     Number(parts.find((part) => part.type === type)?.value);
 
@@ -173,6 +176,7 @@ export default function AgendaScreen() {
   const { session } = useAuth();
   const layout = useNativeLayoutMetrics();
   const router = useRouter();
+  const { date: notificationDate } = useLocalSearchParams<{ date?: string }>();
   const queryClient = useQueryClient();
   const organizationQuery = useQuery({
     enabled: Boolean(session),
@@ -248,6 +252,17 @@ export default function AgendaScreen() {
     'UTC';
   const today = useMemo(() => calendarDateForTimeZone(timeZone), [timeZone]);
   const [selectedDay, setSelectedDay] = useState(today);
+  const notificationDay = useMemo(() => {
+    if (!notificationDate) return null;
+    const startsAt = new Date(notificationDate);
+    if (Number.isNaN(startsAt.getTime())) return null;
+    return calendarDateForTimeZone(timeZone, startsAt);
+  }, [notificationDate, timeZone]);
+  useEffect(() => {
+    if (!notificationDay) return;
+    setSelectedDay(notificationDay);
+    setCalendarMonth(notificationDay);
+  }, [notificationDay]);
   const weekDays = useMemo(() => {
     const monday = mondayOfWeek(selectedDay);
     return Array.from({ length: 7 }, (_, index) => addDays(monday, index));

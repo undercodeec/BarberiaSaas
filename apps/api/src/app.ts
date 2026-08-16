@@ -165,6 +165,7 @@ interface NotificationDeliveryAttempt {
 }
 interface QueuedNotificationData {
   appointmentId?: string;
+  appointmentStartsAt?: string;
   details?: string;
   delivery?: {
     email: NotificationDeliveryAttempt;
@@ -291,12 +292,15 @@ async function processQueuedNotificationDeliveries(
                 body: JSON.stringify(
                   tokens.map((token) => ({
                     body: notification.body,
+                    channelId: 'appointments',
                     data: {
                       appointmentId: data.appointmentId,
+                      appointmentStartsAt: data.appointmentStartsAt,
                       route: data.route,
                       type: data.type,
                     },
                     sound: 'default',
+                    priority: 'high',
                     title: notification.title,
                     to: token.token,
                   })),
@@ -370,6 +374,7 @@ function createQueuedAppointmentNotifier(
             body: content.body,
             data: {
               appointmentId: appointment.id,
+              appointmentStartsAt: appointment.startsAt.toISOString(),
               delivery: {
                 email: {
                   attempts: 0,

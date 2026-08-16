@@ -2,10 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/u, '') ??
-  'http://localhost:4000';
-
 interface ManagedAppointment {
   attendanceConfirmedAt: string | null;
   canCancel: boolean;
@@ -55,7 +51,14 @@ async function responseError(response: Response) {
   return body?.message ?? 'No pudimos completar la acción.';
 }
 
-export function BookingManager({ token }: { token: string }) {
+export function BookingManager({
+  apiBaseUrl,
+  token,
+}: {
+  apiBaseUrl: string;
+  token: string;
+}) {
+  const apiUrl = apiBaseUrl.replace(/\/$/u, '');
   const [appointment, setAppointment] = useState<ManagedAppointment | null>(
     null,
   );
@@ -85,7 +88,7 @@ export function BookingManager({ token }: { token: string }) {
     setError(null);
     try {
       const response = await fetch(
-        `${API_URL}/v1/public/booking/${encodeURIComponent(token)}`,
+        `${apiUrl}/v1/public/booking/${encodeURIComponent(token)}`,
         { cache: 'no-store' },
       );
       if (!response.ok) throw new Error(await responseError(response));
@@ -103,7 +106,7 @@ export function BookingManager({ token }: { token: string }) {
   };
   useEffect(() => {
     const controller = new AbortController();
-    void fetch(`${API_URL}/v1/public/booking/${encodeURIComponent(token)}`, {
+    void fetch(`${apiUrl}/v1/public/booking/${encodeURIComponent(token)}`, {
       cache: 'no-store',
       signal: controller.signal,
     })
@@ -127,14 +130,14 @@ export function BookingManager({ token }: { token: string }) {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [token]);
+  }, [apiUrl, token]);
 
   const action = async (path: string, body: Record<string, unknown> = {}) => {
     setLoading(true);
     setError(null);
     try {
       const response = await fetch(
-        `${API_URL}/v1/public/booking/${encodeURIComponent(token)}/${path}`,
+        `${apiUrl}/v1/public/booking/${encodeURIComponent(token)}/${path}`,
         {
           body: JSON.stringify(body),
           headers: { 'content-type': 'application/json' },
@@ -174,7 +177,7 @@ export function BookingManager({ token }: { token: string }) {
           .join(','),
       });
       const response = await fetch(
-        `${API_URL}/v1/public/${appointment.organization.slug}/${appointment.location.slug}/availability?${query.toString()}`,
+        `${apiUrl}/v1/public/${appointment.organization.slug}/${appointment.location.slug}/availability?${query.toString()}`,
       );
       if (!response.ok) throw new Error(await responseError(response));
       const result = (await response.json()) as {

@@ -9,6 +9,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requireApiClient } from '../../src/lib/api';
+import { notificationDestination } from '../../src/lib/notification-navigation';
 
 function relativeDate(value: string) {
   const minutes = Math.max(
@@ -52,7 +53,7 @@ export default function NotificationsScreen() {
   });
   const open = (notification: AppNotificationRecord) => {
     if (!notification.readAt) void markRead.mutateAsync(notification.id);
-    router.push((notification.data.route ?? '/agenda') as never);
+    router.push(notificationDestination(notification.data) as never);
   };
   const unread =
     query.data?.notifications.filter((notification) => !notification.readAt)

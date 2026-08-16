@@ -241,8 +241,17 @@ function shouldShowWelcomeSurvey(
 
 async function syncPushToken() {
   if (Platform.OS === 'web') return;
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId as
-    string | undefined;
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('appointments', {
+      importance: Notifications.AndroidImportance.MAX,
+      name: 'Citas y reservas',
+      sound: 'default',
+      vibrationPattern: [0, 250, 250, 250],
+    });
+  }
+  const projectId =
+    Constants.easConfig?.projectId ??
+    (Constants.expoConfig?.extra?.eas?.projectId as string | undefined);
   if (!projectId) return;
   const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
   await requireApiClient().request('/v1/push-tokens', {
@@ -1994,10 +2003,7 @@ export default function DashboardScreen() {
       };
     }
 
-    // The notification prompt is intentionally only offered after a manual
-    // sign-in. A restored session must still complete this stage; otherwise it
-    // blocks the Welcome and business-location flows forever.
-    if (!canPromptForNotifications) {
+    if (!session || !user) {
       setNotificationFlowState('completed');
       return () => {
         isMounted = false;
@@ -2038,7 +2044,13 @@ export default function DashboardScreen() {
       isMounted = false;
       if (notificationPromptTimer) clearTimeout(notificationPromptTimer);
     };
-  }, [canPromptForNotifications, isDashboardFocused, needsLocationBanner]);
+  }, [
+    canPromptForNotifications,
+    isDashboardFocused,
+    needsLocationBanner,
+    session,
+    user,
+  ]);
 
   useEffect(() => {
     let isMounted = true;

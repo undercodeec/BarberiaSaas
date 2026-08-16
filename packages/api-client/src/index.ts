@@ -920,6 +920,7 @@ export interface AppNotificationRecord {
   readonly createdAt: string;
   readonly data: {
     readonly appointmentId?: string;
+    readonly appointmentStartsAt?: string;
     readonly route?: string;
     readonly type?: string;
   };

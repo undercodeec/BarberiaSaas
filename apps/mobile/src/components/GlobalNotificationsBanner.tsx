@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { appTheme, goldButtonShadow, goldShadow } from './BottomNavigation';
 import { requireApiClient } from '../lib/api';
+import { notificationDestination } from '../lib/notification-navigation';
 import { useAuth } from '../providers/AuthProvider';
 
 const NOTIFICATION_POSITION_KEY = 'nava.notification-trigger-position-v2';
@@ -241,7 +242,7 @@ export function GlobalNotificationsBanner() {
   const openNotification = (notification: AppNotificationRecord) => {
     if (!notification.readAt) void markRead.mutateAsync(notification.id);
     closeBanner();
-    router.push((notification.data.route ?? '/agenda') as never);
+    router.push(notificationDestination(notification.data) as never);
   };
 
   if (!session) return null;
