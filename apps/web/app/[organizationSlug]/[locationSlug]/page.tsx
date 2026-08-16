@@ -22,5 +22,5 @@ export default async function PublicBookingPage({
   );
   if (!response.ok) notFound();
   const catalog = (await response.json()) as PublicBookingCatalog;
-  return <BookingExperience catalog={catalog} />;
+  return <BookingExperience apiBaseUrl={API_URL} catalog={catalog} />;
 }

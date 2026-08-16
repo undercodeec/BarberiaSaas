@@ -7,10 +7,6 @@ import { useEffect, useMemo, useState } from 'react';
 
 import bookingHero from './booking-hero.png';
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/u, '') ??
-  'http://localhost:4000';
-
 type Step =
   | 'landing'
   | 'professional'
@@ -93,10 +89,13 @@ async function readError(response: Response) {
 }
 
 export function BookingExperience({
+  apiBaseUrl,
   catalog,
 }: {
+  apiBaseUrl: string;
   catalog: PublicBookingCatalog;
 }) {
+  const apiUrl = apiBaseUrl.replace(/\/$/u, '');
   const [step, setStep] = useState<Step>('landing');
   const [professionalId, setProfessionalId] = useState<string | null>(null);
   const [serviceIds, setServiceIds] = useState<string[]>([]);
@@ -201,7 +200,7 @@ export function BookingExperience({
         serviceIds: serviceIds.join(','),
       });
       const response = await fetch(
-        `${API_URL}/v1/public/${catalog.organization.slug}/${catalog.location.slug}/availability?${query.toString()}`,
+        `${apiUrl}/v1/public/${catalog.organization.slug}/${catalog.location.slug}/availability?${query.toString()}`,
       );
       if (!response.ok) throw new Error(await readError(response));
       const data = (await response.json()) as {
@@ -222,7 +221,7 @@ export function BookingExperience({
     setError(null);
     try {
       const response = await fetch(
-        `${API_URL}/v1/public/${catalog.organization.slug}/${catalog.location.slug}/bookings`,
+        `${apiUrl}/v1/public/${catalog.organization.slug}/${catalog.location.slug}/bookings`,
         {
           body: JSON.stringify({
             email,
@@ -263,7 +262,7 @@ export function BookingExperience({
     setError(null);
     try {
       const response = await fetch(
-        `${API_URL}/v1/public/bookings/${bookingId}/verify`,
+        `${apiUrl}/v1/public/bookings/${bookingId}/verify`,
         {
           body: JSON.stringify({ code: verificationCode }),
           headers: { 'content-type': 'application/json' },
@@ -282,7 +281,7 @@ export function BookingExperience({
       );
       setStep('confirmed');
       const paymentResponse = await fetch(
-        `${API_URL}/v1/public/booking/${encodeURIComponent(result.managementToken)}/payphone-link`,
+        `${apiUrl}/v1/public/booking/${encodeURIComponent(result.managementToken)}/payphone-link`,
         { method: 'POST' },
       );
       if (paymentResponse.ok) {
@@ -305,7 +304,11 @@ export function BookingExperience({
   return (
     <main className="min-h-screen overflow-x-clip bg-[#FAF9F6] text-[#1C1C1C] [color-scheme:light]">
       {step === 'landing' ? (
-        <Landing catalog={catalog} onBook={() => setStep('professional')} />
+        <Landing
+          apiBaseUrl={apiUrl}
+          catalog={catalog}
+          onBook={() => setStep('professional')}
+        />
       ) : (
         <section className="mx-auto grid w-full max-w-6xl min-w-0 gap-6 px-4 py-6 sm:px-5 sm:py-8 lg:grid-cols-[minmax(0,1fr)_330px] lg:gap-8">
           <div className="min-w-0 rounded-[2rem] bg-white p-4 shadow-[0_24px_80px_rgba(0,0,0,.08)] sm:p-8">
@@ -705,13 +708,21 @@ export function BookingExperience({
 }
 
 function Landing({
+  apiBaseUrl,
   catalog,
   onBook,
 }: {
+  apiBaseUrl: string;
   catalog: PublicBookingCatalog;
   onBook: () => void;
 }) {
-  return <PublicBookingLanding catalog={catalog} onBook={onBook} />;
+  return (
+    <PublicBookingLanding
+      apiBaseUrl={apiBaseUrl}
+      catalog={catalog}
+      onBook={onBook}
+    />
+  );
   /* Previous landing kept below temporarily while the booking flow remains unchanged.
   return (
     <>
@@ -990,9 +1001,11 @@ function ErrorMessage({ message }: { message: string }) {
 type LandingSection = 'products' | 'reviews' | 'services' | 'team';
 
 function PublicBookingLanding({
+  apiBaseUrl,
   catalog,
   onBook,
 }: {
+  apiBaseUrl: string;
   catalog: PublicBookingCatalog;
   onBook: () => void;
 }) {
@@ -1324,6 +1337,7 @@ function PublicBookingLanding({
       ) : null}
       {cartOpen ? (
         <ProductCartPanel
+          apiBaseUrl={apiBaseUrl}
           cartItems={cartItems}
           currency={catalog.location.currencyCode}
           locationSlug={catalog.location.slug}
@@ -1664,6 +1678,7 @@ function ProductCard({
 }
 
 function ProductCartPanel({
+  apiBaseUrl,
   cartItems,
   currency,
   locationSlug,
@@ -1677,6 +1692,7 @@ function ProductCartPanel({
   step,
   totalCents,
 }: {
+  apiBaseUrl: string;
   cartItems: ReadonlyArray<{
     product: PublicBookingCatalog['products'][number];
     quantity: number;
@@ -1733,7 +1749,7 @@ function ProductCartPanel({
     setPlacingOrder(true);
     try {
       const response = await fetch(
-        `${API_URL}/v1/public/${encodeURIComponent(organizationSlug)}/${encodeURIComponent(locationSlug)}/orders`,
+        `${apiBaseUrl}/v1/public/${encodeURIComponent(organizationSlug)}/${encodeURIComponent(locationSlug)}/orders`,
         {
           body: JSON.stringify({
             customerEmail: customerEmail.trim() || undefined,
