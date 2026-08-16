@@ -11,7 +11,6 @@ import type {
   SubscriptionResponse,
 } from '@barber-saas/api-client';
 import { useQuery } from '@tanstack/react-query';
-import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -249,11 +248,7 @@ async function syncPushToken() {
       vibrationPattern: [0, 250, 250, 250],
     });
   }
-  const projectId =
-    Constants.easConfig?.projectId ??
-    (Constants.expoConfig?.extra?.eas?.projectId as string | undefined);
-  if (!projectId) return;
-  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  const token = (await Notifications.getDevicePushTokenAsync()).data;
   await requireApiClient().request('/v1/push-tokens', {
     body: { platform: Platform.OS, token },
     method: 'PUT',

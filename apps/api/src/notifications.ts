@@ -9,6 +9,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import nodemailer from 'nodemailer';
 
 import type { ApiConfig } from './config';
+import { sendFcmNotifications } from './fcm';
 
 type Authenticate = (
   database: DatabaseClient,
@@ -139,22 +140,13 @@ export function createAppointmentNotifier(
             userId: { in: recipients.map((recipient) => recipient.id) },
           },
         });
-        if (tokens.length)
-          await fetch('https://exp.host/--/api/v2/push/send', {
-            body: JSON.stringify(
-              tokens.map((token) => ({
-                body: content.body,
-                channelId: 'appointments',
-                data,
-                priority: 'high',
-                sound: 'default',
-                title: content.title,
-                to: token.token,
-              })),
-            ),
-            headers: { 'content-type': 'application/json' },
-            method: 'POST',
-          });
+        await sendFcmNotifications({
+          body: content.body,
+          config,
+          data,
+          title: content.title,
+          tokens: tokens.map((token) => token.token),
+        });
       } catch {
         // Delivery is best-effort and never invalidates an appointment.
       }

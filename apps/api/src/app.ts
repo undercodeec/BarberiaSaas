@@ -50,6 +50,7 @@ import { registerCommissionRoutes } from './commissions';
 import { registerClientRoutes } from './clients';
 import { registerInventoryRoutes } from './inventory';
 import { registerOperationsRoutes } from './operations';
+import { sendFcmNotifications } from './fcm';
 import { registerNotificationRoutes } from './notifications';
 import type {
   AppointmentNotificationKind,
@@ -286,30 +287,18 @@ async function processQueuedNotificationDeliveries(
           push = { attempts, state: 'skipped' };
         } else {
           try {
-            const response = await fetch(
-              'https://exp.host/--/api/v2/push/send',
-              {
-                body: JSON.stringify(
-                  tokens.map((token) => ({
-                    body: notification.body,
-                    channelId: 'appointments',
-                    data: {
-                      appointmentId: data.appointmentId,
-                      appointmentStartsAt: data.appointmentStartsAt,
-                      route: data.route,
-                      type: data.type,
-                    },
-                    sound: 'default',
-                    priority: 'high',
-                    title: notification.title,
-                    to: token.token,
-                  })),
-                ),
-                headers: { 'content-type': 'application/json' },
-                method: 'POST',
+            await sendFcmNotifications({
+              body: notification.body,
+              config,
+              data: {
+                appointmentId: data.appointmentId,
+                appointmentStartsAt: data.appointmentStartsAt,
+                route: data.route,
+                type: data.type,
               },
-            );
-            if (!response.ok) throw new Error('Expo Push rechazó el envío.');
+              title: notification.title,
+              tokens: tokens.map((token) => token.token),
+            });
             push = { attempts, state: 'sent' };
           } catch {
             push = failedNotificationAttempt(attempts);

@@ -22,6 +22,12 @@ apps/mobile/aab-check/
 .env.*
 !.env.example
 
+# Secretos de proveedores: se cargan en el servidor, nunca desde Git.
+apps/api/.secrets/
+
+# Entregables binarios locales conservados fuera de los directorios de build.
+apps/mobile/releases/
+
 supabase/.branches/
 supabase/.temp/
 packages/database/src/generated/

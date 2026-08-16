@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "774995461512",
+    "project_id": "p-key-by1efv8zycyb",
+    "storage_bucket": "p-key-by1efv8zycyb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:774995461512:android:2ba56fc5a77028b2c2663d",
+        "android_client_info": {
+          "package_name": "com.barbersaas.mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "774995461512-9pvaj9p83dpuceudhubnfmthelpeb23m.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAyO9jrBnwgjZt5bzZA0uUuiHyz54nISzY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "774995461512-9pvaj9p83dpuceudhubnfmthelpeb23m.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

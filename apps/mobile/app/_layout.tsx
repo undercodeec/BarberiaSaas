@@ -1,4 +1,3 @@
-import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -40,13 +39,7 @@ function NativePushNotifications() {
           vibrationPattern: [0, 250, 250, 250],
         });
       }
-      const projectId =
-        Constants.easConfig?.projectId ??
-        (Constants.expoConfig?.extra?.eas?.projectId as string | undefined);
-      if (!projectId) return;
-      const token = (
-        await Notifications.getExpoPushTokenAsync({ projectId })
-      ).data;
+      const token = (await Notifications.getDevicePushTokenAsync()).data;
       await requireApiClient().request('/v1/push-tokens', {
         body: { platform: Platform.OS, token },
         method: 'PUT',

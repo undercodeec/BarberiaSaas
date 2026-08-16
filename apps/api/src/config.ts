@@ -33,6 +33,8 @@ const environmentSchema = z
       .default(5),
     CORS_ORIGIN: z.string().min(1).default('http://localhost:3000'),
     DATABASE_URL: z.url().startsWith('postgresql://'),
+    FCM_PROJECT_ID: optionalText,
+    FCM_SERVICE_ACCOUNT_FILE: optionalText,
     GOOGLE_MAPS_RATE_LIMIT_MAX: z.coerce
       .number()
       .int()
