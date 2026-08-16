@@ -161,6 +161,22 @@ enum StockDirection {
   OUT
 }
 
+enum ProductOrderStatus {
+  PENDING_PAYMENT
+  RESERVED
+  PAID
+  READY_FOR_PICKUP
+  FULFILLED
+  EXPIRED
+  CANCELLED
+}
+
+enum ProductOrderPaymentMethod {
+  CARD
+  TRANSFER
+  PICKUP
+}
+
 enum AppointmentEventType {
   CREATED
   RESCHEDULED
@@ -437,6 +453,7 @@ model Organization {
   products                           Product[]
   stockMovements                     StockMovement[]
   paymentAttempts                    PaymentAttempt[]
+  productOrders                      ProductOrder[]
   payphoneConfiguration              PayphoneConfiguration?
 
   @@map("organizations")
@@ -611,6 +628,7 @@ model Location {
   inventory               LocationInventory[]
   stockMovements          StockMovement[]
   paymentAttempts         PaymentAttempt[]
+  productOrders           ProductOrder[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -857,6 +875,7 @@ model Product {
   inventory            LocationInventory[]
   stockMovements       StockMovement[]
   cashMovements        CashMovement[]
+  orderItems           ProductOrderItem[]
 
   @@unique([organizationId, name])
   @@unique([organizationId, sku])
@@ -869,6 +888,7 @@ model LocationInventory {
   locationId     String   @map("location_id") @db.Uuid
   productId      String   @map("product_id") @db.Uuid
   quantityOnHand Int      @default(0) @map("quantity_on_hand")
+  quantityReserved Int    @default(0) @map("quantity_reserved")
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
   location       Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
   product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -876,6 +896,51 @@ model LocationInventory {
   @@id([locationId, productId])
   @@index([productId, quantityOnHand])
   @@map("location_inventory")
+}
+
+model ProductOrder {
+  id                    String                    @id @default(uuid()) @db.Uuid
+  organizationId        String                    @map("organization_id") @db.Uuid
+  locationId            String                    @map("location_id") @db.Uuid
+  customerName          String                    @map("customer_name") @db.VarChar(120)
+  customerPhone         String                    @map("customer_phone") @db.VarChar(32)
+  customerEmail         String?                   @map("customer_email") @db.VarChar(254)
+  status                ProductOrderStatus        @default(PENDING_PAYMENT)
+  paymentMethod         ProductOrderPaymentMethod @map("payment_method")
+  paymentReference      String?                   @map("payment_reference") @db.VarChar(100)
+  paymentUrl            String?                   @map("payment_url") @db.Text
+  paymentRequestedAt    DateTime?                 @map("payment_requested_at") @db.Timestamptz(3)
+  paidAt                DateTime?                 @map("paid_at") @db.Timestamptz(3)
+  readyAt               DateTime?                 @map("ready_at") @db.Timestamptz(3)
+  fulfilledAt           DateTime?                 @map("fulfilled_at") @db.Timestamptz(3)
+  expiresAt             DateTime                  @map("expires_at") @db.Timestamptz(3)
+  totalCents            Int                       @map("total_cents")
+  currencyCode          String                    @default("USD") @map("currency_code") @db.Char(3)
+  createdAt             DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization          Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location              Location                  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  items                 ProductOrderItem[]
+
+  @@index([organizationId, status, createdAt])
+  @@index([locationId, status, expiresAt])
+  @@map("product_orders")
+}
+
+model ProductOrderItem {
+  id             String       @id @default(uuid()) @db.Uuid
+  orderId        String       @map("order_id") @db.Uuid
+  productId      String       @map("product_id") @db.Uuid
+  productName    String       @map("product_name") @db.VarChar(120)
+  unitPriceCents Int          @map("unit_price_cents")
+  quantity       Int
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  order          ProductOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, productId])
+  @@index([productId])
+  @@map("product_order_items")
 }
 
 model StockMovement {

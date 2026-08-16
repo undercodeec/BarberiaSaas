@@ -21,6 +21,7 @@ type Step =
   | 'confirmed';
 
 type TimeOfDay = 'afternoon' | 'all' | 'evening' | 'morning';
+type ProductPaymentMethod = 'card' | 'pickup' | 'transfer';
 
 const TIME_OF_DAY_OPTIONS: ReadonlyArray<{
   id: TimeOfDay;
@@ -943,7 +944,7 @@ function NextButton({
 }) {
   return (
     <button
-      className="mt-8 w-full min-h-14 rounded-[17px] border border-white/40 bg-[linear-gradient(135deg,#C79532_0%,#E1B85B_50%,#B47D17_100%)] px-5 py-4 font-black text-white shadow-[0_12px_24px_rgba(180,125,23,.2)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-30"
+      className="mt-8 min-h-14 w-full rounded-[17px] border border-white/40 bg-[linear-gradient(135deg,#C79532_0%,#E1B85B_50%,#B47D17_100%)] px-5 py-4 font-black text-white shadow-[0_12px_24px_rgba(180,125,23,.2)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-30"
       disabled={disabled}
       onClick={onClick}
       type="button"
@@ -968,7 +969,7 @@ function Field({
     <label className="block">
       <span className="mb-2 block text-sm font-bold">{label}</span>
       <input
-        className="min-h-12 w-full rounded-xl border border-[#E4E1DA] bg-white px-4 outline-none transition focus:border-[#B47D17] focus:ring-4 focus:ring-[#EBD8AA]/35"
+        className="min-h-12 w-full rounded-xl border border-[#E4E1DA] bg-white px-4 transition outline-none focus:border-[#B47D17] focus:ring-4 focus:ring-[#EBD8AA]/35"
         onChange={(event) => onChange(event.target.value)}
         required
         type={type}
@@ -1000,6 +1001,13 @@ function PublicBookingLanding({
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [heroScrolled, setHeroScrolled] = useState(false);
+  const [cart, setCart] = useState<Record<string, number>>({});
+  const [cartOpen, setCartOpen] = useState(false);
+  const [productCheckoutStep, setProductCheckoutStep] = useState<
+    'cart' | 'checkout' | 'confirmed'
+  >('cart');
+  const [productPaymentMethod, setProductPaymentMethod] =
+    useState<ProductPaymentMethod>('card');
 
   useEffect(() => {
     const updateHeroState = () => setHeroScrolled(window.scrollY > 8);
@@ -1032,6 +1040,34 @@ function PublicBookingLanding({
     ? catalog.reviews.reduce((sum, review) => sum + review.rating, 0) /
       catalog.reviews.length
     : null;
+  const cartItems = catalog.products
+    .map((product) => ({ product, quantity: cart[product.id] ?? 0 }))
+    .filter((item) => item.quantity > 0);
+  const cartItemCount = cartItems.reduce(
+    (total, item) => total + item.quantity,
+    0,
+  );
+  const cartTotalCents = cartItems.reduce(
+    (total, item) => total + item.product.priceCents * item.quantity,
+    0,
+  );
+  const addProduct = (productId: string) => {
+    setCart((current) => ({
+      ...current,
+      [productId]: (current[productId] ?? 0) + 1,
+    }));
+    setProductCheckoutStep('cart');
+    setCartOpen(true);
+  };
+  const updateProductQuantity = (productId: string, quantity: number) => {
+    setCart((current) => {
+      if (quantity < 1) {
+        const { [productId]: _, ...remaining } = current;
+        return remaining;
+      }
+      return { ...current, [productId]: quantity };
+    });
+  };
   const navigate = (section: LandingSection) => {
     setActiveSection(section);
     document.getElementById(section)?.scrollIntoView({
@@ -1190,15 +1226,26 @@ function PublicBookingLanding({
               className="scroll-mt-20 border-t border-[#E4E1DA] py-7"
               id="products"
             >
-              <SectionHeading>Productos disponibles</SectionHeading>
+              {cartItemCount ? (
+                <SectionHeading
+                  action={`Ver carrito (${cartItemCount})`}
+                  onAction={() => setCartOpen(true)}
+                >
+                  Productos disponibles
+                </SectionHeading>
+              ) : (
+                <SectionHeading>Productos disponibles</SectionHeading>
+              )}
               <p className="-mt-2 mb-5 text-sm text-[#555A63]">
-                Puedes adquirirlos durante tu visita al local.
+                Añadelos a tu carrito y elige pagar ahora, por transferencia o
+                reservarlos para retiro local.
               </p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {catalog.products.map((product) => (
                   <ProductCard
                     currency={catalog.location.currencyCode}
                     key={product.id}
+                    onAdd={addProduct}
                     product={product}
                   />
                 ))}
@@ -1262,6 +1309,38 @@ function PublicBookingLanding({
           <BusinessInformation catalog={catalog} onNavigate={navigate} />
         </main>
       </div>
+      {cartItemCount ? (
+        <button
+          aria-label={`Abrir carrito con ${cartItemCount} productos`}
+          className="fixed right-4 bottom-4 z-40 flex min-h-12 items-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#C79532_0%,#E1B85B_50%,#B47D17_100%)] px-4 text-sm font-black text-white shadow-[0_12px_28px_rgba(180,125,23,.35)] transition hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B47D17]"
+          onClick={() => setCartOpen(true)}
+          type="button"
+        >
+          Carrito{' '}
+          <span className="rounded-full bg-white/20 px-2 py-0.5">
+            {cartItemCount}
+          </span>
+        </button>
+      ) : null}
+      {cartOpen ? (
+        <ProductCartPanel
+          cartItems={cartItems}
+          currency={catalog.location.currencyCode}
+          locationSlug={catalog.location.slug}
+          onClose={() => setCartOpen(false)}
+          onQuantityChange={updateProductQuantity}
+          onReset={() => {
+            setCart({});
+            setProductCheckoutStep('cart');
+          }}
+          onStepChange={setProductCheckoutStep}
+          organizationSlug={catalog.organization.slug}
+          paymentMethod={productPaymentMethod}
+          step={productCheckoutStep}
+          totalCents={cartTotalCents}
+          onPaymentMethodChange={setProductPaymentMethod}
+        />
+      ) : null}
       <footer className="border-t border-[#E4E1DA] px-4 py-6 text-center text-xs text-[#555A63] sm:px-5">
         Desarrollado con Nava
         <br />© {new Date().getFullYear()} Nava. Todos los derechos reservados.
@@ -1284,9 +1363,7 @@ function BusinessHero({
     .join(', ');
   const coverImage = catalog.organization.coverImageUri;
   return (
-    <section
-      className="sticky top-0 z-0 isolate mx-auto h-[min(156vw,39rem)] min-h-[34rem] max-w-6xl overflow-hidden bg-[#574015] shadow-[0_20px_56px_rgba(0,0,0,.28)] sm:h-[35rem] sm:rounded-b-[2rem]"
-    >
+    <section className="sticky top-0 isolate z-0 mx-auto h-[min(156vw,39rem)] min-h-[34rem] max-w-6xl overflow-hidden bg-[#574015] shadow-[0_20px_56px_rgba(0,0,0,.28)] sm:h-[35rem] sm:rounded-b-[2rem]">
       <Image
         alt="Interior de una barbería"
         className="object-cover"
@@ -1528,9 +1605,11 @@ function ServiceCard({
 
 function ProductCard({
   currency,
+  onAdd,
   product,
 }: {
   currency: string;
+  onAdd: (productId: string) => void;
   product: PublicBookingCatalog['products'][number];
 }) {
   return (
@@ -1571,11 +1650,343 @@ function ProductCard({
             {product.isAvailable ? 'Disponible' : 'Agotado'}
           </span>
         </div>
-        <p className="mt-3 text-xs leading-4 text-[#555A63]">
-          Disponible para comprar en el local.
-        </p>
+        <button
+          className="mt-4 min-h-10 w-full rounded-[12px] border border-white/40 bg-[linear-gradient(135deg,#C79532_0%,#E1B85B_50%,#B47D17_100%)] px-3 text-sm font-black text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-45"
+          disabled={!product.isAvailable}
+          onClick={() => onAdd(product.id)}
+          type="button"
+        >
+          {product.isAvailable ? 'Agregar al carrito' : 'Producto agotado'}
+        </button>
       </div>
     </article>
+  );
+}
+
+function ProductCartPanel({
+  cartItems,
+  currency,
+  locationSlug,
+  onClose,
+  onPaymentMethodChange,
+  onQuantityChange,
+  onReset,
+  onStepChange,
+  organizationSlug,
+  paymentMethod,
+  step,
+  totalCents,
+}: {
+  cartItems: ReadonlyArray<{
+    product: PublicBookingCatalog['products'][number];
+    quantity: number;
+  }>;
+  currency: string;
+  locationSlug: string;
+  onClose: () => void;
+  onPaymentMethodChange: (method: ProductPaymentMethod) => void;
+  onQuantityChange: (productId: string, quantity: number) => void;
+  onReset: () => void;
+  onStepChange: (step: 'cart' | 'checkout' | 'confirmed') => void;
+  organizationSlug: string;
+  paymentMethod: ProductPaymentMethod;
+  step: 'cart' | 'checkout' | 'confirmed';
+  totalCents: number;
+}) {
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [placingOrder, setPlacingOrder] = useState(false);
+  const [createdOrder, setCreatedOrder] = useState<{
+    expiresAt: string;
+    id: string;
+    paymentUrl: string | null;
+  } | null>(null);
+  const methods: ReadonlyArray<{
+    id: ProductPaymentMethod;
+    label: string;
+    note: string;
+  }> = [
+    {
+      id: 'card',
+      label: 'Tarjeta / PayPhone',
+      note: 'Pago seguro antes del retiro.',
+    },
+    {
+      id: 'transfer',
+      label: 'Transferencia',
+      note: 'El negocio valida el comprobante.',
+    },
+    {
+      id: 'pickup',
+      label: 'Pagar al retirar',
+      note: 'Reserva el pedido por 2 horas.',
+    },
+  ];
+  const createOrder = async () => {
+    if (customerName.trim().length < 2 || customerPhone.trim().length < 7) {
+      setCheckoutError('Ingresa tu nombre y un teléfono válido.');
+      return;
+    }
+    setCheckoutError(null);
+    setPlacingOrder(true);
+    try {
+      const response = await fetch(
+        `${API_URL}/v1/public/${encodeURIComponent(organizationSlug)}/${encodeURIComponent(locationSlug)}/orders`,
+        {
+          body: JSON.stringify({
+            customerEmail: customerEmail.trim() || undefined,
+            customerName: customerName.trim(),
+            customerPhone: customerPhone.trim(),
+            items: cartItems.map(({ product, quantity }) => ({
+              productId: product.id,
+              quantity,
+            })),
+            paymentMethod,
+          }),
+          headers: { 'content-type': 'application/json' },
+          method: 'POST',
+        },
+      );
+      if (!response.ok) throw new Error(await readError(response));
+      const result = (await response.json()) as {
+        order: { expiresAt: string; id: string; paymentUrl: string | null };
+      };
+      setCreatedOrder(result.order);
+      onStepChange('confirmed');
+    } catch (cause) {
+      setCheckoutError(
+        cause instanceof Error ? cause.message : 'No pudimos crear el pedido.',
+      );
+    } finally {
+      setPlacingOrder(false);
+    }
+  };
+  return (
+    <div
+      className="fixed inset-0 z-50 flex justify-end bg-black/30 p-3 sm:p-5"
+      role="dialog"
+      aria-label="Carrito de productos"
+      aria-modal="true"
+    >
+      <button
+        aria-label="Cerrar carrito"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+        type="button"
+      />
+      <aside className="relative flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-[24px] bg-[#FAF9F6] shadow-[0_24px_80px_rgba(0,0,0,.28)]">
+        <div className="flex items-center justify-between border-b border-[#E4E1DA] p-5">
+          <div>
+            <p className="text-[10px] font-black tracking-[.14em] text-[#B47D17] uppercase">
+              Compra en la barbería
+            </p>
+            <h2 className="mt-1 text-xl font-black">
+              {step === 'confirmed' ? 'Pedido de demostración' : 'Tu carrito'}
+            </h2>
+          </div>
+          <button
+            className="grid h-10 w-10 place-items-center rounded-full border border-[#E4E1DA] text-lg font-bold"
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+        {step === 'confirmed' ? (
+          <div className="p-6 text-center">
+            <span
+              aria-hidden="true"
+              className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-100 text-2xl text-emerald-700"
+            >
+              ✓
+            </span>
+            <h3 className="mt-4 text-2xl font-black">
+              Tu pedido está reservado
+            </h3>
+            <p className="mt-3 text-sm leading-6 text-[#555A63]">
+              Código:{' '}
+              <strong>{createdOrder?.id.slice(0, 8).toUpperCase()}</strong>.
+              Conserva este código para retirar tu compra. La reserva vence el{' '}
+              {createdOrder
+                ? new Intl.DateTimeFormat('es-EC', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  }).format(new Date(createdOrder.expiresAt))
+                : ''}
+              .
+            </p>
+            {createdOrder?.paymentUrl ? (
+              <a
+                className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#B47D17] px-5 text-sm font-black text-white"
+                href={createdOrder.paymentUrl}
+              >
+                Pagar ahora con PayPhone
+              </a>
+            ) : null}
+            {paymentMethod === 'transfer' ? (
+              <p className="mt-4 rounded-xl bg-[#FFF4D9] p-3 text-xs leading-5 text-[#72531B]">
+                Solicita los datos bancarios al negocio y conserva tu
+                comprobante. El pedido se prepara cuando validen la
+                transferencia.
+              </p>
+            ) : null}
+            {paymentMethod === 'pickup' ? (
+              <p className="mt-4 rounded-xl bg-[#FFF4D9] p-3 text-xs leading-5 text-[#72531B]">
+                Tu stock queda reservado durante 2 horas. Paga al retirar en el
+                local.
+              </p>
+            ) : null}
+            <button
+              className="mt-6 min-h-11 rounded-xl bg-[#B47D17] px-5 text-sm font-black text-white"
+              onClick={() => {
+                onReset();
+                setCreatedOrder(null);
+                onClose();
+              }}
+              type="button"
+            >
+              Seguir comprando
+            </button>
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            {step === 'cart' ? (
+              <div className="space-y-4">
+                {cartItems.map(({ product, quantity }) => (
+                  <div
+                    className="flex items-center justify-between gap-3 rounded-xl border border-[#E4E1DA] bg-white p-3"
+                    key={product.id}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black">
+                        {product.name}
+                      </p>
+                      <p className="mt-1 text-xs text-[#555A63]">
+                        {money(product.priceCents, currency)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        aria-label={`Quitar una unidad de ${product.name}`}
+                        className="grid h-8 w-8 place-items-center rounded-lg border border-[#E4E1DA] font-black"
+                        onClick={() =>
+                          onQuantityChange(product.id, quantity - 1)
+                        }
+                        type="button"
+                      >
+                        −
+                      </button>
+                      <span className="w-4 text-center text-sm font-black">
+                        {quantity}
+                      </span>
+                      <button
+                        aria-label={`Añadir una unidad de ${product.name}`}
+                        className="grid h-8 w-8 place-items-center rounded-lg border border-[#E4E1DA] font-black"
+                        onClick={() =>
+                          onQuantityChange(product.id, quantity + 1)
+                        }
+                        type="button"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div>
+                <div className="grid gap-3">
+                  <label className="text-sm font-bold">
+                    Nombre
+                    <input
+                      className="mt-1 min-h-11 w-full rounded-xl border border-[#E4E1DA] bg-white px-3 text-sm font-normal outline-none focus:border-[#B47D17]"
+                      onChange={(event) => setCustomerName(event.target.value)}
+                      value={customerName}
+                    />
+                  </label>
+                  <label className="text-sm font-bold">
+                    Teléfono
+                    <input
+                      className="mt-1 min-h-11 w-full rounded-xl border border-[#E4E1DA] bg-white px-3 text-sm font-normal outline-none focus:border-[#B47D17]"
+                      inputMode="tel"
+                      onChange={(event) => setCustomerPhone(event.target.value)}
+                      value={customerPhone}
+                    />
+                  </label>
+                  <label className="text-sm font-bold">
+                    Correo{' '}
+                    <span className="font-normal text-[#555A63]">
+                      (opcional)
+                    </span>
+                    <input
+                      className="mt-1 min-h-11 w-full rounded-xl border border-[#E4E1DA] bg-white px-3 text-sm font-normal outline-none focus:border-[#B47D17]"
+                      inputMode="email"
+                      onChange={(event) => setCustomerEmail(event.target.value)}
+                      type="email"
+                      value={customerEmail}
+                    />
+                  </label>
+                </div>
+                <p className="text-sm font-bold">¿Cómo deseas pagar?</p>
+                <div className="mt-4 grid gap-3">
+                  {methods.map((method) => (
+                    <label
+                      className={`cursor-pointer rounded-xl border p-4 ${paymentMethod === method.id ? 'border-[#B47D17] bg-[#FFF9EE]' : 'border-[#E4E1DA] bg-white'}`}
+                      key={method.id}
+                    >
+                      <input
+                        checked={paymentMethod === method.id}
+                        className="mr-3 accent-[#B47D17]"
+                        name="product-payment"
+                        onChange={() => onPaymentMethodChange(method.id)}
+                        type="radio"
+                      />
+                      <span className="text-sm font-black">{method.label}</span>
+                      <span className="mt-1 block pl-6 text-xs text-[#555A63]">
+                        {method.note}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <p className="mt-5 rounded-xl bg-[#FFF4D9] p-3 text-xs leading-5 text-[#72531B]">
+                  El checkout real solicitará datos de contacto y confirmará el
+                  pedido únicamente tras pago o validación de transferencia.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+        {step !== 'confirmed' ? (
+          <div className="border-t border-[#E4E1DA] bg-white p-5">
+            <div className="flex items-center justify-between text-base">
+              <span className="font-bold">Total</span>
+              <strong>{money(totalCents, currency)}</strong>
+            </div>
+            {checkoutError ? <ErrorMessage message={checkoutError} /> : null}
+            <button
+              className="mt-4 min-h-12 w-full rounded-[14px] bg-[linear-gradient(135deg,#C79532_0%,#E1B85B_50%,#B47D17_100%)] px-4 text-sm font-black text-white disabled:opacity-60"
+              disabled={placingOrder}
+              onClick={() =>
+                step === 'cart' ? onStepChange('checkout') : void createOrder()
+              }
+              type="button"
+            >
+              {step === 'cart'
+                ? 'Continuar'
+                : placingOrder
+                  ? 'Creando pedido...'
+                  : paymentMethod === 'pickup'
+                    ? 'Reservar para retiro'
+                    : paymentMethod === 'transfer'
+                      ? 'Solicitar validación'
+                      : 'Crear pedido y pagar'}
+            </button>
+          </div>
+        ) : null}
+      </aside>
+    </div>
   );
 }
 
@@ -1649,8 +2060,8 @@ function FeaturedReview({
         {review.comment || 'Gracias por confiar en nuestro equipo.'}
       </p>
       <footer className="mt-4 text-sm text-[#555A63]">
-        <strong className="text-[#1C1C1C]">{review.clientName}</strong> · cita con{' '}
-        {review.professionalName}
+        <strong className="text-[#1C1C1C]">{review.clientName}</strong> · cita
+        con {review.professionalName}
       </footer>
     </blockquote>
   );
@@ -1677,7 +2088,9 @@ function BusinessInformation({
   const socialLinks = [
     { label: 'Facebook', url: catalog.organization.facebookUrl },
     { label: 'Instagram', url: catalog.organization.instagramUrl },
-  ].filter((social): social is { label: string; url: string } => Boolean(social.url));
+  ].filter((social): social is { label: string; url: string } =>
+    Boolean(social.url),
+  );
   return (
     <section className="border-t border-[#E4E1DA] py-7">
       <h2 className="text-xl font-black tracking-[-0.03em]">

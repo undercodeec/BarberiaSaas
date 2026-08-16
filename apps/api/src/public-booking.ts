@@ -239,7 +239,7 @@ async function publicCatalog(
           id: true,
           imageData: true,
           inventory: {
-            select: { quantityOnHand: true },
+            select: { quantityOnHand: true, quantityReserved: true },
             where: { locationId: location.id },
           },
           name: true,
@@ -403,7 +403,9 @@ async function publicCatalog(
       imageData: product.imageData,
       isAvailable:
         !product.stockTrackingEnabled ||
-        (product.inventory[0]?.quantityOnHand ?? 0) > 0,
+        (product.inventory[0]?.quantityOnHand ?? 0) -
+          (product.inventory[0]?.quantityReserved ?? 0) >
+          0,
       name: product.name,
       priceCents: product.salePriceCents,
     })),

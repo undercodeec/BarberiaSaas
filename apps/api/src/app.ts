@@ -58,6 +58,10 @@ import type {
 import { registerProfileRoutes } from './profile';
 import { registerPayphoneRoutes } from './payphone';
 import { registerPayphonePaymentRoutes } from './payphone-payments';
+import {
+  processProductOrderLifecycle,
+  registerProductOrderRoutes,
+} from './product-orders';
 import { registerReportRoutes } from './reports';
 import {
   processPublicBookingLifecycle,
@@ -2359,6 +2363,7 @@ export async function buildApi({
   registerProfileRoutes(app, database, authenticate);
   registerPayphoneRoutes(app, database, authenticate, config);
   registerPayphonePaymentRoutes(app, database, authenticate, config);
+  registerProductOrderRoutes(app, database, authenticate, config);
   registerReportRoutes(app, database, authenticate);
 
   const publicBookingLifecycleTimer = setInterval(() => {
@@ -2376,9 +2381,16 @@ export async function buildApi({
     );
   }, 60_000);
   notificationDeliveryTimer.unref();
+  const productOrderLifecycleTimer = setInterval(() => {
+    void processProductOrderLifecycle(database).catch((error: unknown) =>
+      app.log.error(error),
+    );
+  }, 60_000);
+  productOrderLifecycleTimer.unref();
   app.addHook('onClose', async () => {
     clearInterval(publicBookingLifecycleTimer);
     clearInterval(notificationDeliveryTimer);
+    clearInterval(productOrderLifecycleTimer);
   });
 
   app.setErrorHandler((error, _request, reply) => {

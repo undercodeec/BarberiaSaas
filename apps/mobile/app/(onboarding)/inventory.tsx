@@ -3,6 +3,8 @@ import * as ImagePicker from 'expo-image-picker';
 import type {
   InventoryProduct,
   InventoryResponse,
+  ProductOrderRecord,
+  ProductOrdersResponse,
   StockMovementHistoryResponse,
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -71,7 +73,9 @@ export default function InventoryScreen() {
   const [lowStockOnly, setLowStockOnly] = useState(
     params.filter === 'low-stock',
   );
-  const [tab, setTab] = useState<'products' | 'movements'>('products');
+  const [tab, setTab] = useState<'orders' | 'products' | 'movements'>(
+    'products',
+  );
   const [sheetMode, setSheetMode] = useState<SheetMode>('product');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<InventoryProduct | null>(
@@ -223,6 +227,14 @@ export default function InventoryScreen() {
       ]);
     },
   });
+  const ordersQuery = useQuery({
+    enabled: Boolean(session && tab === 'orders'),
+    queryFn: () =>
+      requireApiClient().request<ProductOrdersResponse>(
+        `/v1/product-orders${resolvedLocationId ? `?locationId=${resolvedLocationId}` : ''}`,
+      ),
+    queryKey: ['product-orders', resolvedLocationId],
+  });
   const deleteProduct = useMutation({
     mutationFn: (productId: string) =>
       requireApiClient().request(`/v1/inventory/products/${productId}`, {
@@ -241,13 +253,52 @@ export default function InventoryScreen() {
       ]);
     },
   });
+  const processOrder = useMutation({
+    mutationFn: ({
+      action,
+      order,
+    }: {
+      action: 'cancel' | 'confirm-payment' | 'fulfill' | 'ready';
+      order: ProductOrderRecord;
+    }) =>
+      requireApiClient().request(
+        `/v1/product-orders/${order.id}/${action}`,
+        action === 'confirm-payment'
+          ? {
+              body: {
+                paymentMethod:
+                  order.paymentMethod === 'pickup'
+                    ? 'cash'
+                    : order.paymentMethod,
+              },
+              method: 'POST',
+            }
+          : { method: 'POST' },
+      ),
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos actualizar el pedido',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['product-orders'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-movements'] }),
+        queryClient.invalidateQueries({ queryKey: ['cash-register-summary'] }),
+      ]);
+    },
+  });
 
   if (!session) return <Redirect href="/(auth)/login" />;
 
   const chooseProductPhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permiso necesario', 'Autoriza el acceso para elegir una foto.');
+      Alert.alert(
+        'Permiso necesario',
+        'Autoriza el acceso para elegir una foto.',
+      );
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -263,11 +314,20 @@ export default function InventoryScreen() {
       return;
     }
     const bytes = asset.fileSize ?? Math.ceil((asset.base64.length * 3) / 4);
-    if (bytes > MAX_IMAGE_BYTES || asset.width > MAX_IMAGE_DIMENSION || asset.height > MAX_IMAGE_DIMENSION) {
-      Alert.alert('Imagen demasiado grande', 'Máximo: 1.5 MB y 1600 × 1600 píxeles.');
+    if (
+      bytes > MAX_IMAGE_BYTES ||
+      asset.width > MAX_IMAGE_DIMENSION ||
+      asset.height > MAX_IMAGE_DIMENSION
+    ) {
+      Alert.alert(
+        'Imagen demasiado grande',
+        'Máximo: 1.5 MB y 1600 × 1600 píxeles.',
+      );
       return;
     }
-    const mimeType = asset.mimeType?.startsWith('image/') ? asset.mimeType : 'image/jpeg';
+    const mimeType = asset.mimeType?.startsWith('image/')
+      ? asset.mimeType
+      : 'image/jpeg';
     setImageData(`data:${mimeType};base64,${asset.base64}`);
   };
 
@@ -329,6 +389,11 @@ export default function InventoryScreen() {
           active={tab === 'movements'}
           label="Movimientos"
           onPress={() => setTab('movements')}
+        />
+        <TabButton
+          active={tab === 'orders'}
+          label="Pedidos"
+          onPress={() => setTab('orders')}
         />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
@@ -408,7 +473,10 @@ export default function InventoryScreen() {
                     ]}
                   >
                     {product.imageData ? (
-                      <Image source={{ uri: product.imageData }} style={styles.productImage} />
+                      <Image
+                        source={{ uri: product.imageData }}
+                        style={styles.productImage}
+                      />
                     ) : (
                       <Ionicons
                         color={product.isLowStock ? '#B54747' : '#805E21'}
@@ -471,7 +539,11 @@ export default function InventoryScreen() {
                       }
                       style={[styles.smallButton, styles.deleteSmallButton]}
                     >
-                      <Ionicons color="#B54747" name="trash-outline" size={18} />
+                      <Ionicons
+                        color="#B54747"
+                        name="trash-outline"
+                        size={18}
+                      />
                     </Pressable>
                   </View>
                 </View>
@@ -494,7 +566,7 @@ export default function InventoryScreen() {
               </View>
             ) : null}
           </>
-        ) : (
+        ) : tab === 'movements' ? (
           <View style={styles.list}>
             {movementQuery.data?.rows.map((movement) => (
               <View key={movement.id} style={styles.movementCard}>
@@ -560,6 +632,87 @@ export default function InventoryScreen() {
               <Text style={styles.muted}>No hay movimientos registrados.</Text>
             ) : null}
           </View>
+        ) : (
+          <View style={styles.list}>
+            {ordersQuery.isLoading ? (
+              <Text style={styles.muted}>Cargando pedidos…</Text>
+            ) : null}
+            {ordersQuery.data?.orders.map((order) => (
+              <View key={order.id} style={styles.movementCard}>
+                <View style={styles.productCopy}>
+                  <Text style={styles.productName}>{order.customerName}</Text>
+                  <Text style={styles.muted}>
+                    #{order.id.slice(0, 8).toUpperCase()} ·{' '}
+                    {order.customerPhone}
+                  </Text>
+                  <Text style={styles.movementNotes}>
+                    {order.items
+                      .map((item) => `${item.productName} ×${item.quantity}`)
+                      .join(', ')}
+                  </Text>
+                  <Text style={styles.muted}>
+                    {order.paymentMethod === 'pickup'
+                      ? 'Pago al retirar'
+                      : order.paymentMethod === 'transfer'
+                        ? 'Transferencia'
+                        : 'Tarjeta'}{' '}
+                    · {order.status.replaceAll('_', ' ')}
+                  </Text>
+                  {['pending_payment', 'reserved'].includes(order.status) ? (
+                    <View style={styles.orderActions}>
+                      <Pressable
+                        onPress={() =>
+                          processOrder.mutate({
+                            action: 'confirm-payment',
+                            order,
+                          })
+                        }
+                        style={styles.reverseButton}
+                      >
+                        <Text style={styles.reverseText}>Confirmar pago</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() =>
+                          processOrder.mutate({ action: 'cancel', order })
+                        }
+                        style={styles.orderCancelButton}
+                      >
+                        <Text style={styles.orderCancelText}>Cancelar</Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+                  {order.status === 'paid' ? (
+                    <Pressable
+                      onPress={() =>
+                        processOrder.mutate({ action: 'ready', order })
+                      }
+                      style={styles.reverseButton}
+                    >
+                      <Text style={styles.reverseText}>
+                        Marcar listo para retiro
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  {order.status === 'ready_for_pickup' ? (
+                    <Pressable
+                      onPress={() =>
+                        processOrder.mutate({ action: 'fulfill', order })
+                      }
+                      style={styles.reverseButton}
+                    >
+                      <Text style={styles.reverseText}>Entregar pedido</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+                <Text style={styles.orderTotal}>{money(order.totalCents)}</Text>
+              </View>
+            ))}
+            {!ordersQuery.isLoading && !ordersQuery.data?.orders.length ? (
+              <Text style={styles.muted}>
+                No hay pedidos para esta sucursal.
+              </Text>
+            ) : null}
+          </View>
         )}
       </ScrollView>
       {tab === 'products' ? (
@@ -588,130 +741,142 @@ export default function InventoryScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalKeyboard}
         >
-        <View style={styles.overlay}>
-          <Pressable
-            onPress={() => setIsSheetOpen(false)}
-            style={styles.backdrop}
-          />
-          <ScrollView
-            contentContainerStyle={[
-              styles.sheetContent,
-              { paddingBottom: layout.bottomInset + 24 },
-            ]}
-            keyboardShouldPersistTaps="handled"
-            style={[styles.sheet, { maxHeight: layout.sheetMaxHeight }]}
-          >
-            <View style={styles.handle} />
-            {sheetMode === 'product' ? (
-              <>
-                <Text style={styles.sheetTitle}>
-                  {editingProduct ? 'Editar producto' : 'Nuevo producto'}
-                </Text>
-                <Pressable
-                  accessibilityLabel="Elegir foto del producto"
-                  onPress={() => void chooseProductPhoto()}
-                  style={styles.photoPicker}
-                >
-                  {imageData ? (
-                    <Image source={{ uri: imageData }} style={styles.photoPickerImage} />
-                  ) : (
-                    <>
-                      <Ionicons color="#805E21" name="image-outline" size={25} />
-                      <Text style={styles.photoPickerLabel}>Agregar foto del producto</Text>
-                    </>
-                  )}
-                </Pressable>
-                {imageData ? (
-                  <Pressable onPress={() => setImageData(null)} style={styles.removePhoto}>
-                    <Text style={styles.removePhotoLabel}>Quitar foto</Text>
+          <View style={styles.overlay}>
+            <Pressable
+              onPress={() => setIsSheetOpen(false)}
+              style={styles.backdrop}
+            />
+            <ScrollView
+              contentContainerStyle={[
+                styles.sheetContent,
+                { paddingBottom: layout.bottomInset + 24 },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              style={[styles.sheet, { maxHeight: layout.sheetMaxHeight }]}
+            >
+              <View style={styles.handle} />
+              {sheetMode === 'product' ? (
+                <>
+                  <Text style={styles.sheetTitle}>
+                    {editingProduct ? 'Editar producto' : 'Nuevo producto'}
+                  </Text>
+                  <Pressable
+                    accessibilityLabel="Elegir foto del producto"
+                    onPress={() => void chooseProductPhoto()}
+                    style={styles.photoPicker}
+                  >
+                    {imageData ? (
+                      <Image
+                        source={{ uri: imageData }}
+                        style={styles.photoPickerImage}
+                      />
+                    ) : (
+                      <>
+                        <Ionicons
+                          color="#805E21"
+                          name="image-outline"
+                          size={25}
+                        />
+                        <Text style={styles.photoPickerLabel}>
+                          Agregar foto del producto
+                        </Text>
+                      </>
+                    )}
                   </Pressable>
-                ) : null}
-                <Field label="Nombre" onChange={setName} value={name} />
-                <Field label="SKU (opcional)" onChange={setSku} value={sku} />
-                <Field
-                  keyboardType="decimal-pad"
-                  label="Costo"
-                  onChange={setCost}
-                  value={cost}
-                />
-                <Field
-                  keyboardType="decimal-pad"
-                  label="Precio de venta"
-                  onChange={setPrice}
-                  value={price}
-                />
-                <Field
-                  keyboardType="number-pad"
-                  label="Stock mínimo"
-                  onChange={setMinimumStock}
-                  value={minimumStock}
-                />
-                <Field
-                  keyboardType="number-pad"
-                  label="Existencia inicial"
-                  onChange={setInitialStock}
-                  value={initialStock}
-                />
-                <SheetActions
-                  isPending={saveProduct.isPending}
-                  onCancel={() => setIsSheetOpen(false)}
-                  onConfirm={() => saveProduct.mutate()}
-                />
-              </>
-            ) : (
-              <>
-                <Text style={styles.sheetTitle}>Ajustar existencias</Text>
-                <Text style={styles.sheetSubtitle}>
-                  {selectedProduct?.name} · actual{' '}
-                  {selectedProduct?.quantityOnHand ?? 0}
-                </Text>
-                <Text style={styles.label}>Tipo de movimiento</Text>
-                <View style={styles.chips}>
-                  {(
-                    [
-                      ['purchase', 'Compra'],
-                      ['return', 'Devolución'],
-                      ['loss', 'Pérdida'],
-                      ['adjustment_in', 'Ajuste +'],
-                      ['adjustment_out', 'Ajuste -'],
-                    ] as const
-                  ).map(([value, label]) => (
-                    <Chip
-                      active={adjustmentType === value}
-                      key={value}
-                      label={label}
-                      onPress={() => setAdjustmentType(value)}
-                    />
-                  ))}
-                </View>
-                <Field
-                  keyboardType="number-pad"
-                  label="Cantidad"
-                  onChange={setAdjustmentQuantity}
-                  value={adjustmentQuantity}
-                />
-                {adjustmentType === 'purchase' ? (
+                  {imageData ? (
+                    <Pressable
+                      onPress={() => setImageData(null)}
+                      style={styles.removePhoto}
+                    >
+                      <Text style={styles.removePhotoLabel}>Quitar foto</Text>
+                    </Pressable>
+                  ) : null}
+                  <Field label="Nombre" onChange={setName} value={name} />
+                  <Field label="SKU (opcional)" onChange={setSku} value={sku} />
                   <Field
                     keyboardType="decimal-pad"
-                    label="Costo unitario"
+                    label="Costo"
                     onChange={setCost}
                     value={cost}
                   />
-                ) : null}
-                <Field
-                  label="Motivo"
-                  onChange={setAdjustmentNotes}
-                  value={adjustmentNotes}
-                />
-                <SheetActions
-                  isPending={adjustStock.isPending}
-                  onCancel={() => setIsSheetOpen(false)}
-                  onConfirm={() => adjustStock.mutate()}
-                />
-              </>
-            )}
-          </ScrollView>
-        </View>
+                  <Field
+                    keyboardType="decimal-pad"
+                    label="Precio de venta"
+                    onChange={setPrice}
+                    value={price}
+                  />
+                  <Field
+                    keyboardType="number-pad"
+                    label="Stock mínimo"
+                    onChange={setMinimumStock}
+                    value={minimumStock}
+                  />
+                  <Field
+                    keyboardType="number-pad"
+                    label="Existencia inicial"
+                    onChange={setInitialStock}
+                    value={initialStock}
+                  />
+                  <SheetActions
+                    isPending={saveProduct.isPending}
+                    onCancel={() => setIsSheetOpen(false)}
+                    onConfirm={() => saveProduct.mutate()}
+                  />
+                </>
+              ) : (
+                <>
+                  <Text style={styles.sheetTitle}>Ajustar existencias</Text>
+                  <Text style={styles.sheetSubtitle}>
+                    {selectedProduct?.name} · actual{' '}
+                    {selectedProduct?.quantityOnHand ?? 0}
+                  </Text>
+                  <Text style={styles.label}>Tipo de movimiento</Text>
+                  <View style={styles.chips}>
+                    {(
+                      [
+                        ['purchase', 'Compra'],
+                        ['return', 'Devolución'],
+                        ['loss', 'Pérdida'],
+                        ['adjustment_in', 'Ajuste +'],
+                        ['adjustment_out', 'Ajuste -'],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <Chip
+                        active={adjustmentType === value}
+                        key={value}
+                        label={label}
+                        onPress={() => setAdjustmentType(value)}
+                      />
+                    ))}
+                  </View>
+                  <Field
+                    keyboardType="number-pad"
+                    label="Cantidad"
+                    onChange={setAdjustmentQuantity}
+                    value={adjustmentQuantity}
+                  />
+                  {adjustmentType === 'purchase' ? (
+                    <Field
+                      keyboardType="decimal-pad"
+                      label="Costo unitario"
+                      onChange={setCost}
+                      value={cost}
+                    />
+                  ) : null}
+                  <Field
+                    label="Motivo"
+                    onChange={setAdjustmentNotes}
+                    value={adjustmentNotes}
+                  />
+                  <SheetActions
+                    isPending={adjustStock.isPending}
+                    onCancel={() => setIsSheetOpen(false)}
+                    onConfirm={() => adjustStock.mutate()}
+                  />
+                </>
+              )}
+            </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
@@ -978,9 +1143,18 @@ const styles = StyleSheet.create({
     marginTop: 16,
     overflow: 'hidden',
   },
+  orderActions: { flexDirection: 'row', gap: 18 },
+  orderCancelButton: { alignSelf: 'flex-start', marginTop: 8 },
+  orderCancelText: { color: '#805E21', fontSize: 13, fontWeight: '800' },
+  orderTotal: { color: '#18202B', fontSize: 16, fontWeight: '900' },
   deleteSmallButton: { backgroundColor: '#FDECEC' },
   photoPickerImage: { height: '100%', width: '100%' },
-  photoPickerLabel: { color: '#805E21', fontSize: 13, fontWeight: '800', marginTop: 7 },
+  photoPickerLabel: {
+    color: '#805E21',
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 7,
+  },
   productActions: { gap: 8 },
   productCard: {
     alignItems: 'center',

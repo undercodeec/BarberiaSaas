@@ -46,14 +46,16 @@ function clientTransactionId() {
     .replace(/[^a-zA-Z0-9]/gu, '')}`.slice(0, 15);
 }
 
-async function requestPayphoneLink({
+export async function requestPayphoneLink({
   amountCents,
   clientTransactionId: transactionId,
+  reference = 'Reserva Nava',
   storeId,
   token,
 }: {
   readonly amountCents: number;
   readonly clientTransactionId: string;
+  readonly reference?: string;
   readonly storeId: string;
   readonly token: string;
 }) {
@@ -68,7 +70,7 @@ async function requestPayphoneLink({
         expireIn: 1,
         isAmountEditable: false,
         oneTime: true,
-        reference: 'Reserva Nava',
+        reference,
         storeId,
       }),
       headers: {

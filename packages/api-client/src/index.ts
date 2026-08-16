@@ -300,6 +300,41 @@ export interface InventoryResponse {
   };
 }
 
+export interface ProductOrderRecord {
+  readonly customerEmail: string | null;
+  readonly customerName: string;
+  readonly customerPhone: string;
+  readonly createdAt: string;
+  readonly currencyCode: string;
+  readonly expiresAt: string;
+  readonly fulfilledAt: string | null;
+  readonly id: string;
+  readonly items: ReadonlyArray<{
+    readonly productId: string;
+    readonly productName: string;
+    readonly quantity: number;
+    readonly unitPriceCents: number;
+  }>;
+  readonly paidAt: string | null;
+  readonly paymentMethod: 'card' | 'pickup' | 'transfer';
+  readonly paymentReference: string | null;
+  readonly paymentUrl: string | null;
+  readonly readyAt: string | null;
+  readonly status:
+    | 'cancelled'
+    | 'expired'
+    | 'fulfilled'
+    | 'paid'
+    | 'pending_payment'
+    | 'ready_for_pickup'
+    | 'reserved';
+  readonly totalCents: number;
+}
+
+export interface ProductOrdersResponse {
+  readonly orders: readonly ProductOrderRecord[];
+}
+
 export interface StockMovementRecord {
   readonly cashMovementId: string | null;
   readonly cashMovementReversedAt: string | null;
