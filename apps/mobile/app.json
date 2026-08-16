@@ -2,8 +2,8 @@
   "expo": {
     "name": "Nava",
     "slug": "barber-saas-mobile",
-    "version": "0.1.2",
-    "runtimeVersion": "0.1.2",
+    "version": "0.1.3",
+    "runtimeVersion": "0.1.3",
     "icon": "./assets/icon.png",
     "updates": {
       "url": "https://u.expo.dev/0feb8bfa-2e01-44e6-8e79-22927a8a7dcb",
