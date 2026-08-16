@@ -49,10 +49,22 @@ const TIME_PERIODS: ReadonlyArray<{
   { id: 'night', label: 'Noche', range: '18:00–05:59' },
 ];
 
-function slotMatchesPeriod(startsAt: string, period: TimePeriod) {
+function slotMatchesPeriod(
+  startsAt: string,
+  period: TimePeriod,
+  timeZone: string,
+) {
   if (period === 'all') return true;
 
-  const hour = new Date(startsAt).getHours();
+  const hour = Number(
+    new Intl.DateTimeFormat('en-US', {
+      hour: '2-digit',
+      hourCycle: 'h23',
+      timeZone,
+    })
+      .formatToParts(new Date(startsAt))
+      .find((part) => part.type === 'hour')?.value,
+  );
   if (period === 'morning') return hour >= 6 && hour < 12;
   if (period === 'afternoon') return hour >= 12 && hour < 18;
   return hour >= 18 || hour < 6;
@@ -84,9 +96,21 @@ function localDateValue(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function futureDates() {
-  const start = new Date();
-  start.setHours(12, 0, 0, 0);
+function dateInTimeZone(timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone,
+    year: 'numeric',
+  }).formatToParts(new Date());
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value);
+
+  return new Date(value('year'), value('month') - 1, value('day'), 12);
+}
+
+function futureDates(timeZone: string) {
+  const start = dateInTimeZone(timeZone);
   return Array.from({ length: 14 }, (_, index) => {
     const date = new Date(start);
     date.setDate(start.getDate() + index);
@@ -104,8 +128,9 @@ export default function BookingDetailsScreen() {
   const [step, setStep] = useState<BookingStep>('professional');
   const [professionalId, setProfessionalId] = useState<string | null>(null);
   const [serviceIds, setServiceIds] = useState<string[]>([]);
-  const dates = useMemo(() => futureDates(), []);
-  const [date, setDate] = useState(dates[0]!);
+  const [selectedDateValue, setSelectedDateValue] = useState<string | null>(
+    null,
+  );
   const [startsAt, setStartsAt] = useState<string | null>(null);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('all');
   const [showAllSlots, setShowAllSlots] = useState(false);
@@ -143,6 +168,16 @@ export default function BookingDetailsScreen() {
   });
 
   const locationId = organizationQuery.data?.location?.id ?? null;
+  const timeZone =
+    organizationQuery.data?.location?.timezone ??
+    organizationQuery.data?.organization?.defaultTimezone ??
+    Intl.DateTimeFormat().resolvedOptions().timeZone ??
+    'UTC';
+  const dates = useMemo(() => futureDates(timeZone), [timeZone]);
+  const date =
+    dates.find(
+      (candidate) => localDateValue(candidate) === selectedDateValue,
+    ) ?? dates[0]!;
   const professionals = useMemo(() => {
     if (!locationId) return [];
     const assignedIds = new Set(
@@ -210,7 +245,7 @@ export default function BookingDetailsScreen() {
     );
   }, [availabilityQuery.data?.slots, availabilityQuery.data?.unavailableSlots]);
   const filteredSlots = scheduleSlots.filter((slot) =>
-    slotMatchesPeriod(slot.startsAt, timePeriod),
+    slotMatchesPeriod(slot.startsAt, timePeriod, timeZone),
   );
   const visibleSlots = showAllSlots
     ? filteredSlots
@@ -302,12 +337,12 @@ export default function BookingDetailsScreen() {
   const chooseTimePeriod = (period: TimePeriod) => {
     setTimePeriod(period);
     setShowAllSlots(false);
-    if (startsAt && !slotMatchesPeriod(startsAt, period)) {
+    if (startsAt && !slotMatchesPeriod(startsAt, period, timeZone)) {
       setStartsAt(null);
     }
   };
   const chooseDate = (nextDate: Date) => {
-    setDate(nextDate);
+    setSelectedDateValue(localDateValue(nextDate));
     setStartsAt(null);
     setShowAllSlots(false);
   };
@@ -543,6 +578,7 @@ export default function BookingDetailsScreen() {
                       {new Date(slot.startsAt).toLocaleTimeString('es-EC', {
                         hour: '2-digit',
                         minute: '2-digit',
+                        timeZone,
                       })}
                     </Text>
                     {unavailable ? (

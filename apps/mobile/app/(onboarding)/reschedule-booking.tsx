@@ -28,6 +28,19 @@ function localDateValue(date: Date) {
   ].join('-');
 }
 
+function dateInTimeZone(timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone,
+    year: 'numeric',
+  }).formatToParts(new Date());
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value);
+
+  return new Date(value('year'), value('month') - 1, value('day'), 12);
+}
+
 export default function RescheduleBookingScreen() {
   const { session } = useAuth();
   const router = useRouter();
@@ -45,17 +58,6 @@ export default function RescheduleBookingScreen() {
     () => (rawServiceIds ?? '').split(',').filter(Boolean),
     [rawServiceIds],
   );
-  const dates = useMemo(() => {
-    const start = new Date();
-    start.setHours(12, 0, 0, 0);
-    return Array.from({ length: 21 }, (_, index) => {
-      const value = new Date(start);
-      value.setDate(start.getDate() + index);
-      return value;
-    });
-  }, []);
-  const [date, setDate] = useState(dates[0]!);
-  const [startsAt, setStartsAt] = useState<string | null>(null);
   const organizationQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -64,6 +66,27 @@ export default function RescheduleBookingScreen() {
       ),
     queryKey: ['current-organization'],
   });
+  const [selectedDateValue, setSelectedDateValue] = useState<string | null>(
+    null,
+  );
+  const timeZone =
+    organizationQuery.data?.location?.timezone ??
+    organizationQuery.data?.organization?.defaultTimezone ??
+    Intl.DateTimeFormat().resolvedOptions().timeZone ??
+    'UTC';
+  const dates = useMemo(() => {
+    const start = dateInTimeZone(timeZone);
+    return Array.from({ length: 21 }, (_, index) => {
+      const value = new Date(start);
+      value.setDate(start.getDate() + index);
+      return value;
+    });
+  }, [timeZone]);
+  const date =
+    dates.find(
+      (candidate) => localDateValue(candidate) === selectedDateValue,
+    ) ?? dates[0]!;
+  const [startsAt, setStartsAt] = useState<string | null>(null);
   const locationId = organizationQuery.data?.location?.id ?? null;
   const availabilityQuery = useQuery({
     enabled: Boolean(locationId && membershipId && serviceIds.length),
@@ -139,7 +162,7 @@ export default function RescheduleBookingScreen() {
               <Pressable
                 key={localDateValue(item)}
                 onPress={() => {
-                  setDate(item);
+                  setSelectedDateValue(localDateValue(item));
                   setStartsAt(null);
                 }}
                 style={[styles.date, selected && styles.selected]}
@@ -179,6 +202,7 @@ export default function RescheduleBookingScreen() {
                 {new Date(slot.startsAt).toLocaleTimeString('es-EC', {
                   hour: '2-digit',
                   minute: '2-digit',
+                  timeZone,
                 })}
               </Text>
             </Pressable>

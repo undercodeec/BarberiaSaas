@@ -973,13 +973,20 @@ export default function AgendaScreen() {
         visible={isAgendaSettingsOpen}
       >
         <View style={styles.settingsOverlay}>
-          <Pressable
-            onPress={dismissAgendaSettings}
+          <Animated.View
+            pointerEvents="box-none"
             style={[
               styles.settingsBackdrop,
               { opacity: settingsBackdropOpacity },
             ]}
-          />
+          >
+            <Pressable
+              accessibilityLabel="Cerrar ajustes de agenda"
+              accessibilityRole="button"
+              onPress={dismissAgendaSettings}
+              style={StyleSheet.absoluteFill}
+            />
+          </Animated.View>
           <Animated.View
             style={[
               styles.settingsSheet,
@@ -1679,7 +1686,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     minHeight: 62,
     paddingHorizontal: 15,
-    ...goldButtonShadow,
   },
   checkboxRowSelected: {
     backgroundColor: appTheme.colors.surface,
@@ -1697,7 +1703,6 @@ const styles = StyleSheet.create({
     minHeight: 88,
     paddingHorizontal: 10,
     width: 116,
-    ...goldButtonShadow,
   },
   optionTileLabel: {
     color: appTheme.colors.text,
@@ -1756,11 +1761,7 @@ const styles = StyleSheet.create({
     backgroundColor: appTheme.colors.surface,
     width: '100%',
   },
-  settingsControlPressed: {
-    elevation: 9,
-    shadowOpacity: 0.2,
-    transform: [{ translateY: -3 }],
-  },
+  settingsControlPressed: { opacity: 0.86 },
   settingsTitle: {
     color: appTheme.colors.text,
     fontSize: 23,

@@ -45,9 +45,21 @@ function dateKey(date: Date) {
   ].join('-');
 }
 
-function futureDates() {
-  const start = new Date();
-  start.setHours(12, 0, 0, 0);
+function dateInTimeZone(timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone,
+    year: 'numeric',
+  }).formatToParts(new Date());
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value);
+
+  return new Date(value('year'), value('month') - 1, value('day'), 12);
+}
+
+function futureDates(timeZone: string) {
+  const start = dateInTimeZone(timeZone);
   return Array.from({ length: 21 }, (_, index) => {
     const value = new Date(start);
     value.setDate(start.getDate() + index);
@@ -87,8 +99,16 @@ export function BookingExperience({
   const [step, setStep] = useState<Step>('landing');
   const [professionalId, setProfessionalId] = useState<string | null>(null);
   const [serviceIds, setServiceIds] = useState<string[]>([]);
-  const dates = useMemo(() => futureDates(), []);
-  const [date, setDate] = useState(dates[0]!);
+  const dates = useMemo(
+    () => futureDates(catalog.location.timezone),
+    [catalog.location.timezone],
+  );
+  const [selectedDateValue, setSelectedDateValue] = useState<string | null>(
+    null,
+  );
+  const date =
+    dates.find((candidate) => dateKey(candidate) === selectedDateValue) ??
+    dates[0]!;
   const [slots, setSlots] = useState<
     ReadonlyArray<{ endsAt: string; startsAt: string }>
   >([]);
@@ -432,7 +452,7 @@ export function BookingExperience({
                         }`}
                         key={dateKey(item)}
                         onClick={() => {
-                          setDate(item);
+                          setSelectedDateValue(dateKey(item));
                           void loadAvailability(item);
                         }}
                         type="button"
@@ -502,7 +522,8 @@ export function BookingExperience({
                     ))}
                   </div>
                 )}
-                {!loading && !visibleSlots.length ? (
+                {error ? <ErrorMessage message={error} /> : null}
+                {!loading && !error && !visibleSlots.length ? (
                   <p className="rounded-2xl bg-[#F4F4F3] p-5 text-center text-sm text-[#555A63]">
                     No hay horarios disponibles durante la{' '}
                     {TIME_OF_DAY_OPTIONS.find(
