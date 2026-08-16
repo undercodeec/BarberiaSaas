@@ -17,6 +17,7 @@ test-results/
 *.tsbuildinfo
 *.aab
 *.apk
+apps/mobile/aab-check/
 
 .env
 .env.*
