@@ -9,6 +9,7 @@ expo-env.d.ts
 # Linux workers. Gradle regenerates these files during the cloud build.
 android/build/
 android/.gradle/
+aab-check/
 
 node_modules/
 .eas-archive/
