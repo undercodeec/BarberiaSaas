@@ -1693,97 +1693,98 @@ export function LegacyLocationBannerSheet({
               },
             ]}
           >
-          <View style={styles.locationHandle} />
-          <Text accessibilityRole="header" style={styles.locationTitle}>
-            {'Ubicaci\u00f3n del negocio'}
-          </Text>
-          <Text style={styles.locationDescription}>
-            {
-              'Una direcci\u00f3n precisa ayuda a que m\u00e1s clientes encuentren tu negocio y reserven contigo.'
-            }
-          </Text>
-
-          <View style={styles.locationInputWrap}>
-            <Text style={styles.locationInputLabel}>{'Direcci\u00f3n'}</Text>
-            <Ionicons color="#555a63" name="location-outline" size={21} />
-            <TextInput
-              accessibilityLabel="Direcci\u00f3n del negocio"
-              editable={!isSubmitted}
-              onChangeText={(value) => {
-                setAddress(value);
-                setError(null);
-              }}
-              placeholder="Ej. Av. Naciones Unidas y Av. Shyris"
-              placeholderTextColor="#8e939b"
-              style={styles.locationInput}
-              value={address}
-            />
-          </View>
-
-          <Pressable
-            accessibilityHint="Toca para ajustar el marcador"
-            accessibilityLabel="Mapa de ubicaci\u00f3n"
-            accessibilityRole="button"
-            disabled={isSubmitted}
-            onPress={({ nativeEvent }) =>
-              setMarkerPosition({
-                left: Math.max(12, Math.min(nativeEvent.locationX - 15, 278)),
-                top: Math.max(12, Math.min(nativeEvent.locationY - 34, 94)),
-              })
-            }
-            style={styles.locationMap}
-          >
-            <View style={[styles.locationRoad, styles.locationRoadOne]} />
-            <View style={[styles.locationRoad, styles.locationRoadTwo]} />
-            <View style={styles.locationBuildingOne} />
-            <View style={styles.locationBuildingTwo} />
-            <View style={styles.locationBuildingThree} />
-            <View style={styles.locationBuildingFour} />
-            <View
-              style={[
-                styles.locationMarker,
-                { left: markerPosition.left, top: markerPosition.top },
-              ]}
-            >
-              <Ionicons color="#ffffff" name="location" size={19} />
-            </View>
-          </Pressable>
-          <Text style={styles.locationMapHint}>
-            Toca el mapa para ajustar el marcador
-          </Text>
-
-          {error ? <Text style={styles.locationError}>{error}</Text> : null}
-          {isSubmitted ? (
-            <Text
-              accessibilityLiveRegion="polite"
-              style={styles.locationSuccess}
-            >
-              {'Ubicaci\u00f3n guardada'}
+            <View style={styles.locationHandle} />
+            <Text accessibilityRole="header" style={styles.locationTitle}>
+              {'Ubicaci\u00f3n del negocio'}
             </Text>
-          ) : null}
-          <View style={styles.locationActions}>
+            <Text style={styles.locationDescription}>
+              {
+                'Una direcci\u00f3n precisa ayuda a que m\u00e1s clientes encuentren tu negocio y reserven contigo.'
+              }
+            </Text>
+
+            <View style={styles.locationInputWrap}>
+              <Text style={styles.locationInputLabel}>{'Direcci\u00f3n'}</Text>
+              <Ionicons color="#555a63" name="location-outline" size={21} />
+              <TextInput
+                accessibilityLabel="Direcci\u00f3n del negocio"
+                editable={!isSubmitted}
+                onChangeText={(value) => {
+                  setAddress(value);
+                  setError(null);
+                }}
+                placeholder="Ej. Av. Naciones Unidas y Av. Shyris"
+                placeholderTextColor="#8e939b"
+                style={styles.locationInput}
+                value={address}
+              />
+            </View>
+
             <Pressable
+              accessibilityHint="Toca para ajustar el marcador"
+              accessibilityLabel="Mapa de ubicaci\u00f3n"
               accessibilityRole="button"
-              disabled={isSubmitting || isSubmitted}
-              onPress={dismissWithAnimation}
-              style={styles.locationSecondaryButton}
+              disabled={isSubmitted}
+              onPress={({ nativeEvent }) =>
+                setMarkerPosition({
+                  left: Math.max(12, Math.min(nativeEvent.locationX - 15, 278)),
+                  top: Math.max(12, Math.min(nativeEvent.locationY - 34, 94)),
+                })
+              }
+              style={styles.locationMap}
             >
-              <Text style={styles.locationSecondaryLabel}>Ahora no</Text>
+              <View style={[styles.locationRoad, styles.locationRoadOne]} />
+              <View style={[styles.locationRoad, styles.locationRoadTwo]} />
+              <View style={styles.locationBuildingOne} />
+              <View style={styles.locationBuildingTwo} />
+              <View style={styles.locationBuildingThree} />
+              <View style={styles.locationBuildingFour} />
+              <View
+                style={[
+                  styles.locationMarker,
+                  { left: markerPosition.left, top: markerPosition.top },
+                ]}
+              >
+                <Ionicons color="#ffffff" name="location" size={19} />
+              </View>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              disabled={isSubmitting || isSubmitted}
-              onPress={() => void submit()}
-              style={[
-                styles.locationPrimaryButton,
-                (isSubmitting || isSubmitted) && styles.locationButtonDisabled,
-              ]}
-            >
-              <Text style={styles.locationPrimaryLabel}>
-                {'Guardar ubicaci\u00f3n'}
+            <Text style={styles.locationMapHint}>
+              Toca el mapa para ajustar el marcador
+            </Text>
+
+            {error ? <Text style={styles.locationError}>{error}</Text> : null}
+            {isSubmitted ? (
+              <Text
+                accessibilityLiveRegion="polite"
+                style={styles.locationSuccess}
+              >
+                {'Ubicaci\u00f3n guardada'}
               </Text>
-            </Pressable>
-          </View>
+            ) : null}
+            <View style={styles.locationActions}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={isSubmitting || isSubmitted}
+                onPress={dismissWithAnimation}
+                style={styles.locationSecondaryButton}
+              >
+                <Text style={styles.locationSecondaryLabel}>Ahora no</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={isSubmitting || isSubmitted}
+                onPress={() => void submit()}
+                style={[
+                  styles.locationPrimaryButton,
+                  (isSubmitting || isSubmitted) &&
+                    styles.locationButtonDisabled,
+                ]}
+              >
+                <Text style={styles.locationPrimaryLabel}>
+                  {'Guardar ubicaci\u00f3n'}
+                </Text>
+              </Pressable>
+            </View>
           </Animated.View>
         </KeyboardAvoidingView>
       </View>
@@ -2343,33 +2344,29 @@ export default function DashboardScreen() {
 
         {planRenewalNotice ? (
           <View style={styles.subscriptionNoticeCard}>
-            <View style={styles.subscriptionNoticeTopRow}>
-              <View style={styles.subscriptionNoticeCopyColumn}>
-                <Text style={styles.cardTitle}>{planRenewalNotice.title}</Text>
-                <Text style={styles.cardCopy}>{planRenewalNotice.copy}</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => router.push('/subscription')}
-                  style={styles.subscriptionUpgradeButton}
-                >
-                  <Text style={styles.subscriptionUpgradeLabel}>
-                    Ver planes
-                  </Text>
-                  <Ionicons
-                    color={appTheme.colors.white}
-                    name="arrow-forward"
-                    size={18}
-                  />
-                </Pressable>
-              </View>
-              <View style={styles.subscriptionNoticeImageColumn}>
-                <Image
-                  accessibilityLabel="Corona dorada de suscripcion"
-                  resizeMode="contain"
-                  source={require('../../assets/suscripcion.png')}
-                  style={styles.subscriptionCrown}
+            <View style={styles.subscriptionNoticeImageColumn}>
+              <Image
+                accessibilityLabel="Corona dorada de suscripcion"
+                resizeMode="contain"
+                source={require('../../assets/suscripcion.png')}
+                style={styles.subscriptionCrown}
+              />
+            </View>
+            <View style={styles.subscriptionNoticeCopyColumn}>
+              <Text style={styles.cardTitle}>{planRenewalNotice.title}</Text>
+              <Text style={styles.cardCopy}>{planRenewalNotice.copy}</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/subscription')}
+                style={styles.subscriptionUpgradeButton}
+              >
+                <Text style={styles.subscriptionUpgradeLabel}>Ver planes</Text>
+                <Ionicons
+                  color={appTheme.colors.white}
+                  name="arrow-forward"
+                  size={18}
                 />
-              </View>
+              </Pressable>
             </View>
           </View>
         ) : null}
@@ -3087,25 +3084,21 @@ const styles = StyleSheet.create({
     ...goldButtonShadow,
   },
   subscriptionNoticeCopyColumn: {
-    flex: 1.18,
-    paddingVertical: 8,
+    alignItems: 'center',
+    gap: 10,
+    paddingTop: 6,
   },
   subscriptionNoticeImageColumn: {
     alignItems: 'center',
-    flex: 0.82,
     justifyContent: 'center',
   },
-  subscriptionNoticeTopRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-  },
   subscriptionCrown: {
-    height: 154,
-    width: '145%',
+    height: 112,
+    width: 180,
   },
   subscriptionUpgradeButton: {
     alignItems: 'center',
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
     backgroundColor: appTheme.colors.accent,
     borderRadius: appTheme.radii.control,
     flexDirection: 'row',

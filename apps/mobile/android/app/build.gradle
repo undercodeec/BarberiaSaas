@@ -120,8 +120,8 @@ android {
         applicationId 'com.barbersaas.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode((findProperty('NAVA_VERSION_CODE') ?: '25').toInteger())
-        versionName "0.1.3"
+        versionCode((findProperty('NAVA_VERSION_CODE') ?: '26').toInteger())
+        versionName "0.1.4"
         manifestPlaceholders = [GOOGLE_MAPS_ANDROID_API_KEY: googleMapsAndroidApiKey]
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""

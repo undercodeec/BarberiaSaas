@@ -1,4 +1,3 @@
-import Constants from 'expo-constants';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -15,8 +14,10 @@ export function BusinessLocationMap({
   readonly onCoordinateChange: (coordinate: MapCoordinate) => void;
 }) {
   const center = coordinate ?? { latitude: -0.1807, longitude: -78.4678 };
-  const nativeMapsEnabled =
-    Constants.expoConfig?.extra?.googleMaps?.nativeEnabled === true;
+  // La clave nativa se inyecta directamente en AndroidManifest mediante Gradle.
+  // Expo Constants no siempre conserva `extra` en un AAB local, por lo que no
+  // debe decidir si MapView se muestra o no.
+  const nativeMapsEnabled = true;
 
   if (!nativeMapsEnabled) {
     return (
