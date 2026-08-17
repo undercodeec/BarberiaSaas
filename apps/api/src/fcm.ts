@@ -9,7 +9,9 @@ export async function sendFcmNotifications({ body, config, data, title, tokens }
   readonly title: string;
   readonly tokens: readonly string[];
 }): Promise<void> {
-  if (!tokens.length || !config.FCM_SERVICE_ACCOUNT_FILE) return;
+  if (!tokens.length) return;
+  if (!config.FCM_SERVICE_ACCOUNT_FILE)
+    throw new Error('FCM no está configurado en el servidor.');
   const auth = new GoogleAuth({
     keyFile: config.FCM_SERVICE_ACCOUNT_FILE,
     scopes: ['https://www.googleapis.com/auth/firebase.messaging'],
