@@ -639,10 +639,8 @@ function normalizePhone(phone: string): string {
 
 function duplicateRegistrationError(
   duplicate: {
-    readonly businessNameKey: string | null;
     readonly phoneKey: string | null;
   },
-  businessNameKey: string,
   phoneKey: string,
 ): ApiError {
   if (duplicate.phoneKey === phoneKey) {
@@ -652,17 +650,10 @@ function duplicateRegistrationError(
       'Ese número telefónico ya está registrado.',
     );
   }
-  if (duplicate.businessNameKey === businessNameKey) {
-    return new ApiError(
-      409,
-      'BUSINESS_NAME_ALREADY_EXISTS',
-      'Ese nombre de negocio ya está en uso.',
-    );
-  }
   return new ApiError(
     409,
     'REGISTRATION_DATA_ALREADY_EXISTS',
-    'El correo, teléfono o nombre del negocio ya está registrado.',
+    'El teléfono ya está registrado.',
   );
 }
 
@@ -897,8 +888,6 @@ export async function buildApi({
     const [
       existingUser,
       pendingEmail,
-      profileBusiness,
-      pendingBusiness,
       profilePhone,
       pendingPhone,
     ] = await Promise.all([
@@ -914,8 +903,6 @@ export async function buildApi({
             where: { email, expiresAt: { gt: now } },
           })
         : null,
-      null,
-      null,
       phoneKey
         ? database.userRegistrationProfile.findUnique({
             select: { userId: true },
@@ -936,9 +923,6 @@ export async function buildApi({
           pendingEmail)
           ? { email: 'Ese correo ya está registrado.' }
           : {}),
-        ...(false && (profileBusiness || pendingBusiness)
-          ? { businessName: 'Ese nombre de negocio ya está en uso.' }
-          : {}),
         ...(phoneKey && (profilePhone || pendingPhone)
           ? { phone: 'Ese número telefónico ya está registrado.' }
           : {}),
@@ -957,7 +941,6 @@ export async function buildApi({
     });
     const input = signUpSchema.parse(request.body);
     const email = normalizeEmail(input.email);
-    const businessNameKey = normalizeBusinessName(input.businessName);
     const phoneKey = normalizePhone(input.phone);
     try {
       const passwordHash = await hashPassword(input.password);
@@ -990,11 +973,11 @@ export async function buildApi({
       const [duplicateProfile, duplicatePendingRegistration] =
         await Promise.all([
           database.userRegistrationProfile.findFirst({
-            select: { businessNameKey: true, phoneKey: true },
+            select: { phoneKey: true },
             where: { phoneKey },
           }),
           database.pendingRegistration.findFirst({
-            select: { businessNameKey: true, phoneKey: true },
+            select: { phoneKey: true },
             where: {
               email: { not: email },
               expiresAt: { gt: new Date() },
@@ -1004,7 +987,7 @@ export async function buildApi({
         ]);
       const duplicate = duplicateProfile ?? duplicatePendingRegistration;
       if (duplicate) {
-        throw duplicateRegistrationError(duplicate, businessNameKey, phoneKey);
+        throw duplicateRegistrationError(duplicate, phoneKey);
       }
       const verification = await issueVerificationCode({
         appEnvironment: config.APP_ENV,

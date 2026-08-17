@@ -41,7 +41,6 @@ export interface RegistrationResponse {
 
 export interface RegistrationAvailabilityResponse {
   readonly conflicts: {
-    readonly businessName?: string;
     readonly email?: string;
     readonly phone?: string;
   };

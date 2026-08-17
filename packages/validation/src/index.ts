@@ -95,12 +95,11 @@ export const signUpSchema = z
 
 export const registrationAvailabilitySchema = z
   .object({
-    businessName: businessNameSchema.optional(),
     email: emailSchema.optional(),
     phone: phoneSchema.optional(),
   })
   .refine(
-    (value) => Boolean(value.businessName || value.email || value.phone),
+    (value) => Boolean(value.email || value.phone),
     'Envía al menos un campo para comprobar.',
   );
 

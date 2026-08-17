@@ -103,7 +103,6 @@ export function RegistrationFlow() {
   const router = useRouter();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const scrollRef = useRef<ScrollView>(null);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const sheetMaxHeight = Math.min(
     Math.max(320, height - insets.top - 12),
@@ -151,17 +150,6 @@ export function RegistrationFlow() {
       hideSubscription.remove();
     };
   }, []);
-  const keepFocusedFieldVisible: NonNullable<TextInputProps['onFocus']> = (
-    event,
-  ) => {
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollResponderScrollNativeHandleToKeyboard(
-        event.target,
-        28,
-        true,
-      );
-    });
-  };
   const verificationExpired = remainingSeconds === 0;
   const defaultCountry =
     COUNTRIES.find((country) => country.code === countryCode) ?? COUNTRIES[0]!;
@@ -210,14 +198,13 @@ export function RegistrationFlow() {
     if (!fieldsAreComplete(['fullName', 'businessName', 'phone'])) return;
     const current = getValues();
     const input = {
-      businessName: current.businessName,
       phone: `${phoneCountry.dial} ${current.phone.trim()}`,
     };
     const parsed = registrationAvailabilitySchema.safeParse(input);
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
         const field = issue.path[0];
-        if (field === 'businessName' || field === 'phone') {
+        if (field === 'phone') {
           setError(field, { message: issue.message });
         }
       }
@@ -226,15 +213,12 @@ export function RegistrationFlow() {
     setCheckingAvailability(true);
     try {
       const { conflicts } = await checkRegistrationAvailability(parsed.data);
-      if (conflicts.businessName) {
-        setError('businessName', { message: conflicts.businessName });
-      }
       if (conflicts.phone) {
         setError('phone', { message: conflicts.phone });
       }
-      if (!conflicts.businessName && !conflicts.phone) setStep('attention');
+      if (!conflicts.phone) setStep('attention');
     } catch (error) {
-      setError('businessName', {
+      setError('phone', {
         message:
           error instanceof Error
             ? error.message
@@ -326,13 +310,6 @@ export function RegistrationFlow() {
         setStep('verification');
       } catch (error) {
         const code = apiErrorCode(error);
-        if (code === 'BUSINESS_NAME_ALREADY_EXISTS') {
-          setError('businessName', {
-            message: 'Ese nombre de negocio ya está en uso.',
-          });
-          setStep('business');
-          return;
-        }
         if (code === 'PHONE_ALREADY_EXISTS') {
           setError('phone', {
             message: 'Ese número telefónico ya está registrado.',
@@ -495,7 +472,6 @@ export function RegistrationFlow() {
                 keyboardDismissMode="on-drag"
                 keyboardShouldPersistTaps="handled"
                 overScrollMode="never"
-                ref={scrollRef}
                 showsVerticalScrollIndicator={false}
                 style={s.scroll}
               >
@@ -562,7 +538,6 @@ export function RegistrationFlow() {
                                 label="Nombre"
                                 onBlur={field.onBlur}
                                 onChangeText={field.onChange}
-                                onFocus={keepFocusedFieldVisible}
                                 value={field.value}
                               />
                             )}
@@ -583,7 +558,6 @@ export function RegistrationFlow() {
                                   clearErrors('businessName');
                                   field.onChange(value);
                                 }}
-                                onFocus={keepFocusedFieldVisible}
                                 value={field.value}
                               />
                             )}
@@ -595,6 +569,7 @@ export function RegistrationFlow() {
                               <PhoneCountryField
                                 countryCode={phoneCountryCode}
                                 error={fieldState.error?.message}
+                                onBlur={field.onBlur}
                                 onChangeCountry={(code) => {
                                   clearErrors('phone');
                                   setPhoneCountryCode(code);
@@ -603,7 +578,6 @@ export function RegistrationFlow() {
                                   clearErrors('phone');
                                   field.onChange(value);
                                 }}
-                                onFocus={keepFocusedFieldVisible}
                                 value={field.value}
                               />
                             )}
@@ -717,7 +691,6 @@ export function RegistrationFlow() {
                                   clearErrors('email');
                                   field.onChange(value);
                                 }}
-                                onFocus={keepFocusedFieldVisible}
                                 value={field.value}
                               />
                             )}
@@ -732,7 +705,6 @@ export function RegistrationFlow() {
                                 label="Contraseña"
                                 onBlur={field.onBlur}
                                 onChangeText={field.onChange}
-                                onFocus={keepFocusedFieldVisible}
                                 secureTextEntry
                                 value={field.value}
                               />
@@ -748,7 +720,6 @@ export function RegistrationFlow() {
                                 label="Confirmar contraseña"
                                 onBlur={field.onBlur}
                                 onChangeText={field.onChange}
-                                onFocus={keepFocusedFieldVisible}
                                 secureTextEntry
                                 value={field.value}
                               />
@@ -857,7 +828,6 @@ export function RegistrationFlow() {
                               onChangeText={(code) =>
                                 setVerificationCode(code.replace(/\D/g, ''))
                               }
-                              onFocus={keepFocusedFieldVisible}
                               placeholder="000000"
                               placeholderTextColor={appTheme.colors.textMuted}
                               style={verificationStyles.codeInput}

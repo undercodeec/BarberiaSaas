@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { City, Country } from 'country-state-city';
-import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, type NativeScrollEvent, type NativeSyntheticEvent, type TextInputProps, View } from 'react-native';
+import { FlatList, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, type NativeScrollEvent, type NativeSyntheticEvent, type TextInputProps, View } from 'react-native';
 import { useState } from 'react';
 
 import {
@@ -50,7 +50,7 @@ export function detectCountryCode() {
   }
 }
 
-export function PhoneCountryField({ countryCode, error, onChangeCountry, onChangeText, onFocus, value }: { readonly countryCode: string; readonly error?: string | undefined; readonly onChangeCountry: (code: string) => void; readonly onChangeText: (value: string) => void; readonly onFocus?: TextInputProps['onFocus']; readonly value: string }) {
+export function PhoneCountryField({ countryCode, error, onBlur, onChangeCountry, onChangeText, onFocus, value }: { readonly countryCode: string; readonly error?: string | undefined; readonly onBlur?: TextInputProps['onBlur']; readonly onChangeCountry: (code: string) => void; readonly onChangeText: (value: string) => void; readonly onFocus?: TextInputProps['onFocus']; readonly value: string }) {
   const [open, setOpen] = useState(false);
   const country = COUNTRIES.find((item) => item.code === countryCode) ?? COUNTRIES[0]!;
   return (
@@ -62,23 +62,25 @@ export function PhoneCountryField({ countryCode, error, onChangeCountry, onChang
           <Text style={styles.dial}>{country.dial}</Text>
           <Ionicons color="#667080" name="chevron-down" size={18} />
         </Pressable>
-        <TextInput accessibilityLabel="Número telefónico" keyboardType="phone-pad" onChangeText={onChangeText} onFocus={onFocus} placeholder="Número telefónico" placeholderTextColor="#98a0ab" style={styles.phoneInput} value={value} />
+        <TextInput autoComplete="tel" accessibilityLabel="Número telefónico" inputMode="tel" keyboardType={Platform.OS === 'web' ? 'numeric' : 'phone-pad'} maxLength={24} onBlur={onBlur} onChangeText={(text) => onChangeText(text.replace(/[^\d+()\s-]/gu, ''))} onFocus={onFocus} placeholder="Número telefónico" placeholderTextColor="#98a0ab" style={styles.phoneInput} value={value} />
       </View>
       {error ? (
         <Text accessibilityRole="alert" style={styles.error}>
           {error}
         </Text>
       ) : null}
-      <OptionsModal
-        onClose={() => setOpen(false)}
-        onSelect={(option) => {
-          onChangeCountry(option.code);
-          setOpen(false);
-        }}
-        options={COUNTRIES}
-        title="Código de país"
-        visible={open}
-      />
+      {open ? (
+        <OptionsModal
+          onClose={() => setOpen(false)}
+          onSelect={(option) => {
+            onChangeCountry(option.code);
+            setOpen(false);
+          }}
+          options={COUNTRIES}
+          title="Código de país"
+          visible
+        />
+      ) : null}
     </View>
   );
 }
@@ -168,15 +170,29 @@ function OptionsModal({ onClose, onSelect, options, title, visible }: { readonly
           ]}
         >
           <Text style={styles.modalTitle}>{title}</Text>
-          <ScrollView>
-            {options.map((option) => (
-              <Pressable key={option.code} onPress={() => onSelect(option)} style={styles.option}>
+          <FlatList
+            data={options}
+            getItemLayout={(_, index) => ({
+              index,
+              length: 54,
+              offset: 54 * index,
+            })}
+            initialNumToRender={16}
+            keyExtractor={(option) => option.code}
+            keyboardShouldPersistTaps="handled"
+            maxToRenderPerBatch={16}
+            renderItem={({ item: option }) => (
+              <Pressable
+                onPress={() => onSelect(option)}
+                style={styles.option}
+              >
                 <Text style={styles.flag}>{flag(option.code)}</Text>
                 <Text style={styles.optionText}>{option.name}</Text>
                 <Text style={styles.optionMeta}>{option.dial}</Text>
               </Pressable>
-            ))}
-          </ScrollView>
+            )}
+            windowSize={7}
+          />
         </View>
       </View>
     </Modal>
@@ -369,6 +385,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     minHeight: 54,
+    minWidth: 0,
     paddingHorizontal: 14,
   },
   phoneRow: {

@@ -886,16 +886,13 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(
       availability.json<{
         conflicts: {
-          businessName?: string;
           email: string;
           phone: string;
         };
       }>().conflicts,
     ).toEqual({
-      businessName: 'Ese nombre de negocio ya está en uso.',
       email: 'Ese correo ya está registrado.',
       phone: 'Ese número telefónico ya está registrado.',
-      ...{ ['business' + 'Name']: undefined },
     });
 
     const duplicateEmail = await app.inject({

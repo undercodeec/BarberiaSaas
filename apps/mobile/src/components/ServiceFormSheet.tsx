@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useRef, useState } from 'react';
-import { Image, Keyboard, KeyboardAvoidingView, LayoutAnimation, Modal, Platform, Pressable, ScrollView as NativeScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View, type GestureResponderEvent, type TextInputProps } from 'react-native';
+import { Image, Keyboard, KeyboardAvoidingView, LayoutAnimation, Modal, Platform, Pressable, ScrollView as NativeScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View, type GestureResponderEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { appTheme, goldButtonShadow } from './BottomNavigation';
@@ -175,20 +175,6 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
     };
   }, []);
 
-  const keepFocusedFieldVisible: NonNullable<TextInputProps['onFocus']> = (
-    event,
-  ) => {
-    const target = event.nativeEvent?.target ?? event.target;
-    const scrollToFocusedField = () => {
-      const scrollView = formScrollRef.current;
-      if (!scrollView || target == null) return;
-      scrollView.scrollResponderScrollNativeHandleToKeyboard(target, 32, true);
-    };
-
-    requestAnimationFrame(scrollToFocusedField);
-    setTimeout(scrollToFocusedField, 220);
-  };
-
   return (
     <Modal animationType="fade" navigationBarTranslucent onRequestClose={close} statusBarTranslucent transparent visible={visible}>
       <View style={styles.layer}>
@@ -216,7 +202,7 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
                 </Text>
                 <View style={[styles.inputShell, submitted && !name.trim() ? styles.inputError : null]}>
                   <Ionicons color="#667080" name="cut-outline" size={21} />
-                  <TextInput onChangeText={setName} onFocus={keepFocusedFieldVisible} placeholder="Ej. Corte clásico" placeholderTextColor="#98a0ab" style={styles.input} value={name} />
+                  <TextInput onChangeText={setName} placeholder="Ej. Corte clásico" placeholderTextColor="#98a0ab" style={styles.input} value={name} />
                 </View>
                 {submitted && !name.trim() ? (
                   <Text accessibilityRole="alert" style={styles.error}>
@@ -227,7 +213,7 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
 
               <View style={styles.field}>
                 <Text style={styles.label}>Descripción del servicio (opcional)</Text>
-                <TextInput multiline onChangeText={setDescription} onFocus={keepFocusedFieldVisible} placeholder="Describe brevemente el servicio" placeholderTextColor="#98a0ab" style={[styles.inputShell, styles.textArea]} textAlignVertical="top" value={description} />
+                <TextInput multiline onChangeText={setDescription} placeholder="Describe brevemente el servicio" placeholderTextColor="#98a0ab" style={[styles.inputShell, styles.textArea]} textAlignVertical="top" value={description} />
               </View>
 
               <View style={styles.fieldRow}>
@@ -237,7 +223,7 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
                   </Text>
                   <View style={[styles.inputShell, submitted && !isPositiveNumber(duration) ? styles.inputError : null]}>
                     <Ionicons color="#667080" name="time-outline" size={21} />
-                    <TextInput accessibilityLabel="Duración en minutos" keyboardType="number-pad" onChangeText={setDuration} onFocus={keepFocusedFieldVisible} placeholder="30 min" placeholderTextColor="#98a0ab" style={styles.input} value={duration} />
+                    <TextInput accessibilityLabel="Duración en minutos" keyboardType="number-pad" onChangeText={setDuration} placeholder="30 min" placeholderTextColor="#98a0ab" style={styles.input} value={duration} />
                   </View>
                   {submitted && !isPositiveNumber(duration) ? (
                     <Text accessibilityRole="alert" style={styles.error}>
@@ -250,7 +236,7 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
                   <Text style={styles.label}>Precio {priceType === 'fixed' || priceType === 'from' ? <Text style={styles.required}>*</Text> : null}</Text>
                   <View style={[styles.inputShell, submitted && (priceType === 'fixed' || priceType === 'from') && !isPositiveNumber(price) ? styles.inputError : null]}>
                     <Text style={styles.currency}>$</Text>
-                    <TextInput accessibilityLabel="Precio del servicio" editable={priceType === 'fixed' || priceType === 'from'} keyboardType="decimal-pad" onChangeText={setPrice} onFocus={keepFocusedFieldVisible} placeholder={priceType === 'fixed' || priceType === 'from' ? '15.00' : 'No aplica'} placeholderTextColor="#98a0ab" style={styles.input} value={price} />
+                    <TextInput accessibilityLabel="Precio del servicio" editable={priceType === 'fixed' || priceType === 'from'} keyboardType="decimal-pad" onChangeText={setPrice} placeholder={priceType === 'fixed' || priceType === 'from' ? '15.00' : 'No aplica'} placeholderTextColor="#98a0ab" style={styles.input} value={price} />
                   </View>
                   {submitted && (priceType === 'fixed' || priceType === 'from') && !isPositiveNumber(price) ? (
                     <Text accessibilityRole="alert" style={styles.error}>
