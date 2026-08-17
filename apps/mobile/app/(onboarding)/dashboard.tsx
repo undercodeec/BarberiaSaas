@@ -1082,11 +1082,13 @@ function DashboardOperationCard({
 }
 
 function ExtraQuickActionsSheet({
+  isSolo,
   selectedIds,
   onClose,
   onSelect,
   visible,
 }: {
+  readonly isSolo: boolean;
   readonly selectedIds: readonly ExtraQuickActionId[];
   readonly onClose: () => void;
   readonly onSelect: (id: ExtraQuickActionId) => void;
@@ -1094,7 +1096,9 @@ function ExtraQuickActionsSheet({
 }) {
   const layout = useNativeLayoutMetrics(0.72);
   const availableActions = EXTRA_QUICK_ACTIONS.filter(
-    (action) => !selectedIds.includes(action.id),
+    (action) =>
+      !selectedIds.includes(action.id) &&
+      (!isSolo || action.id !== 'collaborators'),
   );
 
   return (
@@ -1892,13 +1896,16 @@ export default function DashboardScreen() {
   const [isQuickActionsPickerOpen, setIsQuickActionsPickerOpen] =
     useState(false);
   const rawBookingUrl = accountQuery.data?.bookingUrl?.trim() ?? '';
+  const isSolo = accountQuery.data?.accountType === 'professional';
   const bookingUrl = /^https?:\/\/\S+$/i.test(rawBookingUrl)
     ? rawBookingUrl
     : '';
   const shouldShowWelcome =
     accountQuery.isSuccess && !accountQuery.data?.onboardingCompletedAt;
-  const extraQuickActions = EXTRA_QUICK_ACTIONS.filter((action) =>
-    extraQuickActionIds.includes(action.id),
+  const extraQuickActions = EXTRA_QUICK_ACTIONS.filter(
+    (action) =>
+      extraQuickActionIds.includes(action.id) &&
+      (!isSolo || action.id !== 'collaborators'),
   );
   const planProgress = subscriptionProgress(
     subscriptionQuery.data,
@@ -2167,7 +2174,12 @@ export default function DashboardScreen() {
   };
 
   const addExtraQuickAction = (id: ExtraQuickActionId) => {
-    if (!user || extraQuickActionIds.includes(id)) return;
+    if (
+      !user ||
+      extraQuickActionIds.includes(id) ||
+      (isSolo && id === 'collaborators')
+    )
+      return;
     const nextIds = [...extraQuickActionIds, id];
     setExtraQuickActionIds(nextIds);
     setIsQuickActionsPickerOpen(false);
@@ -2429,6 +2441,7 @@ export default function DashboardScreen() {
         visible={isBookingSheetOpen}
       />
       <ExtraQuickActionsSheet
+        isSolo={isSolo}
         onClose={() => setIsQuickActionsPickerOpen(false)}
         onSelect={addExtraQuickAction}
         selectedIds={extraQuickActionIds}

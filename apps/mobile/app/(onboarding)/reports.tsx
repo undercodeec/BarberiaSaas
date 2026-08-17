@@ -1,5 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { MovementReportResponse } from '@barber-saas/api-client';
+import type {
+  MovementReportResponse,
+  OnboardingAccountDetailsResponse,
+} from '@barber-saas/api-client';
 import { useQuery } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -162,8 +165,30 @@ const reportSections: readonly ReportSection[] = [
 ];
 
 export default function ReportsScreen() {
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const router = useRouter();
+  const accountQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<OnboardingAccountDetailsResponse>(
+        '/v1/onboarding/account-details',
+      ),
+    queryKey: ['onboarding-account-details', user?.id],
+  });
+  const isSolo = accountQuery.data?.accountType === 'professional';
+  const visibleReportSections = useMemo(
+    () =>
+      reportSections.map((section) => ({
+        ...section,
+        items: section.items.filter(
+          (item) =>
+            !isSolo ||
+            (item.id !== 'pay-collaborators' &&
+              item.id !== 'collaborator-payment-history'),
+        ),
+      })),
+    [isSolo],
+  );
   const [movementReport, setMovementReport] = useState<
     'deposits' | 'expenses' | 'sales' | null
   >(null);
@@ -242,7 +267,7 @@ export default function ReportsScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {reportSections.map((section) => (
+        {visibleReportSections.map((section) => (
           <View key={section.id} style={styles.section}>
             <Text accessibilityRole="header" style={styles.sectionTitle}>
               {section.title}
