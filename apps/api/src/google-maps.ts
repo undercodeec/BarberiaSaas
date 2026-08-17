@@ -230,9 +230,16 @@ export function createGoogleMapsClient({
           };
           readonly place_id?: string;
         }[];
+        readonly status?: string;
       }>(
         `https://maps.googleapis.com/maps/api/geocode/json?${search.toString()}`,
       );
+      if (result.status && result.status !== 'OK')
+        throw new ApiError(
+          502,
+          'GOOGLE_MAPS_UPSTREAM_ERROR',
+          'Google Maps no pudo validar esta ubicacion. Intentalo nuevamente.',
+        );
       const first = result.results?.[0];
       if (!first?.place_id || !first.formatted_address)
         throw new ApiError(

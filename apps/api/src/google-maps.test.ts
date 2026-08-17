@@ -114,4 +114,17 @@ describe('cliente seguro de Google Maps', () => {
       }),
     ).rejects.toMatchObject({ code: 'GOOGLE_MAPS_NOT_CONFIGURED' });
   });
+
+  it('reports an upstream error when Geocoding denies the request', async () => {
+    const client = createGoogleMapsClient({
+      apiKey: 'server-key',
+      fetchImplementation: vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(JSON.stringify({ status: 'REQUEST_DENIED' })),
+      ),
+    });
+    await expect(client.reverseGeocode(-0.1807, -78.4678)).rejects.toMatchObject({
+      code: 'GOOGLE_MAPS_UPSTREAM_ERROR',
+      statusCode: 502,
+    });
+  });
 });

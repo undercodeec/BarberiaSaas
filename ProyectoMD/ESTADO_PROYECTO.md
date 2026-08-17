@@ -1,5 +1,116 @@
 # Estado del proyecto
 
+> Actualización de alcance: 2026-08-16 — se definió el MVP de comercio
+> público y reservas protegidas. El carrito y checkout están integrados en la
+> sección Productos de la página pública de reservas y crean pedidos reales.
+
+## MVP: compra con retiro local y reservas protegidas — 16 de agosto de 2026
+
+### Recorrido de demostración
+
+- [x] La página pública de reservas incorpora el carrito en la sección
+      `Productos disponibles`. El recorrido permite agregar un producto,
+      cambiar cantidad y elegir tarjeta/PayPhone, transferencia o pago al
+      retirar, sin abandonar el diseño ni la página de reservas.
+- [x] El checkout público crea un pedido transaccional, bloquea las unidades
+      disponibles y muestra su código de retiro. Tarjeta genera un enlace de
+      PayPhone; transferencia queda pendiente de validación; retiro reserva el
+      stock por dos horas. Los vencimientos liberan el stock automáticamente.
+
+### Alcance funcional aprobado
+
+1. **Productos y retiro:** catálogo público con carrito, cantidades, checkout,
+   código de retiro y estados `PENDING_PAYMENT`, `PAID`, `READY_FOR_PICKUP`,
+   `FULFILLED`, `EXPIRED` y `CANCELLED`.
+2. **Pagos:** tarjeta mediante PayPhone, transferencia pendiente de validación
+   y reserva para retiro con pago local. El stock se bloquea solo durante un
+   checkout/pedido vigente; no se descuenta definitivamente hasta pago o
+   entrega, y se libera automáticamente al vencer.
+3. **Reserva protegida:** OTP para primeras reservas, política aceptada y
+   abono configurable por negocio/servicio. El abono se descuenta del total de
+   la cita; cancelación con anticipación genera saldo a favor y no-show o
+   cancelación tardía aplica la política publicada.
+4. **Antispam:** límites por teléfono/IP/dispositivo, una sola reserva futura
+   activa por cliente configurable, CAPTCHA/rate limiting y confirmación previa
+   a la cita. La confiabilidad del cliente puede permitir retirar el abono en
+   reservas futuras.
+
+### Secuencia de implementación
+
+- [x] Fase 1: persistencia de pedidos, líneas, retenciones de stock y estados;
+      API pública segura e interfaz operativa de Pedidos en la app móvil.
+- [x] Fase 2: extender PayPhone de citas a pedidos, validar transferencias y
+      registrar entregas/reversiones de forma transaccional con Caja.
+- [ ] Fase 3: configurar abonos, verificación OTP, reputación/controles
+      antispam y automatismos de vencimiento/confirmación.
+- [ ] Fase 4: pruebas de concurrencia de stock, idempotencia de pagos,
+      expiración y recorridos E2E antes de activar el checkout real.
+
+> Actualización de continuidad: 2026-08-16 — correcciones de Agenda y reservas,
+> despliegue VPS documentado y transición de compilación Android a Gradle local.
+
+## Correcciones de Agenda, reservas y compilación Android local — 16 de agosto de 2026
+
+### Implementado y verificado
+
+- [x] Se corrigió el cierre en blanco al abrir Ajustes de Agenda. La opacidad
+      animada del fondo ahora se aplica a un `Animated.View`; antes se pasaba un
+      objeto animado a un `Pressable` normal y Android fallaba con
+      `ReadableNativeMap cannot be cast to Double`.
+- [x] Se retiraron las sombras y la elevación de las tarjetas seleccionables de
+      Ajustes de Agenda, incluido su estado al presionar.
+- [x] La disponibilidad de citas usa el huso horario de la sede para generar
+      fechas, consultar la API, filtrar franjas y presentar horas. Se aplicó a
+      la creación y reprogramación móvil, y a la reserva pública Web. Con ello
+      se evita consultar un día o una franja incorrectos según el huso horario
+      del teléfono o navegador.
+- [x] La reserva pública muestra el error real de disponibilidad cuando la API
+      falla, en vez de reportar erróneamente que no existen horarios.
+- [x] Verificado: `pnpm --filter @barber-saas/mobile typecheck` y
+      `pnpm --filter @barber-saas/web typecheck` completaron correctamente.
+- [x] Cambios publicados en `origin/main`: `263528e` (Agenda y reservas),
+      `a712a1a` y `7de5043` (exclusión de artefactos de inspección AAB en EAS).
+
+### Decisión vigente: AAB local, sin EAS Build
+
+- [x] Las futuras compilaciones Android no usarán EAS Build ni su cuota de
+      builds. La aplicación conserva los módulos Expo ya integrados, pero el
+      AAB se genera directamente con Gradle desde el proyecto nativo Android.
+- [x] La firma de `release` se validó con
+      `./gradlew.bat :app:signingReport`: usa el keystore de carga local y no
+      `debug.keystore`.
+- [x] Las credenciales de firma se guardan únicamente en el perfil local de
+      Gradle (`C:\Users\USUARIO\.gradle\gradle.properties`) y el keystore está
+      fuera de Git. No guardar contraseñas ni valores `NAVA_UPLOAD_*` en
+      `apps/mobile/android/gradle.properties`.
+- [x] AAB local generado inicialmente en
+      `apps/mobile/android/app/build/outputs/bundle/release/app-release.aab`.
+      Verificación de existencia: 2026-08-16 13:47:13; SHA-256:
+      `5134563758EC149333547B1FAC179DBF4DEF73C5319F84E54E6C34C65C44A08C`.
+- [x] Play Console ya registró el `versionCode` 24. El siguiente AAB queda
+      preparado con `versionCode` 25, `versionName` 0.1.3 y `runtimeVersion`
+      0.1.3 para evitar el rechazo por código duplicado y aislarlo de los OTA
+      previos.
+- [ ] Generar el AAB 25, inspeccionarlo y validar Agenda, mapa y reserva en un
+      dispositivo con la versión instalada desde el track correspondiente.
+
+Comando operativo para futuros AAB locales (no requiere EAS):
+
+```powershell
+cd D:\Documentos\BarberiaSaas\apps\mobile\android
+.\gradlew.bat bundleRelease
+```
+
+### VPS actual
+
+- [x] El runbook de despliegue confirmado usa `/opt/nava/app` y los servicios
+      systemd `nava-api.service` y `nava-web.service`; no se usa PM2 ni Docker
+      para API/Web. Los secretos de API continúan en `/etc/nava/api.env`.
+- [x] El procedimiento de actualización incluye `git pull --ff-only origin
+      main`, `pnpm install --frozen-lockfile`, `pnpm db:migrate:deploy`,
+      `pnpm db:status`, `pnpm db:generate`, `pnpm build` y el reinicio de ambos
+      servicios. Mantener ese orden y no ejecutar `db:migrate:dev` en la VPS.
+
 > Actualización de continuidad: 2026-08-15 — diagnóstico de Google Maps en VPS
 > y configuración de clave de servidor estabilizada.
 
@@ -22,11 +133,12 @@
 
 ### Pendiente obligatorio antes de publicar
 
-- [ ] Generar manualmente el AAB de reemplazo con `versionCode` 24,
-      `versionName`/`runtimeVersion` 0.1.2 y la clave Android correcta. Antes
-      de subirlo a Play, inspeccionar el bundle interno y comprobar que incluye
-      `Ajustes de agenda` y no contiene `Aplicacion bloqueada`; confirmar en
-      el teléfono que la versión instalada es la nueva.
+- [x] Se generó manualmente el AAB de reemplazo local con la firma de carga
+      configurada. La ruta y huella SHA-256 vigentes constan en la actualización
+      del 16 de agosto de 2026 al inicio de este documento.
+- [ ] Antes de subirlo a Play, inspeccionar el bundle interno y comprobar que
+      incluye `Ajustes de agenda` y no contiene `Aplicacion bloqueada`; confirmar
+      en el teléfono que la versión instalada es la nueva.
 
 ## Suscripciones web y cumplimiento de Google Play — 15 de agosto de 2026
 
@@ -4422,3 +4534,95 @@ caja, comisiones y registros históricos.
 - [x] Verificado con 6 pruebas unitarias de politica de suscripcion, typecheck
       de API y typecheck de `@barber-saas/api-client`.
 - [ ] Los pagos de suscripción de Nava no forman parte de este MVP; no se usan credenciales globales ni cobro de suscripciones con PayPhone.
+
+## Operación Android, FCM y builds (2026-08-16)
+
+- [x] Las notificaciones Android usan **FCM HTTP v1 directo**. La app obtiene el token nativo del dispositivo; el API no debe enviar notificaciones mediante Expo Push ni usar tokens `ExponentPushToken`.
+- [x] El archivo público Firebase de Android está en `apps/mobile/android/app/google-services.json` y debe mantenerse versionado. La cuenta de servicio FCM es privada: nunca se sube a Git.
+- [x] En la VPS, la cuenta de servicio debe estar en `/etc/nava/secrets/fcm-service-account.json` (directorio `700`, archivo `600`, propietario `nava:nava`). En `/etc/nava/api.env` deben existir:
+  ```env
+  FCM_SERVICE_ACCOUNT_FILE=/etc/nava/secrets/fcm-service-account.json
+  FCM_PROJECT_ID=p-key-by1efv8zycyb
+  ```
+  Tras desplegar API o modificar estas variables, ejecutar `sudo systemctl restart nava-api.service`.
+- [x] La notificación de una cita incluye `appointmentStartsAt`; al pulsarla, Agenda debe abrir la fecha exacta de la cita en la zona horaria del negocio.
+- [x] La versión preparada para FCM directo es Android **0.1.6 / versionCode 28** y su AAB fue generado localmente. El AAB 0.1.5 / code 27 no contiene esta integración.
+- [ ] Aún se debe distribuir el AAB 0.1.6 / code 28 mediante el track correspondiente y confirmar la versión instalada en el teléfono.
+- [!] El último bloqueo del AAB no fue de código: `C:` se quedó sin espacio y Gradle no pudo escribir `C:\Users\USUARIO\.gradle\daemon\9.3.1\registry.bin`. Antes de compilar, verificar espacio libre o usar cachés temporales en `D:` durante la sesión:
+  ```powershell
+  New-Item -ItemType Directory -Force 'D:\NavaBuildCache\gradle', 'D:\NavaBuildCache\tmp'
+  $env:GRADLE_USER_HOME='D:\NavaBuildCache\gradle'
+  $env:TEMP='D:\NavaBuildCache\tmp'
+  $env:TMP='D:\NavaBuildCache\tmp'
+  $env:NODE_ENV='production'
+  .\gradlew.bat bundleRelease --no-daemon
+  ```
+  Ejecutar desde `apps/mobile/android`. El resultado se genera en `app/build/outputs/bundle/release/app-release.aab`; copiarlo a un lugar seguro antes de limpiar `app/build`.
+- [!] Si el mapa Android vuelve a mostrarse vacío aun con una AAB nueva, revisar en Google Cloud que **Maps SDK for Android** esté habilitado y que la restricción de la clave permita `com.barbersaas.mobile` con el SHA-1 del firmante de release. No exponer ni versionar la clave privada de FCM.
+
+## Seguimiento de reservas Web, push y AAB (2026-08-17)
+
+- [x] Se identificó que la pantalla Web `/booking/[token]` entregaba al
+      navegador el valor servidor de `API_URL`. Una URL interna de la VPS o un
+      rechazo CORS permitía cargar la página, pero hacía fallar la consulta de
+      la cita con `Failed to fetch`.
+- [x] Las consultas interactivas de reserva y gestión ahora pasan por
+      `/api/public-proxy/[...path]` en el mismo origen de
+      `reservas.navacloud.app`. El proxy solo acepta rutas bajo `/v1/public`,
+      conserva query, cuerpo, `content-type` e `idempotency-key`, y traduce un
+      fallo de conexión con la API a una respuesta `502` legible.
+- [x] La entrega FCM ya no se considera exitosa cuando existen dispositivos
+      registrados pero falta `FCM_SERVICE_ACCOUNT_FILE`: ahora falla de forma
+      explícita para que la cola persistente registre y reintente el envío.
+      Se agregaron dos pruebas unitarias para los casos sin tokens y sin
+      configuración FCM.
+- [x] Verificación local aprobada: typecheck de API y Web, prueba unitaria FCM
+      (2 casos) y build de producción de Next.js. La ruta dinámica del proxy
+      quedó incluida en el build.
+- [x] El AAB local
+      `apps/mobile/android/app/build/outputs/bundle/release/app-release.aab`
+      fue inspeccionado: está firmado, declara versión/runtime `0.1.6`, incluye
+      los componentes de Firebase Messaging, `POST_NOTIFICATIONS`, el registro
+      `/v1/push-tokens`, `appointmentStartsAt`, el canal `Citas y reservas` y el
+      cambio local vigente de la pantalla de reprogramación. Fecha del archivo:
+      2026-08-16 19:12:49; SHA-256:
+      `7203416C10A776E183580F039E45C4EA804731B9A6DA7058A46EE48644FB183D`.
+- [x] Se guardó una copia idéntica fuera de la carpeta regenerable de Gradle
+      en `apps/mobile/releases/Nava-0.1.6-code28.aab`; ambas huellas SHA-256
+      coinciden.
+- [ ] Estas correcciones Web/API son locales y requieren commit, despliegue de
+      `nava-api.service`/`nava-web.service` y una prueba real. Para push, además
+      se debe instalar/distribuir code 28, conceder el permiso de Android y
+      verificar en la VPS que la cuenta FCM y `FCM_PROJECT_ID` estén activos.
+
+## Validacion FCM en VPS (2026-08-17)
+
+- [x] Se publicó y desplegó el commit `d603fe1` (`fix: harden booking delivery
+      and FCM failures`) en `nava-api.service` y `nava-web.service`.
+- [x] Se identificó una diferencia entre el runbook anterior y la VPS real: la
+      cuenta de servicio vive en
+      `/opt/nava/secrets/fcm-service-account.json`, no en `/etc/nava/secrets`.
+      El directorio no existía en `/etc`, por lo que la API tenía una ruta FCM
+      inválida aunque las variables estuvieran presentes.
+- [x] Se corrigió `FCM_SERVICE_ACCOUNT_FILE` en `/etc/nava/api.env`, se
+      asignaron permisos de lectura al usuario `nava` sobre el archivo real y
+      se reinició `nava-api.service`. La variable efectiva del proceso ahora
+      es `/opt/nava/secrets/fcm-service-account.json`.
+- [x] Prueba real completada: una reserva nueva entregó correctamente la
+      notificación push Android.
+- [ ] El banner de ubicación Android continúa sin mostrar el mapa. El AAB
+      contiene una clave nativa no vacía y `react-native-maps` usa
+      `PROVIDER_GOOGLE`; falta confirmar en Google Cloud que **Maps SDK for
+      Android** esté habilitado, con facturación activa y una restricción
+      Android que incluya `com.barbersaas.mobile` más el SHA-1 del certificado
+      de **Google Play App Signing**. Es independiente de FCM y de la clave de
+      servidor usada para Places/Geocoding.
+- [x] Se corrigió una fuente de push duplicados: si un usuario tiene un token
+      vigente y otro obsoleto, un envío parcialmente exitoso ya se marca como
+      entregado. Antes, el token obsoleto hacía fallar el lote completo y la
+      cola reenviaba el aviso al teléfono que ya lo había recibido.
+- [x] Las alertas push se generan una vez por evento de reserva pública para
+      el profesional asignado y los propietarios/administradores activos:
+      creación confirmada, cancelación o reprogramación. Cada alerta abre
+      Agenda en la fecha exacta de la cita; no se emiten push al consultar una
+      reserva, abrir la bandeja interna o refrescar la aplicación.

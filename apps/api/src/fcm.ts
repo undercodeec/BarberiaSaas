@@ -2,14 +2,19 @@ import { GoogleAuth } from 'google-auth-library';
 
 import type { ApiConfig } from './config';
 
+export interface FcmDeliveryResult {
+  readonly delivered: number;
+  readonly failed: number;
+}
+
 export async function sendFcmNotifications({ body, config, data, title, tokens }: {
   readonly body: string;
   readonly config: ApiConfig;
   readonly data: Record<string, string | undefined>;
   readonly title: string;
   readonly tokens: readonly string[];
-}): Promise<void> {
-  if (!tokens.length) return;
+}): Promise<FcmDeliveryResult> {
+  if (!tokens.length) return { delivered: 0, failed: 0 };
   if (!config.FCM_SERVICE_ACCOUNT_FILE)
     throw new Error('FCM no está configurado en el servidor.');
   const auth = new GoogleAuth({
@@ -45,6 +50,10 @@ export async function sendFcmNotifications({ body, config, data, title, tokens }
     );
     if (!response.ok) throw new Error(`FCM rechazó el envío (${response.status}).`);
   }));
-  if (results.some((result) => result.status === 'rejected'))
+  const delivered = results.filter(
+    (result) => result.status === 'fulfilled',
+  ).length;
+  if (!delivered)
     throw new Error('FCM no pudo entregar una o más notificaciones.');
+  return { delivered, failed: results.length - delivered };
 }
