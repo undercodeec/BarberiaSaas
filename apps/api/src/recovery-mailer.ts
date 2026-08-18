@@ -55,6 +55,20 @@ function createTransporter(config: ApiConfig) {
   });
 }
 
+function escapeHtml(value: string) {
+  const entities: Record<string, string> = {
+    '&': '&amp;',
+    "'": '&#39;',
+    '"': '&quot;',
+    '<': '&lt;',
+    '>': '&gt;',
+  };
+  return value.replace(
+    /[&<>'"]/g,
+    (character) => entities[character] ?? character,
+  );
+}
+
 export function createRecoveryMailer(config: ApiConfig): RecoveryMailer | null {
   const transporter = createTransporter(config);
   if (!transporter || !config.SMTP_FROM) return null;
@@ -90,6 +104,12 @@ export function createInvitationMailer(
       try {
         await transporter.sendMail({
           from: config.SMTP_FROM,
+          html: [
+            `<p>${escapeHtml(invitedBy)} te invitó a formar parte del equipo de ${escapeHtml(organizationName)}.</p>`,
+            '<p>Abre el siguiente enlace para crear tu cuenta o iniciar sesión con el mismo correo y aceptar la invitación:</p>',
+            `<p><a href="${escapeHtml(invitationUrl)}">Abrir invitación en Nava</a></p>`,
+            '<p>La invitación vence en 7 días. Hasta aceptarla no podrás acceder ni operar dentro del equipo.</p>',
+          ].join(''),
           subject: `Invitación al equipo de ${organizationName}`,
           text: [
             `${invitedBy} te invitó a formar parte del equipo de ${organizationName}.`,

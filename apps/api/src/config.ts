@@ -51,7 +51,7 @@ const environmentSchema = z
     MOBILE_INVITATION_URL: z
       .string()
       .min(1)
-      .default('barbersaas://accept-invitation'),
+      .default('https://reservas.navacloud.app/accept-invitation'),
     MOBILE_RESET_URL: z.string().min(1).default('barbersaas://reset-password'),
     PLATFORM_ADMIN_EMAILS: z.string().default(''),
     PAYPHONE_CREDENTIALS_ENCRYPTION_KEY: optionalText,

@@ -9,16 +9,19 @@ import type {
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
+  Animated,
   Alert,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -57,8 +60,88 @@ function movementIsIncome(type: CashMovementRecord['type']) {
 export default function CashRegisterScreen() {
   const { session, user } = useAuth();
   const layout = useNativeLayoutMetrics(0.92);
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const floatingSaleOffset = useRef(new Animated.ValueXY()).current;
+  const floatingSaleOffsetRef = useRef({ x: 0, y: 0 });
+  const floatingSaleBoundsRef = useRef({
+    bottomInset: layout.bottomInset,
+    height: screenHeight,
+    topInset: layout.topInset,
+    width: screenWidth,
+  });
+  floatingSaleBoundsRef.current = {
+    bottomInset: layout.bottomInset,
+    height: screenHeight,
+    topInset: layout.topInset,
+    width: screenWidth,
+  };
+  const floatingSalePanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
+      onPanResponderMove: (_, gesture) => {
+        const bounds = floatingSaleBoundsRef.current;
+        const buttonSize = 58;
+        const sideMargin = 16;
+        const navigationHeight = 72;
+        const navigationGap = 12;
+        const baseX = bounds.width - 24 - buttonSize;
+        const baseY =
+          bounds.height - (bounds.bottomInset + 104) - buttonSize;
+        const minimumX = sideMargin - baseX;
+        const maximumX = bounds.width - sideMargin - buttonSize - baseX;
+        const minimumY = bounds.topInset + sideMargin - baseY;
+        const maximumY =
+          bounds.height -
+          bounds.bottomInset -
+          navigationHeight -
+          navigationGap -
+          buttonSize -
+          baseY;
+        const x = Math.min(
+          maximumX,
+          Math.max(minimumX, floatingSaleOffsetRef.current.x + gesture.dx),
+        );
+        const y = Math.min(
+          maximumY,
+          Math.max(minimumY, floatingSaleOffsetRef.current.y + gesture.dy),
+        );
+        floatingSaleOffset.setValue({ x, y });
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const bounds = floatingSaleBoundsRef.current;
+        const buttonSize = 58;
+        const sideMargin = 16;
+        const navigationHeight = 72;
+        const navigationGap = 12;
+        const baseX = bounds.width - 24 - buttonSize;
+        const baseY =
+          bounds.height - (bounds.bottomInset + 104) - buttonSize;
+        floatingSaleOffsetRef.current = {
+          x: Math.min(
+            bounds.width - sideMargin - buttonSize - baseX,
+            Math.max(sideMargin - baseX, floatingSaleOffsetRef.current.x + gesture.dx),
+          ),
+          y: Math.min(
+            bounds.height -
+              bounds.bottomInset -
+              navigationHeight -
+              navigationGap -
+              buttonSize -
+              baseY,
+            Math.max(
+              bounds.topInset + sideMargin - baseY,
+              floatingSaleOffsetRef.current.y + gesture.dy,
+            ),
+          ),
+        };
+        floatingSaleOffset.setValue(floatingSaleOffsetRef.current);
+      },
+      onPanResponderTerminationRequest: () => false,
+    }),
+  ).current;
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<'close' | 'movement' | 'open'>(
     'open',
@@ -274,10 +357,14 @@ export default function CashRegisterScreen() {
   const selectedMovementProduct = inventoryQuery.data?.products.find(
     (product) => product.id === movementProductId,
   );
-  const commissionableProfessionals = (teamQuery.data?.members ?? []).filter(
+  const teamMembers = teamQuery.data?.members ?? [];
+  const isSoloOwner =
+    teamMembers.length === 1 && teamMembers[0]?.role === 'owner';
+  const commissionableProfessionals = teamMembers.filter(
     (member) =>
       (member.role === 'barber' || member.role === 'owner') &&
-      member.commissionPercentage !== null &&
+      (member.commissionPercentage !== null ||
+        (isSoloOwner && member.role === 'owner')) &&
       selectedMovementService?.assignments.some(
         (assignment) => assignment.membershipId === member.id,
       ),
@@ -293,8 +380,12 @@ export default function CashRegisterScreen() {
         <ScrollView
           contentContainerStyle={[
             styles.openContent,
-            { paddingBottom: layout.bottomInset + 84 },
+            // Reserva la altura del menú flotante y un margen táctil adicional
+            // para que la última acción de Caja no quede cubierta.
+            { paddingBottom: layout.bottomInset + 104 },
           ]}
+          showsVerticalScrollIndicator={false}
+          style={styles.openScroll}
         >
           <View style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>Saldo en caja</Text>
@@ -393,40 +484,6 @@ export default function CashRegisterScreen() {
           <View style={styles.sessionActions}>
             <Pressable
               onPress={() => {
-                setMovementType('sale');
-                setSaleKind('free');
-                setMovementProductId(null);
-                setMovementProfessionalId(null);
-                setMovementServiceId(null);
-                setSheetMode('movement');
-                setIsSheetOpen(true);
-              }}
-              style={styles.primary}
-            >
-              <Text style={styles.primaryText}>Registrar venta</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                setMovementType('deposit');
-                setSheetMode('movement');
-                setIsSheetOpen(true);
-              }}
-              style={styles.secondary}
-            >
-              <Text style={styles.secondaryText}>Registrar ingreso</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                setMovementType('expense');
-                setSheetMode('movement');
-                setIsSheetOpen(true);
-              }}
-              style={styles.secondary}
-            >
-              <Text style={styles.secondaryText}>Gasto o retiro</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => {
                 setClosingAmount(
                   ((totals?.expectedCash ?? 0) / 100).toFixed(2),
                 );
@@ -460,6 +517,36 @@ export default function CashRegisterScreen() {
           </Pressable>
         </View>
       )}
+      {sessionData ? (
+        <Animated.View
+          {...floatingSalePanResponder.panHandlers}
+          style={[
+            styles.floatingSaleButton,
+            { bottom: layout.bottomInset + 104 },
+            { transform: floatingSaleOffset.getTranslateTransform() },
+          ]}
+        >
+          <Pressable
+            accessibilityLabel="Registrar venta"
+            accessibilityRole="button"
+            onPress={() => {
+              setMovementType('sale');
+              setSaleKind('free');
+              setMovementProductId(null);
+              setMovementProfessionalId(null);
+              setMovementServiceId(null);
+              setSheetMode('movement');
+              setIsSheetOpen(true);
+            }}
+            style={({ pressed }) => [
+              styles.floatingSaleButtonContent,
+              pressed && styles.floatingSaleButtonPressed,
+            ]}
+          >
+            <Ionicons color="#FFFFFF" name="add" size={25} />
+          </Pressable>
+        </Animated.View>
+      ) : null}
       <Modal
         animationType="slide"
         navigationBarTranslucent
@@ -647,25 +734,27 @@ export default function CashRegisterScreen() {
                           Venta libre
                         </Text>
                       </Pressable>
-                      <Pressable
-                        onPress={() => {
-                          setSaleKind('service');
-                          setMovementProductId(null);
-                        }}
-                        style={[
-                          styles.member,
-                          saleKind === 'service' && styles.selected,
-                        ]}
-                      >
-                        <Text
+                      {!isSoloOwner ? (
+                        <Pressable
+                          onPress={() => {
+                            setSaleKind('service');
+                            setMovementProductId(null);
+                          }}
                           style={[
-                            styles.memberText,
-                            saleKind === 'service' && styles.selectedText,
+                            styles.member,
+                            saleKind === 'service' && styles.selected,
                           ]}
                         >
-                          Servicio comisionable
-                        </Text>
-                      </Pressable>
+                          <Text
+                            style={[
+                              styles.memberText,
+                              saleKind === 'service' && styles.selectedText,
+                            ]}
+                          >
+                            Servicio comisionable
+                          </Text>
+                        </Pressable>
+                      ) : null}
                       <Pressable
                         onPress={() => {
                           setSaleKind('product');
@@ -1049,6 +1138,23 @@ const styles = StyleSheet.create({
     minHeight: 52,
   },
   exitText: { color: '#111827', fontWeight: '900' },
+  floatingSaleButton: {
+    borderRadius: 30,
+    height: 58,
+    right: 24,
+    position: 'absolute',
+    width: 58,
+    zIndex: 1001,
+    ...goldShadow,
+  },
+  floatingSaleButtonContent: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.accent,
+    borderRadius: 30,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  floatingSaleButtonPressed: { opacity: 0.84, transform: [{ scale: 0.97 }] },
   handle: {
     alignSelf: 'center',
     backgroundColor: '#C8CDD4',
@@ -1140,7 +1246,8 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     textAlign: 'center',
   },
-  openContent: { flex: 1, gap: 16, paddingBottom: 105, paddingHorizontal: 24 },
+  openContent: { gap: 16, paddingBottom: 105, paddingHorizontal: 24 },
+  openScroll: { flex: 1 },
   overlay: {
     backgroundColor: 'rgba(17,24,39,.4)',
     flex: 1,
@@ -1159,16 +1266,6 @@ const styles = StyleSheet.create({
   primaryText: { color: '#FFFFFF', fontWeight: '900' },
   screen: appStyles.screen,
   modalKeyboard: { flex: 1 },
-  secondary: {
-    alignItems: 'center',
-    borderColor: '#111827',
-    borderRadius: 16,
-    borderWidth: 1,
-    marginTop: 10,
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-  },
-  secondaryText: { color: '#111827', fontWeight: '900' },
   sessionActions: { alignSelf: 'stretch', marginTop: 24 },
   closeButton: { alignItems: 'center', marginTop: 20, padding: 10 },
   closeText: { color: '#9F1D2F', fontWeight: '900' },
