@@ -1833,7 +1833,7 @@ export default function DashboardScreen() {
   });
   const operationTimeZone =
     organizationQuery.data?.location?.timezone ??
-    organizationQuery.data?.organization.defaultTimezone ??
+    organizationQuery.data?.organization?.defaultTimezone ??
     'America/Guayaquil';
   const operationLocationId = organizationQuery.data?.location?.id;
   const operationDate = dateInTimeZone(operationTimeZone);
@@ -1923,7 +1923,7 @@ export default function DashboardScreen() {
         cashSummary: cashSummaryQuery.data,
         currencyCode:
           organizationQuery.data?.location?.currencyCode ??
-          organizationQuery.data?.organization.currencyCode ??
+          organizationQuery.data?.organization?.currencyCode ??
           'USD',
         inventory: inventoryQuery.data,
         now: progressClock,
@@ -1936,7 +1936,7 @@ export default function DashboardScreen() {
       inventoryQuery.data,
       operationTimeZone,
       organizationQuery.data?.location?.currencyCode,
-      organizationQuery.data?.organization.currencyCode,
+      organizationQuery.data?.organization?.currencyCode,
       progressClock,
     ],
   );
