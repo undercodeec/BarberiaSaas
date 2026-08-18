@@ -1596,6 +1596,17 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(
       acceptanceResponse.json<{ membership: { id: string } }>().membership.id,
     ).toBe(barberMembershipId);
+    expect(
+      await database.professionalService.findUnique({
+        where: {
+          membershipId_serviceId_locationId: {
+            locationId: organization.locationId,
+            membershipId: barberMembershipId,
+            serviceId,
+          },
+        },
+      }),
+    ).not.toBeNull();
     const reusedInvitationResponse = await app.inject({
       headers: { authorization: `Bearer ${barberToken}` },
       method: 'POST',

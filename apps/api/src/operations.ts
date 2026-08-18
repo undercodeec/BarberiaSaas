@@ -1954,6 +1954,22 @@ export function registerOperationsRoutes(
           },
         },
       });
+      if (invitation.role === MembershipRole.BARBER) {
+        const activeServices = await transaction.service.findMany({
+          select: { id: true },
+          where: { isActive: true, organizationId: invitation.organizationId },
+        });
+        if (activeServices.length > 0) {
+          await transaction.professionalService.createMany({
+            data: activeServices.map((service) => ({
+              locationId: invitation.locationId,
+              membershipId: acceptedMembership.id,
+              serviceId: service.id,
+            })),
+            skipDuplicates: true,
+          });
+        }
+      }
       if (
         invitation.role === MembershipRole.BARBER &&
         invitation.commissionPercentage !== null
