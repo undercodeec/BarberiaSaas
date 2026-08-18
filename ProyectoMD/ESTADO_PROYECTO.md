@@ -4623,6 +4623,241 @@ caja, comisiones y registros históricos.
       `AA05D6794DE3CA6662D96C754565F05267C53B73381982F919ADE72D306CC9F2`.
 - [ ] Subir code 34 al track correspondiente y confirmar en el teléfono
       `0.1.12 (build 34)`.
+- [x] El procedimiento preventivo y de diagnóstico permanente está consolidado
+      en la sección siguiente; debe seguirse para todo AAB futuro.
+
+## Procedimiento obligatorio para AAB Android local
+
+Esta sección es la fuente operativa para generar y publicar Nava en Google Play
+sin EAS Build y sin Expo Updates/OTA. El SDK de Expo continúa presente porque
+la aplicación usa Expo Router y módulos nativos, pero el AAB se genera
+localmente con Gradle y ejecuta únicamente el bundle JavaScript incorporado.
+
+### Fuentes de verdad
+
+| Dato | Archivo | Regla |
+| --- | --- | --- |
+| `versionCode` que compara Google Play | `apps/mobile/android/app/build.gradle` | Debe ser único y mayor que todo código ya cargado en Play Console. |
+| `versionName` visible en Android | `apps/mobile/android/app/build.gradle` | Debe coincidir con `expo.version`. |
+| Versión de configuración móvil | `apps/mobile/app.json` | Debe coincidir con `versionName`. |
+| Versión mostrada en Ajustes | `Constants.nativeAppVersion` y `Constants.nativeBuildVersion` | No escribir números manualmente en la pantalla. |
+
+El `app.json` de la raíz del monorepo no corresponde al release Android de
+Nava. Todos los comandos móviles deben ejecutarse desde `apps/mobile` o
+`apps/mobile/android`, según se indique.
+
+### Regla de versionado que nunca debe omitirse
+
+Google Play identifica cada artefacto por el `versionCode` interno, no por el
+nombre del archivo. Después de cargar un código, incluso si la release queda en
+borrador, no se debe intentar reutilizarlo.
+
+Ejemplo:
+
+```text
+Release cargado: versionName 0.1.12 / versionCode 34
+Siguiente release: versionName 0.1.13 / versionCode 35
+```
+
+Actualizar siempre ambos archivos:
+
+```json
+// apps/mobile/app.json
+"version": "0.1.13"
+```
+
+```groovy
+// apps/mobile/android/app/build.gradle
+versionCode((findProperty('NAVA_VERSION_CODE') ?: '35').toInteger())
+versionName "0.1.13"
+```
+
+No pasar `-PNAVA_VERSION_CODE` al comando salvo que se quiera sustituir
+deliberadamente el código declarado en `build.gradle`.
+
+### Checklist antes de compilar
+
+1. Sincronizar el repositorio y revisar cambios locales:
+
+   ```powershell
+   Set-Location D:\Documentos\BarberiaSaas
+   git status --short --branch
+   git pull --ff-only origin main
+   ```
+
+2. Confirmar las versiones configuradas:
+
+   ```powershell
+   rg -n '"version"|versionCode|versionName' `
+     apps/mobile/app.json `
+     apps/mobile/android/app/build.gradle
+   ```
+
+3. Confirmar que OTA continúa eliminado. El comando no debe devolver
+   coincidencias:
+
+   ```powershell
+   rg -n 'expo-updates|u\.expo\.dev|runtimeVersion|expo-channel-name' `
+     apps/mobile/app.json `
+     apps/mobile/package.json `
+     apps/mobile/android/app/src/main/AndroidManifest.xml
+   ```
+
+4. Instalar exactamente el lockfile y validar TypeScript:
+
+   ```powershell
+   pnpm install --frozen-lockfile
+   pnpm --filter @barber-saas/mobile typecheck
+   ```
+
+5. Confirmar la firma release sin mostrar contraseñas:
+
+   ```powershell
+   Set-Location D:\Documentos\BarberiaSaas\apps\mobile\android
+   .\gradlew.bat :app:signingReport --console=plain
+   ```
+
+   La variante `release` debe indicar la clave de carga de Nava. Si muestra
+   `debug.keystore`, detener el release y configurar las propiedades
+   `NAVA_UPLOAD_*`. Nunca escribir contraseñas, keystores o secretos en Git.
+
+### Compilación reproducible
+
+```powershell
+Set-Location D:\Documentos\BarberiaSaas\apps\mobile\android
+$env:NODE_ENV = 'production'
+.\gradlew.bat :app:bundleRelease --no-daemon --console=plain
+```
+
+El resultado genérico siempre se escribe y puede sobrescribirse aquí:
+
+```text
+apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
+```
+
+`BUILD SUCCESSFUL` confirma la compilación, pero todavía no demuestra que se
+haya seleccionado el archivo correcto para Play.
+
+### Archivado inmutable y hash
+
+Cambiar los valores del ejemplo por la versión recién compilada:
+
+```powershell
+$releaseVersion = '0.1.13'
+$releaseCode = 35
+$sourceAab = Resolve-Path `
+  '.\app\build\outputs\bundle\release\app-release.aab'
+$releaseDirectory = Resolve-Path '..\releases'
+$releaseAab = Join-Path `
+  $releaseDirectory `
+  "Nava-$releaseVersion-code$releaseCode.aab"
+
+if (Test-Path -LiteralPath $releaseAab) {
+  throw "El artefacto ya existe y no debe sobrescribirse: $releaseAab"
+}
+
+Copy-Item -LiteralPath $sourceAab -Destination $releaseAab
+$sourceHash = (Get-FileHash $sourceAab -Algorithm SHA256).Hash
+$releaseHash = (Get-FileHash $releaseAab -Algorithm SHA256).Hash
+
+if ($sourceHash -ne $releaseHash) {
+  throw 'La copia archivada no coincide con el resultado de Gradle.'
+}
+
+Get-Item $releaseAab
+Get-FileHash $releaseAab -Algorithm SHA256
+```
+
+Solo se debe subir el archivo con nombre inmutable guardado en
+`apps/mobile/releases/`. Este directorio está ignorado por Git: el commit
+conserva el código fuente, pero no publica ni almacena el AAB.
+
+### Verificación obligatoria del AAB
+
+1. Confirmar la versión incorporada por Gradle:
+
+   ```powershell
+   rg -n 'versionCode|versionName' `
+     '.\app\build\intermediates\bundle_manifest\release\processApplicationManifestReleaseForBundle\AndroidManifest.xml'
+   ```
+
+2. Verificar la firma:
+
+   ```powershell
+   & 'C:\Program Files\Java\jdk-21\bin\jarsigner.exe' `
+     -verify -verbose $releaseAab
+   ```
+
+   Debe aparecer `jar verified`. Las advertencias de certificado autofirmado y
+   ausencia de timestamp son normales para la clave privada de carga; Google
+   Play vuelve a firmar los APK entregados mediante App Signing.
+
+3. Confirmar que no reapareció OTA y que existe el bundle JavaScript:
+
+   ```powershell
+   Add-Type -AssemblyName System.IO.Compression.FileSystem
+   $aabZip = [System.IO.Compression.ZipFile]::OpenRead($releaseAab)
+   try {
+     $bundleEntry = $aabZip.GetEntry('base/assets/index.android.bundle')
+     if (-not $bundleEntry) {
+       throw 'El AAB no contiene el bundle JavaScript.'
+     }
+
+     $otaEntries = @(
+       $aabZip.Entries |
+         Where-Object { $_.FullName -match 'expo.*updates|app\.manifest' }
+     )
+     if ($otaEntries.Count -ne 0) {
+       throw 'El AAB volvió a incluir componentes o manifiestos OTA.'
+     }
+   } finally {
+     $aabZip.Dispose()
+   }
+   ```
+
+4. Para cambios visuales importantes, buscar en el bundle una frase exclusiva
+   de la función nueva. No usar solo la fecha, el nombre o el tamaño del archivo
+   como evidencia.
+
+### Publicación en Google Play
+
+1. Abrir primero `Testing > Internal testing`.
+2. Crear una release nueva y subir únicamente el AAB archivado.
+3. Confirmar en Play Console el `versionName` y `versionCode` leídos del AAB.
+4. Guardar y ejecutar `Start rollout to Internal testing`. Cargar el archivo no
+   equivale a publicar la release.
+5. Confirmar que la cuenta Google del teléfono sea tester y haya aceptado el
+   enlace de participación del mismo track.
+6. Instalar o actualizar desde Play y comprobar en Ajustes:
+   `versionName (build versionCode)`.
+
+Un usuario recibe el código compatible más alto entre los tracks para los que
+es elegible. Revisar producción, prueba abierta, cerrada e interna si Play
+entrega una versión distinta de la esperada.
+
+### Casos relevantes de diagnóstico
+
+| Síntoma | Causa más probable | Acción |
+| --- | --- | --- |
+| Play rechaza el AAB porque el código ya existe | El `versionCode` fue cargado antes | Incrementar código y nombre, recompilar y crear otro archivo inmutable. |
+| Play continúa ofreciendo una versión antigua | Release en borrador, rollout no iniciado o cuenta fuera del track | Revisar estado, tester, enlace de participación y todos los tracks elegibles. |
+| Local muestra cambios, Play no | Local usa Metro/código actual, pero Play entrega otro AAB | Confirmar el build instalado en Ajustes y el código activo del track. |
+| Se subió el archivo equivocado | Se eligió `app-release.aab` o una copia anterior | Subir solo `releases/Nava-<version>-code<code>.aab` y comparar SHA-256. |
+| Versión correcta, interfaz antigua | El AAB fue generado antes del último cambio o la pantalla depende del backend | Recompilar después del último cambio y buscar una marca exclusiva en el bundle. |
+| Reaparecen cambios OTA | Se reintrodujo `expo-updates`, una URL o metadatos OTA | Detener el release, retirar OTA y recompilar con un código nuevo. |
+| El mapa queda vacío solo desde Play | La restricción Android no reconoce la firma de Google Play | Autorizar `com.barbersaas.mobile` con el SHA-1 de App Signing, no solo el de carga. |
+| Play rechaza la firma | Release firmado con debug u otra clave | Revisar `:app:signingReport` y las propiedades `NAVA_UPLOAD_*`. |
+
+### Cierre obligatorio del release
+
+Antes de considerar terminada una entrega, registrar en esta misma sección de
+estado:
+
+- `versionName` y `versionCode`;
+- nombre exacto y SHA-256 del AAB;
+- resultados de build, typecheck y firma;
+- track y estado del rollout;
+- versión observada realmente en el teléfono.
 
 ## Validacion final de Google Maps Android (2026-08-17)
 

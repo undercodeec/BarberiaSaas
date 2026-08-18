@@ -51,7 +51,15 @@ Servicios locales:
 - Web pública: `http://localhost:3000`.
 - Panel interno: `http://localhost:3001`.
 
-Para probar Expo en un dispositivo físico, cambie `EXPO_PUBLIC_API_URL` por la IP LAN de la VPS o del equipo; `127.0.0.1` dentro del teléfono apunta al propio teléfono.
+Para probar la aplicación en un dispositivo físico, cambie
+`EXPO_PUBLIC_API_URL` por la IP LAN de la VPS o del equipo; `127.0.0.1` dentro
+del teléfono apunta al propio teléfono.
+
+## Release Android local
+
+Los AAB de Google Play se generan localmente con Gradle, sin EAS Build ni
+actualizaciones OTA. Antes de incrementar una versión, compilar o publicar,
+siga el [procedimiento obligatorio para AAB Android local](./ProyectoMD/ESTADO_PROYECTO.md#procedimiento-obligatorio-para-aab-android-local).
 
 ## Verificación
 
@@ -76,7 +84,7 @@ URL como `DATABASE_URL`.
 ```text
 apps/
   api/         API Fastify, autenticación y autorización multi-tenant
-  mobile/      Aplicación Expo para el equipo de la barbería
+  mobile/      Aplicación React Native con Expo SDK para módulos locales
   web/         Sitio público y futura reserva web
   admin/       Panel interno del operador
 packages/
