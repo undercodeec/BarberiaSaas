@@ -122,7 +122,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode((findProperty('NAVA_VERSION_CODE') ?: '29').toInteger())
-        versionName "0.1.6"
+        versionName "0.1.7"
         manifestPlaceholders = [GOOGLE_MAPS_ANDROID_API_KEY: googleMapsAndroidApiKey]
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
