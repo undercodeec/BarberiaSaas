@@ -3,12 +3,16 @@
 INSERT INTO "professional_services" (
   "membership_id",
   "service_id",
-  "location_id"
+  "location_id",
+  "created_at",
+  "updated_at"
 )
 SELECT
   membership."id",
   service."id",
-  member_location."location_id"
+  member_location."location_id",
+  CURRENT_TIMESTAMP,
+  CURRENT_TIMESTAMP
 FROM "memberships" AS membership
 JOIN "member_locations" AS member_location
   ON member_location."membership_id" = membership."id"
