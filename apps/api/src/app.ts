@@ -16,6 +16,7 @@ import {
 } from '@barber-saas/database';
 import {
   completeOnboardingSchema,
+  closeOwnedBusinessSchema,
   createSlug,
   createOnboardingCollaboratorSchema,
   createOnboardingServiceSchema,
@@ -1430,6 +1431,49 @@ export async function buildApi({
     return reply.code(204).send();
   });
 
+  app.post('/v1/account/close-owned-business', async (request, reply) => {
+    const { user } = await authenticate(database, request);
+    const input = closeOwnedBusinessSchema.parse(request.body);
+    if (!user.passwordHash || !(await verifyPassword(input.password, user.passwordHash))) {
+      throw new ApiError(401, 'INVALID_ACCOUNT_PASSWORD', 'La contraseÃ±a actual no es correcta.');
+    }
+    const [profile, memberships] = await Promise.all([
+      database.userRegistrationProfile.findUnique({ where: { userId: user.id } }),
+      database.membership.findMany({ where: { status: MembershipStatus.ACTIVE, userId: user.id } }),
+    ]);
+    if (profile?.accountType !== RegistrationAccountType.PROFESSIONAL) {
+      throw new ApiError(409, 'ACCOUNT_NOT_SOLO', 'Cambia tu tipo de cuenta a Solo yo antes de cerrar tu barberÃ­a.');
+    }
+    const organizationIds = memberships
+      .filter(({ role }) => role === MembershipRole.OWNER)
+      .map(({ organizationId }) => organizationId);
+    if (organizationIds.length === 0) {
+      throw new ApiError(409, 'NO_ACTIVE_OWNED_BUSINESS', 'No tienes una barberÃ­a activa para cerrar.');
+    }
+    const now = new Date();
+    const [activeCollaborators, pendingInvitations, openCashRegisters, futureAppointments] = await Promise.all([
+      database.membership.count({ where: { organizationId: { in: organizationIds }, status: MembershipStatus.ACTIVE, userId: { not: user.id } } }),
+      database.teamInvitation.count({ where: { organizationId: { in: organizationIds }, status: InvitationStatus.PENDING } }),
+      database.cashRegisterSession.count({ where: { organizationId: { in: organizationIds }, status: CashRegisterStatus.OPEN } }),
+      database.appointment.count({ where: { organizationId: { in: organizationIds }, startsAt: { gte: now }, status: { in: [AppointmentStatus.AWAITING_CONFIRMATION, AppointmentStatus.CHECKED_IN, AppointmentStatus.CONFIRMED, AppointmentStatus.IN_PROGRESS, AppointmentStatus.PENDING_VERIFICATION, AppointmentStatus.SCHEDULED, AppointmentStatus.WAITING] } } }),
+    ]);
+    if (activeCollaborators > 0) throw new ApiError(409, 'ACCOUNT_HAS_ACTIVE_COLLABORATORS', 'Retira a los colaboradores activos antes de cerrar tu barberÃ­a.');
+    if (pendingInvitations > 0) throw new ApiError(409, 'ACCOUNT_HAS_PENDING_INVITATIONS', 'Cancela las invitaciones pendientes antes de cerrar tu barberÃ­a.');
+    if (openCashRegisters > 0) throw new ApiError(409, 'ACCOUNT_HAS_OPEN_CASH_REGISTER', 'Cierra la caja abierta antes de cerrar tu barberÃ­a.');
+    if (futureAppointments > 0) throw new ApiError(409, 'ACCOUNT_HAS_FUTURE_APPOINTMENTS', 'Cancela o completa las citas futuras antes de cerrar tu barberÃ­a.');
+    await database.$transaction(async (transaction) => {
+      await transaction.auditLog.create({ data: { action: 'account.owned_business_closed', actorUserId: user.id, afterData: { closedAt: now.toISOString(), personalAccountRetained: true }, entityId: user.id, entityType: 'user_account', organizationId: organizationIds[0]! } });
+      await transaction.location.updateMany({ data: { isActive: false }, where: { organizationId: { in: organizationIds } } });
+      await transaction.service.updateMany({ data: { isActive: false, onlineBooking: false }, where: { organizationId: { in: organizationIds } } });
+      await transaction.subscription.updateMany({ data: { status: SubscriptionStatus.CANCELLED }, where: { organizationId: { in: organizationIds } } });
+      await transaction.organization.updateMany({ data: { deletedAt: now, status: OrganizationStatus.CANCELLED }, where: { id: { in: organizationIds } } });
+      await transaction.commissionRule.updateMany({ data: { effectiveTo: now, isActive: false }, where: { isActive: true, professionalMembershipId: { in: memberships.map(({ id }) => id) } } });
+      await transaction.professionalService.deleteMany({ where: { membershipId: { in: memberships.map(({ id }) => id) } } });
+      await transaction.membership.updateMany({ data: { status: MembershipStatus.SUSPENDED }, where: { organizationId: { in: organizationIds } } });
+    });
+    return reply.code(204).send();
+  });
+
   app.post('/v1/auth/recover', async (request) => {
     const { email } = recoverAccessSchema.parse(request.body);
     const user = await database.user.findUnique({
@@ -1643,10 +1687,13 @@ export async function buildApi({
       accountType: profile
         ? (profile.accountType.toLowerCase() as 'business' | 'professional')
         : null,
+      canCloseOwnedBusiness:
+        profile?.accountType === RegistrationAccountType.PROFESSIONAL &&
+        membership?.role === MembershipRole.OWNER,
       addressLine: profile?.addressLine ?? null,
       businessName: profile?.businessName ?? null,
       businessLocation,
-      bookingUrl: profile
+      bookingUrl: profile && membership
         ? publicBookingUrl(
             config.PUBLIC_WEB_URL,
             membership?.organization.publicBookingToken ??

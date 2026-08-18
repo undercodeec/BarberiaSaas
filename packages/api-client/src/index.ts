@@ -64,6 +64,7 @@ export interface RecoverAccessResponse {
 
 export interface OnboardingAccountDetailsResponse {
   readonly accountType: 'business' | 'professional' | null;
+  readonly canCloseOwnedBusiness: boolean;
   readonly addressLine: string | null;
   readonly businessLocation: BusinessLocation | null;
   readonly bookingUrl: string | null;

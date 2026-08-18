@@ -34,6 +34,7 @@ import {
   useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
+import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -48,9 +49,12 @@ export default function SettingsScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isCheckingForUpdate, setIsCheckingForUpdate] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isCloseBusinessOpen, setIsCloseBusinessOpen] = useState(false);
   const [accountDeleted, setAccountDeleted] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [closeBusinessPassword, setCloseBusinessPassword] = useState('');
+  const [closeBusinessConfirmation, setCloseBusinessConfirmation] = useState('');
   const accountQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -59,6 +63,7 @@ export default function SettingsScreen() {
       ),
     queryKey: ['onboarding-account-details'],
   });
+  const organizationQuery = useCurrentOrganization();
   const profileQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -83,6 +88,22 @@ export default function SettingsScreen() {
       }
     },
   });
+  const closeBusinessMutation = useMutation({
+    mutationFn: async () => {
+      await requireApiClient().request<void>('/v1/account/close-owned-business', {
+        body: { confirmation: closeBusinessConfirmation, password: closeBusinessPassword },
+        method: 'POST',
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['current-organization'] }),
+        queryClient.invalidateQueries({ queryKey: ['onboarding-account-details'] }),
+      ]);
+      setIsCloseBusinessOpen(false);
+      setCloseBusinessPassword('');
+      setCloseBusinessConfirmation('');
+      Alert.alert('Barbería cerrada', 'Tu cuenta sigue activa. Abre nuevamente el enlace de invitación para unirte al otro negocio.');
+    },
+  });
   if (!session)
     return <Redirect href={accountDeleted ? '/' : '/(auth)/login'} />;
 
@@ -91,6 +112,8 @@ export default function SettingsScreen() {
   const businessName = account?.businessName || 'Tu negocio';
   const bookingUrl = account?.bookingUrl ?? '';
   const isSolo = account?.accountType === 'professional';
+  const canCloseOwnedBusiness =
+    isSolo && organizationQuery.data?.membership.role === 'owner';
 
   const version = Constants.expoConfig?.version ?? 'No disponible';
 
@@ -187,8 +210,17 @@ export default function SettingsScreen() {
     setDeleteConfirmation('');
     deleteAccountMutation.reset();
   };
+  const closeBusinessModal = () => {
+    if (closeBusinessMutation.isPending) return;
+    setIsCloseBusinessOpen(false);
+    setCloseBusinessPassword('');
+    setCloseBusinessConfirmation('');
+    closeBusinessMutation.reset();
+  };
   const canDelete =
     deletePassword.length >= 8 && deleteConfirmation === 'ELIMINAR';
+  const canCloseBusiness =
+    closeBusinessPassword.length >= 8 && closeBusinessConfirmation === 'CERRAR';
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
@@ -322,6 +354,16 @@ export default function SettingsScreen() {
           />
           <Text style={styles.deleteLabel}>Borrar mi cuenta</Text>
         </Pressable>
+        {canCloseOwnedBusiness ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setIsCloseBusinessOpen(true)}
+            style={styles.deleteAction}
+          >
+            <Ionicons color={appTheme.colors.accentDark} name="storefront-outline" size={19} />
+            <Text style={styles.deleteLabel}>Cerrar mi barbería</Text>
+          </Pressable>
+        ) : null}
         <Pressable
           accessibilityRole="button"
           disabled={isCheckingForUpdate}
@@ -451,6 +493,37 @@ export default function SettingsScreen() {
                     <Ionicons color="#FFFFFF" name="trash-outline" size={18} />
                   )}
                   <Text style={styles.confirmDeleteLabel}>Borrar cuenta</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+      <Modal
+        animationType="fade"
+        navigationBarTranslucent
+        onRequestClose={closeBusinessModal}
+        statusBarTranslucent
+        transparent
+        visible={isCloseBusinessOpen}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardArea}>
+          <View style={styles.modalBackdrop}>
+            <ScrollView contentContainerStyle={[styles.deleteModalContent, { paddingBottom: layout.bottomInset + 10 }]} keyboardShouldPersistTaps="handled" style={[styles.deleteModal, { maxHeight: layout.sheetMaxHeight }]}>
+              <View style={styles.deleteIcon}><Ionicons color="#B93838" name="warning-outline" size={28} /></View>
+              <Text style={styles.deleteTitle}>Cerrar mi barbería</Text>
+              <Text style={styles.deleteCopy}>La barbería, sus servicios y enlace de reservas se desactivarán. Tu cuenta personal, historial y sesiones se conservarán.</Text>
+              <View style={styles.warningBox}><Text style={styles.warningText}>Primero debes retirar colaboradores, cancelar invitaciones pendientes, cerrar Caja y resolver citas futuras. Después podrás aceptar una invitación de otro negocio.</Text></View>
+              <Text style={styles.inputLabel}>Contraseña actual</Text>
+              <TextInput autoCapitalize="none" autoComplete="password" onChangeText={setCloseBusinessPassword} placeholder="Ingresa tu contraseña" secureTextEntry style={styles.input} value={closeBusinessPassword} />
+              <Text style={styles.inputLabel}>Escribe CERRAR para confirmar</Text>
+              <TextInput autoCapitalize="characters" autoCorrect={false} onChangeText={setCloseBusinessConfirmation} placeholder="CERRAR" style={styles.input} value={closeBusinessConfirmation} />
+              {closeBusinessMutation.error ? <Text style={styles.deleteError}>{closeBusinessMutation.error instanceof Error ? closeBusinessMutation.error.message : 'No pudimos cerrar tu barbería.'}</Text> : null}
+              <View style={styles.modalActions}>
+                <Pressable accessibilityRole="button" disabled={closeBusinessMutation.isPending} onPress={closeBusinessModal} style={styles.cancelButton}><Text style={styles.cancelLabel}>Cancelar</Text></Pressable>
+                <Pressable accessibilityRole="button" disabled={!canCloseBusiness || closeBusinessMutation.isPending} onPress={() => closeBusinessMutation.mutate()} style={[styles.confirmDeleteButton, (!canCloseBusiness || closeBusinessMutation.isPending) && styles.disabled]}>
+                  {closeBusinessMutation.isPending ? <ActivityIndicator color={appTheme.colors.accentDark} size="small" /> : <Ionicons color="#FFFFFF" name="storefront-outline" size={18} />}
+                  <Text style={styles.confirmDeleteLabel}>Cerrar barbería</Text>
                 </Pressable>
               </View>
             </ScrollView>

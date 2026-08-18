@@ -244,7 +244,6 @@ async function syncPushToken() {
     await Notifications.setNotificationChannelAsync('appointments', {
       importance: Notifications.AndroidImportance.MAX,
       name: 'Citas y reservas',
-      sound: 'default',
       vibrationPattern: [0, 250, 250, 250],
     });
   }
