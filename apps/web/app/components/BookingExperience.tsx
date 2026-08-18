@@ -1075,7 +1075,8 @@ function PublicBookingLanding({
   const updateProductQuantity = (productId: string, quantity: number) => {
     setCart((current) => {
       if (quantity < 1) {
-        const { [productId]: _, ...remaining } = current;
+        const remaining = { ...current };
+        delete remaining[productId];
         return remaining;
       }
       return { ...current, [productId]: quantity };
@@ -2177,7 +2178,7 @@ function BusinessInformation({
           ) : null}
           {socialLinks.length > 0 ? (
             <div className="mt-5">
-              <h3 className="font-black">SÃ­guenos</h3>
+              <h3 className="font-black">Síguenos</h3>
               <div className="mt-3 flex flex-wrap gap-2">
                 {socialLinks.map((social) => (
                   <a

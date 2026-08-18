@@ -81,7 +81,6 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
-def isEasBuild = System.getenv('EAS_BUILD') == 'true'
 def localEnvFile = rootProject.file('../.env')
 def localEnvValue = { String name ->
     if (!localEnvFile.exists()) return null
@@ -98,10 +97,8 @@ def localEnvValue = { String name ->
     return value.isEmpty() ? null : value
 }
 // En local, .env es la fuente de verdad para impedir que una variable antigua
-// del sistema se incruste en el AAB. En EAS se usa exclusivamente su secreto.
-def googleMapsAndroidApiKey = isEasBuild
-    ? (System.getenv('GOOGLE_MAPS_ANDROID_API_KEY') ?: findProperty('GOOGLE_MAPS_ANDROID_API_KEY') ?: '')
-    : (localEnvValue('GOOGLE_MAPS_ANDROID_API_KEY') ?: System.getenv('GOOGLE_MAPS_ANDROID_API_KEY') ?: findProperty('GOOGLE_MAPS_ANDROID_API_KEY') ?: '')
+// del sistema se incruste en el AAB.
+def googleMapsAndroidApiKey = localEnvValue('GOOGLE_MAPS_ANDROID_API_KEY') ?: System.getenv('GOOGLE_MAPS_ANDROID_API_KEY') ?: findProperty('GOOGLE_MAPS_ANDROID_API_KEY') ?: ''
 def uploadStoreFile = findProperty('NAVA_UPLOAD_STORE_FILE')
 def hasUploadSigning = [
     uploadStoreFile,
@@ -121,8 +118,8 @@ android {
         applicationId 'com.barbersaas.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode((findProperty('NAVA_VERSION_CODE') ?: '30').toInteger())
-        versionName "0.1.8"
+        versionCode((findProperty('NAVA_VERSION_CODE') ?: '33').toInteger())
+        versionName "0.1.11"
         manifestPlaceholders = [GOOGLE_MAPS_ANDROID_API_KEY: googleMapsAndroidApiKey]
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""

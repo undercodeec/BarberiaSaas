@@ -17,6 +17,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  appTheme,
+  goldButtonShadow,
+  goldShadow,
+  useNativeLayoutMetrics,
+} from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -45,6 +51,7 @@ export default function RescheduleBookingScreen() {
   const { session } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const layout = useNativeLayoutMetrics();
   const {
     appointmentId,
     membershipId,
@@ -133,24 +140,64 @@ export default function RescheduleBookingScreen() {
   if (!session) return <Redirect href="/(auth)/login" />;
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
       <View style={styles.header}>
-      <Pressable
-        onPress={() =>
-          router.canGoBack() ? router.back() : router.replace('/agenda')
-        }
-        style={styles.back}
-      >
-          <Ionicons color="#111827" name="arrow-back" size={23} />
+        <Pressable
+          accessibilityLabel="Volver a agenda"
+          onPress={() =>
+            router.canGoBack() ? router.back() : router.replace('/agenda')
+          }
+          style={({ pressed }) => [styles.back, pressed && styles.pressed]}
+        >
+          <Ionicons color={appTheme.colors.icon} name="arrow-back" size={22} />
         </Pressable>
-        <Text style={styles.headerTitle}>Reprogramar cita</Text>
+        <View style={styles.headerCopy}>
+          <Text style={styles.headerEyebrow}>AGENDA</Text>
+          <Text style={styles.headerTitle}>Reprogramar cita</Text>
+        </View>
         <View style={styles.spacer} />
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Elige un nuevo horario</Text>
-        <Text style={styles.copy}>
-          El horario anterior se conserva hasta que confirmes uno nuevo.
-        </Text>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: 116 + layout.bottomInset },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.introCard}>
+          <View style={styles.introIcon}>
+            <Ionicons
+              color={appTheme.colors.accentActive}
+              name="calendar-outline"
+              size={22}
+            />
+          </View>
+          <View style={styles.introCopy}>
+            <Text style={styles.title}>Elige un nuevo horario</Text>
+            <Text style={styles.copy}>
+              Tu cita actual se mantiene reservada hasta confirmar el cambio.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.sectionHeading}>
+          <View>
+            <Text style={styles.sectionTitle}>Selecciona una fecha</Text>
+            <Text style={styles.sectionCaption}>
+              Disponibilidad de los próximos 21 días
+            </Text>
+          </View>
+          <View style={styles.dateBadge}>
+            <Text style={styles.dateBadgeText}>
+              {date
+                .toLocaleDateString('es-EC', {
+                  day: 'numeric',
+                  month: 'short',
+                })
+                .replace('.', '')}
+            </Text>
+          </View>
+        </View>
         <ScrollView
           contentContainerStyle={styles.dateRow}
           horizontal
@@ -165,7 +212,11 @@ export default function RescheduleBookingScreen() {
                   setSelectedDateValue(localDateValue(item));
                   setStartsAt(null);
                 }}
-                style={[styles.date, selected && styles.selected]}
+                style={({ pressed }) => [
+                  styles.date,
+                  selected && styles.selectedDate,
+                  pressed && styles.pressed,
+                ]}
               >
                 <Text style={[styles.day, selected && styles.selectedText]}>
                   {item
@@ -179,20 +230,49 @@ export default function RescheduleBookingScreen() {
             );
           })}
         </ScrollView>
-        <Text style={styles.sectionTitle}>Horarios disponibles</Text>
+        <View style={styles.slotsHeading}>
+          <View style={styles.slotsHeadingTitle}>
+            <Ionicons
+              color={appTheme.colors.accentActive}
+              name="time-outline"
+              size={19}
+            />
+            <Text style={styles.sectionTitle}>Horarios disponibles</Text>
+          </View>
+          <Text style={styles.slotCount}>
+            {availabilityQuery.data?.slots.length ?? 0} disponibles
+          </Text>
+        </View>
         {availabilityQuery.isLoading ? (
-          <Text style={styles.empty}>Consultando disponibilidad...</Text>
+          <View style={styles.statusCard}>
+            <Ionicons
+              color={appTheme.colors.accentActive}
+              name="hourglass-outline"
+              size={20}
+            />
+            <Text style={styles.statusText}>Consultando disponibilidad...</Text>
+          </View>
         ) : null}
         <View style={styles.slots}>
           {(availabilityQuery.data?.slots ?? []).map((slot) => (
             <Pressable
               key={slot.startsAt}
               onPress={() => setStartsAt(slot.startsAt)}
-              style={[
+              style={({ pressed }) => [
                 styles.slot,
-                startsAt === slot.startsAt && styles.selected,
+                startsAt === slot.startsAt && styles.selectedSlot,
+                pressed && styles.pressed,
               ]}
             >
+              <Ionicons
+                color={
+                  startsAt === slot.startsAt
+                    ? appTheme.colors.white
+                    : appTheme.colors.accentActive
+                }
+                name="time-outline"
+                size={16}
+              />
               <Text
                 style={[
                   styles.slotText,
@@ -210,20 +290,39 @@ export default function RescheduleBookingScreen() {
         </View>
         {!availabilityQuery.isLoading &&
         !(availabilityQuery.data?.slots.length ?? 0) ? (
-          <Text style={styles.empty}>
-            No hay espacios disponibles para esta fecha.
-          </Text>
+          <View style={styles.statusCard}>
+            <Ionicons
+              color={appTheme.colors.textMuted}
+              name="calendar-clear-outline"
+              size={21}
+            />
+            <View style={styles.statusCopy}>
+              <Text style={styles.statusTitle}>Sin horarios para este día</Text>
+              <Text style={styles.statusText}>
+                Prueba seleccionando otra fecha.
+              </Text>
+            </View>
+          </View>
         ) : null}
       </ScrollView>
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: 16 + layout.bottomInset }]}>
         <Pressable
           disabled={!startsAt || reschedule.isPending}
           onPress={() => reschedule.mutate()}
-          style={[
+          style={({ pressed }) => [
             styles.action,
             (!startsAt || reschedule.isPending) && styles.disabled,
+            pressed &&
+              Boolean(startsAt) &&
+              !reschedule.isPending &&
+              styles.actionPressed,
           ]}
         >
+          <Ionicons
+            color={appTheme.colors.white}
+            name="checkmark-circle-outline"
+            size={20}
+          />
           <Text style={styles.actionText}>
             {reschedule.isPending ? 'Reprogramando...' : 'Confirmar cambio'}
           </Text>
@@ -236,98 +335,203 @@ export default function RescheduleBookingScreen() {
 const styles = StyleSheet.create({
   action: {
     alignItems: 'center',
-    backgroundColor: '#111318',
-    borderRadius: 16,
+    backgroundColor: appTheme.colors.accent,
+    borderRadius: appTheme.radii.control,
+    flexDirection: 'row',
+    gap: 9,
     justifyContent: 'center',
-    minHeight: 54,
+    minHeight: 56,
+    ...goldButtonShadow,
   },
   actionText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+  actionPressed: { backgroundColor: appTheme.colors.accentActive },
   back: {
     alignItems: 'center',
-    borderColor: '#E2E5EA',
-    borderRadius: 20,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: 18,
     borderWidth: 1,
-    height: 40,
+    height: 44,
     justifyContent: 'center',
-    width: 40,
+    width: 44,
   },
-  content: { padding: 20, paddingBottom: 120 },
-  copy: { color: '#667085', lineHeight: 21, marginBottom: 20, marginTop: 7 },
+  content: { gap: 20, padding: appTheme.spacing.page },
+  copy: {
+    color: appTheme.colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 4,
+  },
   date: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E2E5EA',
-    borderRadius: 15,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
     borderWidth: 1,
-    minWidth: 58,
-    paddingVertical: 10,
+    minWidth: 66,
+    paddingHorizontal: 8,
+    paddingVertical: 12,
   },
-  dateRow: { gap: 8 },
+  dateBadge: {
+    backgroundColor: appTheme.colors.accentSubtle,
+    borderRadius: appTheme.radii.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  dateBadgeText: {
+    color: appTheme.colors.accentActive,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  dateRow: { gap: 10, paddingRight: 24 },
   day: {
-    color: '#667085',
+    color: appTheme.colors.textMuted,
     fontSize: 11,
     fontWeight: '800',
     textTransform: 'uppercase',
   },
-  disabled: { opacity: 0.35 },
-  empty: {
-    color: '#687282',
-    lineHeight: 21,
-    paddingVertical: 20,
-    textAlign: 'center',
-  },
+  disabled: { opacity: 0.45 },
   footer: {
-    backgroundColor: '#FFFFFF',
-    borderTopColor: '#E5E7EB',
+    backgroundColor: appTheme.colors.surfaceElevated,
+    borderTopColor: appTheme.colors.border,
     borderTopWidth: 1,
     bottom: 0,
     left: 0,
-    padding: 16,
+    paddingHorizontal: appTheme.spacing.page,
+    paddingTop: 16,
     position: 'absolute',
     right: 0,
   },
   header: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderBottomColor: '#ECEEF1',
+    backgroundColor: appTheme.colors.background,
+    borderBottomColor: appTheme.colors.border,
     borderBottomWidth: 1,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 14,
+    paddingHorizontal: appTheme.spacing.page,
+    paddingVertical: 14,
   },
-  headerTitle: { color: '#111827', fontSize: 16, fontWeight: '900' },
+  headerCopy: { alignItems: 'center', flex: 1 },
+  headerEyebrow: {
+    color: appTheme.colors.accentActive,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.3,
+  },
+  headerTitle: {
+    color: appTheme.colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+    marginTop: 1,
+  },
+  introCard: {
+    alignItems: 'flex-start',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.card,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 14,
+    padding: 18,
+    ...goldShadow,
+  },
+  introCopy: { flex: 1 },
+  introIcon: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.accentSubtle,
+    borderRadius: 16,
+    height: 46,
+    justifyContent: 'center',
+    width: 46,
+  },
   number: {
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 18,
     fontWeight: '900',
     marginTop: 3,
   },
-  screen: { backgroundColor: '#F7F8FA', flex: 1 },
+  pressed: { opacity: 0.84 },
+  screen: { backgroundColor: appTheme.colors.background, flex: 1 },
+  sectionCaption: {
+    color: appTheme.colors.textMuted,
+    fontSize: 12,
+    marginTop: 3,
+  },
+  sectionHeading: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
   sectionTitle: {
-    color: '#111827',
+    color: appTheme.colors.text,
     fontSize: 15,
     fontWeight: '900',
-    marginBottom: 10,
-    marginTop: 24,
   },
-  selected: { backgroundColor: '#111318', borderColor: '#111318' },
-  selectedText: { color: '#FFFFFF' },
+  selectedDate: {
+    backgroundColor: appTheme.colors.accent,
+    borderColor: appTheme.colors.accent,
+  },
+  selectedSlot: {
+    backgroundColor: appTheme.colors.accent,
+    borderColor: appTheme.colors.accent,
+  },
+  selectedText: { color: appTheme.colors.white },
   slot: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#DDE1E7',
-    borderRadius: 12,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
     borderWidth: 1,
-    minWidth: '30%',
-    padding: 12,
+    flexDirection: 'row',
+    gap: 7,
+    justifyContent: 'center',
+    minWidth: '31%',
+    paddingHorizontal: 8,
+    paddingVertical: 13,
   },
-  slotText: { color: '#111827', fontSize: 13, fontWeight: '800' },
-  slots: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  spacer: { width: 40 },
+  slotCount: {
+    color: appTheme.colors.accentActive,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  slotText: { color: appTheme.colors.text, fontSize: 13, fontWeight: '800' },
+  slots: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  slotsHeading: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  slotsHeadingTitle: { alignItems: 'center', flexDirection: 'row', gap: 7 },
+  spacer: { width: 44 },
+  statusCard: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 11,
+    justifyContent: 'center',
+    minHeight: 72,
+    padding: 16,
+  },
+  statusCopy: { flex: 1 },
+  statusText: {
+    color: appTheme.colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  statusTitle: {
+    color: appTheme.colors.text,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
   title: {
-    color: '#111827',
-    fontSize: 27,
+    color: appTheme.colors.text,
+    fontSize: 20,
     fontWeight: '900',
-    letterSpacing: -0.7,
+    letterSpacing: -0.35,
   },
 });

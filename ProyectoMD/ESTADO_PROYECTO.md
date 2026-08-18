@@ -4595,6 +4595,67 @@ caja, comisiones y registros históricos.
       se debe instalar/distribuir code 28, conceder el permiso de Android y
       verificar en la VPS que la cuenta FCM y `FCM_PROJECT_ID` estén activos.
 
+## Release Android local 0.1.11 / code 33 (2026-08-18)
+
+- [x] La configuración local y nativa coinciden en `versionName` **0.1.11** y
+      `versionCode` **33**.
+- [x] Se retiraron EAS Build y Expo Updates/OTA; el release ejecuta únicamente
+      el bundle JavaScript incluido por la compilación local de Gradle.
+- [x] Ajustes muestra la versión nativa y el build instalados:
+      `0.1.11 (build 33)`.
+- [x] `./gradlew.bat :app:bundleRelease --no-daemon` finalizó correctamente y
+      el artefacto se archivó como
+      `apps/mobile/releases/Nava-0.1.11-code33.aab`.
+- [x] SHA-256 verificado del AAB code 33:
+      `BA3AB84F136FA2A0A5EEB2C9B925FBDF0D9E33C04D937C14AC9CA08936B77395`.
+- [ ] Publicar code 33 en el track de prueba interna y comprobar en el teléfono
+      que Ajustes muestre `0.1.11 (build 33)`.
+
+## Validacion final de Google Maps Android (2026-08-17)
+
+- [x] Estado final: el banner de ubicacion ya muestra el mapa tanto en
+      desarrollo local como en la instalacion de produccion desde Google Play.
+- [x] El mapa nativo usa `react-native-maps` con `PROVIDER_GOOGLE`. La carga
+      de mosaicos y la autorizacion ocurren directamente entre el telefono y
+      Google Maps; la VPS, `GOOGLE_MAPS_SERVER_API_KEY` y los endpoints de
+      Places/Geocoding no intervienen en este renderizado.
+- [x] La clave Android se incorpora durante el build mediante
+      `GOOGLE_MAPS_ANDROID_API_KEY`. No se debe escribir ni publicar su valor
+      en este documento ni en Git; debe identificarse por su valor dentro de
+      Google Cloud Credentials.
+- [x] Diagnostico local: `expo run:android --device` firma con
+      `apps/mobile/android/app/debug.keystore`. Google Maps rechazo inicialmente
+      la huella de desarrollo y funciono al autorizar la combinacion:
+      `com.barbersaas.mobile` +
+      `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`.
+- [x] Diagnostico de produccion: Logcat de la aplicacion instalada desde
+      Google Play reporto `Google Android Maps SDK: Authorization failure` y
+      revelo la combinacion efectiva rechazada:
+      `com.barbersaas.mobile` +
+      `18:9E:25:3C:09:5F:D7:7B:4F:46:F2:01:51:C1:17:E7:A9:E8:15:51`.
+      Esta huella era distinta de las revisadas inicialmente.
+- [x] Se agrego la SHA-1 efectiva de produccion a las restricciones Android
+      de la clave `nava-android-maps-sdk`, conservando habilitada la API
+      **Maps SDK for Android**. Tras la propagacion de Google Cloud, el mapa
+      funciono en produccion sin crear ni publicar un AAB nuevo.
+- [x] Referencia de firmas para futuras pruebas:
+      - Google Play: autorizar la SHA-1 efectiva que Logcat reporte para el
+        paquete `com.barbersaas.mobile` entregado por Play (actualmente la
+        indicada arriba), junto con certificados anteriores solo si siguen
+        distribuyendo builds activas.
+      - Distribucion local firmada con la clave de carga: autorizar
+        `E7:3D:BE:79:91:3F:00:E5:87:5C:51:46:2E:C5:0B:7F:A0:9A:DF:A3` solo para
+        instalaciones directas fuera de Play.
+      - Desarrollo local: mantener la SHA-1 de `debug.keystore` solo mientras
+        se requiera `expo run:android`; no es necesaria para Play.
+- [x] Procedimiento reproducible de diagnostico nativo (no usar logs de SSH):
+  ```powershell
+  $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+  & $adb logcat -d -v threadtime | Select-String -Pattern 'Google Maps Android API|Google Android Maps SDK|Authorization failure|Android Application \(<cert_fingerprint>'
+  ```
+  Abrir primero Dashboard y el banner de ubicacion. El resultado muestra la
+  huella SHA-1 y el paquete que Google Maps esta rechazando.
+
 ## Validacion FCM en VPS (2026-08-17)
 
 - [x] Se publicó y desplegó el commit `d603fe1` (`fix: harden booking delivery

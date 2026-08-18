@@ -6,7 +6,6 @@ import type {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { Redirect, useRouter } from 'expo-router';
-import * as Updates from 'expo-updates';
 import type { ComponentProps } from 'react';
 import { useState } from 'react';
 import {
@@ -47,14 +46,14 @@ export default function SettingsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [isCheckingForUpdate, setIsCheckingForUpdate] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isCloseBusinessOpen, setIsCloseBusinessOpen] = useState(false);
   const [accountDeleted, setAccountDeleted] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [closeBusinessPassword, setCloseBusinessPassword] = useState('');
-  const [closeBusinessConfirmation, setCloseBusinessConfirmation] = useState('');
+  const [closeBusinessConfirmation, setCloseBusinessConfirmation] =
+    useState('');
   const accountQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -90,18 +89,29 @@ export default function SettingsScreen() {
   });
   const closeBusinessMutation = useMutation({
     mutationFn: async () => {
-      await requireApiClient().request<void>('/v1/account/close-owned-business', {
-        body: { confirmation: closeBusinessConfirmation, password: closeBusinessPassword },
-        method: 'POST',
-      });
+      await requireApiClient().request<void>(
+        '/v1/account/close-owned-business',
+        {
+          body: {
+            confirmation: closeBusinessConfirmation,
+            password: closeBusinessPassword,
+          },
+          method: 'POST',
+        },
+      );
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['current-organization'] }),
-        queryClient.invalidateQueries({ queryKey: ['onboarding-account-details'] }),
+        queryClient.invalidateQueries({
+          queryKey: ['onboarding-account-details'],
+        }),
       ]);
       setIsCloseBusinessOpen(false);
       setCloseBusinessPassword('');
       setCloseBusinessConfirmation('');
-      Alert.alert('Barbería cerrada', 'Tu cuenta sigue activa. Abre nuevamente el enlace de invitación para unirte al otro negocio.');
+      Alert.alert(
+        'Barbería cerrada',
+        'Tu cuenta sigue activa. Abre nuevamente el enlace de invitación para unirte al otro negocio.',
+      );
     },
   });
   if (!session)
@@ -115,7 +125,11 @@ export default function SettingsScreen() {
   const canCloseOwnedBusiness =
     isSolo && organizationQuery.data?.membership.role === 'owner';
 
-  const version = Constants.expoConfig?.version ?? 'No disponible';
+  const version =
+    Constants.nativeAppVersion ??
+    Constants.expoConfig?.version ??
+    'No disponible';
+  const buildNumber = Constants.nativeBuildVersion;
 
   const openExternal = async (url: string, title: string) => {
     if (!url)
@@ -123,54 +137,6 @@ export default function SettingsScreen() {
     if (!(await Linking.canOpenURL(url)))
       return Alert.alert(title, 'No pudimos abrir este enlace.');
     await Linking.openURL(url);
-  };
-  const checkForUpdate = async () => {
-    if (Platform.OS === 'web') {
-      Alert.alert(
-        'Actualizaciones disponibles en la app',
-        'Instala Nava en tu teléfono para recibir actualizaciones automáticas.',
-      );
-      return;
-    }
-    if (!Updates.isEnabled) {
-      Alert.alert(
-        'Actualizaciones no disponibles',
-        'Esta versión debe instalarse nuevamente para activar las actualizaciones automáticas.',
-      );
-      return;
-    }
-
-    setIsCheckingForUpdate(true);
-    try {
-      const update = await Updates.checkForUpdateAsync();
-      if (!update.isAvailable) {
-        Alert.alert(
-          'Nava está actualizada',
-          'Ya tienes la versión más reciente.',
-        );
-        return;
-      }
-
-      await Updates.fetchUpdateAsync();
-      Alert.alert(
-        'Actualización lista',
-        'Se descargó una nueva versión. Reinicia Nava para aplicarla.',
-        [
-          { style: 'cancel', text: 'Más tarde' },
-          {
-            onPress: () => void Updates.reloadAsync(),
-            text: 'Reiniciar ahora',
-          },
-        ],
-      );
-    } catch {
-      Alert.alert(
-        'No pudimos buscar actualizaciones',
-        'Comprueba tu conexión e inténtalo nuevamente.',
-      );
-    } finally {
-      setIsCheckingForUpdate(false);
-    }
   };
   const performLogout = async () => {
     if (isSigningOut) return;
@@ -360,41 +326,28 @@ export default function SettingsScreen() {
             onPress={() => setIsCloseBusinessOpen(true)}
             style={styles.deleteAction}
           >
-            <Ionicons color={appTheme.colors.accentDark} name="storefront-outline" size={19} />
+            <Ionicons
+              color={appTheme.colors.accentDark}
+              name="storefront-outline"
+              size={19}
+            />
             <Text style={styles.deleteLabel}>Cerrar mi barbería</Text>
           </Pressable>
         ) : null}
-        <Pressable
-          accessibilityRole="button"
-          disabled={isCheckingForUpdate}
-          onPress={() => void checkForUpdate()}
-          style={({ pressed }) => [
-            styles.version,
-            pressed && styles.pressed,
-            isCheckingForUpdate && styles.disabled,
-          ]}
-        >
-          {isCheckingForUpdate ? (
-            <ActivityIndicator
-              color={appTheme.colors.accentDark}
-              size="small"
-            />
-          ) : (
-            <Ionicons
-              color={appTheme.colors.accentDark}
-              name="refresh-outline"
-              size={22}
-            />
-          )}
+        <View style={styles.version}>
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="information-circle-outline"
+            size={22}
+          />
           <View>
-            <Text style={styles.versionTitle}>
-              {isCheckingForUpdate
-                ? 'Buscando actualización…'
-                : 'Buscar actualización'}
+            <Text style={styles.versionTitle}>Versión instalada</Text>
+            <Text style={styles.versionCopy}>
+              {version}
+              {buildNumber ? ` (build ${buildNumber})` : ''}
             </Text>
-            <Text style={styles.versionCopy}>Versión instalada {version}</Text>
           </View>
-        </Pressable>
+        </View>
       </ScrollView>
       <BottomNavigation active="settings" />
       <Modal
@@ -416,10 +369,7 @@ export default function SettingsScreen() {
                 { paddingBottom: layout.bottomInset + 10 },
               ]}
               keyboardShouldPersistTaps="handled"
-              style={[
-                styles.deleteModal,
-                { maxHeight: layout.sheetMaxHeight },
-              ]}
+              style={[styles.deleteModal, { maxHeight: layout.sheetMaxHeight }]}
             >
               <View style={styles.deleteIcon}>
                 <Ionicons color="#B93838" name="warning-outline" size={28} />
@@ -507,22 +457,95 @@ export default function SettingsScreen() {
         transparent
         visible={isCloseBusinessOpen}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardArea}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardArea}
+        >
           <View style={styles.modalBackdrop}>
-            <ScrollView contentContainerStyle={[styles.deleteModalContent, { paddingBottom: layout.bottomInset + 10 }]} keyboardShouldPersistTaps="handled" style={[styles.deleteModal, { maxHeight: layout.sheetMaxHeight }]}>
-              <View style={styles.deleteIcon}><Ionicons color="#B93838" name="warning-outline" size={28} /></View>
+            <ScrollView
+              contentContainerStyle={[
+                styles.deleteModalContent,
+                { paddingBottom: layout.bottomInset + 10 },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              style={[styles.deleteModal, { maxHeight: layout.sheetMaxHeight }]}
+            >
+              <View style={styles.deleteIcon}>
+                <Ionicons color="#B93838" name="warning-outline" size={28} />
+              </View>
               <Text style={styles.deleteTitle}>Cerrar mi barbería</Text>
-              <Text style={styles.deleteCopy}>La barbería, sus servicios y enlace de reservas se desactivarán. Tu cuenta personal, historial y sesiones se conservarán.</Text>
-              <View style={styles.warningBox}><Text style={styles.warningText}>Primero debes retirar colaboradores, cancelar invitaciones pendientes, cerrar Caja y resolver citas futuras. Después podrás aceptar una invitación de otro negocio.</Text></View>
+              <Text style={styles.deleteCopy}>
+                La barbería, sus servicios y enlace de reservas se desactivarán.
+                Tu cuenta personal, historial y sesiones se conservarán.
+              </Text>
+              <View style={styles.warningBox}>
+                <Text style={styles.warningText}>
+                  Primero debes retirar colaboradores, cancelar invitaciones
+                  pendientes, cerrar Caja y resolver citas futuras. Después
+                  podrás aceptar una invitación de otro negocio.
+                </Text>
+              </View>
               <Text style={styles.inputLabel}>Contraseña actual</Text>
-              <TextInput autoCapitalize="none" autoComplete="password" onChangeText={setCloseBusinessPassword} placeholder="Ingresa tu contraseña" secureTextEntry style={styles.input} value={closeBusinessPassword} />
-              <Text style={styles.inputLabel}>Escribe CERRAR para confirmar</Text>
-              <TextInput autoCapitalize="characters" autoCorrect={false} onChangeText={setCloseBusinessConfirmation} placeholder="CERRAR" style={styles.input} value={closeBusinessConfirmation} />
-              {closeBusinessMutation.error ? <Text style={styles.deleteError}>{closeBusinessMutation.error instanceof Error ? closeBusinessMutation.error.message : 'No pudimos cerrar tu barbería.'}</Text> : null}
+              <TextInput
+                autoCapitalize="none"
+                autoComplete="password"
+                onChangeText={setCloseBusinessPassword}
+                placeholder="Ingresa tu contraseña"
+                secureTextEntry
+                style={styles.input}
+                value={closeBusinessPassword}
+              />
+              <Text style={styles.inputLabel}>
+                Escribe CERRAR para confirmar
+              </Text>
+              <TextInput
+                autoCapitalize="characters"
+                autoCorrect={false}
+                onChangeText={setCloseBusinessConfirmation}
+                placeholder="CERRAR"
+                style={styles.input}
+                value={closeBusinessConfirmation}
+              />
+              {closeBusinessMutation.error ? (
+                <Text style={styles.deleteError}>
+                  {closeBusinessMutation.error instanceof Error
+                    ? closeBusinessMutation.error.message
+                    : 'No pudimos cerrar tu barbería.'}
+                </Text>
+              ) : null}
               <View style={styles.modalActions}>
-                <Pressable accessibilityRole="button" disabled={closeBusinessMutation.isPending} onPress={closeBusinessModal} style={styles.cancelButton}><Text style={styles.cancelLabel}>Cancelar</Text></Pressable>
-                <Pressable accessibilityRole="button" disabled={!canCloseBusiness || closeBusinessMutation.isPending} onPress={() => closeBusinessMutation.mutate()} style={[styles.confirmDeleteButton, (!canCloseBusiness || closeBusinessMutation.isPending) && styles.disabled]}>
-                  {closeBusinessMutation.isPending ? <ActivityIndicator color={appTheme.colors.accentDark} size="small" /> : <Ionicons color="#FFFFFF" name="storefront-outline" size={18} />}
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={closeBusinessMutation.isPending}
+                  onPress={closeBusinessModal}
+                  style={styles.cancelButton}
+                >
+                  <Text style={styles.cancelLabel}>Cancelar</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={
+                    !canCloseBusiness || closeBusinessMutation.isPending
+                  }
+                  onPress={() => closeBusinessMutation.mutate()}
+                  style={[
+                    styles.confirmDeleteButton,
+                    (!canCloseBusiness || closeBusinessMutation.isPending) &&
+                      styles.disabled,
+                  ]}
+                >
+                  {closeBusinessMutation.isPending ? (
+                    <ActivityIndicator
+                      color={appTheme.colors.accentDark}
+                      size="small"
+                    />
+                  ) : (
+                    <Ionicons
+                      color="#FFFFFF"
+                      name="storefront-outline"
+                      size={18}
+                    />
+                  )}
                   <Text style={styles.confirmDeleteLabel}>Cerrar barbería</Text>
                 </Pressable>
               </View>
