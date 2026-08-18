@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nava",
     "slug": "barber-saas-mobile",
-    "version": "0.1.11",
+    "version": "0.1.12",
     "icon": "./assets/icon.png",
     "orientation": "portrait",
     "scheme": "barbersaas",

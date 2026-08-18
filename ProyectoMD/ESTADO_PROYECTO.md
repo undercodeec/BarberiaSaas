@@ -4608,8 +4608,21 @@ caja, comisiones y registros históricos.
       `apps/mobile/releases/Nava-0.1.11-code33.aab`.
 - [x] SHA-256 verificado del AAB code 33:
       `BA3AB84F136FA2A0A5EEB2C9B925FBDF0D9E33C04D937C14AC9CA08936B77395`.
-- [ ] Publicar code 33 en el track de prueba interna y comprobar en el teléfono
-      que Ajustes muestre `0.1.11 (build 33)`.
+- [x] El AAB code 33 fue cargado en Google Play Console.
+- [ ] Comprobar en el teléfono que Ajustes muestre la versión efectivamente
+      entregada por el track correspondiente.
+
+## Release Android local 0.1.12 / code 34 (2026-08-18)
+
+- [x] Configuración local preparada con `versionName` **0.1.12** y
+      `versionCode` **34**.
+- [x] El release continúa sin EAS Build ni Expo Updates/OTA.
+- [x] AAB generado, firmado, validado y archivado como
+      `apps/mobile/releases/Nava-0.1.12-code34.aab`.
+- [x] SHA-256 verificado del AAB code 34:
+      `AA05D6794DE3CA6662D96C754565F05267C53B73381982F919ADE72D306CC9F2`.
+- [ ] Subir code 34 al track correspondiente y confirmar en el teléfono
+      `0.1.12 (build 34)`.
 
 ## Validacion final de Google Maps Android (2026-08-17)
 
