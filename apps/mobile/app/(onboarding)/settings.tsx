@@ -35,6 +35,7 @@ import {
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../../src/lib/api';
+import { runTenantTransition } from '../../src/lib/tenant-transition';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const PRIMARY = appTheme.colors.accent;
@@ -89,22 +90,15 @@ export default function SettingsScreen() {
   });
   const closeBusinessMutation = useMutation({
     mutationFn: async () => {
-      await requireApiClient().request<void>(
-        '/v1/account/close-owned-business',
-        {
+      await runTenantTransition(queryClient, () =>
+        requireApiClient().request<void>('/v1/account/close-owned-business', {
           body: {
             confirmation: closeBusinessConfirmation,
             password: closeBusinessPassword,
           },
           method: 'POST',
-        },
-      );
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['current-organization'] }),
-        queryClient.invalidateQueries({
-          queryKey: ['onboarding-account-details'],
         }),
-      ]);
+      );
       setIsCloseBusinessOpen(false);
       setCloseBusinessPassword('');
       setCloseBusinessConfirmation('');

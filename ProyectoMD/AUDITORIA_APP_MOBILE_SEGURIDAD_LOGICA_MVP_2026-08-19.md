@@ -95,6 +95,8 @@ Impactos:
 
 ### HIGH-02 — Riesgo de exposición cruzada por caché entre organizaciones/cuentas
 
+**Estado:** [ ] Limpieza atómica en transiciones de tenant implementada; pendiente migrar todas las claves tenant-scoped a la factoría central.
+
 **Evidencia:** `apps/mobile/src/providers/AppProviders.tsx:8-24`; claves como `['clients']`, `['cash-register-summary']`, `['inventory']`, `['team']`, `['services']`, `['payphone-configuration']` y `['current-organization']` repartidas en las pantallas; cambio de negocio en `apps/mobile/app/(onboarding)/settings.tsx:90-115`.
 
 El `QueryClient` vive durante toda la ejecución. La mayoría de claves no incluye `userId`, `organizationId` ni `locationId`. El logout normal desde Ajustes ejecuta `queryClient.clear()`, pero esa limpieza no está centralizada en `AuthProvider` y el flujo “cerrar barbería → aceptar invitación a otro negocio” solo invalida unas pocas queries.

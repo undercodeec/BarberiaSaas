@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requireApiClient } from '../../src/lib/api';
+import { runTenantTransition } from '../../src/lib/tenant-transition';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 export default function AcceptInvitationScreen() {
@@ -26,17 +27,12 @@ export default function AcceptInvitationScreen() {
     setError(null);
     setIsAccepting(true);
     try {
-      await requireApiClient().request('/v1/team/invitations/accept', {
-        body: { token },
-        method: 'POST',
-      });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['current-organization'] }),
-        queryClient.invalidateQueries({
-          queryKey: ['onboarding-account-details'],
+      await runTenantTransition(queryClient, () =>
+        requireApiClient().request('/v1/team/invitations/accept', {
+          body: { token },
+          method: 'POST',
         }),
-        queryClient.invalidateQueries({ queryKey: ['team'] }),
-      ]);
+      );
       router.replace('/dashboard');
     } catch (requestError) {
       setError(
