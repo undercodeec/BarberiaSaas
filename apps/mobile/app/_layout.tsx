@@ -18,6 +18,7 @@ import {
 } from '../src/components/BottomNavigation';
 import { GlobalNotificationsBanner } from '../src/components/GlobalNotificationsBanner';
 import { NavaPreloader } from '../src/components/NavaPreloader';
+import { NetworkStatusBanner } from '../src/components/NetworkStatusBanner';
 import { useCurrentOrganization } from '../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../src/lib/api';
 import { createNotificationResponseConsumer } from '../src/lib/notification-navigation';
@@ -124,6 +125,7 @@ function SessionStateGate() {
       <Stack screenOptions={{ headerShown: false }} />
       <NativePushNotifications />
       <GlobalNotificationsBanner />
+      <NetworkStatusBanner />
     </>
   );
 }

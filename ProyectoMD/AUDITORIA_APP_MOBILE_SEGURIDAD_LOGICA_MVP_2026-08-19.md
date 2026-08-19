@@ -274,6 +274,8 @@ Una respuesta incompleta, valor de fecha inválido o error de render puede dejar
 
 ### MED-11 — Sin integración global de AppState/red con React Query
 
+**Estado:** [x] Corregido y verificado el 19 de agosto de 2026.
+
 **Evidencia:** `AppProviders.tsx` crea el cliente, pero no configura `focusManager`/`onlineManager`; no se usa NetInfo/AppState globalmente.
 
 La app puede conservar datos de agenda/caja obsoletos tras volver de background o reconectar, mientras otras queries hacen polling innecesario. El comportamiento es inconsistente por pantalla.
