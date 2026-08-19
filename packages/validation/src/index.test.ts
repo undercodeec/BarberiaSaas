@@ -9,6 +9,7 @@ import {
   createServiceSchema,
   createAppointmentSchema,
   createSlug,
+  dailyAppointmentsQuerySchema,
   locationOnboardingSchema,
   mapsAutocompleteSchema,
   mapsReverseGeocodeSchema,
@@ -19,6 +20,49 @@ import {
   verifyEmailSchema,
   weeklyScheduleIntervalSchema,
 } from './index';
+
+describe('rango de agenda', () => {
+  const locationId = '11111111-1111-4111-8111-111111111111';
+
+  it('acepta una fecha o un rango máximo de 31 días', () => {
+    expect(
+      dailyAppointmentsQuerySchema.safeParse({
+        date: '2026-08-19',
+        locationId,
+      }).success,
+    ).toBe(true);
+    expect(
+      dailyAppointmentsQuerySchema.safeParse({
+        from: '2026-08-01',
+        locationId,
+        to: '2026-08-31',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rechaza rangos incompletos, invertidos o mayores a 31 días', () => {
+    expect(
+      dailyAppointmentsQuerySchema.safeParse({
+        from: '2026-08-01',
+        locationId,
+      }).success,
+    ).toBe(false);
+    expect(
+      dailyAppointmentsQuerySchema.safeParse({
+        from: '2026-08-20',
+        locationId,
+        to: '2026-08-19',
+      }).success,
+    ).toBe(false);
+    expect(
+      dailyAppointmentsQuerySchema.safeParse({
+        from: '2026-08-01',
+        locationId,
+        to: '2026-09-01',
+      }).success,
+    ).toBe(false);
+  });
+});
 
 describe('esquemas de entorno', () => {
   it('acepta un entorno soportado', () => {

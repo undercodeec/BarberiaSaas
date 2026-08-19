@@ -141,8 +141,9 @@ const optionalCoverImage = z
       .max(MAX_COVER_IMAGE_DATA_URI_LENGTH)
       .refine(
         (value) =>
-          /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/u.test(value) ||
-          /^https?:\/\//u.test(value),
+          /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/u.test(
+            value,
+          ) || /^https?:\/\//u.test(value),
         'La portada debe ser una imagen JPEG, PNG o WebP valida.',
       ),
     z.null(),
@@ -465,11 +466,40 @@ export const availabilityQuerySchema = z.object({
     .pipe(serviceIdsSchema),
 });
 
-export const dailyAppointmentsQuerySchema = z.object({
-  date: localDateSchema,
-  locationId: uuidSchema,
-  membershipId: uuidSchema.optional(),
-});
+export const dailyAppointmentsQuerySchema = z
+  .object({
+    date: localDateSchema.optional(),
+    from: localDateSchema.optional(),
+    locationId: uuidSchema,
+    membershipId: uuidSchema.optional(),
+    to: localDateSchema.optional(),
+  })
+  .superRefine((input, context) => {
+    const hasSingleDate = Boolean(input.date);
+    const hasCompleteRange = Boolean(input.from && input.to);
+    if (
+      hasSingleDate === hasCompleteRange ||
+      Boolean(input.from) !== Boolean(input.to)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Indica date o un rango from/to completo.',
+        path: ['date'],
+      });
+      return;
+    }
+    if (!input.from || !input.to) return;
+    const fromTime = Date.parse(`${input.from}T00:00:00.000Z`);
+    const toTime = Date.parse(`${input.to}T00:00:00.000Z`);
+    const rangeDays = (toTime - fromTime) / 86_400_000;
+    if (rangeDays < 0 || rangeDays > 30) {
+      context.addIssue({
+        code: 'custom',
+        message: 'El rango debe contener entre 1 y 31 días.',
+        path: ['to'],
+      });
+    }
+  });
 
 export const appointmentEventsQuerySchema = z.object({
   after: z.string().regex(/^\d+$/u).default('0'),

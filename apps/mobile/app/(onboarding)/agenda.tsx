@@ -468,14 +468,18 @@ export default function AgendaScreen() {
   const appointmentsQuery = useQuery({
     enabled: Boolean(session && locationId),
     queryFn: async () => {
-      const results = await Promise.all(
-        visibleDates.map((date) =>
-          requireApiClient().request<AppointmentsResponse>(
-            `/v1/appointments?date=${localDateValue(date)}&locationId=${locationId}`,
-          ),
-        ),
+      const firstDate = visibleDates.at(0);
+      const lastDate = visibleDates.at(-1);
+      if (!firstDate || !lastDate) return [];
+      const search = new URLSearchParams({
+        from: localDateValue(firstDate),
+        locationId: locationId ?? '',
+        to: localDateValue(lastDate),
+      });
+      const result = await requireApiClient().request<AppointmentsResponse>(
+        `/v1/appointments?${search.toString()}`,
       );
-      return results.flatMap((result) => result.appointments);
+      return result.appointments;
     },
     queryKey: [
       'agenda-appointments',
@@ -483,8 +487,8 @@ export default function AgendaScreen() {
       locationId,
       localDateValue(selectedDay),
     ],
-    refetchInterval: 2_000,
-    refetchIntervalInBackground: true,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
   const monthDays = useMemo(() => calendarGrid(calendarMonth), [calendarMonth]);
   const selectedDaySchedules = useMemo(
@@ -627,8 +631,8 @@ export default function AgendaScreen() {
             />
           </Pressable>
           <Pressable
-          accessibilityLabel="Ajustes agenda"
-          accessibilityRole="button"
+            accessibilityLabel="Ajustes agenda"
+            accessibilityRole="button"
             onPress={openAgendaSettings}
             style={styles.filterButton}
           >

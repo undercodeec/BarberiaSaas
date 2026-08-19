@@ -608,8 +608,13 @@ export function registerAgendaRoutes(
     }
     const targetMembershipId =
       current.role === MembershipRole.BARBER ? current.id : input.membershipId;
-    const dayStart = zonedDateTimeToUtc(input.date, 0, location.timezone);
-    const dayEnd = zonedDateTimeToUtc(input.date, 1440, location.timezone);
+    const fromDate = input.date ?? input.from;
+    const toDate = input.date ?? input.to;
+    if (!fromDate || !toDate) {
+      throw new ApiError(400, 'INVALID_DATE_RANGE', 'El rango no es válido.');
+    }
+    const dayStart = zonedDateTimeToUtc(fromDate, 0, location.timezone);
+    const dayEnd = zonedDateTimeToUtc(toDate, 1440, location.timezone);
     const appointments = await database.appointment.findMany({
       include: { services: { orderBy: { sortOrder: 'asc' } } },
       orderBy: { startsAt: 'asc' },

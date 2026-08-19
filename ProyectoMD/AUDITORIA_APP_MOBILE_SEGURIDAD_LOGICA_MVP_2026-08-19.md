@@ -75,6 +75,8 @@ Expo Doctor detectó:
 
 ### HIGH-01 — Polling explosivo de agenda y actividad en background
 
+**Estado:** [ ] Corrección implementada y checks automatizados verdes; pendiente medición de 5 minutos en las tres vistas y en dispositivo real.
+
 **Evidencia:** `apps/mobile/app/(onboarding)/agenda.tsx:457-486`.
 
 La query de citas hace un request por cada fecha visible y se repite cada 2 segundos. La vista diaria genera aproximadamente 30 requests/minuto; la semanal, 210/minuto; la mensual puede generar entre 840 y 930/minuto por usuario. `refetchIntervalInBackground: true` solicita además mantener el polling fuera de foco mientras el runtime siga activo.
