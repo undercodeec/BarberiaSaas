@@ -109,6 +109,8 @@ Aunque la API luego responda correctamente, una aparición momentánea de PII/fi
 
 ### HIGH-03 — Un error de conectividad elimina sesiones válidas
 
+**Estado:** [x] Corregido y verificado el 19 de agosto de 2026.
+
 **Evidencia:** `apps/mobile/src/providers/AuthProvider.tsx:53-68`; diferenciación de errores disponible en `packages/api-client/src/index.ts:937-1032`.
 
 Al restaurar sesión, cualquier excepción —timeout, modo avión, DNS, 500 o mantenimiento— entra al mismo `catch` y borra el token seguro. Una persona que abre la app sin conexión pierde su sesión aunque el token siga vigente.
@@ -116,6 +118,8 @@ Al restaurar sesión, cualquier excepción —timeout, modo avión, DNS, 500 o m
 **Corrección requerida:** borrar token solo ante 401/403 o código inequívoco de sesión revocada. Para timeout/red/5xx, conservarlo, mostrar estado offline y permitir reintento. Añadir una máquina de estado: `restoring`, `authenticated`, `unauthenticated`, `offline-auth-unknown`.
 
 ### HIGH-04 — Expiración/revocación de sesión no se gestiona durante el uso
+
+**Estado:** [x] Corregido y verificado el 19 de agosto de 2026.
 
 **Evidencia:** `session.expiresAt` solo se conserva en `AuthProvider`; no se usa para expirar sesión. `createApiClient` lanza `ApiClientError` pero no tiene interceptor global de autenticación.
 

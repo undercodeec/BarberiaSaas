@@ -2,8 +2,20 @@ import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../src/components/BottomNavigation';
 import { GlobalNotificationsBanner } from '../src/components/GlobalNotificationsBanner';
 import { NavaPreloader } from '../src/components/NavaPreloader';
 import { useCurrentOrganization } from '../src/features/organization/useCurrentOrganization';
@@ -66,9 +78,8 @@ function NativePushNotifications() {
         data: response.notification.request.content.data,
         id: response.notification.request.identifier,
       });
-    const subscription = Notifications.addNotificationResponseReceivedListener(
-      openRoute,
-    );
+    const subscription =
+      Notifications.addNotificationResponseReceivedListener(openRoute);
     void Notifications.getLastNotificationResponseAsync().then((response) => {
       if (response) openRoute(response);
     });
@@ -76,6 +87,45 @@ function NativePushNotifications() {
   }, [consumeNotificationResponse, role, session]);
 
   return null;
+}
+
+function SessionStateGate() {
+  const { retrySessionRestore, status } = useAuth();
+
+  if (status === 'restoring') {
+    return (
+      <View style={styles.sessionState}>
+        <ActivityIndicator color={appTheme.colors.accent} size="large" />
+        <Text style={styles.sessionMessage}>Comprobando tu sesión…</Text>
+      </View>
+    );
+  }
+
+  if (status === 'offline-auth-unknown') {
+    return (
+      <View style={styles.sessionState}>
+        <Text style={styles.sessionTitle}>No pudimos comprobar tu sesión</Text>
+        <Text style={styles.sessionMessage}>
+          Tu acceso sigue guardado. Revisa la conexión y vuelve a intentarlo.
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void retrySessionRestore()}
+          style={styles.retryButton}
+        >
+          <Text style={styles.retryLabel}>Reintentar</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <Stack screenOptions={{ headerShown: false }} />
+      <NativePushNotifications />
+      <GlobalNotificationsBanner />
+    </>
+  );
 }
 
 export default function RootLayout() {
@@ -88,9 +138,7 @@ export default function RootLayout() {
     <View style={styles.root}>
       <AppProviders>
         <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false }} />
-        <NativePushNotifications />
-        <GlobalNotificationsBanner />
+        <SessionStateGate />
       </AppProviders>
       {showPreloader ? <NavaPreloader onFinish={finishPreloader} /> : null}
     </View>
@@ -98,7 +146,41 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
+  retryButton: {
+    backgroundColor: appTheme.colors.surface,
+    borderRadius: 18,
+    marginTop: 22,
+    paddingHorizontal: 28,
+    paddingVertical: 15,
+    ...goldButtonShadow,
+  },
+  retryLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 16,
+    fontWeight: '800',
+  },
   root: {
     flex: 1,
+  },
+  sessionMessage: {
+    color: appTheme.colors.textMuted,
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 12,
+    maxWidth: 360,
+    textAlign: 'center',
+  },
+  sessionState: {
+    alignItems: 'center',
+    ...appStyles.screen,
+    flex: 1,
+    justifyContent: 'center',
+    padding: 28,
+  },
+  sessionTitle: {
+    color: appTheme.colors.text,
+    fontSize: 22,
+    fontWeight: '800',
+    textAlign: 'center',
   },
 });

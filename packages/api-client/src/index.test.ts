@@ -25,6 +25,7 @@ describe('createApiClient', () => {
   });
 
   it('adjunta la sesión y conserva el error del backend', async () => {
+    const onAuthenticationFailure = vi.fn();
     const fetchImplementation = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -38,6 +39,7 @@ describe('createApiClient', () => {
       baseUrl: 'https://example.test',
       fetchImplementation,
       getAccessToken: async () => 'token-secreto',
+      onAuthenticationFailure,
     });
 
     await expect(client.request('/private')).rejects.toMatchObject({
@@ -52,6 +54,9 @@ describe('createApiClient', () => {
           authorization: 'Bearer token-secreto',
         }),
       }),
+    );
+    expect(onAuthenticationFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'INVALID_SESSION', statusCode: 401 }),
     );
   });
 });

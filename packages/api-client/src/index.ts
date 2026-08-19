@@ -18,6 +18,9 @@ export interface ApiClientConfig {
   readonly baseUrl: string;
   readonly fetchImplementation?: typeof fetch;
   readonly getAccessToken?: () => Promise<string | null>;
+  readonly onAuthenticationFailure?: (
+    error: ApiClientError,
+  ) => Promise<void> | void;
   readonly timeoutMs?: number;
 }
 
@@ -1018,12 +1021,18 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
           code?: string;
           message?: string;
         } | null;
-        throw new ApiClientError(
+        const apiError = new ApiClientError(
           response.status,
           payload?.code ?? 'REQUEST_FAILED',
           payload?.message ??
             'No fue posible completar la solicitud. Inténtalo nuevamente.',
         );
+        if (response.status === 401 || response.status === 403) {
+          await Promise.resolve(
+            config.onAuthenticationFailure?.(apiError),
+          ).catch(() => undefined);
+        }
+        throw apiError;
       }
 
       if (response.status === 204) return undefined as TResponse;
