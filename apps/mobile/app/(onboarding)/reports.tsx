@@ -11,7 +11,6 @@ import {
   Alert,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   View,
@@ -24,6 +23,7 @@ import {
   goldButtonShadow,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
+import { shareTemporaryExport } from '../../src/lib/temporary-export';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -349,7 +349,7 @@ function MovementReportView({
       : kind === 'sales'
         ? 'Historial de ventas'
         : 'Historial de depósitos';
-  const exportCsv = async () => {
+  const performCsvExport = async () => {
     try {
       const search = new URLSearchParams(queryString);
       search.set('format', 'csv');
@@ -357,13 +357,27 @@ function MovementReportView({
         `/v1/reports/movements?${search.toString()}`,
         { responseType: 'text' },
       );
-      await Share.share({ message: csv, title: `${title}.csv` });
+      await shareTemporaryExport({
+        contents: csv,
+        filename: `${kind}-${new Date().toISOString().slice(0, 10)}.csv`,
+        mimeType: 'text/csv;charset=utf-8',
+      });
     } catch (error) {
       Alert.alert(
         'No pudimos exportar el reporte',
         error instanceof Error ? error.message : 'Inténtalo nuevamente.',
       );
     }
+  };
+  const exportCsv = () => {
+    Alert.alert(
+      'Exportación con datos financieros',
+      'El archivo puede contener información sensible. Compártelo solo con personas y aplicaciones autorizadas.',
+      [
+        { style: 'cancel', text: 'Cancelar' },
+        { onPress: () => void performCsvExport(), text: 'Exportar' },
+      ],
+    );
   };
   const money = (value: number) =>
     new Intl.NumberFormat('es-EC', {
@@ -389,7 +403,7 @@ function MovementReportView({
         <Pressable
           accessibilityLabel="Exportar CSV"
           disabled={!report?.rows.length}
-          onPress={() => void exportCsv()}
+          onPress={exportCsv}
           style={styles.backButton}
         >
           <Ionicons

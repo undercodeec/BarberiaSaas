@@ -197,6 +197,8 @@ La propiedad `data.route` se devuelve sin allowlist; solo el listener nativo exi
 
 ### MED-03 — Exportaciones de PII dejan archivos y comparten texto de forma defectuosa
 
+**Estado:** [ ] Implementación terminada; pendiente smoke test del share sheet en Android/iOS con Files, Drive, Excel y correo.
+
 **Evidencia:** `apps/mobile/app/(onboarding)/clients.tsx:363-424`; `reports.tsx:352-366`.
 
 La exportación de clientes escribe nombre, teléfono, correo, dirección, documento y notas en `cacheDirectory`, lo comparte y no elimina el archivo después. La exportación de reportes usa `Share.share({ message: csv })`; en móvil comparte texto largo, no un archivo `.csv`, por lo que varias apps destino no lo tratarán como documento.
@@ -204,6 +206,8 @@ La exportación de clientes escribe nombre, teléfono, correo, dirección, docum
 **Corrección:** crear archivo temporal con MIME/extensión correctos, aviso explícito de sensibilidad, compartir y borrar en `finally`; opción de cifrado o exportación mínima; evitar persistencia en logs/backups; probar Drive, Files, Excel, correo y cancelación del share sheet.
 
 ### MED-04 — Dependencia `xlsx@0.18.5` obsoleta y con avisos conocidos
+
+**Estado:** [x] Corregido y verificado el 19 de agosto de 2026.
 
 **Evidencia:** `apps/mobile/package.json`; import estático en `clients.tsx:33` y uso de escritura/exportación.
 
@@ -253,6 +257,8 @@ Una configuración release equivocada puede incrustar `http://`. Android/iOS pro
 **Corrección:** validación build-time que exija `https:` fuera de local/debug, allowlist de hosts por entorno y check del valor final dentro del bundle sin imprimirlo.
 
 ### MED-09 — Dependencias Expo desalineadas con SDK 57
+
+**Estado:** [ ] Dependencias alineadas y checks automatizados verdes; pendiente smoke test en Android/iOS reales.
 
 **Evidencia:** Expo Doctor detectó 12 mismatches patch: Expo core, router, asset, constants, contacts, file-system, image-picker, linking, location, notifications, sharing y metro runtime.
 
@@ -345,6 +351,8 @@ Cualquier app/web puede abrir rutas del cliente. No se observó bypass de autori
 Corregir archivos a UTF-8, eliminar código inalcanzable y añadir check que detecte mojibake en textos de UI.
 
 ### LOW-06 — Uso de FileSystem legacy
+
+**Estado:** [x] Corregido y verificado el 19 de agosto de 2026.
 
 `clients.tsx` importa `expo-file-system/legacy`. Migrar a la API actual de Expo, especialmente al corregir el ciclo de vida de exportaciones temporales.
 

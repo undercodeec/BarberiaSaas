@@ -13,13 +13,13 @@ allowBuilds:
 packageExtensions:
   expo-font@57.0.1:
     dependencies:
-      expo-asset: 57.0.10
+      expo-asset: 57.0.12
 
 overrides:
-  expo-constants: 57.0.10
+  expo-constants: 57.0.12
 
 minimumReleaseAgeExclude:
   - react-hook-form@7.82.0
   - expo-updates@57.0.12
   - '@expo/config-plugins@57.0.8'
-  - expo-sharing@57.0.12
+  - expo-sharing@57.0.13

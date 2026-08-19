@@ -8,7 +8,6 @@ import {
   Alert,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   View,
@@ -21,6 +20,7 @@ import {
 } from '../../src/components/BottomNavigation';
 import { InlineMessage } from '../../src/components/InlineMessage';
 import { requireApiClient } from '../../src/lib/api';
+import { shareTemporaryExport } from '../../src/lib/temporary-export';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 type Preset = DailyReportResponse['period']['preset'];
@@ -58,19 +58,33 @@ export default function DailyReportScreen() {
   if (!session) return <Redirect href="/(auth)/login" />;
   const report = reportQuery.data;
   const currency = report?.currencyCode ?? 'USD';
-  const exportCsv = async () => {
+  const performCsvExport = async () => {
     try {
       const csv = await requireApiClient().request<string>(
         `/v1/reports/daily?${queryString}&format=csv`,
         { responseType: 'text' },
       );
-      await Share.share({ message: csv, title: 'Reporte diario.csv' });
+      await shareTemporaryExport({
+        contents: csv,
+        filename: `reporte-diario-${new Date().toISOString().slice(0, 10)}.csv`,
+        mimeType: 'text/csv;charset=utf-8',
+      });
     } catch (error) {
       Alert.alert(
         'No pudimos exportar el reporte',
         error instanceof Error ? error.message : 'Inténtalo nuevamente.',
       );
     }
+  };
+  const exportCsv = () => {
+    Alert.alert(
+      'Exportación con datos financieros',
+      'El archivo puede contener información sensible. Compártelo solo con personas y aplicaciones autorizadas.',
+      [
+        { style: 'cancel', text: 'Cancelar' },
+        { onPress: () => void performCsvExport(), text: 'Exportar' },
+      ],
+    );
   };
 
   return (
@@ -96,7 +110,7 @@ export default function DailyReportScreen() {
         <IconButton
           label="Exportar CSV"
           name="share-outline"
-          onPress={() => void exportCsv()}
+          onPress={exportCsv}
           trailing
         />
       </View>

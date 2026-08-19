@@ -29,9 +29,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
-import * as XLSX from 'xlsx';
 
 import {
   appStyles,
@@ -43,7 +40,9 @@ import {
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { requireApiClient } from '../../src/lib/api';
 import { normalizeClientsResponse } from '../../src/lib/client-record';
+import { createCsv } from '../../src/lib/csv-export';
 import { phoneNumberToE164 } from '../../src/lib/phone-number';
+import { shareTemporaryExport } from '../../src/lib/temporary-export';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const CONTACT_IMPORT_FIELDS = [
@@ -151,7 +150,10 @@ export default function ClientsScreen() {
         'Revisa el permiso de Contactos para Nava en los ajustes del teléfono.',
         [
           { label: 'Cerrar' },
-          { label: 'Abrir ajustes', onPress: () => void Linking.openSettings() },
+          {
+            label: 'Abrir ajustes',
+            onPress: () => void Linking.openSettings(),
+          },
         ],
       );
       return;
@@ -263,9 +265,8 @@ export default function ClientsScreen() {
         }
       };
       await Promise.all(
-        Array.from(
-          { length: Math.min(4, selectedImportContacts.length) },
-          () => importContact(),
+        Array.from({ length: Math.min(4, selectedImportContacts.length) }, () =>
+          importContact(),
         ),
       );
       await queryClient.invalidateQueries({ queryKey: ['clients'] });
@@ -347,75 +348,70 @@ export default function ClientsScreen() {
     });
   }, [visibleClients]);
 
-  const exportSelectedClients = useCallback(async () => {
+  const performClientExport = useCallback(
+    async (includeSensitiveDetails: boolean) => {
+      if (!selectedClients.length) return;
+      try {
+        const headers = includeSensitiveDetails
+          ? [
+              'Nombre',
+              'Apellido',
+              'Teléfono',
+              'Correo',
+              'Dirección',
+              'Documento',
+              'Notas',
+            ]
+          : ['Nombre', 'Apellido', 'Teléfono', 'Correo'];
+        const rows = selectedClients.map((client) => {
+          const minimum = [
+            client.fullName,
+            client.lastName ?? '',
+            client.phone ?? '',
+            client.email ?? '',
+          ];
+          return includeSensitiveDetails
+            ? [
+                ...minimum,
+                client.addressLine ?? '',
+                client.documentNumber ?? '',
+                client.notes ?? '',
+              ]
+            : minimum;
+        });
+        await shareTemporaryExport({
+          contents: createCsv(headers, rows),
+          filename: `clientes-nava-${new Date().toISOString().slice(0, 10)}.csv`,
+          mimeType: 'text/csv;charset=utf-8',
+        });
+      } catch (error) {
+        openDialog(
+          'No pudimos exportar los clientes',
+          error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+        );
+      }
+    },
+    [openDialog, selectedClients],
+  );
+
+  const exportSelectedClients = useCallback(() => {
     if (!selectedClients.length) return;
-    try {
-      const worksheet = XLSX.utils.json_to_sheet(
-        selectedClients.map((client) => ({
-          Apellido: client.lastName ?? '',
-          Correo: client.email ?? '',
-          Dirección: client.addressLine ?? '',
-          Documento: client.documentNumber ?? '',
-          Nombre: client.fullName,
-          Notas: client.notes ?? '',
-          Teléfono: client.phone ?? '',
-        })),
+    openDialog(
+      'Exportación con datos personales',
+      'El archivo puede contener información sensible. Compártelo solo con personas y aplicaciones autorizadas.',
+      [
+        { label: 'Cancelar' },
         {
-          header: [
-            'Nombre',
-            'Apellido',
-            'Teléfono',
-            'Correo',
-            'Dirección',
-            'Documento',
-            'Notas',
-          ],
+          label: 'Datos mínimos',
+          onPress: () => void performClientExport(false),
         },
-      );
-      worksheet['!cols'] = [
-        { wch: 24 },
-        { wch: 20 },
-        { wch: 18 },
-        { wch: 30 },
-        { wch: 34 },
-        { wch: 18 },
-        { wch: 40 },
-      ];
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Clientes');
-      const filename = `clientes-nava-${new Date().toISOString().slice(0, 10)}.xlsx`;
-
-      if (Platform.OS === 'web') {
-        XLSX.writeFile(workbook, filename, { bookType: 'xlsx' });
-        return;
-      }
-
-      const directory = FileSystem.cacheDirectory;
-      if (!directory) throw new Error('No pudimos preparar el archivo Excel.');
-      const fileUri = `${directory}${filename}`;
-      const contents = XLSX.write(workbook, {
-        bookType: 'xlsx',
-        compression: true,
-        type: 'base64',
-      });
-      await FileSystem.writeAsStringAsync(fileUri, contents, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      if (!(await Sharing.isAvailableAsync())) {
-        throw new Error('No hay una aplicación disponible para compartir archivos.');
-      }
-      await Sharing.shareAsync(fileUri, {
-        dialogTitle: 'Exportar clientes de Nava',
-        mimeType:
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
-    } catch (error) {
-      openDialog(
-        'No pudimos exportar los clientes',
-        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
-      );
-    }
-  }, [openDialog, selectedClients]);
+        {
+          label: 'Archivo completo',
+          onPress: () => void performClientExport(true),
+        },
+      ],
+    );
+  }, [openDialog, performClientExport, selectedClients.length]);
 
   const deleteSelectedClients = useCallback(async () => {
     if (!selectedClients.length) return;
@@ -462,9 +458,8 @@ export default function ClientsScreen() {
         }
       };
       await Promise.all(
-        Array.from(
-          { length: Math.min(4, clientsToDelete.length) },
-          () => deleteClient(),
+        Array.from({ length: Math.min(4, clientsToDelete.length) }, () =>
+          deleteClient(),
         ),
       );
       setSelectedClientIds([...failedClientIds]);
@@ -597,8 +592,8 @@ export default function ClientsScreen() {
             />
           </View>
           <Text style={styles.deletionProgressCopy}>
-            {deletionProgress.completed} de {deletionProgress.total}{' '}
-            contactos procesados
+            {deletionProgress.completed} de {deletionProgress.total} contactos
+            procesados
           </Text>
         </View>
       ) : null}
@@ -1083,7 +1078,8 @@ function ContactImportSheet({
                 onPress={onConfirm}
                 style={[
                   styles.importConfirmButton,
-                  (importing || selectedContactIds.length === 0) && styles.disabled,
+                  (importing || selectedContactIds.length === 0) &&
+                    styles.disabled,
                 ]}
               >
                 <Text style={styles.importConfirmLabel}>
@@ -1523,7 +1519,12 @@ const styles = StyleSheet.create({
     marginTop: 9,
   },
   dialogOverlay: { alignItems: 'center', flex: 1, justifyContent: 'center' },
-  dialogTitle: { color: '#101C2D', fontSize: 21, fontWeight: '900', marginTop: 16 },
+  dialogTitle: {
+    color: '#101C2D',
+    fontSize: 21,
+    fontWeight: '900',
+    marginTop: 16,
+  },
   empty: { alignItems: 'center', marginHorizontal: 20, marginTop: 76 },
   emptyAction: {
     color: '#101c2d',
@@ -1631,7 +1632,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 38,
   },
-  importContactAvatarLabel: { color: '#101C2D', fontSize: 15, fontWeight: '900' },
+  importContactAvatarLabel: {
+    color: '#101C2D',
+    fontSize: 15,
+    fontWeight: '900',
+  },
   importContactCopy: { flex: 1 },
   importContactName: { color: '#101C2D', fontSize: 14, fontWeight: '900' },
   importContactPhone: { color: '#69717D', fontSize: 12, marginTop: 2 },
@@ -1645,7 +1650,10 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 11,
   },
-  importContactRowSelected: { backgroundColor: '#FFF7E5', borderColor: '#C79532' },
+  importContactRowSelected: {
+    backgroundColor: '#FFF7E5',
+    borderColor: '#C79532',
+  },
   importCopy: { color: '#5D6672', fontSize: 14, lineHeight: 20, marginTop: 7 },
   importEmpty: {
     color: '#69717D',
@@ -1672,7 +1680,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingHorizontal: 12,
   },
-  importSearchInput: { color: '#101C2D', flex: 1, fontSize: 14, paddingVertical: 13 },
+  importSearchInput: {
+    color: '#101C2D',
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 13,
+  },
   importSelectAll: {
     alignItems: 'center',
     alignSelf: 'flex-start',
@@ -1702,7 +1715,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     zIndex: 1,
   },
-  importTitle: { color: '#101C2D', fontSize: 23, fontWeight: '900', marginTop: 10 },
+  importTitle: {
+    color: '#101C2D',
+    fontSize: 23,
+    fontWeight: '900',
+    marginTop: 10,
+  },
   iconButton: {
     alignItems: 'center',
     backgroundColor: '#ffffff',
