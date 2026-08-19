@@ -10,6 +10,7 @@ import type {
   ClientLabelsResponse,
   ClientRecord,
   ClientsResponse,
+  CurrentOrganizationResponse,
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
@@ -42,6 +43,7 @@ import {
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { requireApiClient } from '../../src/lib/api';
 import { normalizeClientsResponse } from '../../src/lib/client-record';
+import { phoneNumberToE164 } from '../../src/lib/phone-number';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const CONTACT_IMPORT_FIELDS = [
@@ -66,11 +68,6 @@ type ImportContactCandidate = {
   readonly id: string;
   readonly phone: string;
 };
-
-function normalizedPhone(value: string | undefined) {
-  const digits = value?.replace(/\D/gu, '') ?? '';
-  return digits.length >= 5 ? digits : null;
-}
 
 export default function ClientsScreen() {
   const { session } = useAuth();
@@ -104,10 +101,18 @@ export default function ClientsScreen() {
     ) => setDialog(actions ? { actions, message, title } : { message, title }),
     [],
   );
+  const organizationQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<CurrentOrganizationResponse>(
+        '/v1/organizations/current',
+      ),
+    queryKey: ['current-organization'],
+  });
   const importContacts = useCallback(async () => {
     if (Platform.OS === 'web') {
       openDialog(
-        'Importaci?n disponible en el tel?fono',
+        'Importación disponible en el teléfono',
         'Por privacidad, los contactos solo se pueden sincronizar desde Android o iPhone.',
       );
       return;
@@ -123,7 +128,7 @@ export default function ClientsScreen() {
         if (!permission.canAskAgain) {
           openDialog(
             'Permiso de contactos desactivado',
-            'Activa Contactos para Nava desde los ajustes del telefono.',
+            'Activa Contactos para Nava desde los ajustes del teléfono.',
             [
               { label: 'Ahora no' },
               {
@@ -135,7 +140,7 @@ export default function ClientsScreen() {
         } else {
           openDialog(
             'Permiso necesario',
-            'Toca Importar contactos nuevamente y permite el acceso cuando aparezca la ventana del telefono.',
+            'Toca Importar contactos nuevamente y permite el acceso cuando aparezca la ventana del teléfono.',
           );
         }
         return;
@@ -143,7 +148,7 @@ export default function ClientsScreen() {
     } catch {
       openDialog(
         'No pudimos solicitar el permiso',
-        'Revisa el permiso de Contactos para Nava en los ajustes del telefono.',
+        'Revisa el permiso de Contactos para Nava en los ajustes del teléfono.',
         [
           { label: 'Cerrar' },
           { label: 'Abrir ajustes', onPress: () => void Linking.openSettings() },
@@ -157,28 +162,37 @@ export default function ClientsScreen() {
       if (!contacts.length) {
         openDialog(
           'Contactos importados',
-          'No encontramos contactos en tu telÃ©fono para importar.',
+          'No encontramos contactos en tu teléfono para importar.',
         );
         return;
       }
       const existingClients = normalizeClientsResponse(
         await requireApiClient().request<ClientsResponse>('/v1/clients'),
       );
+      const currentOrganization =
+        organizationQuery.data ?? (await organizationQuery.refetch()).data;
+      const countryCode = currentOrganization?.location?.countryCode;
+      if (!countryCode) {
+        openDialog(
+          'Ubicación necesaria',
+          'Configura el país de la sucursal antes de importar contactos.',
+        );
+        return;
+      }
       const knownPhones = new Set(
         existingClients.clients
-          .map((client) => normalizedPhone(client.phone ?? undefined))
+          .map((client) => phoneNumberToE164(client.phone, countryCode))
           .filter((phone): phone is string => Boolean(phone)),
       );
       const importable = contacts.flatMap((contact) => {
         const fullName = contact.fullName?.trim();
         const phone = contact.phones
-          .find((item) => normalizedPhone(item.number))
-          ?.number?.trim();
-        const phoneKey = normalizedPhone(phone);
-        if (!fullName || !phone || !phoneKey || knownPhones.has(phoneKey)) {
+          .map((item) => phoneNumberToE164(item.number, countryCode))
+          .find((item): item is string => Boolean(item));
+        if (!fullName || !phone || knownPhones.has(phone)) {
           return [];
         }
-        knownPhones.add(phoneKey);
+        knownPhones.add(phone);
         return [{ fullName, id: contact.id, phone }];
       });
       if (!importable.length) {
@@ -189,44 +203,17 @@ export default function ClientsScreen() {
         return;
       }
       setImportCandidates(importable);
-      setSelectedImportContactIds(importable.map((contact) => contact.id));
+      setSelectedImportContactIds([]);
       setIsContactImportOpen(true);
-      return;
-      /* Legacy single-picker import flow retained only for source history.
-      const importedClients: ClientRecord[] = [];
-      for (const contact of importable) {
-        const response = await requireApiClient().request<{
-          readonly client: ClientRecord;
-        }>('/v1/clients', {
-          body: {
-            fullName: contact.fullName,
-            phone: contact.phone,
-          },
-          method: 'POST',
-        });
-        const importedClient = normalizeClientRecord(response.client);
-        if (!importedClient) {
-          throw new Error('El contacto importado no recibió datos válidos.');
-        }
-        importedClients.push(importedClient!);
-      }
-      await queryClient.invalidateQueries({ queryKey: ['clients'] });
-      openDialog(
-        'Contactos importados',
-        importedClients.length
-          ? 'Tus contactos ya est?n disponibles en Nava.'
-          : 'No encontramos contactos con nombre y tel?fono para importar.',
-      );
-      */
     } catch (error) {
       openDialog(
         'No pudimos importar los contactos',
-        error instanceof Error ? error.message : 'Int?ntalo nuevamente.',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
       );
     } finally {
       setIsImporting(false);
     }
-  }, [openDialog]);
+  }, [openDialog, organizationQuery]);
   const selectedImportContacts = useMemo(() => {
     const selectedIds = new Set(selectedImportContactIds);
     return importCandidates.filter((contact) => selectedIds.has(contact.id));
@@ -633,7 +620,7 @@ export default function ClientsScreen() {
           <TextInput
             accessibilityLabel="Buscar cliente"
             onChangeText={setSearch}
-            placeholder="Buscar por nombre o tel?fono"
+            placeholder="Buscar por nombre o teléfono"
             placeholderTextColor="#7b838d"
             style={styles.searchInput}
             value={search}
@@ -749,7 +736,7 @@ export default function ClientsScreen() {
                       {client.lastName ? ' ' + client.lastName : ''}
                     </Text>
                     <Text style={styles.clientPhone}>
-                      {client.phone || 'Sin tel?fono registrado'}
+                      {client.phone || 'Sin teléfono registrado'}
                     </Text>
                     {client.labels.length ? (
                       <View style={styles.clientLabels}>
@@ -993,7 +980,9 @@ function ContactImportSheet({
               Importar contactos
             </Text>
             <Text style={styles.importCopy}>
-              Selecciona los contactos que quieres guardar en Nava.
+              Selecciona los contactos que quieres guardar. Solo enviaremos su
+              nombre y teléfono a tu negocio en Nava; luego podrás eliminarlos
+              desde Clientes.
             </Text>
             <View style={styles.importSearchBox}>
               <Ionicons color="#69717D" name="search-outline" size={20} />

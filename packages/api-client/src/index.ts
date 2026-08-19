@@ -509,6 +509,7 @@ export interface ApiMessageResponse {
 
 export interface CurrentOrganizationResponse {
   readonly location: {
+    readonly countryCode: string;
     readonly currencyCode: string;
     readonly id: string;
     readonly name: string;

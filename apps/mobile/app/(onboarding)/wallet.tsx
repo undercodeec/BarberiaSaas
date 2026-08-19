@@ -31,6 +31,7 @@ import {
 } from '../../src/components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { requireApiClient } from '../../src/lib/api';
+import { settlementPeriodForTimeZone } from '../../src/lib/calendar-date';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 export default function WalletScreen() {
@@ -66,9 +67,13 @@ export default function WalletScreen() {
   >('cash');
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
-  const today = new Date().toISOString().slice(0, 10);
-  const [periodStart, setPeriodStart] = useState(`${today.slice(0, 8)}01`);
-  const [periodEnd, setPeriodEnd] = useState(today);
+  const [initialPeriod] = useState(() =>
+    settlementPeriodForTimeZone(
+      Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'America/Guayaquil',
+    ),
+  );
+  const [periodStart, setPeriodStart] = useState(initialPeriod.periodStart);
+  const [periodEnd, setPeriodEnd] = useState(initialPeriod.periodEnd);
   const summaryQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -111,6 +116,11 @@ export default function WalletScreen() {
   });
   const refreshPayphone = () =>
     queryClient.invalidateQueries({ queryKey: ['payphone-configuration'] });
+  const closePayphoneSheet = () => {
+    setPayphoneSheetOpen(false);
+    setPayphoneStoreId('');
+    setPayphoneToken('');
+  };
   const savePayphone = useMutation({
     mutationFn: () =>
       requireApiClient().request<PayphoneConfigurationResponse>(
@@ -180,9 +190,7 @@ export default function WalletScreen() {
         error instanceof Error ? error.message : 'Intentalo nuevamente.',
       ),
     onSuccess: async () => {
-      setPayphoneSheetOpen(false);
-      setPayphoneStoreId('');
-      setPayphoneToken('');
+      closePayphoneSheet();
       await refreshPayphone();
     },
   });
@@ -206,6 +214,17 @@ export default function WalletScreen() {
   );
   const refreshCommissions = () =>
     queryClient.invalidateQueries({ queryKey: ['commission-overview'] });
+  const openSettlementSheet = () => {
+    const timeZone =
+      organizationQuery.data?.location?.timezone ??
+      organizationQuery.data?.organization.defaultTimezone ??
+      Intl.DateTimeFormat().resolvedOptions().timeZone ??
+      'America/Guayaquil';
+    const period = settlementPeriodForTimeZone(timeZone);
+    setPeriodStart(period.periodStart);
+    setPeriodEnd(period.periodEnd);
+    setSheetMode('settlement');
+  };
   const createAdvance = useMutation({
     mutationFn: async () => {
       if (!effectiveProfessional) throw new Error('Selecciona un profesional.');
@@ -538,7 +557,7 @@ export default function WalletScreen() {
                     </Pressable>
                     <Pressable
                       accessibilityLabel="Crear liquidación de comisión"
-                      onPress={() => setSheetMode('settlement')}
+                      onPress={openSettlementSheet}
                       style={styles.primaryAction}
                     >
                       <Text style={styles.primaryActionText}>
@@ -711,7 +730,6 @@ export default function WalletScreen() {
               <Pressable
                 accessibilityLabel="Configurar PayPhone"
                 onPress={() => {
-                  const configuration = payphoneQuery.data?.configuration;
                   setPayphoneStoreId('');
                   setPayphoneToken('');
                   setPayphoneSheetOpen(true);
@@ -727,7 +745,7 @@ export default function WalletScreen() {
       <Modal
         animationType="slide"
         navigationBarTranslucent
-        onRequestClose={() => setPayphoneSheetOpen(false)}
+        onRequestClose={closePayphoneSheet}
         statusBarTranslucent
         transparent
         visible={payphoneSheetOpen}
@@ -739,7 +757,7 @@ export default function WalletScreen() {
         <View style={styles.modalRoot}>
           <Pressable
             accessibilityLabel="Cerrar configuracion PayPhone"
-            onPress={() => setPayphoneSheetOpen(false)}
+            onPress={closePayphoneSheet}
             style={styles.modalBackdrop}
           />
           <ScrollView

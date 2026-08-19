@@ -22,6 +22,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { appTheme, goldButtonShadow, goldShadow } from './BottomNavigation';
+import { useCurrentOrganization } from '../features/organization/useCurrentOrganization';
 import { requireApiClient } from '../lib/api';
 import { notificationDestination } from '../lib/notification-navigation';
 import { useAuth } from '../providers/AuthProvider';
@@ -55,6 +56,7 @@ export function GlobalNotificationsBanner() {
   const { height, width } = useWindowDimensions();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const organizationQuery = useCurrentOrganization();
   const [isOpen, setIsOpen] = useState(false);
   const [isTriggerPositionReady, setIsTriggerPositionReady] = useState(false);
   const [borderDotProgress] = useState(() => new Animated.Value(0));
@@ -242,7 +244,11 @@ export function GlobalNotificationsBanner() {
   const openNotification = (notification: AppNotificationRecord) => {
     if (!notification.readAt) void markRead.mutateAsync(notification.id);
     closeBanner();
-    router.push(notificationDestination(notification.data) as never);
+    const destination = notificationDestination(
+      notification.data,
+      organizationQuery.data?.membership.role,
+    );
+    if (destination) router.push(destination as never);
   };
 
   if (!session) return null;

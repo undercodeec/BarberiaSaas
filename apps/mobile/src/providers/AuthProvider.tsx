@@ -27,6 +27,8 @@ import {
   requireApiClient,
   storeSessionToken,
 } from '../lib/api';
+import { revokeCurrentDevicePushToken } from '../lib/push-notifications';
+import { runSessionSignOut } from '../lib/session-sign-out';
 
 interface AuthContextValue {
   readonly configurationError: string | null;
@@ -117,11 +119,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const signOut = useCallback(async () => {
     try {
-      await requireApiClient().request<void>('/v1/auth/logout', {
-        method: 'POST',
+      await runSessionSignOut({
+        clearLocalSession: clearSessionToken,
+        logoutFromApi: () =>
+          requireApiClient().request<void>('/v1/auth/logout', {
+            method: 'POST',
+          }),
+        revokePushToken: revokeCurrentDevicePushToken,
       });
     } finally {
-      await clearSessionToken();
       setSession(null);
       setShowNotificationsAfterSignIn(false);
       setUser(null);

@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../../src/lib/api';
 import { notificationDestination } from '../../src/lib/notification-navigation';
 
@@ -29,6 +30,7 @@ function relativeDate(value: string) {
 export default function NotificationsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const organizationQuery = useCurrentOrganization();
   const query = useQuery({
     queryFn: () =>
       requireApiClient().request<AppNotificationsResponse>('/v1/notifications'),
@@ -53,7 +55,11 @@ export default function NotificationsScreen() {
   });
   const open = (notification: AppNotificationRecord) => {
     if (!notification.readAt) void markRead.mutateAsync(notification.id);
-    router.push(notificationDestination(notification.data) as never);
+    const destination = notificationDestination(
+      notification.data,
+      organizationQuery.data?.membership.role,
+    );
+    if (destination) router.push(destination as never);
   };
   const unread =
     query.data?.notifications.filter((notification) => !notification.readAt)

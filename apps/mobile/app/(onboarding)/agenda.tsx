@@ -32,7 +32,6 @@ import {
   appStyles,
   appTheme,
   BottomNavigation,
-  goldButtonShadow,
   goldShadow,
   useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
@@ -252,6 +251,7 @@ export default function AgendaScreen() {
     'UTC';
   const today = useMemo(() => calendarDateForTimeZone(timeZone), [timeZone]);
   const [selectedDay, setSelectedDay] = useState(today);
+  const [calendarMonth, setCalendarMonth] = useState(today);
   const notificationDay = useMemo(() => {
     if (!notificationDate) return null;
     const startsAt = new Date(notificationDate);
@@ -260,6 +260,9 @@ export default function AgendaScreen() {
   }, [notificationDate, timeZone]);
   useEffect(() => {
     if (!notificationDay) return;
+    // El parámetro de navegación es un evento externo que puede cambiar con la
+    // pantalla montada y debe sincronizar ambos controles del calendario.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedDay(notificationDay);
     setCalendarMonth(notificationDay);
   }, [notificationDay]);
@@ -280,7 +283,6 @@ export default function AgendaScreen() {
   const [manualPaymentConfirmed, setManualPaymentConfirmed] = useState(false);
   const [manualPaymentNote, setManualPaymentNote] = useState('');
   const [manualPaymentReference, setManualPaymentReference] = useState('');
-  const [calendarMonth, setCalendarMonth] = useState(today);
   const [dayContentOpacity] = useState(() => new Animated.Value(1));
   const [timelineTransitionX] = useState(() => new Animated.Value(0));
   const [settingsSheetTranslateY] = useState(() => new Animated.Value(0));
@@ -843,7 +845,7 @@ export default function AgendaScreen() {
               ))
             ) : (
               <Text style={styles.emptySchedule}>
-                No hay horarios de atenci?n configurados para este dia.
+                No hay horarios de atención configurados para este día.
               </Text>
             )}
           </View>

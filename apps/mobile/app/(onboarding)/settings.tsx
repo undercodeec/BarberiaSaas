@@ -152,8 +152,6 @@ export default function SettingsScreen() {
     }
   };
   const logout = () => {
-    void performLogout();
-    return;
     const message =
       '¿Estás seguro de que deseas cerrar sesión en este dispositivo?';
     if (Platform.OS === 'web') {

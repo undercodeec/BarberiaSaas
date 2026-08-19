@@ -1,3 +1,6 @@
+import java.security.KeyStore
+import java.security.MessageDigest
+
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
@@ -106,6 +109,72 @@ def hasUploadSigning = [
     findProperty('NAVA_UPLOAD_STORE_PASSWORD'),
     findProperty('NAVA_UPLOAD_KEY_PASSWORD'),
 ].every { it != null && !it.toString().trim().isEmpty() }
+def expectedUploadCertificateSha256 = findProperty('NAVA_UPLOAD_CERT_SHA256')
+def hasExpectedUploadCertificate = expectedUploadCertificateSha256 != null &&
+    !expectedUploadCertificateSha256.toString().trim().isEmpty()
+
+def uploadCertificateSha256 = { File storePath, String storePassword, String keyAlias ->
+    if (!storePath.isFile()) {
+        throw new GradleException('Release bloqueado: no se encontró el keystore de producción.')
+    }
+    def certificate = null
+    def lastError = null
+    ['PKCS12', 'JKS'].find { storeType ->
+        try {
+            def keyStore = KeyStore.getInstance(storeType)
+            storePath.withInputStream { stream ->
+                keyStore.load(stream, storePassword.toCharArray())
+            }
+            certificate = keyStore.getCertificate(keyAlias)
+            if (certificate == null) {
+                throw new GradleException('El alias de firma no existe en el keystore.')
+            }
+            return true
+        } catch (Exception error) {
+            lastError = error
+            certificate = null
+            return false
+        }
+    }
+    if (certificate == null) {
+        throw new GradleException('Release bloqueado: no se pudo validar el certificado de upload.', lastError)
+    }
+    return MessageDigest.getInstance('SHA-256')
+        .digest(certificate.getEncoded())
+        .collect { String.format('%02X', it) }
+        .join('')
+}
+
+gradle.taskGraph.whenReady { taskGraph ->
+    def buildsReleaseArtifact = taskGraph.allTasks.any { task ->
+        def taskName = task.name.toLowerCase()
+        (taskName.startsWith('assemble') || taskName.startsWith('bundle') || taskName.startsWith('package')) &&
+            taskName.contains('release')
+    }
+    if (buildsReleaseArtifact && (!hasUploadSigning || !hasExpectedUploadCertificate)) {
+        throw new GradleException(
+            'Release bloqueado: configure NAVA_UPLOAD_STORE_FILE, NAVA_UPLOAD_KEY_ALIAS, ' +
+                'NAVA_UPLOAD_STORE_PASSWORD, NAVA_UPLOAD_KEY_PASSWORD y NAVA_UPLOAD_CERT_SHA256.'
+        )
+    }
+    if (buildsReleaseArtifact) {
+        def expected = expectedUploadCertificateSha256.toString()
+            .replace(':', '')
+            .trim()
+            .toUpperCase()
+        if (!(expected ==~ /[0-9A-F]{64}/)) {
+            throw new GradleException('Release bloqueado: NAVA_UPLOAD_CERT_SHA256 no es válido.')
+        }
+        def actual = uploadCertificateSha256(
+            file(uploadStoreFile),
+            findProperty('NAVA_UPLOAD_STORE_PASSWORD').toString(),
+            findProperty('NAVA_UPLOAD_KEY_ALIAS').toString(),
+        )
+        if (actual != expected) {
+            throw new GradleException('Release bloqueado: el certificado de upload no coincide con el esperado.')
+        }
+    }
+}
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -145,14 +214,7 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            if (hasUploadSigning) {
-                signingConfig signingConfigs.release
-            } else {
-                // Permite instalar builds locales de desarrollo sin las credenciales
-                // privadas de lanzamiento. EAS sustituye esta firma con sus
-                // credenciales administradas al generar una distribución.
-                signingConfig signingConfigs.debug
-            }
+            signingConfig signingConfigs.release
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
