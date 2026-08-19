@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Redirect, Stack, useSegments } from 'expo-router';
 
 import { requireApiClient } from '../../src/lib/api';
+import { accountQueryKey } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const setupRoutes = new Set([
@@ -21,7 +22,7 @@ export default function OnboardingLayout() {
       requireApiClient().request<OnboardingAccountDetailsResponse>(
         '/v1/onboarding/account-details',
       ),
-    queryKey: ['onboarding-account-details', user?.id],
+    queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
     refetchOnMount: 'always',
     staleTime: 0,
   });

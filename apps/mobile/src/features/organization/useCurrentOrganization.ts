@@ -2,6 +2,7 @@ import type { CurrentOrganizationResponse } from '@barber-saas/api-client';
 import { useQuery } from '@tanstack/react-query';
 
 import { requireApiClient } from '../../lib/api';
+import { accountQueryKey } from '../../lib/query-keys';
 import { useAuth } from '../../providers/AuthProvider';
 
 export function useCurrentOrganization() {
@@ -14,6 +15,6 @@ export function useCurrentOrganization() {
       >('/v1/organizations/current');
       return response.organization ? response : null;
     },
-    queryKey: ['current-organization', user?.id],
+    queryKey: accountQueryKey(user?.id, 'current-organization'),
   });
 }

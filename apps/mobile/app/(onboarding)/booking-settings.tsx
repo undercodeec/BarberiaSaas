@@ -14,10 +14,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { appStyles, appTheme, goldButtonShadow } from '../../src/components/BottomNavigation';
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { requireApiClient } from '../../src/lib/api';
+import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 const reminderOptions = [
   [1440, '24 h'],
@@ -36,6 +42,7 @@ const leadOptions = [
 
 export default function BookingSettingsScreen() {
   const { session } = useAuth();
+  const tenant = useTenantScope();
   const router = useRouter();
   const queryClient = useQueryClient();
   const settingsQuery = useQuery({
@@ -44,7 +51,7 @@ export default function BookingSettingsScreen() {
       requireApiClient().request<BookingSettingsResponse>(
         '/v1/booking-settings',
       ),
-    queryKey: ['booking-settings'],
+    queryKey: tenant.key('booking-settings'),
   });
   const [draft, setDraft] = useState<BookingSettingsResponse | null>(null);
   const current = draft ?? settingsQuery.data ?? null;
@@ -72,7 +79,9 @@ export default function BookingSettingsScreen() {
       ),
     onSuccess: async (settings) => {
       setDraft(settings);
-      await queryClient.invalidateQueries({ queryKey: ['booking-settings'] });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('booking-settings'),
+      });
       Alert.alert(
         'Configuración guardada',
         'Las nuevas reservas usarán estas reglas.',
@@ -123,7 +132,10 @@ export default function BookingSettingsScreen() {
                 onValueChange={(confirmationEnabled) =>
                   setDraft({ ...current, confirmationEnabled })
                 }
-                trackColor={{ false: appTheme.colors.border, true: appTheme.colors.text }}
+                trackColor={{
+                  false: appTheme.colors.border,
+                  true: appTheme.colors.text,
+                }}
                 value={current.confirmationEnabled}
               />
             </View>
@@ -292,7 +304,11 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  cardDescription: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 4 },
+  cardDescription: {
+    color: appTheme.colors.textMuted,
+    fontSize: 13,
+    marginTop: 4,
+  },
   cardTitle: { color: appTheme.colors.text, fontSize: 15, fontWeight: '900' },
   content: { padding: 20, paddingBottom: 130 },
   disabled: { opacity: 0.35 },
@@ -337,7 +353,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  optionSelected: { backgroundColor: appTheme.colors.accentWash, borderColor: appTheme.colors.accentWash },
+  optionSelected: {
+    backgroundColor: appTheme.colors.accentWash,
+    borderColor: appTheme.colors.accentWash,
+  },
   optionText: { color: appTheme.colors.text, fontSize: 12, fontWeight: '800' },
   optionTextSelected: { color: appTheme.colors.text },
   policyInput: {
@@ -360,7 +379,11 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  saveText: { color: appTheme.colors.accentDark, fontSize: 16, fontWeight: '900' },
+  saveText: {
+    color: appTheme.colors.accentDark,
+    fontSize: 16,
+    fontWeight: '900',
+  },
   screen: appStyles.screen,
   sectionTitle: {
     color: appTheme.colors.text,

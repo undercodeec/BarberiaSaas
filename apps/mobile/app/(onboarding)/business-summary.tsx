@@ -21,6 +21,7 @@ import {
 } from '../../src/components/BottomNavigation';
 import { InlineMessage } from '../../src/components/InlineMessage';
 import { requireApiClient } from '../../src/lib/api';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 type Preset = BusinessSummaryResponse['period']['preset'];
@@ -53,6 +54,7 @@ function percentage(value: number, total: number) {
 }
 
 export default function BusinessSummaryScreen() {
+  const tenant = useTenantScope();
   const router = useRouter();
   const layout = useNativeLayoutMetrics();
   const { session } = useAuth();
@@ -69,7 +71,7 @@ export default function BusinessSummaryScreen() {
         `/v1/reports/business-summary?range=${preset}${location}`,
       );
     },
-    queryKey: ['business-summary', preset, locationId],
+    queryKey: tenant.key('business-summary', preset),
   });
   if (!session) return <Redirect href="/(auth)/login" />;
 

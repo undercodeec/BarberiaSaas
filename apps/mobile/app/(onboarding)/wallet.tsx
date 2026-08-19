@@ -3,7 +3,6 @@ import type {
   CashRegisterHistoryResponse,
   CashRegisterSummaryResponse,
   CommissionOverviewResponse,
-  CurrentOrganizationResponse,
   PayphoneConfigurationResponse,
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -30,15 +29,19 @@ import {
   useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
+import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../../src/lib/api';
 import { settlementPeriodForTimeZone } from '../../src/lib/calendar-date';
+import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 export default function WalletScreen() {
   const router = useRouter();
   const layout = useNativeLayoutMetrics();
   const searchParams = useLocalSearchParams<{ tab?: string | string[] }>();
   const { session } = useAuth();
+  const tenant = useTenantScope();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<
     'commissions' | 'history' | 'settings' | 'summary'
@@ -80,7 +83,7 @@ export default function WalletScreen() {
       requireApiClient().request<CashRegisterSummaryResponse>(
         '/v1/cash-register/summary',
       ),
-    queryKey: ['cash-register-summary'],
+    queryKey: tenant.key('cash-register-summary'),
   });
   const historyQuery = useQuery({
     enabled: Boolean(session) && tab === 'history',
@@ -88,23 +91,16 @@ export default function WalletScreen() {
       requireApiClient().request<CashRegisterHistoryResponse>(
         '/v1/cash-register/history',
       ),
-    queryKey: ['cash-register-history'],
+    queryKey: tenant.key('cash-register-history'),
   });
-  const organizationQuery = useQuery({
-    enabled: Boolean(session),
-    queryFn: () =>
-      requireApiClient().request<CurrentOrganizationResponse>(
-        '/v1/organizations/current',
-      ),
-    queryKey: ['current-organization'],
-  });
+  const organizationQuery = useCurrentOrganization();
   const commissionsQuery = useQuery({
     enabled: Boolean(session) && tab === 'commissions',
     queryFn: () =>
       requireApiClient().request<CommissionOverviewResponse>(
         '/v1/commissions/overview',
       ),
-    queryKey: ['commission-overview'],
+    queryKey: tenant.key('commission-overview'),
   });
   const payphoneQuery = useQuery({
     enabled: Boolean(session) && tab === 'settings',
@@ -112,10 +108,12 @@ export default function WalletScreen() {
       requireApiClient().request<PayphoneConfigurationResponse>(
         '/v1/payphone/configuration',
       ),
-    queryKey: ['payphone-configuration'],
+    queryKey: tenant.key('payphone-configuration'),
   });
   const refreshPayphone = () =>
-    queryClient.invalidateQueries({ queryKey: ['payphone-configuration'] });
+    queryClient.invalidateQueries({
+      queryKey: tenantQueryPrefix('payphone-configuration'),
+    });
   const closePayphoneSheet = () => {
     setPayphoneSheetOpen(false);
     setPayphoneStoreId('');
@@ -213,7 +211,9 @@ export default function WalletScreen() {
     (entry) => entry.professionalMembershipId === effectiveProfessional?.id,
   );
   const refreshCommissions = () =>
-    queryClient.invalidateQueries({ queryKey: ['commission-overview'] });
+    queryClient.invalidateQueries({
+      queryKey: tenantQueryPrefix('commission-overview'),
+    });
   const openSettlementSheet = () => {
     const timeZone =
       organizationQuery.data?.location?.timezone ??
@@ -250,7 +250,9 @@ export default function WalletScreen() {
     onSuccess: async () => {
       await Promise.all([
         refreshCommissions(),
-        queryClient.invalidateQueries({ queryKey: ['cash-register-summary'] }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('cash-register-summary'),
+        }),
       ]);
       setSheetMode(null);
       setAmount('');
@@ -304,7 +306,9 @@ export default function WalletScreen() {
     onSuccess: async () => {
       await Promise.all([
         refreshCommissions(),
-        queryClient.invalidateQueries({ queryKey: ['cash-register-summary'] }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('cash-register-summary'),
+        }),
       ]);
     },
   });
@@ -754,164 +758,166 @@ export default function WalletScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalKeyboard}
         >
-        <View style={styles.modalRoot}>
-          <Pressable
-            accessibilityLabel="Cerrar configuracion PayPhone"
-            onPress={closePayphoneSheet}
-            style={styles.modalBackdrop}
-          />
-          <ScrollView
-            contentContainerStyle={[
-              styles.payphoneSheet,
-              { paddingBottom: layout.bottomInset + 20 },
-            ]}
-            keyboardShouldPersistTaps="handled"
-            style={[
-              styles.sheetViewport,
-              { maxHeight: layout.sheetMaxHeight },
-            ]}
-          >
-            <Text style={styles.sheetTitle}>Configurar PayPhone</Text>
-            <Text style={styles.sheetCopy}>
-              Ingresa las credenciales de PayPhone Business de este negocio. El
-              Token se cifra en el servidor y nunca se mostrara nuevamente.
-            </Text>
-            <View style={styles.payphoneGuide}>
-              <Text style={styles.payphoneGuideTitle}>
-                Como obtener tu Token y StoreID
-              </Text>
-              <Text style={styles.payphoneGuideStep}>
-                1. Ingresa a PayPhone Business con una cuenta administradora y
-                crea un usuario con rol Desarrollador.
-              </Text>
-              <Text style={styles.payphoneGuideStep}>
-                2. Ingresa a PayPhone Developer con ese usuario y pulsa Agregar
-                para crear una aplicacion.
-              </Text>
-              <Text style={styles.payphoneGuideStep}>
-                3. Selecciona tipo de aplicacion API, completa los datos y
-                guarda. PayPhone determina el ambiente con esas credenciales.
-              </Text>
-              <Text style={styles.payphoneGuideStep}>
-                4. Abre Credenciales, copia solamente Token y StoreID, y pegalos
-                abajo. No compartas el Token con nadie.
-              </Text>
-              <Pressable
-                accessibilityLabel="Ver video de configuracion de PayPhone"
-                onPress={() =>
-                  void Linking.openURL(
-                    'https://www.youtube.com/watch?v=Y7KCMq91QPk&list=PL5vPkGVDdQxRw-tRc5gocIEj9E2iv6fts&index=2',
-                  )
-                }
-              >
-                <Text style={styles.linkText}>
-                  Ver video guia — mira solo del minuto 1:00 al 4:00
-                </Text>
-              </Pressable>
-              <Text style={styles.payphoneGuideNote}>
-                El resto del video no es necesario para Nava: solo necesitas los
-                campos Token y StoreID. Nava genera el enlace de cobro, pero
-                PayPhone no comunica automáticamente el resultado. Verifica la
-                transacción en PayPhone Business antes de registrarla como
-                pagada.
-              </Text>
-            </View>
-            <Text style={styles.inputLabel}>Ambiente</Text>
-
-            <Text style={styles.inputLabel}>StoreID</Text>
-            <TextInput
-              autoCapitalize="none"
-              editable={!savePayphone.isPending}
-              onChangeText={setPayphoneStoreId}
-              placeholder="StoreID de PayPhone"
-              placeholderTextColor={appTheme.colors.textMuted}
-              style={styles.input}
-              value={payphoneStoreId}
-            />
-            <Text style={styles.inputLabel}>Token</Text>
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!savePayphone.isPending}
-              onChangeText={setPayphoneToken}
-              placeholder={
-                payphoneQuery.data?.configuration
-                  ? 'Nuevo Token para rotarlo'
-                  : 'Token de PayPhone'
-              }
-              placeholderTextColor={appTheme.colors.textMuted}
-              secureTextEntry
-              style={styles.input}
-              value={payphoneToken}
-            />
+          <View style={styles.modalRoot}>
             <Pressable
-              disabled={
-                !payphoneStoreId.trim() ||
-                !payphoneToken.trim() ||
-                savePayphone.isPending ||
-                !payphoneQuery.data?.encryptionConfigured
-              }
-              onPress={() => savePayphone.mutate()}
-              style={styles.confirmButton}
+              accessibilityLabel="Cerrar configuracion PayPhone"
+              onPress={closePayphoneSheet}
+              style={styles.modalBackdrop}
+            />
+            <ScrollView
+              contentContainerStyle={[
+                styles.payphoneSheet,
+                { paddingBottom: layout.bottomInset + 20 },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              style={[
+                styles.sheetViewport,
+                { maxHeight: layout.sheetMaxHeight },
+              ]}
             >
-              <Text style={styles.confirmButtonText}>
-                {savePayphone.isPending
-                  ? 'Guardando...'
-                  : 'Guardar credenciales'}
+              <Text style={styles.sheetTitle}>Configurar PayPhone</Text>
+              <Text style={styles.sheetCopy}>
+                Ingresa las credenciales de PayPhone Business de este negocio.
+                El Token se cifra en el servidor y nunca se mostrara nuevamente.
               </Text>
-            </Pressable>
-            {payphoneQuery.data?.configuration ? (
-              <>
+              <View style={styles.payphoneGuide}>
+                <Text style={styles.payphoneGuideTitle}>
+                  Como obtener tu Token y StoreID
+                </Text>
+                <Text style={styles.payphoneGuideStep}>
+                  1. Ingresa a PayPhone Business con una cuenta administradora y
+                  crea un usuario con rol Desarrollador.
+                </Text>
+                <Text style={styles.payphoneGuideStep}>
+                  2. Ingresa a PayPhone Developer con ese usuario y pulsa
+                  Agregar para crear una aplicacion.
+                </Text>
+                <Text style={styles.payphoneGuideStep}>
+                  3. Selecciona tipo de aplicacion API, completa los datos y
+                  guarda. PayPhone determina el ambiente con esas credenciales.
+                </Text>
+                <Text style={styles.payphoneGuideStep}>
+                  4. Abre Credenciales, copia solamente Token y StoreID, y
+                  pegalos abajo. No compartas el Token con nadie.
+                </Text>
                 <Pressable
-                  disabled={testPayphone.isPending}
-                  onPress={() => testPayphone.mutate()}
-                  style={styles.secondaryAction}
-                >
-                  <Text style={styles.secondaryActionText}>
-                    {testPayphone.isPending ? 'Probando...' : 'Probar conexion'}
-                  </Text>
-                </Pressable>
-                {payphoneQuery.data.configuration.status === 'connected' ? (
-                  <Pressable
-                    disabled={setPayphoneEnabled.isPending}
-                    onPress={() =>
-                      setPayphoneEnabled.mutate(
-                        !payphoneQuery.data?.configuration?.isEnabled,
-                      )
-                    }
-                    style={styles.confirmButton}
-                  >
-                    <Text style={styles.confirmButtonText}>
-                      {payphoneQuery.data.configuration.isEnabled
-                        ? 'Desactivar PayPhone'
-                        : 'Activar PayPhone'}
-                    </Text>
-                  </Pressable>
-                ) : null}
-                <Pressable
-                  disabled={disconnectPayphone.isPending}
+                  accessibilityLabel="Ver video de configuracion de PayPhone"
                   onPress={() =>
-                    Alert.alert(
-                      'Desconectar PayPhone',
-                      'Se eliminara el Token cifrado de este negocio.',
-                      [
-                        { style: 'cancel', text: 'Cancelar' },
-                        {
-                          onPress: () => disconnectPayphone.mutate(),
-                          style: 'destructive',
-                          text: 'Desconectar',
-                        },
-                      ],
+                    void Linking.openURL(
+                      'https://www.youtube.com/watch?v=Y7KCMq91QPk&list=PL5vPkGVDdQxRw-tRc5gocIEj9E2iv6fts&index=2',
                     )
                   }
-                  style={styles.dangerButton}
                 >
-                  <Text style={styles.dangerText}>Desconectar PayPhone</Text>
+                  <Text style={styles.linkText}>
+                    Ver video guia — mira solo del minuto 1:00 al 4:00
+                  </Text>
                 </Pressable>
-              </>
-            ) : null}
-          </ScrollView>
-        </View>
+                <Text style={styles.payphoneGuideNote}>
+                  El resto del video no es necesario para Nava: solo necesitas
+                  los campos Token y StoreID. Nava genera el enlace de cobro,
+                  pero PayPhone no comunica automáticamente el resultado.
+                  Verifica la transacción en PayPhone Business antes de
+                  registrarla como pagada.
+                </Text>
+              </View>
+              <Text style={styles.inputLabel}>Ambiente</Text>
+
+              <Text style={styles.inputLabel}>StoreID</Text>
+              <TextInput
+                autoCapitalize="none"
+                editable={!savePayphone.isPending}
+                onChangeText={setPayphoneStoreId}
+                placeholder="StoreID de PayPhone"
+                placeholderTextColor={appTheme.colors.textMuted}
+                style={styles.input}
+                value={payphoneStoreId}
+              />
+              <Text style={styles.inputLabel}>Token</Text>
+              <TextInput
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!savePayphone.isPending}
+                onChangeText={setPayphoneToken}
+                placeholder={
+                  payphoneQuery.data?.configuration
+                    ? 'Nuevo Token para rotarlo'
+                    : 'Token de PayPhone'
+                }
+                placeholderTextColor={appTheme.colors.textMuted}
+                secureTextEntry
+                style={styles.input}
+                value={payphoneToken}
+              />
+              <Pressable
+                disabled={
+                  !payphoneStoreId.trim() ||
+                  !payphoneToken.trim() ||
+                  savePayphone.isPending ||
+                  !payphoneQuery.data?.encryptionConfigured
+                }
+                onPress={() => savePayphone.mutate()}
+                style={styles.confirmButton}
+              >
+                <Text style={styles.confirmButtonText}>
+                  {savePayphone.isPending
+                    ? 'Guardando...'
+                    : 'Guardar credenciales'}
+                </Text>
+              </Pressable>
+              {payphoneQuery.data?.configuration ? (
+                <>
+                  <Pressable
+                    disabled={testPayphone.isPending}
+                    onPress={() => testPayphone.mutate()}
+                    style={styles.secondaryAction}
+                  >
+                    <Text style={styles.secondaryActionText}>
+                      {testPayphone.isPending
+                        ? 'Probando...'
+                        : 'Probar conexion'}
+                    </Text>
+                  </Pressable>
+                  {payphoneQuery.data.configuration.status === 'connected' ? (
+                    <Pressable
+                      disabled={setPayphoneEnabled.isPending}
+                      onPress={() =>
+                        setPayphoneEnabled.mutate(
+                          !payphoneQuery.data?.configuration?.isEnabled,
+                        )
+                      }
+                      style={styles.confirmButton}
+                    >
+                      <Text style={styles.confirmButtonText}>
+                        {payphoneQuery.data.configuration.isEnabled
+                          ? 'Desactivar PayPhone'
+                          : 'Activar PayPhone'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  <Pressable
+                    disabled={disconnectPayphone.isPending}
+                    onPress={() =>
+                      Alert.alert(
+                        'Desconectar PayPhone',
+                        'Se eliminara el Token cifrado de este negocio.',
+                        [
+                          { style: 'cancel', text: 'Cancelar' },
+                          {
+                            onPress: () => disconnectPayphone.mutate(),
+                            style: 'destructive',
+                            text: 'Desconectar',
+                          },
+                        ],
+                      )
+                    }
+                    style={styles.dangerButton}
+                  >
+                    <Text style={styles.dangerText}>Desconectar PayPhone</Text>
+                  </Pressable>
+                </>
+              ) : null}
+            </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
       <Modal
@@ -926,133 +932,133 @@ export default function WalletScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalKeyboard}
         >
-        <View style={styles.modalRoot}>
-          <Pressable
-            accessibilityLabel="Cerrar formulario"
-            onPress={() => setSheetMode(null)}
-            style={styles.modalBackdrop}
-          />
-          <ScrollView
-            contentContainerStyle={[
-              styles.sheet,
-              { paddingBottom: layout.bottomInset + 18 },
-            ]}
-            keyboardShouldPersistTaps="handled"
-            style={[
-              styles.sheetViewport,
-              { maxHeight: layout.sheetMaxHeight },
-            ]}
-          >
-            <Text style={styles.sheetTitle}>
-              {sheetMode === 'advance'
-                ? 'Registrar anticipo'
-                : 'Crear liquidación'}
-            </Text>
-            <Text style={styles.sheetCopy}>
-              {effectiveProfessional?.name ?? 'Selecciona un profesional'}
-            </Text>
-            {sheetMode === 'advance' ? (
-              <>
-                <Text style={styles.inputLabel}>Monto</Text>
-                <TextInput
-                  accessibilityLabel="Monto del anticipo"
-                  keyboardType="decimal-pad"
-                  onChangeText={setAmount}
-                  placeholder="0.00"
-                  style={styles.input}
-                  value={amount}
-                />
-                <Text style={styles.inputLabel}>Método de entrega</Text>
-                <View style={styles.methodRow}>
-                  {(
-                    [
-                      ['cash', 'Efectivo'],
-                      ['transfer', 'Transferencia'],
-                      ['other', 'Otro'],
-                    ] as const
-                  ).map(([value, label]) => (
-                    <Pressable
-                      key={value}
-                      onPress={() => setPaymentMethod(value)}
-                      style={[
-                        styles.method,
-                        paymentMethod === value && styles.methodActive,
-                      ]}
-                    >
-                      <Text
-                        style={
-                          paymentMethod === value
-                            ? styles.methodTextActive
-                            : styles.methodText
-                        }
-                      >
-                        {label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-                <Text style={styles.inputLabel}>Referencia opcional</Text>
-                <TextInput
-                  accessibilityLabel="Referencia del anticipo"
-                  onChangeText={setReference}
-                  style={styles.input}
-                  value={reference}
-                />
-              </>
-            ) : (
-              <View style={styles.dateRow}>
-                <View style={styles.dateField}>
-                  <Text style={styles.inputLabel}>Desde</Text>
-                  <TextInput
-                    accessibilityLabel="Inicio del período"
-                    onChangeText={setPeriodStart}
-                    placeholder="AAAA-MM-DD"
-                    style={styles.input}
-                    value={periodStart}
-                  />
-                </View>
-                <View style={styles.dateField}>
-                  <Text style={styles.inputLabel}>Hasta</Text>
-                  <TextInput
-                    accessibilityLabel="Fin del período"
-                    onChangeText={setPeriodEnd}
-                    placeholder="AAAA-MM-DD"
-                    style={styles.input}
-                    value={periodEnd}
-                  />
-                </View>
-              </View>
-            )}
-            <Text style={styles.inputLabel}>Nota opcional</Text>
-            <TextInput
-              accessibilityLabel="Nota"
-              multiline
-              onChangeText={setNotes}
-              style={[styles.input, styles.notesInput]}
-              value={notes}
-            />
-            {sheetMode === 'advance' ? (
-              <Text style={styles.warningCopy}>
-                Este valor se descontará de futuras liquidaciones.
-              </Text>
-            ) : null}
+          <View style={styles.modalRoot}>
             <Pressable
-              disabled={createAdvance.isPending || createSettlement.isPending}
-              onPress={() =>
-                sheetMode === 'advance'
-                  ? createAdvance.mutate()
-                  : createSettlement.mutate()
-              }
-              style={styles.confirmButton}
+              accessibilityLabel="Cerrar formulario"
+              onPress={() => setSheetMode(null)}
+              style={styles.modalBackdrop}
+            />
+            <ScrollView
+              contentContainerStyle={[
+                styles.sheet,
+                { paddingBottom: layout.bottomInset + 18 },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              style={[
+                styles.sheetViewport,
+                { maxHeight: layout.sheetMaxHeight },
+              ]}
             >
-              <Text style={styles.confirmButtonText}>
-                {createAdvance.isPending || createSettlement.isPending
-                  ? 'Guardando...'
-                  : 'Confirmar'}
+              <Text style={styles.sheetTitle}>
+                {sheetMode === 'advance'
+                  ? 'Registrar anticipo'
+                  : 'Crear liquidación'}
               </Text>
-            </Pressable>
-          </ScrollView>
-        </View>
+              <Text style={styles.sheetCopy}>
+                {effectiveProfessional?.name ?? 'Selecciona un profesional'}
+              </Text>
+              {sheetMode === 'advance' ? (
+                <>
+                  <Text style={styles.inputLabel}>Monto</Text>
+                  <TextInput
+                    accessibilityLabel="Monto del anticipo"
+                    keyboardType="decimal-pad"
+                    onChangeText={setAmount}
+                    placeholder="0.00"
+                    style={styles.input}
+                    value={amount}
+                  />
+                  <Text style={styles.inputLabel}>Método de entrega</Text>
+                  <View style={styles.methodRow}>
+                    {(
+                      [
+                        ['cash', 'Efectivo'],
+                        ['transfer', 'Transferencia'],
+                        ['other', 'Otro'],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <Pressable
+                        key={value}
+                        onPress={() => setPaymentMethod(value)}
+                        style={[
+                          styles.method,
+                          paymentMethod === value && styles.methodActive,
+                        ]}
+                      >
+                        <Text
+                          style={
+                            paymentMethod === value
+                              ? styles.methodTextActive
+                              : styles.methodText
+                          }
+                        >
+                          {label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <Text style={styles.inputLabel}>Referencia opcional</Text>
+                  <TextInput
+                    accessibilityLabel="Referencia del anticipo"
+                    onChangeText={setReference}
+                    style={styles.input}
+                    value={reference}
+                  />
+                </>
+              ) : (
+                <View style={styles.dateRow}>
+                  <View style={styles.dateField}>
+                    <Text style={styles.inputLabel}>Desde</Text>
+                    <TextInput
+                      accessibilityLabel="Inicio del período"
+                      onChangeText={setPeriodStart}
+                      placeholder="AAAA-MM-DD"
+                      style={styles.input}
+                      value={periodStart}
+                    />
+                  </View>
+                  <View style={styles.dateField}>
+                    <Text style={styles.inputLabel}>Hasta</Text>
+                    <TextInput
+                      accessibilityLabel="Fin del período"
+                      onChangeText={setPeriodEnd}
+                      placeholder="AAAA-MM-DD"
+                      style={styles.input}
+                      value={periodEnd}
+                    />
+                  </View>
+                </View>
+              )}
+              <Text style={styles.inputLabel}>Nota opcional</Text>
+              <TextInput
+                accessibilityLabel="Nota"
+                multiline
+                onChangeText={setNotes}
+                style={[styles.input, styles.notesInput]}
+                value={notes}
+              />
+              {sheetMode === 'advance' ? (
+                <Text style={styles.warningCopy}>
+                  Este valor se descontará de futuras liquidaciones.
+                </Text>
+              ) : null}
+              <Pressable
+                disabled={createAdvance.isPending || createSettlement.isPending}
+                onPress={() =>
+                  sheetMode === 'advance'
+                    ? createAdvance.mutate()
+                    : createSettlement.mutate()
+                }
+                style={styles.confirmButton}
+              >
+                <Text style={styles.confirmButtonText}>
+                  {createAdvance.isPending || createSettlement.isPending
+                    ? 'Guardando...'
+                    : 'Confirmar'}
+                </Text>
+              </Pressable>
+            </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>

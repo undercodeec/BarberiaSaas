@@ -23,8 +23,10 @@ import {
   goldButtonShadow,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
+import { accountQueryKey } from '../../src/lib/query-keys';
 import { shareTemporaryExport } from '../../src/lib/temporary-export';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 type ReportMenuItem = {
@@ -173,7 +175,7 @@ export default function ReportsScreen() {
       requireApiClient().request<OnboardingAccountDetailsResponse>(
         '/v1/onboarding/account-details',
       ),
-    queryKey: ['onboarding-account-details', user?.id],
+    queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
   });
   const isSolo = accountQuery.data?.accountType === 'professional';
   const visibleReportSections = useMemo(
@@ -320,6 +322,7 @@ function MovementReportView({
   readonly kind: 'deposits' | 'expenses' | 'sales';
   readonly onBack: () => void;
 }) {
+  const tenant = useTenantScope();
   const [preset, setPreset] = useState<MovementPreset>('this_month');
   const [payment, setPayment] = useState<MovementPayment | null>(null);
   const [locationId, setLocationId] = useState<string | null>(null);
@@ -340,7 +343,7 @@ function MovementReportView({
       requireApiClient().request<MovementReportResponse>(
         `/v1/reports/movements?${queryString}`,
       ),
-    queryKey: ['movement-report', queryString],
+    queryKey: tenant.key('movement-report', queryString),
   });
   const report = reportQuery.data;
   const title =

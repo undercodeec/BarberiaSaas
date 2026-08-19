@@ -4,7 +4,6 @@ import type {
   AppointmentsResponse,
   CashRegisterSummaryResponse,
   CurrentCashRegisterResponse,
-  CurrentOrganizationResponse,
   GoogleMapsLocationCandidate,
   InventoryResponse,
   OnboardingAccountDetailsResponse,
@@ -54,7 +53,10 @@ import {
 import { requireApiClient } from '../../src/lib/api';
 import { BookingLinkSheet } from '../../src/components/BookingLinkSheet';
 import { BusinessLocationSheet } from '../../src/components/BusinessLocationSheet';
+import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { accountQueryKey } from '../../src/lib/query-keys';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SUBSCRIPTION_NOTICE_TRIAL_DAYS = 3;
@@ -1803,6 +1805,7 @@ export default function DashboardScreen() {
   const router = useRouter();
   const layout = useNativeLayoutMetrics();
   const { session, showNotificationsAfterSignIn, user } = useAuth();
+  const tenant = useTenantScope();
   const canPromptForNotifications = Boolean(
     session && user && showNotificationsAfterSignIn,
   );
@@ -1812,21 +1815,14 @@ export default function DashboardScreen() {
       requireApiClient().request<OnboardingAccountDetailsResponse>(
         '/v1/onboarding/account-details',
       ),
-    queryKey: ['onboarding-account-details', user?.id],
+    queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
   });
-  const organizationQuery = useQuery({
-    enabled: Boolean(session),
-    queryFn: () =>
-      requireApiClient().request<CurrentOrganizationResponse>(
-        '/v1/organizations/current',
-      ),
-    queryKey: ['current-organization'],
-  });
+  const organizationQuery = useCurrentOrganization();
   const subscriptionQuery = useQuery({
     enabled: Boolean(session && user),
     queryFn: () =>
       requireApiClient().request<SubscriptionResponse>('/v1/subscription'),
-    queryKey: ['subscription', user?.id],
+    queryKey: accountQueryKey(user?.id, 'subscription'),
     refetchInterval: 60_000,
     refetchOnMount: 'always',
     staleTime: 0,
@@ -1843,12 +1839,7 @@ export default function DashboardScreen() {
       requireApiClient().request<AppointmentsResponse>(
         `/v1/appointments?date=${operationDate}&locationId=${encodeURIComponent(operationLocationId ?? '')}`,
       ),
-    queryKey: [
-      'agenda-appointments',
-      'dashboard',
-      operationLocationId,
-      operationDate,
-    ],
+    queryKey: tenant.key('agenda-appointments', 'dashboard', operationDate),
   });
   const cashRegisterQuery = useQuery({
     enabled: Boolean(session),
@@ -1856,7 +1847,7 @@ export default function DashboardScreen() {
       requireApiClient().request<CurrentCashRegisterResponse>(
         '/v1/cash-register/current',
       ),
-    queryKey: ['cash-register-current'],
+    queryKey: tenant.key('cash-register-current'),
   });
   const cashSummaryQuery = useQuery({
     enabled: Boolean(session),
@@ -1864,13 +1855,13 @@ export default function DashboardScreen() {
       requireApiClient().request<CashRegisterSummaryResponse>(
         '/v1/cash-register/summary',
       ),
-    queryKey: ['cash-register-summary'],
+    queryKey: tenant.key('cash-register-summary'),
   });
   const inventoryQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
       requireApiClient().request<InventoryResponse>('/v1/inventory'),
-    queryKey: ['inventory'],
+    queryKey: tenant.key('inventory'),
   });
 
   const businessName = accountQuery.data?.businessName ?? 'Tu negocio';

@@ -29,7 +29,9 @@ import {
   useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
+import { accountQueryKey, tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 const COLORS = {
   border: appTheme.colors.border,
@@ -61,6 +63,7 @@ export default function TeamManagementScreen() {
   const layout = useNativeLayoutMetrics();
   const queryClient = useQueryClient();
   const { session, user } = useAuth();
+  const tenant = useTenantScope();
   const organizationQuery = useCurrentOrganization();
   const current = organizationQuery.data;
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -78,12 +81,12 @@ export default function TeamManagementScreen() {
       requireApiClient().request<OnboardingAccountDetailsResponse>(
         '/v1/onboarding/account-details',
       ),
-    queryKey: ['onboarding-account-details', user?.id],
+    queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
   });
   const teamQuery = useQuery({
     enabled: Boolean(session && current),
     queryFn: () => requireApiClient().request<TeamResponse>('/v1/team'),
-    queryKey: ['team'],
+    queryKey: tenant.key('team'),
   });
   if (!session) return <Redirect href="/(auth)/login" />;
   if (accountQuery.data?.accountType === 'professional') {
@@ -170,7 +173,9 @@ export default function TeamManagementScreen() {
           method: 'POST',
         });
       }
-      await queryClient.invalidateQueries({ queryKey: ['team'] });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('team'),
+      });
       setInviteOpen(false);
       setEditingMember(null);
     } catch (error) {
@@ -190,7 +195,9 @@ export default function TeamManagementScreen() {
       await requireApiClient().request(`/v1/team/members/${member.id}`, {
         method: 'DELETE',
       });
-      await queryClient.invalidateQueries({ queryKey: ['team'] });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('team'),
+      });
       setInviteOpen(false);
       setEditingMember(null);
     } catch (error) {
@@ -208,7 +215,9 @@ export default function TeamManagementScreen() {
       await requireApiClient().request(`/v1/team/invitations/${id}`, {
         method: 'DELETE',
       });
-      await queryClient.invalidateQueries({ queryKey: ['team'] });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('team'),
+      });
     } catch (error) {
       Alert.alert(
         'No fue posible cancelar',
@@ -230,7 +239,11 @@ export default function TeamManagementScreen() {
           }
           style={styles.backButton}
         >
-          <Ionicons color={appTheme.colors.accentDark} name="arrow-back" size={25} />
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="arrow-back"
+            size={25}
+          />
         </Pressable>
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={styles.title}>
@@ -277,7 +290,11 @@ export default function TeamManagementScreen() {
               onPress={openInvite}
               style={styles.addButton}
             >
-              <Ionicons color={appTheme.colors.accentDark} name="person-add-outline" size={21} />
+              <Ionicons
+                color={appTheme.colors.accentDark}
+                name="person-add-outline"
+                size={21}
+              />
               <Text style={styles.addButtonLabel}>Enviar invitación</Text>
             </Pressable>
           ) : (
@@ -402,171 +419,170 @@ export default function TeamManagementScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalKeyboard}
         >
-        <View style={styles.modalLayer}>
-          <Pressable
-            accessibilityLabel="Cerrar invitación"
-            accessibilityRole="button"
-            onPress={closeInvite}
-            style={styles.modalBackdrop}
-          />
-          <ScrollView
-            contentContainerStyle={[
-              styles.inviteSheetContent,
-              { paddingBottom: layout.bottomInset + 16 },
-            ]}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            style={[
-              styles.inviteSheet,
-              { maxHeight: layout.sheetMaxHeight },
-            ]}
-          >
-            <View style={styles.sheetHeader}>
-              <View style={styles.headerCopy}>
-                <Text accessibilityRole="header" style={styles.sheetTitle}>
-                  {editingMember ? 'Editar colaborador' : 'Invitar colaborador'}
-                </Text>
-                <Text style={styles.sheetDescription}>
-                  {editingMember
-                    ? 'Actualiza sus datos, rol y comisión vigente.'
-                    : 'El correo es obligatorio para que acepte y active su acceso.'}
-                </Text>
-              </View>
-              <Pressable
-                accessibilityLabel="Cerrar"
-                accessibilityRole="button"
-                disabled={isInviting}
-                onPress={closeInvite}
-                style={styles.closeButton}
-              >
-                <Ionicons color={COLORS.muted} name="close" size={23} />
-              </Pressable>
-            </View>
-
-            {inviteError ? (
-              <Text accessibilityRole="alert" style={styles.inviteError}>
-                {inviteError}
-              </Text>
-            ) : null}
-
-            <Text style={styles.inputLabel}>Nombre completo</Text>
-            <TextInput
-              autoComplete="name"
-              onChangeText={setFullName}
-              placeholder="Nombre del colaborador"
-              placeholderTextColor="#8b94a1"
-              style={styles.input}
-              value={fullName}
+          <View style={styles.modalLayer}>
+            <Pressable
+              accessibilityLabel="Cerrar invitación"
+              accessibilityRole="button"
+              onPress={closeInvite}
+              style={styles.modalBackdrop}
             />
-            <Text style={styles.inputLabel}>Correo electrónico</Text>
-            <TextInput
-              autoCapitalize="none"
-              autoComplete="email"
-              editable={!editingMember}
-              keyboardType="email-address"
-              onChangeText={setEmail}
-              placeholder="correo@ejemplo.com"
-              placeholderTextColor="#8b94a1"
-              style={[
-                styles.input,
-                editingMember ? styles.inputDisabled : null,
+            <ScrollView
+              contentContainerStyle={[
+                styles.inviteSheetContent,
+                { paddingBottom: layout.bottomInset + 16 },
               ]}
-              value={email}
-            />
-            <Text style={styles.inputLabel}>Rol</Text>
-            <View style={styles.roleOptions}>
-              {INVITATION_ROLES.map((option) => (
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              style={[styles.inviteSheet, { maxHeight: layout.sheetMaxHeight }]}
+            >
+              <View style={styles.sheetHeader}>
+                <View style={styles.headerCopy}>
+                  <Text accessibilityRole="header" style={styles.sheetTitle}>
+                    {editingMember
+                      ? 'Editar colaborador'
+                      : 'Invitar colaborador'}
+                  </Text>
+                  <Text style={styles.sheetDescription}>
+                    {editingMember
+                      ? 'Actualiza sus datos, rol y comisión vigente.'
+                      : 'El correo es obligatorio para que acepte y active su acceso.'}
+                  </Text>
+                </View>
                 <Pressable
-                  key={option.value}
-                  accessibilityLabel={option.label}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: role === option.value }}
-                  onPress={() => setRole(option.value)}
-                  style={[
-                    styles.roleOption,
-                    role === option.value ? styles.roleOptionSelected : null,
-                  ]}
+                  accessibilityLabel="Cerrar"
+                  accessibilityRole="button"
+                  disabled={isInviting}
+                  onPress={closeInvite}
+                  style={styles.closeButton}
                 >
-                  <Text
+                  <Ionicons color={COLORS.muted} name="close" size={23} />
+                </Pressable>
+              </View>
+
+              {inviteError ? (
+                <Text accessibilityRole="alert" style={styles.inviteError}>
+                  {inviteError}
+                </Text>
+              ) : null}
+
+              <Text style={styles.inputLabel}>Nombre completo</Text>
+              <TextInput
+                autoComplete="name"
+                onChangeText={setFullName}
+                placeholder="Nombre del colaborador"
+                placeholderTextColor="#8b94a1"
+                style={styles.input}
+                value={fullName}
+              />
+              <Text style={styles.inputLabel}>Correo electrónico</Text>
+              <TextInput
+                autoCapitalize="none"
+                autoComplete="email"
+                editable={!editingMember}
+                keyboardType="email-address"
+                onChangeText={setEmail}
+                placeholder="correo@ejemplo.com"
+                placeholderTextColor="#8b94a1"
+                style={[
+                  styles.input,
+                  editingMember ? styles.inputDisabled : null,
+                ]}
+                value={email}
+              />
+              <Text style={styles.inputLabel}>Rol</Text>
+              <View style={styles.roleOptions}>
+                {INVITATION_ROLES.map((option) => (
+                  <Pressable
+                    key={option.value}
+                    accessibilityLabel={option.label}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: role === option.value }}
+                    onPress={() => setRole(option.value)}
                     style={[
-                      styles.roleOptionLabel,
-                      role === option.value
-                        ? styles.roleOptionLabelSelected
-                        : null,
+                      styles.roleOption,
+                      role === option.value ? styles.roleOptionSelected : null,
                     ]}
                   >
-                    {option.label}
+                    <Text
+                      style={[
+                        styles.roleOptionLabel,
+                        role === option.value
+                          ? styles.roleOptionLabelSelected
+                          : null,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              {role === 'barber' ? (
+                <>
+                  <Text style={styles.inputLabel}>
+                    Comisión por servicios (%)
                   </Text>
-                </Pressable>
-              ))}
-            </View>
-            {role === 'barber' ? (
-              <>
-                <Text style={styles.inputLabel}>
-                  Comisión por servicios (%)
-                </Text>
-                <TextInput
-                  keyboardType="number-pad"
-                  maxLength={3}
-                  onChangeText={setCommissionPercentage}
-                  placeholder="Ej. 40"
-                  placeholderTextColor="#8b94a1"
-                  style={styles.input}
-                  value={commissionPercentage}
-                />
-                <Text style={styles.commissionHint}>
-                  {editingMember
-                    ? 'El nuevo porcentaje se aplicará a las comisiones futuras.'
-                    : 'Se guardará al aceptar la invitación; antes no genera pagos.'}
-                </Text>
-              </>
-            ) : null}
-            <Pressable
-              accessibilityLabel={
-                editingMember ? 'Guardar colaborador' : 'Enviar invitación'
-              }
-              accessibilityRole="button"
-              disabled={isInviting}
-              onPress={() => void saveCollaborator()}
-              style={[styles.sendButton, isInviting ? styles.disabled : null]}
-            >
-              <Text style={styles.sendButtonLabel}>
-                {isInviting
-                  ? 'Guardando…'
-                  : editingMember
-                    ? 'Guardar cambios'
-                    : 'Enviar invitación'}
-              </Text>
-            </Pressable>
-            {editingMember ? (
+                  <TextInput
+                    keyboardType="number-pad"
+                    maxLength={3}
+                    onChangeText={setCommissionPercentage}
+                    placeholder="Ej. 40"
+                    placeholderTextColor="#8b94a1"
+                    style={styles.input}
+                    value={commissionPercentage}
+                  />
+                  <Text style={styles.commissionHint}>
+                    {editingMember
+                      ? 'El nuevo porcentaje se aplicará a las comisiones futuras.'
+                      : 'Se guardará al aceptar la invitación; antes no genera pagos.'}
+                  </Text>
+                </>
+              ) : null}
               <Pressable
-                accessibilityLabel="Eliminar colaborador"
+                accessibilityLabel={
+                  editingMember ? 'Guardar colaborador' : 'Enviar invitación'
+                }
                 accessibilityRole="button"
                 disabled={isInviting}
-                onPress={() =>
-                  Alert.alert(
-                    'Eliminar colaborador',
-                    `¿Quieres retirar a ${editingMember.user.fullName} del equipo? Su historial se conservará.`,
-                    [
-                      { style: 'cancel', text: 'Cancelar' },
-                      {
-                        onPress: () => void deleteMember(editingMember),
-                        style: 'destructive',
-                        text: 'Eliminar',
-                      },
-                    ],
-                  )
-                }
-                style={styles.deleteButton}
+                onPress={() => void saveCollaborator()}
+                style={[styles.sendButton, isInviting ? styles.disabled : null]}
               >
-                <Ionicons color="#bd2d2d" name="trash-outline" size={20} />
-                <Text style={styles.deleteButtonLabel}>
-                  Eliminar colaborador
+                <Text style={styles.sendButtonLabel}>
+                  {isInviting
+                    ? 'Guardando…'
+                    : editingMember
+                      ? 'Guardar cambios'
+                      : 'Enviar invitación'}
                 </Text>
               </Pressable>
-            ) : null}
-          </ScrollView>
-        </View>
+              {editingMember ? (
+                <Pressable
+                  accessibilityLabel="Eliminar colaborador"
+                  accessibilityRole="button"
+                  disabled={isInviting}
+                  onPress={() =>
+                    Alert.alert(
+                      'Eliminar colaborador',
+                      `¿Quieres retirar a ${editingMember.user.fullName} del equipo? Su historial se conservará.`,
+                      [
+                        { style: 'cancel', text: 'Cancelar' },
+                        {
+                          onPress: () => void deleteMember(editingMember),
+                          style: 'destructive',
+                          text: 'Eliminar',
+                        },
+                      ],
+                    )
+                  }
+                  style={styles.deleteButton}
+                >
+                  <Ionicons color="#bd2d2d" name="trash-outline" size={20} />
+                  <Text style={styles.deleteButtonLabel}>
+                    Eliminar colaborador
+                  </Text>
+                </Pressable>
+              ) : null}
+            </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
@@ -615,7 +631,11 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  addButtonLabel: { color: appTheme.colors.accentDark, fontSize: 14, fontWeight: '900' },
+  addButtonLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 14,
+    fontWeight: '900',
+  },
   closeButton: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surfaceMuted,
@@ -636,7 +656,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
     minHeight: 50,
   },
-  deleteButtonLabel: { color: appTheme.colors.dangerBorder, fontSize: 14, fontWeight: '900' },
+  deleteButtonLabel: {
+    color: appTheme.colors.dangerBorder,
+    fontSize: 14,
+    fontWeight: '900',
+  },
   disabled: { opacity: 0.6 },
   empty: { color: COLORS.muted, fontSize: 14, paddingVertical: 18 },
   header: {
@@ -787,7 +811,11 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  sendButtonLabel: { color: appTheme.colors.accentDark, fontSize: 15, fontWeight: '900' },
+  sendButtonLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 15,
+    fontWeight: '900',
+  },
   subtitle: { color: COLORS.muted, fontSize: 13, marginTop: 2 },
   sheetDescription: {
     color: COLORS.muted,
@@ -814,9 +842,21 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  summaryDivider: { backgroundColor: appTheme.colors.border, height: 48, width: 1 },
-  summaryLabel: { color: appTheme.colors.textMuted, fontSize: 12, marginTop: 3 },
-  summaryValue: { color: appTheme.colors.text, fontSize: 25, fontWeight: '900' },
+  summaryDivider: {
+    backgroundColor: appTheme.colors.border,
+    height: 48,
+    width: 1,
+  },
+  summaryLabel: {
+    color: appTheme.colors.textMuted,
+    fontSize: 12,
+    marginTop: 3,
+  },
+  summaryValue: {
+    color: appTheme.colors.text,
+    fontSize: 25,
+    fontWeight: '900',
+  },
   title: {
     color: COLORS.text,
     fontSize: 24,

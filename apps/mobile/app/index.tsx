@@ -17,6 +17,7 @@ import {
 } from '../src/components/BottomNavigation';
 import { NavaWelcomeScreen } from '../src/components/NavaWelcomeScreen';
 import { requireApiClient } from '../src/lib/api';
+import { accountQueryKey } from '../src/lib/query-keys';
 import { useCurrentOrganization } from '../src/features/organization/useCurrentOrganization';
 import { useAuth } from '../src/providers/AuthProvider';
 
@@ -30,7 +31,7 @@ export default function EntryScreen() {
       requireApiClient().request<OnboardingAccountDetailsResponse>(
         '/v1/onboarding/account-details',
       ),
-    queryKey: ['onboarding-account-details', user?.id],
+    queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
     refetchOnMount: 'always',
     staleTime: 0,
   });

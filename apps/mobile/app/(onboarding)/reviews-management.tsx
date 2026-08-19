@@ -12,18 +12,25 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { appStyles, appTheme, goldButtonShadow } from '../../src/components/BottomNavigation';
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
+import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 export default function ReviewsManagementScreen() {
   const { session } = useAuth();
+  const tenant = useTenantScope();
   const router = useRouter();
   const queryClient = useQueryClient();
   const reviewsQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<ReviewsResponse>('/v1/reviews'),
-    queryKey: ['reviews'],
+    queryKey: tenant.key('reviews'),
   });
   const changeVisibility = useMutation({
     mutationFn: ({
@@ -43,7 +50,9 @@ export default function ReviewsManagementScreen() {
         error instanceof Error ? error.message : 'Inténtalo nuevamente.',
       ),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['reviews'] });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('reviews'),
+      });
     },
   });
 
@@ -52,12 +61,12 @@ export default function ReviewsManagementScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.header}>
-      <Pressable
-        onPress={() =>
-          router.canGoBack() ? router.back() : router.replace('/dashboard')
-        }
-        style={styles.back}
-      >
+        <Pressable
+          onPress={() =>
+            router.canGoBack() ? router.back() : router.replace('/dashboard')
+          }
+          style={styles.back}
+        >
           <Ionicons color="#111827" name="arrow-back" size={23} />
         </Pressable>
         <View style={styles.headerCopy}>
@@ -184,7 +193,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textAlign: 'center',
   },
-  professional: { color: appTheme.colors.textMuted, fontSize: 12, marginTop: 3 },
+  professional: {
+    color: appTheme.colors.textMuted,
+    fontSize: 12,
+    marginTop: 3,
+  },
   screen: appStyles.screen,
   spacer: { width: 40 },
   stars: { color: appTheme.colors.text, fontSize: 16, letterSpacing: 2 },

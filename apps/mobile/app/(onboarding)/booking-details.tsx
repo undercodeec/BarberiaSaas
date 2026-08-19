@@ -3,7 +3,6 @@ import type {
   AppointmentRecord,
   AvailabilityResponse,
   ClientDetailResponse,
-  CurrentOrganizationResponse,
   ServicesResponse,
   TeamResponse,
 } from '@barber-saas/api-client';
@@ -23,7 +22,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requireApiClient } from '../../src/lib/api';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
+import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
+import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 import {
   appTheme,
   goldButtonShadow,
@@ -120,6 +122,7 @@ function futureDates(timeZone: string) {
 
 export default function BookingDetailsScreen() {
   const { session } = useAuth();
+  const tenant = useTenantScope();
   const layout = useNativeLayoutMetrics();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -140,23 +143,16 @@ export default function BookingDetailsScreen() {
   const [createdAppointment, setCreatedAppointment] =
     useState<AppointmentRecord | null>(null);
 
-  const organizationQuery = useQuery({
-    enabled: Boolean(session),
-    queryFn: () =>
-      requireApiClient().request<CurrentOrganizationResponse>(
-        '/v1/organizations/current',
-      ),
-    queryKey: ['current-organization'],
-  });
+  const organizationQuery = useCurrentOrganization();
   const teamQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<TeamResponse>('/v1/team'),
-    queryKey: ['team'],
+    queryKey: tenant.key('team'),
   });
   const servicesQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<ServicesResponse>('/v1/services'),
-    queryKey: ['services'],
+    queryKey: tenant.key('services'),
   });
   const clientQuery = useQuery({
     enabled: Boolean(session && clientId && !withoutClient),
@@ -164,7 +160,7 @@ export default function BookingDetailsScreen() {
       requireApiClient().request<ClientDetailResponse>(
         `/v1/clients/${clientId}`,
       ),
-    queryKey: ['client', clientId],
+    queryKey: tenant.key('client-detail', clientId),
   });
 
   const locationId = organizationQuery.data?.location?.id ?? null;
@@ -216,13 +212,12 @@ export default function BookingDetailsScreen() {
         `/v1/availability?${query.toString()}`,
       );
     },
-    queryKey: [
+    queryKey: tenant.key(
       'availability',
       localDateValue(date),
-      locationId,
       professionalId,
       serviceIds,
-    ],
+    ),
   });
 
   const scheduleSlots = useMemo<ScheduleSlot[]>(() => {
@@ -307,10 +302,14 @@ export default function BookingDetailsScreen() {
       setCreatedAppointment(appointment);
       setStartsAt(null);
       await queryClient.invalidateQueries({
-        queryKey: ['agenda-appointments'],
+        queryKey: tenantQueryPrefix('agenda-appointments'),
       });
-      await queryClient.invalidateQueries({ queryKey: ['availability'] });
-      await queryClient.invalidateQueries({ queryKey: ['client', clientId] });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('availability'),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('client-detail'),
+      });
       Alert.alert(
         'Cita agendada',
         'El horario quedó reservado correctamente.',

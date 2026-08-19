@@ -22,6 +22,7 @@ import { InlineMessage } from '../../src/components/InlineMessage';
 import { requireApiClient } from '../../src/lib/api';
 import { shareTemporaryExport } from '../../src/lib/temporary-export';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 type Preset = DailyReportResponse['period']['preset'];
 const presets: ReadonlyArray<{ label: string; value: Preset }> = [
@@ -39,6 +40,7 @@ function money(value: number, currency: string) {
 
 export default function DailyReportScreen() {
   const { session } = useAuth();
+  const tenant = useTenantScope();
   const router = useRouter();
   const [preset, setPreset] = useState<Preset>('today');
   const [locationId, setLocationId] = useState<string | null>(null);
@@ -53,7 +55,7 @@ export default function DailyReportScreen() {
       requireApiClient().request<DailyReportResponse>(
         `/v1/reports/daily?${queryString}`,
       ),
-    queryKey: ['daily-report', queryString],
+    queryKey: tenant.key('daily-report', queryString),
   });
   if (!session) return <Redirect href="/(auth)/login" />;
   const report = reportQuery.data;

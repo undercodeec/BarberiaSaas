@@ -6,8 +6,13 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InlineMessage } from '../../src/components/InlineMessage';
-import { appStyles, appTheme, goldButtonShadow } from '../../src/components/BottomNavigation';
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
+import { accountQueryKey, accountQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 type AccountType = 'business' | 'professional';
@@ -42,7 +47,7 @@ export default function AccountTypeScreen() {
       requireApiClient().request<OnboardingAccountDetailsResponse>(
         '/v1/onboarding/account-details',
       ),
-    queryKey: ['onboarding-account-details', user?.id],
+    queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
   });
   const mutation = useMutation({
     mutationFn: (accountType: AccountType) =>
@@ -52,7 +57,7 @@ export default function AccountTypeScreen() {
       ),
     onSuccess: async ({ accountType }) => {
       await queryClient.invalidateQueries({
-        queryKey: ['onboarding-account-details'],
+        queryKey: accountQueryPrefix('onboarding-account-details'),
       });
       Alert.alert(
         'Tipo de cuenta actualizado',
@@ -204,7 +209,12 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  noticeCopy: { color: appTheme.colors.textMuted, flex: 1, fontSize: 13, lineHeight: 19 },
+  noticeCopy: {
+    color: appTheme.colors.textMuted,
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+  },
   option: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surface,
@@ -217,8 +227,16 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  optionCopy: { color: appTheme.colors.textMuted, fontSize: 13, lineHeight: 18, marginTop: 4 },
-  optionSelected: { backgroundColor: appTheme.colors.accentWash, borderColor: appTheme.colors.accentWash },
+  optionCopy: {
+    color: appTheme.colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  optionSelected: {
+    backgroundColor: appTheme.colors.accentWash,
+    borderColor: appTheme.colors.accentWash,
+  },
   optionTitle: { color: appTheme.colors.text, fontSize: 17, fontWeight: '900' },
   pressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },
   screen: appStyles.screen,

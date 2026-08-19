@@ -35,7 +35,9 @@ import {
 } from '../../src/components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { requireApiClient } from '../../src/lib/api';
+import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 function movementLabel(type: CashMovementRecord['type']) {
   if (type === 'sale') return 'Venta';
@@ -59,6 +61,7 @@ function movementIsIncome(type: CashMovementRecord['type']) {
 
 export default function CashRegisterScreen() {
   const { session, user } = useAuth();
+  const tenant = useTenantScope();
   const layout = useNativeLayoutMetrics(0.92);
   const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const router = useRouter();
@@ -88,8 +91,7 @@ export default function CashRegisterScreen() {
         const navigationHeight = 72;
         const navigationGap = 12;
         const baseX = bounds.width - 24 - buttonSize;
-        const baseY =
-          bounds.height - (bounds.bottomInset + 104) - buttonSize;
+        const baseY = bounds.height - (bounds.bottomInset + 104) - buttonSize;
         const minimumX = sideMargin - baseX;
         const maximumX = bounds.width - sideMargin - buttonSize - baseX;
         const minimumY = bounds.topInset + sideMargin - baseY;
@@ -117,12 +119,14 @@ export default function CashRegisterScreen() {
         const navigationHeight = 72;
         const navigationGap = 12;
         const baseX = bounds.width - 24 - buttonSize;
-        const baseY =
-          bounds.height - (bounds.bottomInset + 104) - buttonSize;
+        const baseY = bounds.height - (bounds.bottomInset + 104) - buttonSize;
         floatingSaleOffsetRef.current = {
           x: Math.min(
             bounds.width - sideMargin - buttonSize - baseX,
-            Math.max(sideMargin - baseX, floatingSaleOffsetRef.current.x + gesture.dx),
+            Math.max(
+              sideMargin - baseX,
+              floatingSaleOffsetRef.current.x + gesture.dx,
+            ),
           ),
           y: Math.min(
             bounds.height -
@@ -178,23 +182,23 @@ export default function CashRegisterScreen() {
       requireApiClient().request<CurrentCashRegisterResponse>(
         '/v1/cash-register/current',
       ),
-    queryKey: ['cash-register-current'],
+    queryKey: tenant.key('cash-register-current'),
   });
   const teamQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<TeamResponse>('/v1/team'),
-    queryKey: ['team'],
+    queryKey: tenant.key('team'),
   });
   const servicesQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<ServicesResponse>('/v1/services'),
-    queryKey: ['services'],
+    queryKey: tenant.key('services'),
   });
   const inventoryQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
       requireApiClient().request<InventoryResponse>('/v1/inventory'),
-    queryKey: ['inventory'],
+    queryKey: tenant.key('inventory'),
   });
   const summaryQuery = useQuery({
     enabled: Boolean(session),
@@ -202,7 +206,7 @@ export default function CashRegisterScreen() {
       requireApiClient().request<CashRegisterSummaryResponse>(
         '/v1/cash-register/summary',
       ),
-    queryKey: ['cash-register-summary'],
+    queryKey: tenant.key('cash-register-summary'),
   });
   const openCash = useMutation({
     mutationFn: () => {
@@ -228,9 +232,15 @@ export default function CashRegisterScreen() {
     onSuccess: async () => {
       setIsSheetOpen(false);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['cash-register-current'] }),
-        queryClient.invalidateQueries({ queryKey: ['cash-register-summary'] }),
-        queryClient.invalidateQueries({ queryKey: ['cash-register-history'] }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('cash-register-current'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('cash-register-summary'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('cash-register-history'),
+        }),
       ]);
     },
   });
@@ -308,13 +318,21 @@ export default function CashRegisterScreen() {
       setMovementProfessionalId(null);
       setMovementServiceId(null);
       await queryClient.invalidateQueries({
-        queryKey: ['cash-register-summary'],
+        queryKey: tenantQueryPrefix('cash-register-summary'),
       });
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['business-summary'] }),
-        queryClient.invalidateQueries({ queryKey: ['movement-report'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory-movements'] }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('business-summary'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('movement-report'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('inventory'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('inventory-movements'),
+        }),
       ]);
     },
   });
@@ -339,9 +357,15 @@ export default function CashRegisterScreen() {
     onSuccess: async () => {
       setIsSheetOpen(false);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['cash-register-current'] }),
-        queryClient.invalidateQueries({ queryKey: ['cash-register-summary'] }),
-        queryClient.invalidateQueries({ queryKey: ['cash-register-history'] }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('cash-register-current'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('cash-register-summary'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('cash-register-history'),
+        }),
       ]);
     },
   });
@@ -559,479 +583,485 @@ export default function CashRegisterScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalKeyboard}
         >
-        <View style={styles.overlay}>
-          <Pressable
-            onPress={() => setIsSheetOpen(false)}
-            style={styles.backdrop}
-          />
-          <ScrollView
-            contentContainerStyle={[
-              styles.sheetContent,
-              { paddingBottom: layout.bottomInset + 22 },
-            ]}
-            keyboardShouldPersistTaps="handled"
-            style={[styles.sheet, { maxHeight: layout.sheetMaxHeight }]}
-          >
-            <View style={styles.handle} />
-            {sheetMode === 'open' ? (
-              <>
-                <Text style={styles.sheetTitle}>Abrir caja</Text>
-                <Text style={styles.label}>Responsable</Text>
-                <View style={styles.members}>
-                  <Pressable
-                    onPress={() => setResponsibleId(null)}
-                    style={[styles.member, !responsibleId && styles.selected]}
-                  >
-                    <Text
-                      style={[
-                        styles.memberText,
-                        !responsibleId && styles.selectedText,
-                      ]}
-                    >
-                      {user?.fullName ?? 'Yo'}
-                    </Text>
-                  </Pressable>
-                  {availableResponsibles.map((member) => (
+          <View style={styles.overlay}>
+            <Pressable
+              onPress={() => setIsSheetOpen(false)}
+              style={styles.backdrop}
+            />
+            <ScrollView
+              contentContainerStyle={[
+                styles.sheetContent,
+                { paddingBottom: layout.bottomInset + 22 },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              style={[styles.sheet, { maxHeight: layout.sheetMaxHeight }]}
+            >
+              <View style={styles.handle} />
+              {sheetMode === 'open' ? (
+                <>
+                  <Text style={styles.sheetTitle}>Abrir caja</Text>
+                  <Text style={styles.label}>Responsable</Text>
+                  <View style={styles.members}>
                     <Pressable
-                      key={member.id}
-                      onPress={() => setResponsibleId(member.id)}
-                      style={[
-                        styles.member,
-                        responsibleId === member.id && styles.selected,
-                      ]}
+                      onPress={() => setResponsibleId(null)}
+                      style={[styles.member, !responsibleId && styles.selected]}
                     >
                       <Text
                         style={[
                           styles.memberText,
-                          responsibleId === member.id && styles.selectedText,
+                          !responsibleId && styles.selectedText,
                         ]}
                       >
-                        {member.user.fullName}
+                        {user?.fullName ?? 'Yo'}
                       </Text>
                     </Pressable>
-                  ))}
-                </View>
-                <View style={styles.moneyLabel}>
-                  <Text style={styles.label}>Dinero base</Text>
-                  <Pressable
-                    accessibilityLabel="Informacion sobre dinero base"
-                    onPress={() => setIsBaseInfoVisible((visible) => !visible)}
-                    style={styles.infoButton}
-                  >
-                    <Text style={styles.infoButtonLabel}>!</Text>
-                  </Pressable>
-                </View>
-                {isBaseInfoVisible ? (
-                  <View style={styles.baseInfoBox}>
-                    <Ionicons
-                      color="#5D6672"
-                      name="information-circle-outline"
-                      size={18}
-                    />
-                    <Text style={styles.baseInfo}>
-                      Ingresa el efectivo fisico disponible al iniciar la caja.
-                      No incluyas ventas ni gastos del dia.
-                    </Text>
-                  </View>
-                ) : null}
-                <TextInput
-                  accessibilityLabel="Dinero base"
-                  keyboardType="decimal-pad"
-                  onChangeText={setOpeningAmount}
-                  placeholder="0.00"
-                  placeholderTextColor="#8B96A5"
-                  style={styles.input}
-                  value={openingAmount}
-                />
-                <View style={styles.actions}>
-                  <Pressable
-                    onPress={() => setIsSheetOpen(false)}
-                    style={styles.exit}
-                  >
-                    <Text style={styles.exitText}>Salir</Text>
-                  </Pressable>
-                  <Pressable
-                    disabled={openCash.isPending}
-                    onPress={() => openCash.mutate()}
-                    style={styles.confirm}
-                  >
-                    <Text style={styles.primaryText}>
-                      {openCash.isPending ? 'Abriendo...' : 'Abrir caja'}
-                    </Text>
-                  </Pressable>
-                </View>
-              </>
-            ) : sheetMode === 'movement' ? (
-              <>
-                <Text style={styles.sheetTitle}>
-                  {movementType === 'sale'
-                    ? 'Registrar venta'
-                    : movementType === 'deposit' ||
-                        movementType === 'other_income'
-                      ? 'Registrar ingreso'
-                      : 'Registrar salida'}
-                </Text>
-                <Text style={styles.label}>Tipo</Text>
-                <View style={styles.members}>
-                  {(
-                    [
-                      'sale',
-                      'deposit',
-                      'other_income',
-                      'expense',
-                      'withdrawal',
-                    ] as const
-                  ).map((type) => (
-                    <Pressable
-                      key={type}
-                      onPress={() => {
-                        setMovementType(type);
-                        if (type !== 'sale') {
-                          setSaleKind('free');
-                          setMovementProductId(null);
-                          setMovementProfessionalId(null);
-                          setMovementServiceId(null);
-                        }
-                      }}
-                      style={[
-                        styles.member,
-                        movementType === type && styles.selected,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.memberText,
-                          movementType === type && styles.selectedText,
-                        ]}
-                      >
-                        {movementLabel(type)}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-                {movementType === 'sale' ? (
-                  <>
-                    <Text style={styles.label}>Clase de venta</Text>
-                    <View style={styles.members}>
+                    {availableResponsibles.map((member) => (
                       <Pressable
-                        onPress={() => {
-                          setSaleKind('free');
-                          setMovementProductId(null);
-                          setMovementProfessionalId(null);
-                          setMovementServiceId(null);
-                        }}
+                        key={member.id}
+                        onPress={() => setResponsibleId(member.id)}
                         style={[
                           styles.member,
-                          saleKind === 'free' && styles.selected,
+                          responsibleId === member.id && styles.selected,
                         ]}
                       >
                         <Text
                           style={[
                             styles.memberText,
-                            saleKind === 'free' && styles.selectedText,
+                            responsibleId === member.id && styles.selectedText,
                           ]}
                         >
-                          Venta libre
+                          {member.user.fullName}
                         </Text>
                       </Pressable>
-                      {!isSoloOwner ? (
+                    ))}
+                  </View>
+                  <View style={styles.moneyLabel}>
+                    <Text style={styles.label}>Dinero base</Text>
+                    <Pressable
+                      accessibilityLabel="Informacion sobre dinero base"
+                      onPress={() =>
+                        setIsBaseInfoVisible((visible) => !visible)
+                      }
+                      style={styles.infoButton}
+                    >
+                      <Text style={styles.infoButtonLabel}>!</Text>
+                    </Pressable>
+                  </View>
+                  {isBaseInfoVisible ? (
+                    <View style={styles.baseInfoBox}>
+                      <Ionicons
+                        color="#5D6672"
+                        name="information-circle-outline"
+                        size={18}
+                      />
+                      <Text style={styles.baseInfo}>
+                        Ingresa el efectivo fisico disponible al iniciar la
+                        caja. No incluyas ventas ni gastos del dia.
+                      </Text>
+                    </View>
+                  ) : null}
+                  <TextInput
+                    accessibilityLabel="Dinero base"
+                    keyboardType="decimal-pad"
+                    onChangeText={setOpeningAmount}
+                    placeholder="0.00"
+                    placeholderTextColor="#8B96A5"
+                    style={styles.input}
+                    value={openingAmount}
+                  />
+                  <View style={styles.actions}>
+                    <Pressable
+                      onPress={() => setIsSheetOpen(false)}
+                      style={styles.exit}
+                    >
+                      <Text style={styles.exitText}>Salir</Text>
+                    </Pressable>
+                    <Pressable
+                      disabled={openCash.isPending}
+                      onPress={() => openCash.mutate()}
+                      style={styles.confirm}
+                    >
+                      <Text style={styles.primaryText}>
+                        {openCash.isPending ? 'Abriendo...' : 'Abrir caja'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </>
+              ) : sheetMode === 'movement' ? (
+                <>
+                  <Text style={styles.sheetTitle}>
+                    {movementType === 'sale'
+                      ? 'Registrar venta'
+                      : movementType === 'deposit' ||
+                          movementType === 'other_income'
+                        ? 'Registrar ingreso'
+                        : 'Registrar salida'}
+                  </Text>
+                  <Text style={styles.label}>Tipo</Text>
+                  <View style={styles.members}>
+                    {(
+                      [
+                        'sale',
+                        'deposit',
+                        'other_income',
+                        'expense',
+                        'withdrawal',
+                      ] as const
+                    ).map((type) => (
+                      <Pressable
+                        key={type}
+                        onPress={() => {
+                          setMovementType(type);
+                          if (type !== 'sale') {
+                            setSaleKind('free');
+                            setMovementProductId(null);
+                            setMovementProfessionalId(null);
+                            setMovementServiceId(null);
+                          }
+                        }}
+                        style={[
+                          styles.member,
+                          movementType === type && styles.selected,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.memberText,
+                            movementType === type && styles.selectedText,
+                          ]}
+                        >
+                          {movementLabel(type)}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  {movementType === 'sale' ? (
+                    <>
+                      <Text style={styles.label}>Clase de venta</Text>
+                      <View style={styles.members}>
                         <Pressable
                           onPress={() => {
-                            setSaleKind('service');
+                            setSaleKind('free');
                             setMovementProductId(null);
+                            setMovementProfessionalId(null);
+                            setMovementServiceId(null);
                           }}
                           style={[
                             styles.member,
-                            saleKind === 'service' && styles.selected,
+                            saleKind === 'free' && styles.selected,
                           ]}
                         >
                           <Text
                             style={[
                               styles.memberText,
-                              saleKind === 'service' && styles.selectedText,
+                              saleKind === 'free' && styles.selectedText,
                             ]}
                           >
-                            Servicio comisionable
+                            Venta libre
                           </Text>
                         </Pressable>
-                      ) : null}
-                      <Pressable
-                        onPress={() => {
-                          setSaleKind('product');
-                          setMovementProfessionalId(null);
-                          setMovementServiceId(null);
-                        }}
-                        style={[
-                          styles.member,
-                          saleKind === 'product' && styles.selected,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.memberText,
-                            saleKind === 'product' && styles.selectedText,
-                          ]}
-                        >
-                          Producto
-                        </Text>
-                      </Pressable>
-                    </View>
-                    {saleKind === 'service' ? (
-                      <>
-                        <Text style={styles.label}>Servicio</Text>
-                        <View style={styles.members}>
-                          {(servicesQuery.data?.services ?? []).map(
-                            (service) => (
-                              <Pressable
-                                key={service.id}
-                                onPress={() => {
-                                  setMovementServiceId(service.id);
-                                  setMovementProfessionalId(null);
-                                  setMovementAmount(
-                                    (service.priceCents / 100).toFixed(2),
-                                  );
-                                  setMovementDescription(service.name);
-                                }}
-                                style={[
-                                  styles.member,
-                                  movementServiceId === service.id &&
-                                    styles.selected,
-                                ]}
-                              >
-                                <Text
-                                  style={[
-                                    styles.memberText,
-                                    movementServiceId === service.id &&
-                                      styles.selectedText,
-                                  ]}
-                                >
-                                  {service.name}
-                                </Text>
-                              </Pressable>
-                            ),
-                          )}
-                        </View>
-                        <Text style={styles.label}>Profesional</Text>
-                        <View style={styles.members}>
-                          {commissionableProfessionals.map((member) => (
-                            <Pressable
-                              key={member.id}
-                              onPress={() =>
-                                setMovementProfessionalId(member.id)
-                              }
+                        {!isSoloOwner ? (
+                          <Pressable
+                            onPress={() => {
+                              setSaleKind('service');
+                              setMovementProductId(null);
+                            }}
+                            style={[
+                              styles.member,
+                              saleKind === 'service' && styles.selected,
+                            ]}
+                          >
+                            <Text
                               style={[
-                                styles.member,
-                                movementProfessionalId === member.id &&
-                                  styles.selected,
+                                styles.memberText,
+                                saleKind === 'service' && styles.selectedText,
                               ]}
                             >
-                              <Text
-                                style={[
-                                  styles.memberText,
-                                  movementProfessionalId === member.id &&
-                                    styles.selectedText,
-                                ]}
-                              >
-                                {member.user.fullName}
-                              </Text>
-                            </Pressable>
-                          ))}
-                          {movementServiceId &&
-                          commissionableProfessionals.length === 0 ? (
-                            <Text style={styles.inlineEmpty}>
-                              Este servicio no tiene profesionales asignados.
+                              Servicio comisionable
                             </Text>
-                          ) : null}
-                        </View>
-                      </>
-                    ) : null}
-                    {saleKind === 'product' ? (
-                      <>
-                        <Text style={styles.label}>Producto</Text>
-                        <View style={styles.members}>
-                          {(inventoryQuery.data?.products ?? []).map(
-                            (product) => (
+                          </Pressable>
+                        ) : null}
+                        <Pressable
+                          onPress={() => {
+                            setSaleKind('product');
+                            setMovementProfessionalId(null);
+                            setMovementServiceId(null);
+                          }}
+                          style={[
+                            styles.member,
+                            saleKind === 'product' && styles.selected,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.memberText,
+                              saleKind === 'product' && styles.selectedText,
+                            ]}
+                          >
+                            Producto
+                          </Text>
+                        </Pressable>
+                      </View>
+                      {saleKind === 'service' ? (
+                        <>
+                          <Text style={styles.label}>Servicio</Text>
+                          <View style={styles.members}>
+                            {(servicesQuery.data?.services ?? []).map(
+                              (service) => (
+                                <Pressable
+                                  key={service.id}
+                                  onPress={() => {
+                                    setMovementServiceId(service.id);
+                                    setMovementProfessionalId(null);
+                                    setMovementAmount(
+                                      (service.priceCents / 100).toFixed(2),
+                                    );
+                                    setMovementDescription(service.name);
+                                  }}
+                                  style={[
+                                    styles.member,
+                                    movementServiceId === service.id &&
+                                      styles.selected,
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.memberText,
+                                      movementServiceId === service.id &&
+                                        styles.selectedText,
+                                    ]}
+                                  >
+                                    {service.name}
+                                  </Text>
+                                </Pressable>
+                              ),
+                            )}
+                          </View>
+                          <Text style={styles.label}>Profesional</Text>
+                          <View style={styles.members}>
+                            {commissionableProfessionals.map((member) => (
                               <Pressable
-                                disabled={
-                                  product.stockTrackingEnabled &&
-                                  product.quantityOnHand < 1
+                                key={member.id}
+                                onPress={() =>
+                                  setMovementProfessionalId(member.id)
                                 }
-                                key={product.id}
-                                onPress={() => {
-                                  setMovementProductId(product.id);
-                                  setMovementProductQuantity('1');
-                                  setMovementAmount(
-                                    (product.salePriceCents / 100).toFixed(2),
-                                  );
-                                  setMovementDescription(product.name);
-                                }}
                                 style={[
                                   styles.member,
-                                  movementProductId === product.id &&
+                                  movementProfessionalId === member.id &&
                                     styles.selected,
                                 ]}
                               >
                                 <Text
                                   style={[
                                     styles.memberText,
-                                    movementProductId === product.id &&
+                                    movementProfessionalId === member.id &&
                                       styles.selectedText,
                                   ]}
                                 >
-                                  {product.name} ({product.quantityOnHand})
+                                  {member.user.fullName}
                                 </Text>
                               </Pressable>
-                            ),
-                          )}
-                          {!inventoryQuery.data?.products.length ? (
-                            <Text style={styles.inlineEmpty}>
-                              Crea productos con existencias desde Inventario.
-                            </Text>
-                          ) : null}
-                        </View>
-                        <Text style={styles.label}>Cantidad</Text>
-                        <TextInput
-                          accessibilityLabel="Cantidad de producto"
-                          keyboardType="number-pad"
-                          onChangeText={(value) => {
-                            setMovementProductQuantity(value);
-                            const quantity = Number(value);
-                            if (
-                              selectedMovementProduct &&
-                              Number.isInteger(quantity) &&
-                              quantity > 0
-                            )
-                              setMovementAmount(
-                                (
-                                  (selectedMovementProduct.salePriceCents *
-                                    quantity) /
-                                  100
-                                ).toFixed(2),
-                              );
-                          }}
-                          placeholder="1"
-                          placeholderTextColor="#8B96A5"
-                          style={styles.input}
-                          value={movementProductQuantity}
-                        />
-                      </>
-                    ) : null}
-                  </>
-                ) : null}
-                <Text style={styles.label}>Descripción</Text>
-                <TextInput
-                  accessibilityLabel="Descripción del movimiento"
-                  onChangeText={setMovementDescription}
-                  placeholder="Ej. corte y barba"
-                  placeholderTextColor="#8B96A5"
-                  style={styles.input}
-                  value={movementDescription}
-                />
-                <Text style={styles.label}>Monto</Text>
-                <TextInput
-                  accessibilityLabel="Monto del movimiento"
-                  keyboardType="decimal-pad"
-                  editable={saleKind !== 'product'}
-                  onChangeText={setMovementAmount}
-                  placeholder="0.00"
-                  placeholderTextColor="#8B96A5"
-                  style={styles.input}
-                  value={movementAmount}
-                />
-                <Text style={styles.label}>Método de pago</Text>
-                <View style={styles.members}>
-                  {(['cash', 'card', 'transfer', 'other'] as const).map(
-                    (method) => (
-                      <Pressable
-                        key={method}
-                        onPress={() => setMovementPayment(method)}
-                        style={[
-                          styles.member,
-                          movementPayment === method && styles.selected,
-                        ]}
-                      >
-                        <Text
+                            ))}
+                            {movementServiceId &&
+                            commissionableProfessionals.length === 0 ? (
+                              <Text style={styles.inlineEmpty}>
+                                Este servicio no tiene profesionales asignados.
+                              </Text>
+                            ) : null}
+                          </View>
+                        </>
+                      ) : null}
+                      {saleKind === 'product' ? (
+                        <>
+                          <Text style={styles.label}>Producto</Text>
+                          <View style={styles.members}>
+                            {(inventoryQuery.data?.products ?? []).map(
+                              (product) => (
+                                <Pressable
+                                  disabled={
+                                    product.stockTrackingEnabled &&
+                                    product.quantityOnHand < 1
+                                  }
+                                  key={product.id}
+                                  onPress={() => {
+                                    setMovementProductId(product.id);
+                                    setMovementProductQuantity('1');
+                                    setMovementAmount(
+                                      (product.salePriceCents / 100).toFixed(2),
+                                    );
+                                    setMovementDescription(product.name);
+                                  }}
+                                  style={[
+                                    styles.member,
+                                    movementProductId === product.id &&
+                                      styles.selected,
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.memberText,
+                                      movementProductId === product.id &&
+                                        styles.selectedText,
+                                    ]}
+                                  >
+                                    {product.name} ({product.quantityOnHand})
+                                  </Text>
+                                </Pressable>
+                              ),
+                            )}
+                            {!inventoryQuery.data?.products.length ? (
+                              <Text style={styles.inlineEmpty}>
+                                Crea productos con existencias desde Inventario.
+                              </Text>
+                            ) : null}
+                          </View>
+                          <Text style={styles.label}>Cantidad</Text>
+                          <TextInput
+                            accessibilityLabel="Cantidad de producto"
+                            keyboardType="number-pad"
+                            onChangeText={(value) => {
+                              setMovementProductQuantity(value);
+                              const quantity = Number(value);
+                              if (
+                                selectedMovementProduct &&
+                                Number.isInteger(quantity) &&
+                                quantity > 0
+                              )
+                                setMovementAmount(
+                                  (
+                                    (selectedMovementProduct.salePriceCents *
+                                      quantity) /
+                                    100
+                                  ).toFixed(2),
+                                );
+                            }}
+                            placeholder="1"
+                            placeholderTextColor="#8B96A5"
+                            style={styles.input}
+                            value={movementProductQuantity}
+                          />
+                        </>
+                      ) : null}
+                    </>
+                  ) : null}
+                  <Text style={styles.label}>Descripción</Text>
+                  <TextInput
+                    accessibilityLabel="Descripción del movimiento"
+                    onChangeText={setMovementDescription}
+                    placeholder="Ej. corte y barba"
+                    placeholderTextColor="#8B96A5"
+                    style={styles.input}
+                    value={movementDescription}
+                  />
+                  <Text style={styles.label}>Monto</Text>
+                  <TextInput
+                    accessibilityLabel="Monto del movimiento"
+                    keyboardType="decimal-pad"
+                    editable={saleKind !== 'product'}
+                    onChangeText={setMovementAmount}
+                    placeholder="0.00"
+                    placeholderTextColor="#8B96A5"
+                    style={styles.input}
+                    value={movementAmount}
+                  />
+                  <Text style={styles.label}>Método de pago</Text>
+                  <View style={styles.members}>
+                    {(['cash', 'card', 'transfer', 'other'] as const).map(
+                      (method) => (
+                        <Pressable
+                          key={method}
+                          onPress={() => setMovementPayment(method)}
                           style={[
-                            styles.memberText,
-                            movementPayment === method && styles.selectedText,
+                            styles.member,
+                            movementPayment === method && styles.selected,
                           ]}
                         >
-                          {method === 'cash'
-                            ? 'Efectivo'
-                            : method === 'card'
-                              ? 'Tarjeta'
-                              : method === 'transfer'
-                                ? 'Transferencia'
-                                : 'Otro'}
-                        </Text>
-                      </Pressable>
-                    ),
-                  )}
-                </View>
-                <View style={styles.actions}>
-                  <Pressable
-                    onPress={() => setIsSheetOpen(false)}
-                    style={styles.exit}
-                  >
-                    <Text style={styles.exitText}>Salir</Text>
-                  </Pressable>
-                  <Pressable
-                    disabled={registerMovement.isPending}
-                    onPress={() => registerMovement.mutate()}
-                    style={styles.confirm}
-                  >
-                    <Text style={styles.primaryText}>
-                      {registerMovement.isPending ? 'Guardando...' : 'Guardar'}
-                    </Text>
-                  </Pressable>
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={styles.sheetTitle}>Cerrar caja</Text>
-                <Text style={styles.copy}>
-                  Efectivo esperado: {formatMoney(totals?.expectedCash ?? 0)}
-                </Text>
-                <Text style={styles.label}>Efectivo contado</Text>
-                <TextInput
-                  accessibilityLabel="Efectivo contado"
-                  keyboardType="decimal-pad"
-                  onChangeText={setClosingAmount}
-                  placeholder="0.00"
-                  placeholderTextColor="#8B96A5"
-                  style={styles.input}
-                  value={closingAmount}
-                />
-                <Text style={styles.label}>Nota del cierre (opcional)</Text>
-                <TextInput
-                  accessibilityLabel="Nota del cierre"
-                  onChangeText={setClosingNote}
-                  placeholder="Observaciones"
-                  placeholderTextColor="#8B96A5"
-                  style={styles.input}
-                  value={closingNote}
-                />
-                <View style={styles.actions}>
-                  <Pressable
-                    onPress={() => setIsSheetOpen(false)}
-                    style={styles.exit}
-                  >
-                    <Text style={styles.exitText}>Salir</Text>
-                  </Pressable>
-                  <Pressable
-                    disabled={closeCash.isPending}
-                    onPress={() => closeCash.mutate()}
-                    style={styles.confirm}
-                  >
-                    <Text style={styles.primaryText}>
-                      {closeCash.isPending ? 'Cerrando...' : 'Confirmar cierre'}
-                    </Text>
-                  </Pressable>
-                </View>
-              </>
-            )}
-          </ScrollView>
-        </View>
+                          <Text
+                            style={[
+                              styles.memberText,
+                              movementPayment === method && styles.selectedText,
+                            ]}
+                          >
+                            {method === 'cash'
+                              ? 'Efectivo'
+                              : method === 'card'
+                                ? 'Tarjeta'
+                                : method === 'transfer'
+                                  ? 'Transferencia'
+                                  : 'Otro'}
+                          </Text>
+                        </Pressable>
+                      ),
+                    )}
+                  </View>
+                  <View style={styles.actions}>
+                    <Pressable
+                      onPress={() => setIsSheetOpen(false)}
+                      style={styles.exit}
+                    >
+                      <Text style={styles.exitText}>Salir</Text>
+                    </Pressable>
+                    <Pressable
+                      disabled={registerMovement.isPending}
+                      onPress={() => registerMovement.mutate()}
+                      style={styles.confirm}
+                    >
+                      <Text style={styles.primaryText}>
+                        {registerMovement.isPending
+                          ? 'Guardando...'
+                          : 'Guardar'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.sheetTitle}>Cerrar caja</Text>
+                  <Text style={styles.copy}>
+                    Efectivo esperado: {formatMoney(totals?.expectedCash ?? 0)}
+                  </Text>
+                  <Text style={styles.label}>Efectivo contado</Text>
+                  <TextInput
+                    accessibilityLabel="Efectivo contado"
+                    keyboardType="decimal-pad"
+                    onChangeText={setClosingAmount}
+                    placeholder="0.00"
+                    placeholderTextColor="#8B96A5"
+                    style={styles.input}
+                    value={closingAmount}
+                  />
+                  <Text style={styles.label}>Nota del cierre (opcional)</Text>
+                  <TextInput
+                    accessibilityLabel="Nota del cierre"
+                    onChangeText={setClosingNote}
+                    placeholder="Observaciones"
+                    placeholderTextColor="#8B96A5"
+                    style={styles.input}
+                    value={closingNote}
+                  />
+                  <View style={styles.actions}>
+                    <Pressable
+                      onPress={() => setIsSheetOpen(false)}
+                      style={styles.exit}
+                    >
+                      <Text style={styles.exitText}>Salir</Text>
+                    </Pressable>
+                    <Pressable
+                      disabled={closeCash.isPending}
+                      onPress={() => closeCash.mutate()}
+                      style={styles.confirm}
+                    >
+                      <Text style={styles.primaryText}>
+                        {closeCash.isPending
+                          ? 'Cerrando...'
+                          : 'Confirmar cierre'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </>
+              )}
+            </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
       <BottomNavigation active="cash" />

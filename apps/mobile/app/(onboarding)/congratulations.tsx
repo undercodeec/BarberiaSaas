@@ -24,6 +24,7 @@ import {
   goldButtonShadow,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
+import { accountQueryKey, accountQueryPrefix } from '../../src/lib/query-keys';
 import { BookingLinkSheet } from '../../src/components/BookingLinkSheet';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -40,7 +41,7 @@ export default function CongratulationsScreen() {
       requireApiClient().request<OnboardingAccountDetailsResponse>(
         '/v1/onboarding/account-details',
       ),
-    queryKey: ['onboarding-account-details', user?.id],
+    queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
   });
 
   const [isBookingSheetOpen, setIsBookingSheetOpen] = useState(false);
@@ -54,7 +55,7 @@ export default function CongratulationsScreen() {
       ),
     onSuccess: async (result) => {
       queryClient.setQueryData<OnboardingAccountDetailsResponse>(
-        ['onboarding-account-details', user?.id],
+        accountQueryKey(user?.id, 'onboarding-account-details'),
         (profile) =>
           profile
             ? {
@@ -64,7 +65,7 @@ export default function CongratulationsScreen() {
             : profile,
       );
       await queryClient.invalidateQueries({
-        queryKey: ['current-organization'],
+        queryKey: accountQueryPrefix('current-organization'),
       });
       router.replace('/dashboard' as never);
     },
@@ -131,11 +132,19 @@ export default function CongratulationsScreen() {
           <Text style={styles.helpLabel}>
             {'¿Como configurar el enlace en Instagram?'}
           </Text>
-          <Ionicons color={appTheme.colors.text} name="arrow-forward" size={21} />
+          <Ionicons
+            color={appTheme.colors.text}
+            name="arrow-forward"
+            size={21}
+          />
         </Pressable>
 
         <View style={styles.linkBox}>
-          <Ionicons color={appTheme.colors.text} name="link-outline" size={22} />
+          <Ionicons
+            color={appTheme.colors.text}
+            name="link-outline"
+            size={22}
+          />
           <Text numberOfLines={2} style={styles.linkValue}>
             {bookingUrl || 'Preparando tu enlace de reservas?'}
           </Text>
@@ -258,7 +267,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     width: '100%',
   },
-  linkValue: { color: appTheme.colors.text, flex: 1, fontSize: 14, fontWeight: '700' },
+  linkValue: {
+    color: appTheme.colors.text,
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+  },
   openButton: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surface,

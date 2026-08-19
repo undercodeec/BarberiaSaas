@@ -25,7 +25,9 @@ import {
   goldButtonShadow,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
+import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 const MAX_IMAGE_BYTES = 1_500_000;
 const MAX_IMAGE_DIMENSION = 1_600;
@@ -42,6 +44,7 @@ export default function ServiceManagementScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { session } = useAuth();
+  const tenant = useTenantScope();
   const organizationQuery = useCurrentOrganization();
   const current = organizationQuery.data;
   const [categoryName, setCategoryName] = useState('');
@@ -62,7 +65,7 @@ export default function ServiceManagementScreen() {
   const servicesQuery = useQuery({
     enabled: Boolean(session && current),
     queryFn: () => requireApiClient().request<ServicesResponse>('/v1/services'),
-    queryKey: ['services'],
+    queryKey: tenant.key('services'),
   });
   const categoriesById = useMemo(
     () =>
@@ -84,7 +87,9 @@ export default function ServiceManagementScreen() {
     onSuccess: async () => {
       setCategoryName('');
       setSuccessMessage('Categoría creada correctamente.');
-      await queryClient.invalidateQueries({ queryKey: ['services'] });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('services'),
+      });
     },
   });
 
@@ -140,7 +145,9 @@ export default function ServiceManagementScreen() {
           ? 'Servicio actualizado correctamente.'
           : 'Servicio creado y habilitado correctamente.',
       );
-      await queryClient.invalidateQueries({ queryKey: ['services'] });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('services'),
+      });
     },
   });
 
@@ -159,7 +166,9 @@ export default function ServiceManagementScreen() {
       setOnlineBooking(true);
       setSelectedCategoryId(null);
       setSuccessMessage('Servicio eliminado del catálogo activo.');
-      await queryClient.invalidateQueries({ queryKey: ['services'] });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('services'),
+      });
     },
   });
 
@@ -191,7 +200,10 @@ export default function ServiceManagementScreen() {
   const chooseServicePhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permiso necesario', 'Autoriza el acceso para elegir una foto.');
+      Alert.alert(
+        'Permiso necesario',
+        'Autoriza el acceso para elegir una foto.',
+      );
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -207,11 +219,20 @@ export default function ServiceManagementScreen() {
       return;
     }
     const bytes = asset.fileSize ?? Math.ceil((asset.base64.length * 3) / 4);
-    if (bytes > MAX_IMAGE_BYTES || asset.width > MAX_IMAGE_DIMENSION || asset.height > MAX_IMAGE_DIMENSION) {
-      Alert.alert('Imagen demasiado grande', 'Máximo: 1.5 MB y 1600 × 1600 píxeles.');
+    if (
+      bytes > MAX_IMAGE_BYTES ||
+      asset.width > MAX_IMAGE_DIMENSION ||
+      asset.height > MAX_IMAGE_DIMENSION
+    ) {
+      Alert.alert(
+        'Imagen demasiado grande',
+        'Máximo: 1.5 MB y 1600 × 1600 píxeles.',
+      );
       return;
     }
-    const mimeType = asset.mimeType?.startsWith('image/') ? asset.mimeType : 'image/jpeg';
+    const mimeType = asset.mimeType?.startsWith('image/')
+      ? asset.mimeType
+      : 'image/jpeg';
     setServiceImageData(`data:${mimeType};base64,${asset.base64}`);
   };
 
@@ -236,7 +257,11 @@ export default function ServiceManagementScreen() {
           }
           style={styles.backButton}
         >
-          <Ionicons color={appTheme.colors.accentDark} name="arrow-back" size={25} />
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="arrow-back"
+            size={25}
+          />
         </Pressable>
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={styles.title}>
@@ -306,7 +331,11 @@ export default function ServiceManagementScreen() {
                   styles.buttonMuted,
               ]}
             >
-              <Ionicons color={appTheme.colors.accentDark} name="add" size={24} />
+              <Ionicons
+                color={appTheme.colors.accentDark}
+                name="add"
+                size={24}
+              />
             </Pressable>
           </View>
           <View style={styles.chips}>
@@ -359,16 +388,28 @@ export default function ServiceManagementScreen() {
             style={styles.photoPicker}
           >
             {serviceImageData ? (
-              <Image source={{ uri: serviceImageData }} style={styles.photoPickerImage} />
+              <Image
+                source={{ uri: serviceImageData }}
+                style={styles.photoPickerImage}
+              />
             ) : (
               <>
-                <Ionicons color={appTheme.colors.accentDark} name="image-outline" size={25} />
-                <Text style={styles.photoPickerLabel}>Agregar foto del servicio</Text>
+                <Ionicons
+                  color={appTheme.colors.accentDark}
+                  name="image-outline"
+                  size={25}
+                />
+                <Text style={styles.photoPickerLabel}>
+                  Agregar foto del servicio
+                </Text>
               </>
             )}
           </Pressable>
           {serviceImageData ? (
-            <Pressable onPress={() => setServiceImageData(null)} style={styles.removePhoto}>
+            <Pressable
+              onPress={() => setServiceImageData(null)}
+              style={styles.removePhoto}
+            >
               <Text style={styles.removePhotoLabel}>Quitar foto</Text>
             </Pressable>
           ) : null}
@@ -430,7 +471,8 @@ export default function ServiceManagementScreen() {
             onPress={() => serviceMutation.mutate()}
             style={[
               styles.primaryButton,
-              (!canCreateService || serviceMutation.isPending) && styles.buttonMuted,
+              (!canCreateService || serviceMutation.isPending) &&
+                styles.buttonMuted,
             ]}
           >
             <Ionicons
@@ -500,9 +542,16 @@ export default function ServiceManagementScreen() {
             >
               <View style={styles.serviceIcon}>
                 {service.imageData ? (
-                  <Image source={{ uri: service.imageData }} style={styles.serviceImage} />
+                  <Image
+                    source={{ uri: service.imageData }}
+                    style={styles.serviceImage}
+                  />
                 ) : (
-                  <Ionicons color={appTheme.colors.accentDark} name="cut-outline" size={23} />
+                  <Ionicons
+                    color={appTheme.colors.accentDark}
+                    name="cut-outline"
+                    size={23}
+                  />
                 )}
               </View>
               <View style={styles.serviceCopy}>
@@ -514,7 +563,11 @@ export default function ServiceManagementScreen() {
                   {(service.priceCents / 100).toFixed(2)}
                 </Text>
               </View>
-              <Ionicons color={appTheme.colors.accentDark} name="create-outline" size={22} />
+              <Ionicons
+                color={appTheme.colors.accentDark}
+                name="create-outline"
+                size={22}
+              />
             </Pressable>
           ))}
           {!servicesQuery.isLoading &&
@@ -559,7 +612,10 @@ const styles = StyleSheet.create({
   },
   chipLabel: { color: COLORS.text, fontSize: 13, fontWeight: '700' },
   chipLabelSelected: { color: appTheme.colors.text, fontWeight: '900' },
-  chipSelected: { backgroundColor: appTheme.colors.accentWash, borderColor: appTheme.colors.accentWash },
+  chipSelected: {
+    backgroundColor: appTheme.colors.accentWash,
+    borderColor: appTheme.colors.accentWash,
+  },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
   content: {
     alignSelf: 'center',
@@ -581,7 +637,11 @@ const styles = StyleSheet.create({
     minHeight: 46,
     paddingHorizontal: 14,
   },
-  dangerActionLabel: { color: appTheme.colors.danger, fontSize: 14, fontWeight: '800' },
+  dangerActionLabel: {
+    color: appTheme.colors.danger,
+    fontSize: 14,
+    fontWeight: '800',
+  },
   descriptionInput: {
     height: 92,
     paddingTop: 14,
@@ -646,9 +706,18 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   photoPickerImage: { height: '100%', width: '100%' },
-  photoPickerLabel: { color: appTheme.colors.accentDark, fontSize: 13, fontWeight: '800', marginTop: 7 },
+  photoPickerLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 7,
+  },
   removePhoto: { alignSelf: 'flex-start', marginTop: 8 },
-  removePhotoLabel: { color: appTheme.colors.danger, fontSize: 13, fontWeight: '800' },
+  removePhotoLabel: {
+    color: appTheme.colors.danger,
+    fontSize: 13,
+    fontWeight: '800',
+  },
   primaryButton: {
     alignItems: 'center',
     alignSelf: 'flex-start',
@@ -755,9 +824,21 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  summaryDivider: { backgroundColor: appTheme.colors.border, height: 48, width: 1 },
-  summaryLabel: { color: appTheme.colors.textMuted, fontSize: 12, marginTop: 3 },
-  summaryValue: { color: appTheme.colors.text, fontSize: 25, fontWeight: '900' },
+  summaryDivider: {
+    backgroundColor: appTheme.colors.border,
+    height: 48,
+    width: 1,
+  },
+  summaryLabel: {
+    color: appTheme.colors.textMuted,
+    fontSize: 12,
+    marginTop: 3,
+  },
+  summaryValue: {
+    color: appTheme.colors.text,
+    fontSize: 25,
+    fontWeight: '900',
+  },
   title: {
     color: COLORS.text,
     fontSize: 24,

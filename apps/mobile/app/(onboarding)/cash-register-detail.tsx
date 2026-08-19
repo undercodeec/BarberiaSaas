@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requireApiClient } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 function movementLabel(type: CashMovementRecord['type']) {
   if (type === 'sale') return 'Venta';
@@ -34,6 +35,7 @@ function movementIsIncome(type: CashMovementRecord['type']) {
 
 export default function CashRegisterDetailScreen() {
   const { session } = useAuth();
+  const tenant = useTenantScope();
   const router = useRouter();
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const [arePaymentMethodsVisible, setArePaymentMethodsVisible] =
@@ -44,7 +46,7 @@ export default function CashRegisterDetailScreen() {
       requireApiClient().request<CashRegisterDetailResponse>(
         `/v1/cash-register/sessions/${sessionId}`,
       ),
-    queryKey: ['cash-register-detail', sessionId],
+    queryKey: tenant.key('cash-register-detail', sessionId),
   });
 
   if (!session) return <Redirect href="/(auth)/login" />;

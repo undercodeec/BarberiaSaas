@@ -31,7 +31,9 @@ import {
 } from '../../src/components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { requireApiClient } from '../../src/lib/api';
+import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 const MAX_IMAGE_BYTES = 1_500_000;
 const MAX_IMAGE_DIMENSION = 1_600;
@@ -65,6 +67,7 @@ function movementLabel(type: string) {
 
 export default function InventoryScreen() {
   const { session } = useAuth();
+  const tenant = useTenantScope();
   const layout = useNativeLayoutMetrics();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -107,7 +110,7 @@ export default function InventoryScreen() {
       requireApiClient().request<InventoryResponse>(
         `/v1/inventory${inventorySearch ? `?${inventorySearch}` : ''}`,
       ),
-    queryKey: ['inventory', inventorySearch],
+    queryKey: tenant.key('inventory', inventorySearch),
   });
   const resolvedLocationId =
     locationId ?? inventoryQuery.data?.locationId ?? null;
@@ -117,7 +120,7 @@ export default function InventoryScreen() {
       requireApiClient().request<StockMovementHistoryResponse>(
         `/v1/inventory/movements?locationId=${resolvedLocationId}`,
       ),
-    queryKey: ['inventory-movements', resolvedLocationId],
+    queryKey: tenant.key('inventory-movements', resolvedLocationId),
   });
 
   const saveProduct = useMutation({
@@ -160,8 +163,12 @@ export default function InventoryScreen() {
     onSuccess: async () => {
       setIsSheetOpen(false);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['inventory'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory-movements'] }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('inventory'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('inventory-movements'),
+        }),
       ]);
     },
   });
@@ -198,8 +205,12 @@ export default function InventoryScreen() {
     onSuccess: async () => {
       setIsSheetOpen(false);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['inventory'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory-movements'] }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('inventory'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('inventory-movements'),
+        }),
       ]);
     },
   });
@@ -219,11 +230,21 @@ export default function InventoryScreen() {
       ),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['inventory'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory-movements'] }),
-        queryClient.invalidateQueries({ queryKey: ['cash-register-summary'] }),
-        queryClient.invalidateQueries({ queryKey: ['business-summary'] }),
-        queryClient.invalidateQueries({ queryKey: ['movement-report'] }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('inventory'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('inventory-movements'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('cash-register-summary'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('business-summary'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('movement-report'),
+        }),
       ]);
     },
   });
@@ -233,7 +254,7 @@ export default function InventoryScreen() {
       requireApiClient().request<ProductOrdersResponse>(
         `/v1/product-orders${resolvedLocationId ? `?locationId=${resolvedLocationId}` : ''}`,
       ),
-    queryKey: ['product-orders', resolvedLocationId],
+    queryKey: tenant.key('product-orders', resolvedLocationId),
   });
   const deleteProduct = useMutation({
     mutationFn: (productId: string) =>
@@ -248,8 +269,12 @@ export default function InventoryScreen() {
       ),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['inventory'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory-movements'] }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('inventory'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('inventory-movements'),
+        }),
       ]);
     },
   });
@@ -282,10 +307,18 @@ export default function InventoryScreen() {
       ),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['product-orders'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory-movements'] }),
-        queryClient.invalidateQueries({ queryKey: ['cash-register-summary'] }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('product-orders'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('inventory'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('inventory-movements'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('cash-register-summary'),
+        }),
       ]);
     },
   });

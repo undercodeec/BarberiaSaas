@@ -4,7 +4,6 @@ import type {
   AppointmentsResponse,
   BusinessScheduleResponse,
   ClientsResponse,
-  CurrentOrganizationResponse,
   SchedulesResponse,
   TeamResponse,
 } from '@barber-saas/api-client';
@@ -36,8 +35,11 @@ import {
   useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
+import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../../src/lib/api';
+import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 function addDays(date: Date, days: number): Date {
   const result = new Date(date);
@@ -173,23 +175,17 @@ function timelineMinutes(
 
 export default function AgendaScreen() {
   const { session } = useAuth();
+  const tenant = useTenantScope();
   const layout = useNativeLayoutMetrics();
   const router = useRouter();
   const { date: notificationDate } = useLocalSearchParams<{ date?: string }>();
   const queryClient = useQueryClient();
-  const organizationQuery = useQuery({
-    enabled: Boolean(session),
-    queryFn: () =>
-      requireApiClient().request<CurrentOrganizationResponse>(
-        '/v1/organizations/current',
-      ),
-    queryKey: ['current-organization'],
-  });
+  const organizationQuery = useCurrentOrganization();
   const schedulesQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
       requireApiClient().request<SchedulesResponse>('/v1/schedules'),
-    queryKey: ['schedules'],
+    queryKey: tenant.key('schedules'),
   });
   const businessScheduleQuery = useQuery({
     enabled: Boolean(session),
@@ -197,17 +193,17 @@ export default function AgendaScreen() {
       requireApiClient().request<BusinessScheduleResponse>(
         '/v1/business-schedule',
       ),
-    queryKey: ['business-schedule'],
+    queryKey: tenant.key('business-schedule'),
   });
   const clientsQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<ClientsResponse>('/v1/clients'),
-    queryKey: ['clients'],
+    queryKey: tenant.key('clients'),
   });
   const teamQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<TeamResponse>('/v1/team'),
-    queryKey: ['team'],
+    queryKey: tenant.key('team'),
   });
   const cancelAppointment = useMutation({
     mutationFn: (appointmentId: string) =>
@@ -226,7 +222,7 @@ export default function AgendaScreen() {
     onSuccess: async () => {
       setSelectedAppointment(null);
       await queryClient.invalidateQueries({
-        queryKey: ['agenda-appointments'],
+        queryKey: tenantQueryPrefix('agenda-appointments'),
       });
     },
   });
@@ -481,12 +477,11 @@ export default function AgendaScreen() {
       );
       return result.appointments;
     },
-    queryKey: [
+    queryKey: tenant.key(
       'agenda-appointments',
       calendarView,
-      locationId,
       localDateValue(selectedDay),
-    ],
+    ),
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
   });
@@ -534,7 +529,10 @@ export default function AgendaScreen() {
       requireApiClient().request<PayphoneManualConfirmationResponse>(
         `/v1/appointments/${selectedAppointment!.id}/payphone/manual-confirmation`,
       ),
-    queryKey: ['payphone-manual-confirmation', selectedAppointment?.id],
+    queryKey: tenant.key(
+      'payphone-manual-confirmation',
+      selectedAppointment?.id,
+    ),
   });
   const confirmPayphonePayment = useMutation({
     mutationFn: () => {
@@ -563,11 +561,17 @@ export default function AgendaScreen() {
       setManualPaymentNote('');
       setManualPaymentReference('');
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['agenda-appointments'] }),
-        queryClient.invalidateQueries({ queryKey: ['cash-register-summary'] }),
-        queryClient.invalidateQueries({ queryKey: ['commission-overview'] }),
         queryClient.invalidateQueries({
-          queryKey: ['payphone-manual-confirmation'],
+          queryKey: tenantQueryPrefix('agenda-appointments'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('cash-register-summary'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('commission-overview'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('payphone-manual-confirmation'),
         }),
       ]);
     },

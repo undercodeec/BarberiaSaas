@@ -11,6 +11,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../../src/lib/api';
 import { notificationDestination } from '../../src/lib/notification-navigation';
+import { tenantQueryPrefix } from '../../src/lib/query-keys';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 function relativeDate(value: string) {
   const minutes = Math.max(
@@ -31,10 +33,11 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const organizationQuery = useCurrentOrganization();
+  const tenant = useTenantScope();
   const query = useQuery({
     queryFn: () =>
       requireApiClient().request<AppNotificationsResponse>('/v1/notifications'),
-    queryKey: ['notifications'],
+    queryKey: tenant.key('notifications'),
     refetchInterval: 15_000,
   });
   const markRead = useMutation({
@@ -43,7 +46,9 @@ export default function NotificationsScreen() {
         method: 'POST',
       }),
     onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+      void queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('notifications'),
+      }),
   });
   const markAllRead = useMutation({
     mutationFn: () =>
@@ -51,7 +56,9 @@ export default function NotificationsScreen() {
         method: 'POST',
       }),
     onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+      void queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('notifications'),
+      }),
   });
   const open = (notification: AppNotificationRecord) => {
     if (!notification.readAt) void markRead.mutateAsync(notification.id);

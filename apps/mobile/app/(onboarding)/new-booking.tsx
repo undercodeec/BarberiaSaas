@@ -3,18 +3,13 @@ import type { ClientRecord, ClientsResponse } from '@barber-saas/api-client';
 import { useQuery } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requireApiClient } from '../../src/lib/api';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 import {
   appTheme,
   goldButtonShadow,
@@ -23,6 +18,7 @@ import { ClientFormSheet } from './clients';
 
 export default function NewBookingScreen() {
   const { session } = useAuth();
+  const tenant = useTenantScope();
   const router = useRouter();
   const [isCreateClientOpen, setIsCreateClientOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -30,7 +26,7 @@ export default function NewBookingScreen() {
   const clientsQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<ClientsResponse>('/v1/clients'),
-    queryKey: ['clients'],
+    queryKey: tenant.key('clients'),
   });
   const clients = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('es-EC');

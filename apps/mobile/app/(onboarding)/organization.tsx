@@ -26,6 +26,7 @@ import {
 import { NavaButton } from '../../src/components/NavaButton';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { requireApiClient } from '../../src/lib/api';
+import { accountQueryKey, accountQueryPrefix } from '../../src/lib/query-keys';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const teamIllustration = require('../../assets/onboarding-team.png') as number;
@@ -59,7 +60,7 @@ function optionalValue(value: string) {
 export default function OrganizationOnboardingScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const { height, width } = useWindowDimensions();
   const compact = height < 740;
   const [collaboratorSheetOpen, setCollaboratorSheetOpen] = useState(false);
@@ -72,7 +73,7 @@ export default function OrganizationOnboardingScreen() {
       requireApiClient().request<OnboardingCollaboratorsResponse>(
         '/v1/onboarding/collaborators',
       ),
-    queryKey: ['onboarding-collaborators'],
+    queryKey: accountQueryKey(user?.id, 'onboarding-collaborators'),
   });
   const collaborators = (collaboratorsQuery.data?.collaborators ?? []).map(
     toStoredCollaborator,
@@ -102,7 +103,7 @@ export default function OrganizationOnboardingScreen() {
       });
     }
     await queryClient.invalidateQueries({
-      queryKey: ['onboarding-collaborators'],
+      queryKey: accountQueryPrefix('onboarding-collaborators'),
     });
     setEditingCollaborator(null);
     setCollaboratorSheetOpen(false);
@@ -115,7 +116,7 @@ export default function OrganizationOnboardingScreen() {
       { method: 'DELETE' },
     );
     await queryClient.invalidateQueries({
-      queryKey: ['onboarding-collaborators'],
+      queryKey: accountQueryPrefix('onboarding-collaborators'),
     });
     setEditingCollaborator(null);
     setCollaboratorSheetOpen(false);

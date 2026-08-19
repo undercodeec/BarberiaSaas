@@ -2,7 +2,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
   AppointmentRecord,
   AvailabilityResponse,
-  CurrentOrganizationResponse,
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -24,7 +23,10 @@ import {
   useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
+import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
+import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 function localDateValue(date: Date) {
   return [
@@ -49,6 +51,7 @@ function dateInTimeZone(timeZone: string) {
 
 export default function RescheduleBookingScreen() {
   const { session } = useAuth();
+  const tenant = useTenantScope();
   const router = useRouter();
   const queryClient = useQueryClient();
   const layout = useNativeLayoutMetrics();
@@ -65,14 +68,7 @@ export default function RescheduleBookingScreen() {
     () => (rawServiceIds ?? '').split(',').filter(Boolean),
     [rawServiceIds],
   );
-  const organizationQuery = useQuery({
-    enabled: Boolean(session),
-    queryFn: () =>
-      requireApiClient().request<CurrentOrganizationResponse>(
-        '/v1/organizations/current',
-      ),
-    queryKey: ['current-organization'],
-  });
+  const organizationQuery = useCurrentOrganization();
   const [selectedDateValue, setSelectedDateValue] = useState<string | null>(
     null,
   );
@@ -108,13 +104,12 @@ export default function RescheduleBookingScreen() {
         `/v1/availability?${query.toString()}`,
       );
     },
-    queryKey: [
+    queryKey: tenant.key(
       'availability',
       localDateValue(date),
-      locationId,
       membershipId,
       serviceIds,
-    ],
+    ),
   });
   const reschedule = useMutation({
     mutationFn: () =>
@@ -129,7 +124,7 @@ export default function RescheduleBookingScreen() {
       ),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: ['agenda-appointments'],
+        queryKey: tenantQueryPrefix('agenda-appointments'),
       });
       Alert.alert('Cita reprogramada', 'El nuevo horario quedó reservado.', [
         { onPress: () => router.replace('/agenda'), text: 'Ver Agenda' },

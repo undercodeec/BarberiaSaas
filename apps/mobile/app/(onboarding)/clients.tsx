@@ -10,7 +10,6 @@ import type {
   ClientLabelsResponse,
   ClientRecord,
   ClientsResponse,
-  CurrentOrganizationResponse,
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
@@ -38,12 +37,15 @@ import {
   useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
+import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../../src/lib/api';
 import { normalizeClientsResponse } from '../../src/lib/client-record';
 import { createCsv } from '../../src/lib/csv-export';
 import { phoneNumberToE164 } from '../../src/lib/phone-number';
+import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { shareTemporaryExport } from '../../src/lib/temporary-export';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 const CONTACT_IMPORT_FIELDS = [
   ContactField.FULL_NAME,
@@ -70,6 +72,7 @@ type ImportContactCandidate = {
 
 export default function ClientsScreen() {
   const { session } = useAuth();
+  const tenant = useTenantScope();
   const layout = useNativeLayoutMetrics();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -100,14 +103,7 @@ export default function ClientsScreen() {
     ) => setDialog(actions ? { actions, message, title } : { message, title }),
     [],
   );
-  const organizationQuery = useQuery({
-    enabled: Boolean(session),
-    queryFn: () =>
-      requireApiClient().request<CurrentOrganizationResponse>(
-        '/v1/organizations/current',
-      ),
-    queryKey: ['current-organization'],
-  });
+  const organizationQuery = useCurrentOrganization();
   const importContacts = useCallback(async () => {
     if (Platform.OS === 'web') {
       openDialog(
@@ -269,7 +265,9 @@ export default function ClientsScreen() {
           importContact(),
         ),
       );
-      await queryClient.invalidateQueries({ queryKey: ['clients'] });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('clients'),
+      });
       setIsContactImportOpen(false);
       setImportCandidates([]);
       setSelectedImportContactIds([]);
@@ -290,14 +288,14 @@ export default function ClientsScreen() {
   const clientsQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<ClientsResponse>('/v1/clients'),
-    queryKey: ['clients'],
+    queryKey: tenant.key('clients'),
     select: normalizeClientsResponse,
   });
   const labelsQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
       requireApiClient().request<ClientLabelsResponse>('/v1/clients/labels'),
-    queryKey: ['client-labels'],
+    queryKey: tenant.key('client-labels'),
   });
   const visibleClients = useMemo(() => {
     const value = search.trim().toLocaleLowerCase('es-EC');
@@ -434,15 +432,17 @@ export default function ClientsScreen() {
               method: 'DELETE',
             });
             deletedClientIds.add(client.id);
-            queryClient.setQueryData<ClientsResponse>(['clients'], (current) =>
-              current
-                ? {
-                    ...current,
-                    clients: current.clients.filter(
-                      (currentClient) => currentClient.id !== client.id,
-                    ),
-                  }
-                : current,
+            queryClient.setQueryData<ClientsResponse>(
+              tenant.key('clients'),
+              (current) =>
+                current
+                  ? {
+                      ...current,
+                      clients: current.clients.filter(
+                        (currentClient) => currentClient.id !== client.id,
+                      ),
+                    }
+                  : current,
             );
           } catch (error) {
             failedClientIds.add(client.id);
@@ -463,7 +463,9 @@ export default function ClientsScreen() {
         ),
       );
       setSelectedClientIds([...failedClientIds]);
-      await queryClient.invalidateQueries({ queryKey: ['clients'] });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('clients'),
+      });
       if (failureMessages.length) {
         openDialog(
           'Algunos contactos no se eliminaron',
@@ -484,12 +486,14 @@ export default function ClientsScreen() {
         'No pudimos eliminar todos los clientes',
         error instanceof Error ? error.message : 'Inténtalo nuevamente.',
       );
-      await queryClient.invalidateQueries({ queryKey: ['clients'] });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('clients'),
+      });
     } finally {
       setIsDeletingSelected(false);
       setDeletionProgress(null);
     }
-  }, [openDialog, queryClient, selectedClients]);
+  }, [openDialog, queryClient, selectedClients, tenant]);
 
   const confirmDeleteSelectedClients = useCallback(() => {
     if (!selectedClients.length) return;
@@ -1157,7 +1161,9 @@ export function ClientFormSheet({
       Alert.alert('No pudimos guardar el cliente', message);
     },
     onSuccess: async ({ client }) => {
-      await queryClient.invalidateQueries({ queryKey: ['clients'] });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('clients'),
+      });
       await onCreated?.(client);
       reset();
       onClose();

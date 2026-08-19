@@ -28,7 +28,9 @@ import {
   useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
+import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 const COLORS = {
   accent: appTheme.colors.accent,
@@ -77,7 +79,8 @@ function scheduleSignature(days: readonly BusinessScheduleDay[]) {
 export default function BusinessScheduleScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { session, user } = useAuth();
+  const { session } = useAuth();
+  const tenant = useTenantScope();
   const [dayOverrides, setDayOverrides] = useState<
     Partial<Record<number, BusinessScheduleDay>>
   >({});
@@ -92,7 +95,7 @@ export default function BusinessScheduleScreen() {
       requireApiClient().request<BusinessScheduleResponse>(
         '/v1/business-schedule',
       ),
-    queryKey: ['business-schedule', user?.id],
+    queryKey: tenant.key('business-schedule'),
   });
 
   const saveMutation = useMutation({
@@ -111,11 +114,13 @@ export default function BusinessScheduleScreen() {
     onSuccess: async (response) => {
       setDayOverrides({});
       setRequestError(null);
-      queryClient.setQueryData(['business-schedule', user?.id], response);
+      queryClient.setQueryData(tenant.key('business-schedule'), response);
       await queryClient.invalidateQueries({
-        queryKey: ['business-schedule'],
+        queryKey: tenantQueryPrefix('business-schedule'),
       });
-      await queryClient.invalidateQueries({ queryKey: ['availability'] });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('availability'),
+      });
       Alert.alert('Horario guardado', 'Los cambios ya se aplican a tu agenda.');
     },
   });
@@ -200,7 +205,11 @@ export default function BusinessScheduleScreen() {
               pressed && styles.pressed,
             ]}
           >
-            <Ionicons color={appTheme.colors.accentDark} name="arrow-back" size={25} />
+            <Ionicons
+              color={appTheme.colors.accentDark}
+              name="arrow-back"
+              size={25}
+            />
           </Pressable>
           <Text accessibilityRole="header" style={styles.headerTitle}>
             Horario del negocio
@@ -214,7 +223,11 @@ export default function BusinessScheduleScreen() {
       >
         <View style={styles.intro}>
           <View style={styles.introIcon}>
-            <Ionicons color={appTheme.colors.accentDark} name="calendar-outline" size={28} />
+            <Ionicons
+              color={appTheme.colors.accentDark}
+              name="calendar-outline"
+              size={28}
+            />
           </View>
           <View style={styles.introCopy}>
             <Text style={styles.introTitle}>Horario general</Text>
@@ -283,7 +296,11 @@ export default function BusinessScheduleScreen() {
             <ActivityIndicator color={appTheme.colors.accentDark} />
           ) : (
             <>
-              <Ionicons color={appTheme.colors.accentDark} name="checkmark" size={22} />
+              <Ionicons
+                color={appTheme.colors.accentDark}
+                name="checkmark"
+                size={22}
+              />
               <Text style={styles.saveText}>Guardar cambios</Text>
             </>
           )}
@@ -323,7 +340,11 @@ function DayCard({
           style={[styles.checkbox, day.isOpen && styles.checkboxActive]}
         >
           {day.isOpen ? (
-            <Ionicons color={appTheme.colors.white} name="checkmark" size={18} />
+            <Ionicons
+              color={appTheme.colors.white}
+              name="checkmark"
+              size={18}
+            />
           ) : null}
         </Pressable>
         <Pressable
@@ -339,7 +360,11 @@ function DayCard({
           ]}
         >
           <Ionicons
-            color={day.isOpen ? appTheme.colors.accentDark : appTheme.colors.textMuted}
+            color={
+              day.isOpen
+                ? appTheme.colors.accentDark
+                : appTheme.colors.textMuted
+            }
             name="settings-outline"
             size={20}
           />
@@ -467,7 +492,11 @@ function ScheduleSheet({
               onPress={closeAnimated}
               style={styles.closeButton}
             >
-              <Ionicons color={appTheme.colors.accentDark} name="close" size={24} />
+              <Ionicons
+                color={appTheme.colors.accentDark}
+                name="close"
+                size={24}
+              />
             </Pressable>
           </View>
           <Text style={styles.sheetDescription}>
@@ -567,7 +596,11 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  confirmText: { color: appTheme.colors.accentDark, fontSize: 16, fontWeight: '800' },
+  confirmText: {
+    color: appTheme.colors.accentDark,
+    fontSize: 16,
+    fontWeight: '800',
+  },
   content: {
     alignSelf: 'center',
     maxWidth: 720,
@@ -691,7 +724,11 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
-  saveText: { color: appTheme.colors.accentDark, fontSize: 17, fontWeight: '800' },
+  saveText: {
+    color: appTheme.colors.accentDark,
+    fontSize: 17,
+    fontWeight: '800',
+  },
   screen: appStyles.screen,
   sheet: {
     alignSelf: 'center',

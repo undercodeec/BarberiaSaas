@@ -2,13 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type { SubscriptionResponse } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InlineMessage } from '../../src/components/InlineMessage';
@@ -18,6 +12,7 @@ import {
   goldButtonShadow,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
+import { accountQueryKey, accountQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const STATUS_LABELS: Record<SubscriptionResponse['current']['status'], string> =
@@ -83,13 +78,13 @@ function bookingUsageNotice(subscription: SubscriptionResponse | undefined) {
 
 export default function SubscriptionScreen() {
   const router = useRouter();
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const queryClient = useQueryClient();
   const subscriptionQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
       requireApiClient().request<SubscriptionResponse>('/v1/subscription'),
-    queryKey: ['subscription'],
+    queryKey: accountQueryKey(user?.id, 'subscription'),
   });
   const simulateSubscription = useMutation({
     mutationFn: (status: 'active' | 'suspended') =>
@@ -98,7 +93,9 @@ export default function SubscriptionScreen() {
         method: 'POST',
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      await queryClient.invalidateQueries({
+        queryKey: accountQueryPrefix('subscription'),
+      });
     },
   });
   const activateGrace = useMutation({
@@ -107,7 +104,9 @@ export default function SubscriptionScreen() {
         method: 'POST',
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      await queryClient.invalidateQueries({
+        queryKey: accountQueryPrefix('subscription'),
+      });
     },
   });
   if (!session) return <Redirect href="/(auth)/login" />;
@@ -183,11 +182,11 @@ export default function SubscriptionScreen() {
             {isDemoAccount
               ? 'Gratis durante la prueba'
               : currentPlan
-              ? formatPrice(
-                  currentPlan.monthlyPriceCents,
-                  currentPlan.currencyCode,
-                )
-              : 'Consultando precio'}
+                ? formatPrice(
+                    currentPlan.monthlyPriceCents,
+                    currentPlan.currencyCode,
+                  )
+                : 'Consultando precio'}
           </Text>
           {trialEnd ? (
             <Text style={styles.periodCopy}>

@@ -26,8 +26,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requireApiClient } from '../../src/lib/api';
 import { normalizeClientRecord } from '../../src/lib/client-record';
+import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 import {
   appTheme,
   goldButtonShadow,
@@ -76,6 +78,7 @@ function statusLabel(
 }
 
 export default function ClientDetailScreen() {
+  const tenant = useTenantScope();
   const { session } = useAuth();
   const layout = useNativeLayoutMetrics();
   const router = useRouter();
@@ -109,7 +112,7 @@ export default function ClientDetailScreen() {
       requireApiClient().request<ClientDetailResponse>(
         `/v1/clients/${clientId}`,
       ),
-    queryKey: ['client-detail', clientId],
+    queryKey: tenant.key('client-detail', clientId),
     select: (response) => {
       const client = normalizeClientRecord(response.client);
       if (!client) throw new Error('El cliente recibido no es válido.');
@@ -163,7 +166,7 @@ export default function ClientDetailScreen() {
       requireApiClient().request<ClientNotesResponse>(
         `/v1/clients/${clientId}/notes`,
       ),
-    queryKey: ['client-notes', clientId],
+    queryKey: tenant.key('client-notes', clientId),
   });
 
   useEffect(() => {
@@ -205,9 +208,11 @@ export default function ClientDetailScreen() {
     onSuccess: async () => {
       setIsEditing(false);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['clients'] }),
         queryClient.invalidateQueries({
-          queryKey: ['client-detail', clientId],
+          queryKey: tenantQueryPrefix('clients'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('client-detail'),
         }),
       ]);
     },
@@ -324,10 +329,14 @@ export default function ClientDetailScreen() {
       setLabelName('');
       setLabelColor('#101C2D');
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['clients'] }),
-        queryClient.invalidateQueries({ queryKey: ['client-labels'] }),
         queryClient.invalidateQueries({
-          queryKey: ['client-detail', clientId],
+          queryKey: tenantQueryPrefix('clients'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('client-labels'),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: tenantQueryPrefix('client-detail'),
         }),
       ]);
     },
@@ -343,7 +352,9 @@ export default function ClientDetailScreen() {
         error instanceof Error ? error.message : 'Inténtalo nuevamente.',
       ),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['clients'] });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('clients'),
+      });
       router.replace('/clients');
     },
   });

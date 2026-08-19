@@ -1,5 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { OnboardingAccountDetailsResponse, UserProfileResponse } from '@barber-saas/api-client';
+import type {
+  OnboardingAccountDetailsResponse,
+  UserProfileResponse,
+} from '@barber-saas/api-client';
 import * as ImagePicker from 'expo-image-picker';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
@@ -26,6 +29,7 @@ import {
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { CountryCityFields } from '../../src/components/RegistrationSelectors';
 import { requireApiClient } from '../../src/lib/api';
+import { accountQueryKey, accountQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const PRIMARY = appTheme.colors.accent;
@@ -55,7 +59,9 @@ export default function ProfileEditScreen() {
   const [businessAddress, setBusinessAddress] = useState('');
   const [businessCity, setBusinessCity] = useState('');
   const [businessCountryCode, setBusinessCountryCode] = useState('EC');
-  const [businessCoverImage, setBusinessCoverImage] = useState<string | null>(null);
+  const [businessCoverImage, setBusinessCoverImage] = useState<string | null>(
+    null,
+  );
   const [facebookUrl, setFacebookUrl] = useState('');
   const [instagramUrl, setInstagramUrl] = useState('');
   const [photoSheetTarget, setPhotoSheetTarget] = useState<PhotoTarget | null>(
@@ -66,7 +72,7 @@ export default function ProfileEditScreen() {
     enabled: Boolean(session),
     queryFn: () =>
       requireApiClient().request<UserProfileResponse>('/v1/profile'),
-    queryKey: ['user-profile'],
+    queryKey: accountQueryKey(user?.id, 'user-profile'),
   });
   const profile = profileQuery.data?.profile;
   const accountDetailsQuery = useQuery({
@@ -75,7 +81,7 @@ export default function ProfileEditScreen() {
       requireApiClient().request<OnboardingAccountDetailsResponse>(
         '/v1/onboarding/account-details',
       ),
-    queryKey: ['onboarding-account-details', user?.id],
+    queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
   });
   const accountDetails = accountDetailsQuery.data;
 
@@ -99,12 +105,13 @@ export default function ProfileEditScreen() {
   }, [accountDetails]);
 
   const refreshProfile = () =>
-    queryClient.invalidateQueries({ queryKey: ['user-profile'] });
+    queryClient.invalidateQueries({
+      queryKey: accountQueryPrefix('user-profile'),
+    });
   const saveProfile = useMutation({
     mutationFn: async () => {
-      const updatedProfile = await requireApiClient().request<UserProfileResponse>(
-        '/v1/profile',
-        {
+      const updatedProfile =
+        await requireApiClient().request<UserProfileResponse>('/v1/profile', {
           body: {
             bio: bio.trim() || null,
             fullName: fullName.trim(),
@@ -112,14 +119,15 @@ export default function ProfileEditScreen() {
             photoData,
           },
           method: 'PATCH',
-        },
-      );
+        });
       if (accountDetails) {
         await requireApiClient().request('/v1/onboarding/account-details', {
           body: {
             addressLine: businessAddress.trim() || null,
             businessName:
-              businessName.trim() || accountDetails.businessName || fullName.trim(),
+              businessName.trim() ||
+              accountDetails.businessName ||
+              fullName.trim(),
             city: businessCity.trim() || accountDetails.city || '',
             countryCode: businessCountryCode,
             coverImageUri: businessCoverImage,
@@ -272,20 +280,32 @@ export default function ProfileEditScreen() {
               style={styles.businessCover}
             >
               {businessCoverImage ? (
-                <Image source={{ uri: businessCoverImage }} style={styles.businessCoverImage} />
+                <Image
+                  source={{ uri: businessCoverImage }}
+                  style={styles.businessCoverImage}
+                />
               ) : (
                 <>
                   <Ionicons color={PRIMARY} name="image-outline" size={28} />
-                  <Text style={styles.businessCoverLabel}>Agregar imagen de portada</Text>
+                  <Text style={styles.businessCoverLabel}>
+                    Agregar imagen de portada
+                  </Text>
                 </>
               )}
             </Pressable>
             {businessCoverImage ? (
-              <Pressable onPress={() => setBusinessCoverImage(null)} style={styles.removeCover}>
+              <Pressable
+                onPress={() => setBusinessCoverImage(null)}
+                style={styles.removeCover}
+              >
                 <Text style={styles.removeCoverLabel}>Quitar portada</Text>
               </Pressable>
             ) : null}
-            <Field label="Nombre del negocio" onChangeText={setBusinessName} value={businessName} />
+            <Field
+              label="Nombre del negocio"
+              onChangeText={setBusinessName}
+              value={businessName}
+            />
             <Field
               label="Dirección"
               onChangeText={setBusinessAddress}
@@ -360,10 +380,7 @@ export default function ProfileEditScreen() {
         >
           <Pressable
             onPress={(event) => event.stopPropagation()}
-            style={[
-              styles.sheet,
-              { paddingBottom: layout.bottomInset + 16 },
-            ]}
+            style={[styles.sheet, { paddingBottom: layout.bottomInset + 16 }]}
           >
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>Añadir foto</Text>
@@ -468,8 +485,18 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   businessCoverImage: { height: '100%', width: '100%' },
-  businessCoverLabel: { color: PRIMARY, fontSize: 13, fontWeight: '800', marginTop: 8 },
-  businessHint: { color: '#697483', fontSize: 13, lineHeight: 19, marginTop: 5 },
+  businessCoverLabel: {
+    color: PRIMARY,
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 8,
+  },
+  businessHint: {
+    color: '#697483',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 5,
+  },
   card: {
     backgroundColor: appTheme.colors.surface,
     borderRadius: 22,
@@ -530,7 +557,11 @@ const styles = StyleSheet.create({
   photoSection: { alignItems: 'center', marginTop: 28 },
   pressed: { opacity: 0.7, transform: [{ scale: 0.98 }] },
   removeCover: { alignSelf: 'flex-start', marginTop: 9 },
-  removeCoverLabel: { color: appTheme.colors.danger, fontSize: 13, fontWeight: '800' },
+  removeCoverLabel: {
+    color: appTheme.colors.danger,
+    fontSize: 13,
+    fontWeight: '800',
+  },
   readOnlyField: {
     backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 14,

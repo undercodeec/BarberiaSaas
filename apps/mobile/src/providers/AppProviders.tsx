@@ -12,6 +12,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { isNetworkOnline } from '../lib/query-lifecycle';
 import { AuthProvider } from './AuthProvider';
+import { TenantScopeProvider } from './TenantScopeProvider';
 
 function QueryLifecycleManager() {
   useEffect(() => {
@@ -59,7 +60,9 @@ export function AppProviders({ children }: PropsWithChildren) {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <QueryLifecycleManager />
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <TenantScopeProvider>{children}</TenantScopeProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>
   );

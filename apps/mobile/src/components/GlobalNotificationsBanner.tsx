@@ -25,7 +25,9 @@ import { appTheme, goldButtonShadow, goldShadow } from './BottomNavigation';
 import { useCurrentOrganization } from '../features/organization/useCurrentOrganization';
 import { requireApiClient } from '../lib/api';
 import { notificationDestination } from '../lib/notification-navigation';
+import { tenantQueryPrefix } from '../lib/query-keys';
 import { useAuth } from '../providers/AuthProvider';
+import { useTenantScope } from '../providers/TenantScopeProvider';
 
 const NOTIFICATION_POSITION_KEY = 'nava.notification-trigger-position-v2';
 const TRIGGER_MARGIN = 10;
@@ -52,6 +54,7 @@ function relativeDate(value: string) {
 
 export function GlobalNotificationsBanner() {
   const { session } = useAuth();
+  const tenant = useTenantScope();
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
   const router = useRouter();
@@ -201,7 +204,7 @@ export function GlobalNotificationsBanner() {
     enabled: Boolean(session),
     queryFn: () =>
       requireApiClient().request<AppNotificationsResponse>('/v1/notifications'),
-    queryKey: ['notifications'],
+    queryKey: tenant.key('notifications'),
     refetchInterval: 15_000,
   });
   const markRead = useMutation({
@@ -210,7 +213,9 @@ export function GlobalNotificationsBanner() {
         method: 'POST',
       }),
     onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+      void queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('notifications'),
+      }),
   });
   const markAll = useMutation({
     mutationFn: () =>
@@ -218,7 +223,9 @@ export function GlobalNotificationsBanner() {
         method: 'POST',
       }),
     onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+      void queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('notifications'),
+      }),
   });
   const notifications = query.data?.notifications ?? [];
   const unread = notifications.filter(

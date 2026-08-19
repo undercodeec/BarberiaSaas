@@ -7,6 +7,7 @@ import { AccountSetupWelcomeScreen } from '../../src/components/AccountSetupWelc
 import { appStyles, appTheme } from '../../src/components/BottomNavigation';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../../src/lib/api';
+import { accountQueryKey } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 export default function AccountSetupScreen() {
@@ -19,7 +20,7 @@ export default function AccountSetupScreen() {
       requireApiClient().request<OnboardingAccountDetailsResponse>(
         '/v1/onboarding/account-details',
       ),
-    queryKey: ['onboarding-account-details', user?.id],
+    queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
   });
 
   if (isLoadingSession || (session && organizationQuery.isLoading)) {

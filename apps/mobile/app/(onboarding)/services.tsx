@@ -31,6 +31,7 @@ import {
 } from '../../src/components/ServiceFormSheet';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { requireApiClient } from '../../src/lib/api';
+import { accountQueryKey, accountQueryPrefix } from '../../src/lib/query-keys';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const servicesImage = require('../../assets/imagenServicios.png') as number;
@@ -57,7 +58,7 @@ export default function ServicesOnboardingScreen() {
       requireApiClient().request<{
         readonly services: readonly StoredService[];
       }>('/v1/onboarding/services'),
-    queryKey: ['onboarding-services'],
+    queryKey: accountQueryKey(user?.id, 'onboarding-services'),
   });
   const accountQuery = useQuery({
     enabled: Boolean(session),
@@ -65,7 +66,7 @@ export default function ServicesOnboardingScreen() {
       requireApiClient().request<OnboardingAccountDetailsResponse>(
         '/v1/onboarding/account-details',
       ),
-    queryKey: ['onboarding-account-details', user?.id],
+    queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
   });
   const services = servicesQuery.data?.services ?? [];
   const isSolo = accountQuery.data?.accountType === 'professional';
@@ -84,7 +85,9 @@ export default function ServicesOnboardingScreen() {
         body: service,
         method: 'POST',
       });
-    await queryClient.invalidateQueries({ queryKey: ['onboarding-services'] });
+    await queryClient.invalidateQueries({
+      queryKey: accountQueryPrefix('onboarding-services'),
+    });
     setEditingService(null);
     setServiceSheetOpen(false);
   };
@@ -94,7 +97,9 @@ export default function ServicesOnboardingScreen() {
       `/v1/onboarding/services/${service.id}`,
       { method: 'DELETE' },
     );
-    await queryClient.invalidateQueries({ queryKey: ['onboarding-services'] });
+    await queryClient.invalidateQueries({
+      queryKey: accountQueryPrefix('onboarding-services'),
+    });
     setEditingService(null);
     setServiceSheetOpen(false);
   };

@@ -21,6 +21,7 @@ import {
   goldButtonShadow,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
+import { accountQueryKey } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -81,8 +82,7 @@ const settingsSections: readonly SettingsSection[] = [
         title: 'Editar informaci\u00f3n',
       },
       {
-        description:
-          'Crea y configura las sucursales incluidas en tu plan.',
+        description: 'Crea y configura las sucursales incluidas en tu plan.',
         icon: 'business-outline',
         id: 'locations',
         route: '/location-management',
@@ -140,7 +140,7 @@ export default function BusinessSettingsScreen() {
       requireApiClient().request<OnboardingAccountDetailsResponse>(
         '/v1/onboarding/account-details',
       ),
-    queryKey: ['onboarding-account-details', user?.id],
+    queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
   });
   const isSolo = accountQuery.data?.accountType === 'professional';
   const isBusiness = accountQuery.data?.accountType === 'business';

@@ -7,9 +7,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InlineMessage } from '../../src/components/InlineMessage';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
-import { appStyles, appTheme, goldButtonShadow } from '../../src/components/BottomNavigation';
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
+import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 type EditableRole = 'barber' | 'manager' | 'receptionist';
 
@@ -52,11 +58,12 @@ export default function CollaboratorPermissionsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { session, user } = useAuth();
+  const tenant = useTenantScope();
   const organizationQuery = useCurrentOrganization();
   const teamQuery = useQuery({
     enabled: Boolean(session && organizationQuery.data),
     queryFn: () => requireApiClient().request<TeamResponse>('/v1/team'),
-    queryKey: ['team'],
+    queryKey: tenant.key('team'),
   });
   const mutation = useMutation({
     mutationFn: ({
@@ -76,7 +83,9 @@ export default function CollaboratorPermissionsScreen() {
         method: 'PATCH',
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['team'] });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('team'),
+      });
     },
   });
   if (!session) return <Redirect href="/(auth)/login" />;
@@ -212,7 +221,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
   },
-  capability: { color: appTheme.colors.textMuted, fontSize: 12, lineHeight: 18, marginTop: 2 },
+  capability: {
+    color: appTheme.colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 2,
+  },
   content: {
     alignSelf: 'center',
     gap: 14,
@@ -220,7 +234,12 @@ const styles = StyleSheet.create({
     padding: 20,
     width: '100%',
   },
-  empty: { color: appTheme.colors.textMuted, fontSize: 14, padding: 24, textAlign: 'center' },
+  empty: {
+    color: appTheme.colors.textMuted,
+    fontSize: 14,
+    padding: 24,
+    textAlign: 'center',
+  },
   header: {
     alignItems: 'center',
     alignSelf: 'center',
@@ -257,7 +276,12 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 15,
   },
-  noticeCopy: { color: appTheme.colors.textMuted, flex: 1, fontSize: 13, lineHeight: 19 },
+  noticeCopy: {
+    color: appTheme.colors.textMuted,
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+  },
   pressed: { opacity: 0.72 },
   profile: {
     backgroundColor: appTheme.colors.surface,
@@ -272,8 +296,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  profileLabel: { color: appTheme.colors.text, fontSize: 14, fontWeight: '900' },
-  profileSelected: { backgroundColor: appTheme.colors.accentWash, borderColor: appTheme.colors.accentWash },
+  profileLabel: {
+    color: appTheme.colors.text,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  profileSelected: {
+    backgroundColor: appTheme.colors.accentWash,
+    borderColor: appTheme.colors.accentWash,
+  },
   screen: appStyles.screen,
   subtitle: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 2 },
   title: { color: appTheme.colors.text, fontSize: 23, fontWeight: '900' },

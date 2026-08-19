@@ -22,6 +22,7 @@ import {
   goldButtonShadow,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
+import { accountQueryKey } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const COLORS = {
@@ -41,7 +42,7 @@ export default function AdvancedSettingsScreen() {
       requireApiClient().request<OnboardingAccountDetailsResponse>(
         '/v1/onboarding/account-details',
       ),
-    queryKey: ['onboarding-account-details', user?.id],
+    queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
   });
   const account = accountQuery.data;
   const isBusiness = account?.accountType === 'business';
@@ -77,7 +78,11 @@ export default function AdvancedSettingsScreen() {
           onPress={goBack}
           style={styles.backButton}
         >
-          <Ionicons color={appTheme.colors.accentDark} name="arrow-back" size={25} />
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="arrow-back"
+            size={25}
+          />
         </Pressable>
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={styles.title}>
@@ -114,7 +119,11 @@ export default function AdvancedSettingsScreen() {
               {isBusiness ? 'Tengo un negocio' : 'Solo yo'}
             </Text>
           </View>
-          <Ionicons color={appTheme.colors.accentDark} name="chevron-forward" size={23} />
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="chevron-forward"
+            size={23}
+          />
         </Pressable>
 
         {isBusiness ? (
@@ -139,14 +148,22 @@ export default function AdvancedSettingsScreen() {
                 Asigna perfiles de acceso y consulta sus capacidades.
               </Text>
             </View>
-            <Ionicons color={appTheme.colors.accentDark} name="chevron-forward" size={23} />
+            <Ionicons
+              color={appTheme.colors.accentDark}
+              name="chevron-forward"
+              size={23}
+            />
           </Pressable>
         ) : null}
 
         <View style={styles.linkCard}>
           <View style={styles.linkHeading}>
             <View style={styles.cardIcon}>
-              <Ionicons color={appTheme.colors.accentDark} name="link-outline" size={26} />
+              <Ionicons
+                color={appTheme.colors.accentDark}
+                name="link-outline"
+                size={26}
+              />
             </View>
             <View style={styles.cardCopy}>
               <Text style={styles.cardTitle}>Enlace de reserva</Text>
@@ -199,7 +216,11 @@ export default function AdvancedSettingsScreen() {
               Confirmación, cancelación y reprogramación.
             </Text>
           </View>
-          <Ionicons color={appTheme.colors.accentDark} name="chevron-forward" size={23} />
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="chevron-forward"
+            size={23}
+          />
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -215,7 +236,11 @@ export default function AdvancedSettingsScreen() {
               Consulta, muestra u oculta reseñas verificadas.
             </Text>
           </View>
-          <Ionicons color={appTheme.colors.accentDark} name="chevron-forward" size={23} />
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="chevron-forward"
+            size={23}
+          />
         </Pressable>
         <ComingSoonRow
           description="Contenido adicional para mejorar tu sitio de reservas."

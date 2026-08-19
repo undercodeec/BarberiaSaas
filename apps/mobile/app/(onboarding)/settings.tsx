@@ -35,6 +35,7 @@ import {
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../../src/lib/api';
+import { accountQueryKey } from '../../src/lib/query-keys';
 import { runTenantTransition } from '../../src/lib/tenant-transition';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -42,7 +43,7 @@ const PRIMARY = appTheme.colors.accent;
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
 export default function SettingsScreen() {
-  const { session, signOut } = useAuth();
+  const { session, signOut, user } = useAuth();
   const layout = useNativeLayoutMetrics(0.92);
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -61,14 +62,14 @@ export default function SettingsScreen() {
       requireApiClient().request<OnboardingAccountDetailsResponse>(
         '/v1/onboarding/account-details',
       ),
-    queryKey: ['onboarding-account-details'],
+    queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
   });
   const organizationQuery = useCurrentOrganization();
   const profileQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
       requireApiClient().request<UserProfileResponse>('/v1/profile'),
-    queryKey: ['user-profile'],
+    queryKey: accountQueryKey(user?.id, 'user-profile'),
   });
   const deleteAccountMutation = useMutation({
     mutationFn: async () => {
