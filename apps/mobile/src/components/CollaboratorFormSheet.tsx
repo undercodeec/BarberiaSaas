@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NavaButton } from './NavaButton';
 import { KeyboardAwareScrollView as ScrollView } from './KeyboardAwareScrollView';
+import { classifyPermission } from '../lib/permission-access';
 
 type CollaboratorRole = 'administrator' | 'barber' | 'custom';
 
@@ -145,8 +146,12 @@ export function CollaboratorFormSheet({
   const selectPhoto = async () => {
     setPhotoError(null);
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setPhotoError('Permite el acceso a tus fotos para elegir una imagen.');
+    if (classifyPermission(permission) !== 'granted') {
+      setPhotoError(
+        permission.canAskAgain === false
+          ? 'Activa Fotos para Nava desde los ajustes del telefono.'
+          : 'Permite el acceso a tus fotos para elegir una imagen.',
+      );
       return;
     }
 

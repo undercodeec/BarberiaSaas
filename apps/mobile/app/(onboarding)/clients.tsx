@@ -42,6 +42,7 @@ import { requireApiClient } from '../../src/lib/api';
 import { normalizeClientsResponse } from '../../src/lib/client-record';
 import { createCsv } from '../../src/lib/csv-export';
 import { phoneNumberToE164 } from '../../src/lib/phone-number';
+import { ensurePermissionAccess } from '../../src/lib/permission-access';
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { shareTemporaryExport } from '../../src/lib/temporary-export';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -113,14 +114,13 @@ export default function ClientsScreen() {
       return;
     }
     try {
-      const currentPermission = await getPermissionsAsync();
-      const permission =
-        currentPermission.status === 'granted'
-          ? currentPermission
-          : await requestPermissionsAsync();
+      const permission = await ensurePermissionAccess(
+        getPermissionsAsync,
+        requestPermissionsAsync,
+      );
 
-      if (permission.status !== 'granted') {
-        if (!permission.canAskAgain) {
+      if (permission !== 'granted') {
+        if (permission === 'blocked') {
           openDialog(
             'Permiso de contactos desactivado',
             'Activa Contactos para Nava desde los ajustes del teléfono.',

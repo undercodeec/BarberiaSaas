@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { appTheme, goldButtonShadow } from './BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from './KeyboardAwareScrollView';
 import { NavaButton } from './NavaButton';
+import { classifyPermission } from '../lib/permission-access';
 
 export interface ServiceDraft {
   readonly agendaColor: string;
@@ -144,8 +145,12 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
   const selectImage = async () => {
     setImageError(null);
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setImageError('Permite el acceso a tus fotos para elegir una imagen.');
+    if (classifyPermission(permission) !== 'granted') {
+      setImageError(
+        permission.canAskAgain === false
+          ? 'Activa Fotos para Nava desde los ajustes del telefono.'
+          : 'Permite el acceso a tus fotos para elegir una imagen.',
+      );
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({

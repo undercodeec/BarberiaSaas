@@ -25,6 +25,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { requireApiClient } from '../lib/api';
+import { ensurePermissionAccess } from '../lib/permission-access';
 import { KeyboardAwareScrollView as ScrollView } from './KeyboardAwareScrollView';
 import { BusinessLocationMap, type MapCoordinate } from './BusinessLocationMap';
 import { appTheme, goldButtonShadow } from './BottomNavigation';
@@ -207,18 +208,17 @@ export function BusinessLocationSheet({
     setIsLocating(true);
     setError(null);
     try {
-      const currentPermission = await Location.getForegroundPermissionsAsync();
-      const permission =
-        currentPermission.status === 'granted'
-          ? currentPermission
-          : await Location.requestForegroundPermissionsAsync();
-      if (permission.status !== 'granted' && !permission.canAskAgain) {
+      const permission = await ensurePermissionAccess(
+        Location.getForegroundPermissionsAsync,
+        Location.requestForegroundPermissionsAsync,
+      );
+      if (permission === 'blocked') {
         setError(
           'El permiso de ubicacion esta desactivado. Activalo desde Ajustes para usar tu posicion actual.',
         );
         return;
       }
-      if (permission.status !== 'granted') {
+      if (permission !== 'granted') {
         setError(
           'No se concedió el permiso. Puedes buscar el negocio o las calles manualmente.',
         );

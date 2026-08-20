@@ -36,6 +36,11 @@ import {
 } from '../../src/components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
+import {
+  agendaRange,
+  localCalendarDate,
+  type AgendaView,
+} from '../../src/lib/agenda-range';
 import { requireApiClient } from '../../src/lib/api';
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -134,7 +139,6 @@ type PayphoneManualConfirmationResponse = {
     readonly transactionReference: string;
   } | null;
 };
-type AgendaView = 'day' | 'month' | 'week';
 type AgendaStatusFilter =
   | 'active'
   | 'all'
@@ -145,14 +149,6 @@ type AgendaStatusFilter =
   | 'paid'
   | 'scheduled'
   | 'waiting';
-
-function localDateValue(date: Date): string {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-');
-}
 
 function timelineMinutes(
   schedules: ReadonlyArray<{
@@ -452,25 +448,13 @@ export default function AgendaScreen() {
       timelineTransitionX,
     ],
   );
-  const visibleDates = useMemo(() => {
-    if (calendarView === 'day') return [selectedDay];
-    if (calendarView === 'week') {
-      const monday = mondayOfWeek(selectedDay);
-      return Array.from({ length: 7 }, (_, index) => addDays(monday, index));
-    }
-    return daysInMonth(selectedDay);
-  }, [calendarView, selectedDay]);
   const locationId = organizationQuery.data?.location?.id;
   const appointmentsQuery = useQuery({
     enabled: Boolean(session && locationId),
     queryFn: async () => {
-      const firstDate = visibleDates.at(0);
-      const lastDate = visibleDates.at(-1);
-      if (!firstDate || !lastDate) return [];
       const search = new URLSearchParams({
-        from: localDateValue(firstDate),
+        ...agendaRange(calendarView, selectedDay),
         locationId: locationId ?? '',
-        to: localDateValue(lastDate),
       });
       const result = await requireApiClient().request<AppointmentsResponse>(
         `/v1/appointments?${search.toString()}`,
@@ -480,7 +464,7 @@ export default function AgendaScreen() {
     queryKey: tenant.key(
       'agenda-appointments',
       calendarView,
-      localDateValue(selectedDay),
+      localCalendarDate(selectedDay),
     ),
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,

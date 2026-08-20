@@ -77,6 +77,8 @@ Expo Doctor detectó:
 
 **Estado:** [ ] Corrección implementada y checks automatizados verdes; pendiente medición de 5 minutos en las tres vistas y en dispositivo real.
 
+**Avance verificado el 20 de agosto de 2026:** `agendaRange()` centraliza un único rango civil para las vistas día, semana y mes; la pantalla realiza una sola consulta `/v1/appointments` por rango, cada 30 segundos y nunca en background. Las pruebas cubren domingo, semana completa, febrero bisiesto y cambio de año. La medición física exigida para el cierre continúa pendiente.
+
 **Evidencia:** `apps/mobile/app/(onboarding)/agenda.tsx:457-486`.
 
 La query de citas hace un request por cada fecha visible y se repite cada 2 segundos. La vista diaria genera aproximadamente 30 requests/minuto; la semanal, 210/minuto; la mensual puede generar entre 840 y 930/minuto por usuario. `refetchIntervalInBackground: true` solicita además mantener el polling fuera de foco mientras el runtime siga activo.
@@ -300,6 +302,8 @@ La app puede conservar datos de agenda/caja obsoletos tras volver de background 
 
 ### MED-12 — Accesibilidad incompleta
 
+**Estado:** [ ] Pendiente auditoría manual con TalkBack/VoiceOver, fuente al 200 %, foco modal y objetivos táctiles en Android/iOS reales.
+
 **Evidencia estática:** 349 `Pressable`, 260 apariciones de `accessibilityRole`, 197 de `accessibilityLabel`; 37 modales frente a 10 apariciones de propiedades de modalidad/foco. Hay múltiples objetivos visuales de 24–42 px.
 
 Las cifras no demuestran por sí solas 89 fallos, porque algunos roles/labels pertenecen a componentes envolventes o reutilizables. Sí justifican una revisión manual: botones icon-only sin rol, foco atrapado en modales, orden de lectura, escape accesible, tamaños inferiores a 44/48 dp y truncado con fuentes grandes.
@@ -331,6 +335,10 @@ Se incluyen accesos a refs durante render, `setState` síncrono en efectos, pure
 **Corrección:** clasificar falsos positivos documentados, corregir los defectos reales y exigir lint verde en CI. No desactivar globalmente reglas de hooks/pureza.
 
 ### MED-15 — Cobertura de pruebas insuficiente
+
+**Estado:** [ ] Cobertura unitaria y de integración ampliada y verde; pendiente E2E nativo real de login, onboarding, agenda, clientes, caja y wallet.
+
+**Avance verificado el 20 de agosto de 2026:** 24 suites y 74 pruebas cubren restauración offline, 401 concurrentes, cambio de tenant, rango único de agenda, fecha civil de wallet, recovery/deep links, push logout, navegación de notificaciones, limpieza de exportaciones, validación runtime, permisos concedidos/denegados/bloqueados y controles de release. `agenda-range.ts` y `permission-access.ts` extraen reglas puras reutilizadas por las pantallas para evitar que las pruebas repliquen la implementación. Typecheck y lint mobile permanecen verdes.
 
 **Evidencia:** 4 archivos de test y 6 casos para 45 archivos de rutas y ~34.990 líneas.
 
@@ -391,6 +399,8 @@ Corregir archivos a UTF-8, eliminar código inalcanzable y añadir check que det
 `clients.tsx` importa `expo-file-system/legacy`. Migrar a la API actual de Expo, especialmente al corregir el ciclo de vida de exportaciones temporales.
 
 ### LOW-07 — Componentes y pantallas monolíticos
+
+**Estado:** [ ] Pendiente refactor progresivo de los ocho módulos enumerados; las extracciones funcionales realizadas durante la remediación reducen riesgo, pero las pantallas principales todavía superan 1.200 líneas.
 
 Mayores archivos:
 
