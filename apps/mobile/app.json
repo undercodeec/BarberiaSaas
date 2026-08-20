@@ -38,13 +38,35 @@
         "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
       "package": "com.barbersaas.mobile",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [
+            {
+              "host": "reservas.navacloud.app",
+              "path": "/accept-invitation",
+              "scheme": "https"
+            },
+            {
+              "host": "reservas.navacloud.app",
+              "path": "/reset-password",
+              "scheme": "https"
+            }
+          ]
+        }
+      ],
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.READ_CONTACTS"
       ]
     },
-    "ios": { "bundleIdentifier": "com.barbersaas.mobile" },
+    "ios": {
+      "associatedDomains": ["applinks:reservas.navacloud.app"],
+      "bundleIdentifier": "com.barbersaas.mobile"
+    },
     "extra": { "router": {} }
   }
 }

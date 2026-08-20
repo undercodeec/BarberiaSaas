@@ -23,8 +23,15 @@
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="barbersaas"/>
-        <data android:scheme="exp+barber-saas-mobile"/>
+        <data android:scheme="barbersaas" android:host="accept-invitation"/>
+        <data android:scheme="barbersaas" android:host="reset-password"/>
+      </intent-filter>
+      <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="https" android:host="reservas.navacloud.app" android:path="/accept-invitation"/>
+        <data android:scheme="https" android:host="reservas.navacloud.app" android:path="/reset-password"/>
       </intent-filter>
     </activity>
   </application>

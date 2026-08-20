@@ -37,4 +37,29 @@ for (const permission of requiredPermissions) {
     throw new Error(`Permiso funcional ausente: ${permission}.`);
 }
 
+const deepLinkDataElements = manifest.match(/<data\b[^>]*>/gu) ?? [];
+const productionSchemeElements = deepLinkDataElements.filter((element) =>
+  element.includes('android:scheme="barbersaas"'),
+);
+if (
+  productionSchemeElements.some((element) => !element.includes('android:host='))
+)
+  throw new Error('Deep link barbersaas sin host restringido.');
+for (const host of ['accept-invitation', 'reset-password']) {
+  if (
+    !productionSchemeElements.some((element) =>
+      element.includes(`android:host="${host}"`),
+    )
+  )
+    throw new Error(`Deep link requerido ausente: ${host}.`);
+}
+if (manifest.includes('android:scheme="exp+barber-saas-mobile"'))
+  throw new Error('El esquema del cliente de desarrollo aparece en release.');
+if (
+  !manifest.includes('android:host="reservas.navacloud.app"') ||
+  !manifest.includes('android:path="/accept-invitation"') ||
+  !manifest.includes('android:path="/reset-password"')
+)
+  throw new Error('La allowlist de App Links no está completa.');
+
 console.log('Manifest Android release verificado.');

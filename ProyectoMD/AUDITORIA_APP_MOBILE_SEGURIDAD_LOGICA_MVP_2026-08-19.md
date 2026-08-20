@@ -356,6 +356,10 @@ Guardar limpia el token y abrir configuración también, pero cerrar mediante ba
 
 ### LOW-04 — Deep link Android demasiado amplio
 
+**Estado:** [x] Corregido y verificado el 19 de agosto de 2026.
+
+**Evidencia de cierre:** el manifest principal limita `barbersaas` a los hosts `accept-invitation` y `reset-password`, mientras el esquema de Expo permanece solo en manifests debug; `app/+native-intent.ts` y `src/lib/incoming-link.ts` aplican una allowlist de ruta, origen y token y redirigen entradas desconocidas a `/`; Android/iOS declaran los App/Universal Links exactos de `reservas.navacloud.app`. El verificador release rechaza esquemas amplios o de desarrollo. Verificado con 63 tests, typecheck, lint aislado, manifest fusionado release y `verify:android-release`.
+
 **Evidencia:** intent filter de `MainActivity` acepta cualquier URI con esquema `barbersaas` o `exp+barber-saas-mobile`, sin host/path.
 
 Cualquier app/web puede abrir rutas del cliente. No se observó bypass de autorización, pero sí navegación inesperada y mayor superficie. Usar App Links/Universal Links verificados y limitar host/path para invitaciones/recovery.
