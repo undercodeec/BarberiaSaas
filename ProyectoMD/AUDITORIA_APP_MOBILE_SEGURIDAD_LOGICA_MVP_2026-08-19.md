@@ -338,6 +338,10 @@ No hay pruebas mobile para AuthProvider, API/token, logout/cache, cambio de tena
 
 ### LOW-01 — QR de reservas delegado a un tercero
 
+**Estado:** [x] Corregido y verificado el 20 de agosto de 2026.
+
+**Evidencia de cierre:** `apps/mobile/src/lib/qr-code.ts` genera localmente una matriz QR versión 5-L con codificación UTF-8, corrección Reed-Solomon, patrones funcionales, máscara y zona silenciosa; `LocalQrCode.tsx` la representa con el `react-native-svg` ya instalado y `BookingLinkSheet.tsx` dejó de construir o abrir URLs de QuickChart. Los enlaces demasiado largos fallan de forma segura y conservan la opción de copiar. Verificado con 66 tests, typecheck, lint mobile y decodificación independiente del QR generado mediante OpenCV.
+
 **Evidencia:** `BookingLinkSheet.tsx:25-27` abre QuickChart con la URL completa como query string.
 
 La URL pública de reservas queda en logs/historial de un tercero y el QR depende de conectividad externa. El enlace está pensado para compartirse, por lo que el impacto es limitado, pero conviene generar el QR localmente y documentar terceros.

@@ -16,16 +16,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { appTheme, goldButtonShadow } from './BottomNavigation';
+import { LocalQrCode } from './LocalQrCode';
 
 type BookingLinkSheetProps = {
   readonly onClose: () => void;
   readonly url: string;
   readonly visible: boolean;
 };
-
-function qrCodeUrl(url: string) {
-  return `https://quickchart.io/qr?size=768&text=${encodeURIComponent(url)}`;
-}
 
 export function BookingLinkSheet({
   onClose,
@@ -34,6 +31,7 @@ export function BookingLinkSheet({
 }: BookingLinkSheetProps) {
   const insets = useSafeAreaInsets();
   const [copied, setCopied] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const translateY = useRef(new Animated.Value(540)).current;
 
   useEffect(() => {
@@ -48,6 +46,7 @@ export function BookingLinkSheet({
   }, [translateY, visible]);
 
   const close = () => {
+    setShowQr(false);
     Animated.timing(translateY, {
       duration: 190,
       easing: Easing.in(Easing.cubic),
@@ -74,7 +73,6 @@ export function BookingLinkSheet({
 
   if (!visible) return null;
   const isBookingUrlReady = Boolean(url);
-  const qrUrl = isBookingUrlReady ? qrCodeUrl(url) : '';
 
   return (
     <Modal
@@ -110,10 +108,20 @@ export function BookingLinkSheet({
             {url || 'Estamos preparando tu enlace de reservas.'}
           </Text>
 
+          {showQr && isBookingUrlReady ? (
+            <View style={styles.qrCard}>
+              <LocalQrCode size={220} value={url} />
+              <Text style={styles.qrHint}>
+                Escanéalo con la cámara. El código se genera en este
+                dispositivo.
+              </Text>
+            </View>
+          ) : null}
+
           <Pressable
             accessibilityRole="button"
             disabled={!isBookingUrlReady}
-            onPress={() => void openUrl(qrUrl, 'mostrar el código QR')}
+            onPress={() => setShowQr((current) => !current)}
             style={[styles.option, !isBookingUrlReady && styles.optionDisabled]}
           >
             <View style={styles.iconCircle}>
@@ -126,12 +134,14 @@ export function BookingLinkSheet({
             <View style={styles.optionCopy}>
               <Text style={styles.optionTitle}>Código QR</Text>
               <Text style={styles.optionDescription}>
-                Ábrelo para descargarlo o compartirlo en tu local y redes.
+                {showQr
+                  ? 'Oculta el código cuando termines de usarlo.'
+                  : 'Muéstralo en tu local sin enviar el enlace a terceros.'}
               </Text>
             </View>
             <Ionicons
               color={appTheme.colors.accentDark}
-              name="open-outline"
+              name={showQr ? 'chevron-up' : 'chevron-down'}
               size={20}
             />
           </Pressable>
@@ -234,6 +244,22 @@ const styles = StyleSheet.create({
   optionDisabled: { opacity: 0.5 },
   optionTitle: { color: appTheme.colors.text, fontSize: 16, fontWeight: '800' },
   overlay: { flex: 1, justifyContent: 'flex-end' },
+  qrCard: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: 22,
+    borderWidth: 1,
+    marginBottom: 14,
+    padding: 14,
+  },
+  qrHint: {
+    color: appTheme.colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 8,
+    textAlign: 'center',
+  },
   sheet: {
     backgroundColor: appTheme.colors.surfaceElevated,
     borderTopLeftRadius: appTheme.radii.sheet,
