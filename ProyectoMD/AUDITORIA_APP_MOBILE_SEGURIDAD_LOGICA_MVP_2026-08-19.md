@@ -310,7 +310,7 @@ La app puede conservar datos de agenda/caja obsoletos tras volver de background 
 
 **Estado:** [ ] Pendiente auditoría manual con TalkBack/VoiceOver, fuente al 200 %, foco modal y objetivos táctiles en Android/iOS reales.
 
-**Prueba Android del 20 de agosto de 2026:** con el tamaño de fuente máximo (200 % o equivalente), Dashboard y Clientes conservaron textos legibles, botones accesibles y sin contenido cortado. Faltan las comprobaciones manuales de TalkBack, foco de modales, objetivos táctiles e iOS.
+**Prueba Android del 20 de agosto de 2026:** con el tamaño de fuente máximo (200 % o equivalente), Dashboard y Clientes conservaron textos legibles, botones accesibles y sin contenido cortado. TalkBack anunció el diálogo de exportación de Clientes y mantuvo el foco en sus acciones. Faltan la revisión completa de objetivos táctiles y la comprobación equivalente en iOS.
 
 **Evidencia estática:** 349 `Pressable`, 260 apariciones de `accessibilityRole`, 197 de `accessibilityLabel`; 37 modales frente a 10 apariciones de propiedades de modalidad/foco. Hay múltiples objetivos visuales de 24–42 px.
 
