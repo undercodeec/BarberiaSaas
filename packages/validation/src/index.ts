@@ -295,6 +295,11 @@ export const updateTeamMemberSchema = z
     }
   });
 
+export const updateMemberOnlineBookingSchema = z.object({
+  locationId: uuidSchema,
+  onlineBookingEnabled: z.boolean(),
+});
+
 export const acceptTeamInvitationSchema = z.object({
   token: z.string().min(32, 'La invitación no es válida.'),
 });
@@ -642,6 +647,9 @@ export type CreateTeamInvitationInput = z.infer<
   typeof createTeamInvitationSchema
 >;
 export type UpdateTeamMemberInput = z.infer<typeof updateTeamMemberSchema>;
+export type UpdateMemberOnlineBookingInput = z.infer<
+  typeof updateMemberOnlineBookingSchema
+>;
 export type DailyAppointmentsQuery = z.infer<
   typeof dailyAppointmentsQuerySchema
 >;

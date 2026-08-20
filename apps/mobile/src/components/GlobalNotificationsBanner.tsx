@@ -338,7 +338,7 @@ export function GlobalNotificationsBanner() {
                   onPress={() => void markAll.mutateAsync()}
                   style={[styles.readAll, !unread && styles.disabled]}
                 >
-                  <Text style={styles.readAllText}>Leer todas</Text>
+                  <Text style={styles.readAllText}>Marcar leídas</Text>
                 </Pressable>
                 <Pressable
                   accessibilityLabel="Cerrar"

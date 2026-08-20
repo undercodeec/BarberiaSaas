@@ -1,9 +1,11 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 
+import navaLogo from '../../mobile/assets/nava-logo.png';
+
 import {
-  API_URL,
   PlatformApiError,
   accessSupport,
   getAuditLogs,
@@ -12,8 +14,9 @@ import {
   getOverview,
   getPlatformSession,
   requestPlatformAccessCode,
-  signIn,
   signOut,
+  startDevelopmentSession,
+  startPlatformLogin,
   updateOrganization,
   verifyPlatformAccessCode,
   type NotificationFailure,
@@ -24,6 +27,8 @@ import {
   type PlatformOverview,
   type SupportDiagnostics,
 } from './platform-api';
+import ParticleField from './ParticleField';
+import PlatformLogin from './PlatformLogin';
 
 const SESSION_KEY = 'nava.platform.session';
 const dateFormatter = new Intl.DateTimeFormat('es-EC', {
@@ -46,6 +51,13 @@ const statusLabels: Readonly<Record<string, string>> = {
   trial: 'En prueba',
 };
 
+const planLabels: Readonly<Record<string, string>> = {
+  essential: 'Esencial',
+  free: 'Free',
+  local: 'Local',
+  multi: 'Multi',
+};
+
 const actionLabels: Readonly<Record<string, string>> = {
   'platform.organization.change_plan': 'Cambio de plan',
   'platform.organization.reactivate': 'Reactivación',
@@ -64,6 +76,11 @@ function formatReason(value: unknown) {
 
 function statusLabel(status: string) {
   return statusLabels[status] ?? status.replaceAll('_', ' ');
+}
+
+function planLabel(plan: string | null) {
+  if (!plan) return 'Sin plan';
+  return planLabels[plan] ?? plan.replaceAll('_', ' ');
 }
 
 function initials(name: string) {
@@ -91,6 +108,9 @@ function Icon({ name }: { readonly name: string }) {
       <path d="M10 17l5-5-5-5M15 12H3m9-9h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7" />
     ),
     menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+    refresh: (
+      <path d="M20 6v5h-5M4 18v-5h5m10.1-2A8 8 0 0 0 6.3 6.3L4 8m16 8-2.3 1.7A8 8 0 0 1 4.9 14" />
+    ),
     search: <path d="m21 21-4.35-4.35M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z" />,
     shield: (
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Zm-3-10 2 2 4-5" />
@@ -113,81 +133,11 @@ function Icon({ name }: { readonly name: string }) {
 function LoadingScreen() {
   return (
     <main className="auth-shell">
-      <div aria-label="Cargando" className="loader" role="status" />
-    </main>
-  );
-}
-
-function LoginScreen({
-  error,
-  loading,
-  onSubmit,
-}: {
-  readonly error: string | null;
-  readonly loading: boolean;
-  readonly onSubmit: (email: string, password: string) => Promise<void>;
-}) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await onSubmit(email, password);
-  }
-
-  return (
-    <main className="auth-shell">
-      <section className="login-card">
+      <div className="loading-lockup">
         <div className="brand-mark brand-mark--large">N</div>
-        <div className="eyebrow">
-          <span /> Operación interna
-        </div>
-        <h1>Control de plataforma</h1>
-        <p className="login-copy">
-          Acceso exclusivo para operadores autorizados de Nava.
-        </p>
-        <form className="login-form" onSubmit={(event) => void submit(event)}>
-          <label>
-            Correo del operador
-            <input
-              autoComplete="email"
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="operaciones@nava.ec"
-              required
-              type="email"
-              value={email}
-            />
-          </label>
-          <label>
-            Contraseña
-            <input
-              autoComplete="current-password"
-              minLength={8}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              type="password"
-              value={password}
-            />
-          </label>
-          {error ? (
-            <div className="form-error" role="alert">
-              {error}
-            </div>
-          ) : null}
-          <button
-            className="button button--primary button--wide"
-            disabled={loading}
-            type="submit"
-          >
-            {loading ? 'Verificando…' : 'Ingresar al panel'}
-          </button>
-        </form>
-        <div className="security-note">
-          <Icon name="shield" />
-          <span>Sesión protegida y acciones auditadas</span>
-        </div>
-        <p className="api-hint">API: {API_URL}</p>
-      </section>
+        <div aria-label="Cargando" className="loader" role="status" />
+        <p>Preparando el centro de operaciones…</p>
+      </div>
     </main>
   );
 }
@@ -570,16 +520,36 @@ function Organizations({
   readonly data: OrganizationList | null;
   readonly loading: boolean;
   readonly onAction: (type: NonNullable<ModalState>['type']) => void;
-  readonly onFilters: (search: string, status: string) => void;
+  readonly onFilters: (
+    search: string,
+    status: string,
+    plan: string,
+    trial: string,
+  ) => void;
   readonly onPage: (page: number) => void;
   readonly onSelect: (organization: PlatformOrganization) => void;
   readonly selected: PlatformOrganization | null;
 }) {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
+  const [plan, setPlan] = useState('all');
+  const [trial, setTrial] = useState('all');
+  const activeFilters = [
+    search.trim(),
+    status !== 'all',
+    plan !== 'all',
+    trial !== 'all',
+  ].filter(Boolean).length;
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onFilters(search.trim(), status);
+    onFilters(search.trim(), status, plan, trial);
+  }
+  function resetFilters() {
+    setSearch('');
+    setStatus('all');
+    setPlan('all');
+    setTrial('all');
+    onFilters('', 'all', 'all', 'all');
   }
   return (
     <>
@@ -598,7 +568,7 @@ function Organizations({
           />
         </label>
         <label>
-          <span className="sr-only">Filtrar por estado</span>
+          <span>Estado</span>
           <select
             onChange={(event) => setStatus(event.target.value)}
             value={status}
@@ -612,49 +582,99 @@ function Organizations({
             <option value="cancelled">Canceladas</option>
           </select>
         </label>
+        <label>
+          <span>Plan</span>
+          <select
+            onChange={(event) => setPlan(event.target.value)}
+            value={plan}
+          >
+            <option value="all">Todos los planes</option>
+            <option value="free">Nava Free</option>
+            <option value="essential">Nava Esencial</option>
+            <option value="local">Nava Local</option>
+            <option value="multi">Nava Multi</option>
+          </select>
+        </label>
+        <label>
+          <span>Periodo de prueba</span>
+          <select
+            onChange={(event) => setTrial(event.target.value)}
+            value={trial}
+          >
+            <option value="all">Cualquier fecha</option>
+            <option value="ending_soon">Vence en 7 días</option>
+            <option value="expired">Prueba vencida</option>
+          </select>
+        </label>
         <button className="button button--primary" type="submit">
           Aplicar filtros
         </button>
+        {activeFilters > 0 ? (
+          <button
+            className="button button--ghost"
+            onClick={resetFilters}
+            type="button"
+          >
+            Limpiar ({activeFilters})
+          </button>
+        ) : null}
       </form>
       <div className="organizations-layout">
-        <section className="table-card">
-          {loading && !data ? (
-            <div className="panel-loader">Cargando organizaciones…</div>
-          ) : null}
-          {data?.organizations.length === 0 ? (
-            <EmptyState>
-              No se encontraron organizaciones con estos filtros.
-            </EmptyState>
-          ) : null}
-          {data?.organizations.map((organization) => (
-            <button
-              className={`organization-row${selected?.id === organization.id ? 'organization-row--selected' : ''}`}
-              key={organization.id}
-              onClick={() => onSelect(organization)}
-              type="button"
-            >
-              <span className="organization-avatar">
-                {initials(organization.name)}
-              </span>
-              <span className="organization-main">
-                <strong>{organization.name}</strong>
-                <small>
-                  {organization.owner?.fullName ?? 'Sin propietario'} ·{' '}
-                  {organization.owner?.email ?? 'Sin contacto'}
-                </small>
-              </span>
-              <span className="organization-plan">
-                <small>Plan</small>
-                <strong>{organization.plan ?? '—'}</strong>
-              </span>
-              <span
-                className={`status-badge status-badge--${organization.status}`}
+        <section className="table-card organization-table">
+          <div className="table-toolbar">
+            <div>
+              <span className="card-kicker">Directorio</span>
+              <strong>{data?.pagination.total ?? 0} organizaciones</strong>
+            </div>
+            {loading ? (
+              <span className="inline-loader">Actualizando…</span>
+            ) : null}
+          </div>
+          <div className="organization-table-body">
+            <div aria-hidden="true" className="organization-table-head">
+              <span>Organización</span>
+              <span>Plan</span>
+              <span>Estado</span>
+            </div>
+            {loading && !data ? (
+              <div className="panel-loader">Cargando organizaciones…</div>
+            ) : null}
+            {data?.organizations.length === 0 ? (
+              <EmptyState>
+                No se encontraron organizaciones con estos filtros.
+              </EmptyState>
+            ) : null}
+            {data?.organizations.map((organization) => (
+              <button
+                aria-pressed={selected?.id === organization.id}
+                className={`organization-row${selected?.id === organization.id ? 'organization-row--selected' : ''}`}
+                key={organization.id}
+                onClick={() => onSelect(organization)}
+                type="button"
               >
-                <span /> {statusLabel(organization.status)}
-              </span>
-              <Icon name="chevron" />
-            </button>
-          ))}
+                <span className="organization-avatar">
+                  {initials(organization.name)}
+                </span>
+                <span className="organization-main">
+                  <strong title={organization.name}>{organization.name}</strong>
+                  <small>
+                    {organization.owner?.fullName ?? 'Sin propietario'} ·{' '}
+                    {organization.owner?.email ?? 'Sin contacto'}
+                  </small>
+                </span>
+                <span className="organization-plan">
+                  <small>Plan</small>
+                  <strong>{planLabel(organization.plan)}</strong>
+                </span>
+                <span
+                  className={`status-badge status-badge--${organization.status}`}
+                >
+                  <span /> {statusLabel(organization.status)}
+                </span>
+                <Icon name="chevron" />
+              </button>
+            ))}
+          </div>
           {data ? (
             <div className="pagination">
               <span>{data.pagination.total} organizaciones</span>
@@ -954,9 +974,13 @@ export default function AdminConsole() {
   >([]);
   const [auditLogs, setAuditLogs] = useState<readonly PlatformAuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [organizationsLoading, setOrganizationsLoading] = useState(true);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
+  const [plan, setPlan] = useState('all');
+  const [trial, setTrial] = useState('all');
   const [selected, setSelected] = useState<PlatformOrganization | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
   const [modalBusy, setModalBusy] = useState(false);
@@ -1006,6 +1030,7 @@ export default function AdminConsole() {
         setOverview(nextOverview);
         setNotificationErrors(failures.errors);
         setAuditLogs(audits.logs);
+        setLastUpdatedAt(new Date());
       })
       .catch((error: unknown) => {
         if (active)
@@ -1026,7 +1051,7 @@ export default function AdminConsole() {
   useEffect(() => {
     if (!token) return;
     let active = true;
-    void getOrganizations(token, { page, search, status })
+    void getOrganizations(token, { page, plan, search, status, trial })
       .then((result) => {
         if (!active) return;
         setOrganizations(result);
@@ -1044,11 +1069,14 @@ export default function AdminConsole() {
               ? error.message
               : 'No fue posible cargar las organizaciones.',
           );
+      })
+      .finally(() => {
+        if (active) setOrganizationsLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [page, refreshKey, search, status, token]);
+  }, [page, plan, refreshKey, search, status, token, trial]);
 
   useEffect(() => {
     if (!toast) return;
@@ -1079,23 +1107,37 @@ export default function AdminConsole() {
     setLoginBusy(true);
     setLoginError(null);
     try {
-      const response = await signIn(email, password);
-      try {
-        const challenge = await requestPlatformAccessCode(
-          response.session.token,
-        );
-        setChallengeToken(response.session.token);
-        setChallengeExpiresAt(challenge.expiresAt);
-        setAuthState('challenge');
-      } catch (error) {
-        await signOut(response.session.token).catch(() => undefined);
-        throw error;
-      }
+      const challenge = await startPlatformLogin(email, password);
+      setChallengeToken(challenge.challengeToken);
+      setChallengeExpiresAt(challenge.expiresAt);
+      setAuthState('challenge');
     } catch (error) {
       setLoginError(
         error instanceof PlatformApiError
           ? error.message
           : 'No fue posible conectar con la API.',
+      );
+    } finally {
+      setLoginBusy(false);
+    }
+  }
+
+  async function enterDevelopmentDashboard() {
+    if (process.env.NODE_ENV === 'production') return;
+    setLoginBusy(true);
+    setLoginError(null);
+    try {
+      const { operator: developmentOperator, session } =
+        await startDevelopmentSession();
+      window.sessionStorage.setItem(SESSION_KEY, session.token);
+      setOperator(developmentOperator);
+      setToken(session.token);
+      setAuthState('authenticated');
+    } catch (error) {
+      setLoginError(
+        error instanceof PlatformApiError
+          ? error.message
+          : 'No fue posible conectar con la API local.',
       );
     } finally {
       setLoginBusy(false);
@@ -1108,9 +1150,9 @@ export default function AdminConsole() {
     setLoginError(null);
     try {
       const session = await verifyPlatformAccessCode(challengeToken, code);
-      window.sessionStorage.setItem(SESSION_KEY, challengeToken);
+      window.sessionStorage.setItem(SESSION_KEY, session.session.token);
       setOperator(session.operator);
-      setToken(challengeToken);
+      setToken(session.session.token);
       setChallengeToken(null);
       setChallengeExpiresAt(null);
       setAuthState('authenticated');
@@ -1161,6 +1203,12 @@ export default function AdminConsole() {
     setAuthState('anonymous');
   }
 
+  function refreshPanel() {
+    setLoading(true);
+    setOrganizationsLoading(true);
+    setRefreshKey((value) => value + 1);
+  }
+
   async function submitOperation(reason: string, planCode: string) {
     if (!token || !modal) return;
     setModalBusy(true);
@@ -1199,7 +1247,12 @@ export default function AdminConsole() {
   if (authState === 'checking') return <LoadingScreen />;
   if (authState === 'anonymous')
     return (
-      <LoginScreen error={loginError} loading={loginBusy} onSubmit={login} />
+      <PlatformLogin
+        error={loginError}
+        loading={loginBusy}
+        onDevelopmentAccess={enterDevelopmentDashboard}
+        onSubmit={login}
+      />
     );
   if (authState === 'challenge' && challengeExpiresAt)
     return (
@@ -1217,12 +1270,9 @@ export default function AdminConsole() {
   return (
     <div className="admin-shell">
       <aside className={`sidebar${mobileMenu ? 'sidebar--open' : ''}`}>
+        <ParticleField className="sidebar-particle-field" />
         <div className="brand">
-          <div className="brand-mark">N</div>
-          <div>
-            <strong>Nava</strong>
-            <span>Plataforma</span>
-          </div>
+          <Image alt="Nava" className="brand-logo" priority src={navaLogo} />
         </div>
         <nav aria-label="Navegación principal">
           {navigation.map((item) => (
@@ -1278,8 +1328,34 @@ export default function AdminConsole() {
             <Icon name="menu" />
           </button>
           <div className="topbar-context">
-            <span>Panel interno</span>
-            <strong>Operación de pilotos</strong>
+            <span>
+              Panel interno /{' '}
+              {navigation.find((item) => item.id === view)?.label}
+            </span>
+            <strong>Operación de plataforma</strong>
+          </div>
+          <div className="topbar-actions">
+            <div className="sync-status">
+              <span />
+              <div>
+                <strong>API conectada</strong>
+                <small>
+                  {lastUpdatedAt
+                    ? `Actualizado ${lastUpdatedAt.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}`
+                    : 'Sincronizando'}
+                </small>
+              </div>
+            </div>
+            <button
+              aria-label="Actualizar datos"
+              className={`refresh-button${loading ? 'refresh-button--loading' : ''}`}
+              disabled={loading}
+              onClick={refreshPanel}
+              title="Actualizar datos"
+              type="button"
+            >
+              <Icon name="refresh" />
+            </button>
           </div>
           <div className="operator">
             <div>
@@ -1298,19 +1374,25 @@ export default function AdminConsole() {
           {view === 'organizations' ? (
             <Organizations
               data={organizations}
-              loading={loading}
+              loading={organizationsLoading}
               onAction={(type) => {
                 if (selected) {
                   setDiagnostics(null);
                   setModal({ organization: selected, type });
                 }
               }}
-              onFilters={(nextSearch, nextStatus) => {
+              onFilters={(nextSearch, nextStatus, nextPlan, nextTrial) => {
+                setOrganizationsLoading(true);
                 setPage(1);
                 setSearch(nextSearch);
                 setStatus(nextStatus);
+                setPlan(nextPlan);
+                setTrial(nextTrial);
               }}
-              onPage={setPage}
+              onPage={(nextPage) => {
+                setOrganizationsLoading(true);
+                setPage(nextPage);
+              }}
               onSelect={setSelected}
               selected={selected}
             />

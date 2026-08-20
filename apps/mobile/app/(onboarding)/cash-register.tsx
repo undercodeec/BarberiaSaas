@@ -158,9 +158,7 @@ export default function CashRegisterScreen() {
   const [movementType, setMovementType] = useState<
     'deposit' | 'expense' | 'other_income' | 'sale' | 'withdrawal'
   >('sale');
-  const [saleKind, setSaleKind] = useState<'free' | 'product' | 'service'>(
-    'free',
-  );
+  const [saleKind, setSaleKind] = useState<'product' | 'service'>('service');
   const [movementServiceId, setMovementServiceId] = useState<string | null>(
     null,
   );
@@ -310,7 +308,7 @@ export default function CashRegisterScreen() {
       setIsSheetOpen(false);
       setMovementAmount('');
       setMovementDescription('');
-      setSaleKind('free');
+      setSaleKind('service');
       setMovementProductId(null);
       setMovementProductQuantity('1');
       setMovementProfessionalId(null);
@@ -391,6 +389,23 @@ export default function CashRegisterScreen() {
         (assignment) => assignment.membershipId === member.id,
       ),
   );
+  const movementAmountValue = Number(movementAmount.replace(',', '.'));
+  const productQuantityValue = Number(movementProductQuantity);
+  const isSaleSelectionComplete =
+    saleKind === 'service'
+      ? Boolean(movementServiceId && movementProfessionalId)
+      : Boolean(
+          movementProductId &&
+            Number.isInteger(productQuantityValue) &&
+            productQuantityValue > 0,
+        );
+  const isMovementReady =
+    Number.isFinite(movementAmountValue) &&
+    movementAmountValue > 0 &&
+    movementDescription.trim().length >= 2 &&
+    (movementType !== 'sale' || isSaleSelectionComplete);
+  const isRegisterMovementDisabled =
+    registerMovement.isPending || !isMovementReady;
   const formatMoney = (amountCents: number) =>
     `$${(amountCents / 100).toFixed(2)}`;
   return (
@@ -553,7 +568,7 @@ export default function CashRegisterScreen() {
             accessibilityRole="button"
             onPress={() => {
               setMovementType('sale');
-              setSaleKind('free');
+              setSaleKind('service');
               setMovementProductId(null);
               setMovementProfessionalId(null);
               setMovementServiceId(null);
@@ -711,7 +726,7 @@ export default function CashRegisterScreen() {
                         onPress={() => {
                           setMovementType(type);
                           if (type !== 'sale') {
-                            setSaleKind('free');
+                            setSaleKind('service');
                             setMovementProductId(null);
                             setMovementProfessionalId(null);
                             setMovementServiceId(null);
@@ -739,46 +754,23 @@ export default function CashRegisterScreen() {
                       <View style={styles.members}>
                         <Pressable
                           onPress={() => {
-                            setSaleKind('free');
+                            setSaleKind('service');
                             setMovementProductId(null);
-                            setMovementProfessionalId(null);
-                            setMovementServiceId(null);
                           }}
                           style={[
                             styles.member,
-                            saleKind === 'free' && styles.selected,
+                            saleKind === 'service' && styles.selected,
                           ]}
                         >
                           <Text
                             style={[
                               styles.memberText,
-                              saleKind === 'free' && styles.selectedText,
+                              saleKind === 'service' && styles.selectedText,
                             ]}
                           >
-                            Venta libre
+                            Servicio
                           </Text>
                         </Pressable>
-                        {!isSoloOwner ? (
-                          <Pressable
-                            onPress={() => {
-                              setSaleKind('service');
-                              setMovementProductId(null);
-                            }}
-                            style={[
-                              styles.member,
-                              saleKind === 'service' && styles.selected,
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.memberText,
-                                saleKind === 'service' && styles.selectedText,
-                              ]}
-                            >
-                              Servicio comisionable
-                            </Text>
-                          </Pressable>
-                        ) : null}
                         <Pressable
                           onPress={() => {
                             setSaleKind('product');
@@ -1000,9 +992,13 @@ export default function CashRegisterScreen() {
                       <Text style={styles.exitText}>Salir</Text>
                     </Pressable>
                     <Pressable
-                      disabled={registerMovement.isPending}
+                      accessibilityState={{ disabled: isRegisterMovementDisabled }}
+                      disabled={isRegisterMovementDisabled}
                       onPress={() => registerMovement.mutate()}
-                      style={styles.confirm}
+                      style={[
+                        styles.confirm,
+                        isRegisterMovementDisabled && styles.confirmDisabled,
+                      ]}
                     >
                       <Text style={styles.primaryText}>
                         {registerMovement.isPending

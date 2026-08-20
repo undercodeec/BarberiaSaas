@@ -216,6 +216,9 @@ async function publicCatalog(
             ...(allowedProfessionalIds === null
               ? {}
               : { id: { in: allowedProfessionalIds } }),
+            memberLocations: {
+              some: { locationId: location.id, onlineBookingEnabled: true },
+            },
             status: MembershipStatus.ACTIVE,
           },
           service: {
@@ -413,6 +416,34 @@ async function publicCatalog(
   };
 }
 
+async function assertPublicOnlineBookingEnabled(
+  database: Pick<DatabaseClient, 'memberLocation'>,
+  input: {
+    locationId: string;
+    membershipId: string;
+    organizationId: string;
+  },
+) {
+  const memberLocation = await database.memberLocation.findFirst({
+    where: {
+      locationId: input.locationId,
+      membershipId: input.membershipId,
+      onlineBookingEnabled: true,
+      membership: {
+        organizationId: input.organizationId,
+        status: MembershipStatus.ACTIVE,
+      },
+    },
+  });
+  if (!memberLocation) {
+    throw new ApiError(
+      404,
+      'PROFESSIONAL_NOT_AVAILABLE',
+      'Este profesional no está disponible para reservas online.',
+    );
+  }
+}
+
 async function calculatePublicAvailability(
   database: DatabaseClient,
   input: {
@@ -423,6 +454,7 @@ async function calculatePublicAvailability(
     serviceIds: readonly string[];
   },
 ) {
+  await assertPublicOnlineBookingEnabled(database, input);
   const context = await loadBookingContext(
     database,
     input.organizationId,
@@ -962,6 +994,11 @@ export function registerPublicBookingRoutes(
           'Este negocio no está aceptando nuevas reservas por el momento.',
         );
       await assertCanCreateBooking(database, location.organizationId, 'public');
+      await assertPublicOnlineBookingEnabled(database, {
+        locationId: location.id,
+        membershipId: input.membershipId,
+        organizationId: location.organizationId,
+      });
       const context = await loadBookingContext(
         database,
         location.organizationId,
@@ -1009,6 +1046,11 @@ export function registerPublicBookingRoutes(
             location.organizationId,
             'public',
           );
+          await assertPublicOnlineBookingEnabled(transaction, {
+            locationId: location.id,
+            membershipId: input.membershipId,
+            organizationId: location.organizationId,
+          });
           await assertCanUseProfessional(
             transaction,
             location.organizationId,

@@ -1,361 +1,563 @@
-Necesito modificar la integración actual de PayPhone de Nava para simplificarla durante el primer MVP.
+Quiero que implementes la **vista de inicio de sesión web de Nava** tomando como referencia visual exacta la **imagen adjunta**.
 
-Antes de editar, revisa completamente:
+## Objetivo
 
-* `ProyectoMD/ESTADO_PROYECTO.md`
-* `ProyectoMD/PAYPHONE_PUESTA_EN_MARCHA.md`
-* El esquema Prisma y las migraciones relacionadas con PayPhone.
-* La implementación actual de configuración PayPhone.
-* La creación de API Link.
-* El webhook `POST /v1/payphone/NotificacionPago`.
-* Los flujos actuales para cobrar una cita, registrar movimientos, calcular comisiones y actualizar `AppointmentPaymentStatus`.
+Replicar el diseño visual de la referencia con alta fidelidad, pero adaptándolo correctamente al stack, arquitectura, componentes y estilos que ya existen en este proyecto.
 
-## Objetivo del cambio
+Antes de modificar código:
 
-PayPhone funcionará solamente como generador de enlaces de cobro.
+1. Analiza la estructura actual del proyecto.
+2. Identifica framework, sistema de rutas, sistema de estilos y componentes reutilizables existentes.
+3. Localiza la pantalla/ruta actual de Login.
+4. Reutiliza componentes existentes siempre que tenga sentido.
+5. No cambies la arquitectura general del proyecto innecesariamente.
 
-Cada propietario conectará su propia cuenta PayPhone Business ingresando:
+---
 
-* Token.
-* StoreID.
-* Ambiente: Pruebas o Producción.
+# Diseño
 
-Nava permitirá generar y abrir el enlace para que el cliente pague con tarjeta. Sin embargo, Nava no recibirá confirmación automática del resultado.
+La pantalla debe ocupar:
 
-El propietario o un usuario autorizado deberá verificar el pago en PayPhone Business y pulsar manualmente un botón dentro de Nava para registrar el cobro.
+```css
+min-height: 100vh;
+width: 100%;
+```
 
-Para este MVP no se utilizará:
+En escritorio debe dividirse visualmente en **dos grandes secciones**.
 
-* Notificación Externa.
-* Webhook de PayPhone.
-* Consulta automática o periódica de pagos.
-* API Sale para confirmar automáticamente el resultado.
-* Modelo de comercio aliado o token de terceros.
-* Custodia o intermediación de fondos por Nava.
+## Panel izquierdo
 
-## Decisiones obligatorias
+Debe ocupar aproximadamente:
 
-### 1. Conservar la conexión PayPhone existente
+```text
+42% - 45% del ancho
+```
+
+Características:
+
+* Fondo negro / carbón muy oscuro.
+* Apariencia premium.
+* Bordes limpios.
+* La zona inferior/derecha puede tener una terminación curva similar a la referencia.
+* Incorporar detalles dorados sutiles.
+* Evitar saturar visualmente la interfaz.
+
+Paleta aproximada:
+
+```css
+--background-dark: #111111;
+--background-dark-secondary: #1C1C1C;
+
+--gold: #C9A227;
+--gold-light: #E4C45A;
+--gold-dark: #A67C00;
+
+--white: #FFFFFF;
+--off-white: #FAF9F6;
+
+--gray-light: #EEECE7;
+--gray: #9A9A9A;
+--text-dark: #111111;
+```
+
+Puedes ajustar ligeramente los dorados para conseguir una apariencia más elegante.
+
+### Logo
+
+En la zona superior izquierda incluir el isotipo/logo de Nava.
+
+Si existe un logo real dentro de `/public`, `/assets` o recursos del proyecto, úsalo.
+
+No inventes un nuevo logo si ya existe uno.
+
+### Mensaje
+
+Mostrar:
+
+```text
+Bienvenido a Nava
+```
+
+"Nava" debe tener acento dorado.
+
+Debajo:
+
+```text
+La plataforma inteligente que impulsa
+tu productividad al siguiente nivel.
+```
+
+Tipografía limpia, moderna y profesional.
+
+### Elemento visual
+
+Recrear el concepto visual de la referencia:
+
+* ondas digitales;
+* partículas;
+* líneas;
+* pequeños puntos;
+* brillos dorados;
+* sensación tecnológica y premium.
+
+IMPORTANTE:
+
+No hace falta copiar pixel por pixel la ilustración.
+
+Puede recrearse utilizando:
+
+* CSS gradients;
+* radial-gradient;
+* pseudo-elementos;
+* SVG;
+* canvas;
+* o una combinación ligera de efectos.
+
+Prioriza rendimiento.
+
+No agregues dependencias pesadas únicamente para generar el fondo.
+
+Debe sentirse como:
+
+```text
+tecnología + lujo + minimalismo
+```
+
+y no como una interfaz de criptomonedas o casino.
+
+### Mensaje inferior
+
+Agregar un pequeño icono de escudo y el texto:
+
+```text
+Seguro, confiable y diseñado
+para equipos modernos.
+```
+
+Con detalles dorados discretos.
+
+---
+
+# Panel derecho
+
+Fondo:
+
+```css
+#FFFFFF
+```
+
+o un blanco ligeramente cálido:
+
+```css
+#FAF9F6
+```
+
+Debe ocupar aproximadamente:
+
+```text
+55% - 58%
+```
+
+del ancho de pantalla.
+
+El formulario debe estar centrado vertical y horizontalmente.
+
+---
+
+# Card de Login
+
+Crear una tarjeta blanca similar a la referencia.
+
+Características:
+
+```text
+ancho aproximado: 500 - 560px
+border-radius: 24 - 30px
+padding generoso
+sombra extremadamente suave
+```
+
+Ejemplo conceptual:
+
+```css
+box-shadow:
+  0 20px 60px rgba(0, 0, 0, 0.06);
+```
+
+No exagerar las sombras.
+
+Debe transmitir una interfaz SaaS moderna y premium.
+
+---
+
+# Logo principal
+
+En la parte superior del formulario mostrar:
+
+```text
+Nava
+```
+
+Usar el logo real del proyecto si existe.
+
+El elemento distintivo de la marca puede utilizar dorado.
+
+---
+
+# Formulario
+
+Mostrar:
+
+## Título
+
+```text
+Iniciar sesión
+```
+
+## Subtítulo
+
+```text
+Ingresa tus credenciales para continuar
+```
+
+---
+
+## Correo electrónico
+
+Label:
+
+```text
+Correo electrónico
+```
+
+Input:
+
+```text
+ejemplo@correo.com
+```
+
+Agregar icono de correo dentro del input.
+
+---
+
+## Contraseña
+
+Label:
+
+```text
+Contraseña
+```
+
+Input de contraseña.
+
+Agregar:
+
+* icono de candado a la izquierda;
+* botón de mostrar/ocultar contraseña a la derecha.
+
+El botón debe funcionar realmente.
+
+---
+
+# Opciones
+
+Debajo de contraseña:
+
+Izquierda:
+
+```text
+☑ Recordarme
+```
+
+Derecha:
+
+```text
+¿Olvidaste tu contraseña?
+```
+
+El enlace debe utilizar dorado como color de énfasis.
+
+---
+
+# Botón principal
+
+Texto:
+
+```text
+Ingresar
+```
+
+Debe ocupar prácticamente todo el ancho disponible.
+
+Estilo:
+
+* fondo dorado;
+* degradado dorado muy sutil;
+* texto blanco o negro dependiendo del contraste;
+* border-radius aproximadamente 10-14px;
+* transición suave;
+* icono/flecha a la derecha.
+
+Ejemplo conceptual:
+
+```css
+background: linear-gradient(
+  135deg,
+  #C9A227,
+  #D9B743
+);
+```
+
+Hover:
+
+* ligera elevación;
+* pequeño cambio de brillo;
+* transición de 200-300ms.
+
+No agregar animaciones excesivas.
+
+---
+
+# Crear cuenta
+
+En la parte inferior:
+
+```text
+¿No tienes una cuenta? Crear cuenta
+```
+
+"Crear cuenta" debe aparecer en dorado y ser clickeable si ya existe una ruta de registro.
+
+---
+
+# Importante sobre autenticación
+
+Nava utiliza actualmente autenticación tradicional mediante **correo electrónico y contraseña**.
+
+Por lo tanto:
+
+**NO agregar autenticación mediante Google ni Microsoft.**
+
+Aunque aparezcan en la referencia visual, omite esos botones.
+
+No agregues Firebase ni ningún proveedor adicional.
+
+Utiliza exclusivamente el mecanismo de autenticación que ya tenga implementado el proyecto.
+
+---
+
+# Responsive
+
+La pantalla debe funcionar correctamente en:
+
+```text
+Desktop
+Laptop
+Tablet
+Mobile
+```
+
+## Desktop
+
+Mantener layout dividido:
+
+```text
+panel visual | formulario
+```
+
+## Tablet
+
+Puede mantenerse el panel izquierdo reducido o simplificado si existe espacio suficiente.
+
+## Mobile
+
+En resoluciones pequeñas:
+
+* ocultar el panel visual izquierdo;
+* formulario ocupando toda la pantalla;
+* mantener logo;
+* mantener buen padding lateral;
+* card sin sombra excesiva;
+* evitar scroll horizontal;
+* mantener inputs y botón cómodos para interacción táctil.
+
+Ejemplo:
+
+```text
+< 768px
+```
+
+mostrar únicamente el formulario.
+
+---
+
+# Animaciones
+
+Agregar únicamente microinteracciones sutiles:
+
+### Inputs
+
+Al hacer focus:
+
+* borde dorado;
+* pequeño glow dorado con baja opacidad.
+
+### Botón
+
+Hover:
+
+```text
+translateY(-1px)
+```
+
+y ligero aumento de luminosidad.
+
+### Card
+
+Al cargar puede aparecer con:
+
+```text
+opacity 0 → 1
+translateY(8px) → 0
+```
+
+duración aproximada:
+
+```text
+300-500ms
+```
+
+No implementar animaciones innecesarias.
+
+---
+
+# Accesibilidad
 
 Mantener:
 
-* Configuración independiente por negocio.
-* Token y StoreID.
-* Ambientes Pruebas y Producción.
-* Cifrado AES-256-GCM del Token.
-* `PAYPHONE_CREDENTIALS_ENCRYPTION_KEY`.
-* Prueba de conexión.
-* Activación, desactivación, rotación y desconexión.
-* El Token nunca debe regresar al cliente ni aparecer en logs, auditorías o respuestas.
-* Creación de API Link con monto expresado correctamente en centavos.
-* Identificador interno único e idempotente.
-* Expiración del enlace después de una hora.
-* Registro de cada intento de pago.
+* labels reales asociados a inputs;
+* navegación mediante teclado;
+* estados `focus-visible`;
+* contraste correcto;
+* botones accesibles;
+* `autocomplete="email"`;
+* `autocomplete="current-password"`;
+* atributos `aria-label` cuando sean necesarios.
 
-No reutilizar estas credenciales para cobrar la suscripción de Nava.
+---
 
-### 2. Retirar la dependencia del webhook
+# Código
 
-El flujo no debe requerir autorización de Notificación Externa.
+Quiero código:
 
-Retirar o desactivar de forma segura:
+* limpio;
+* mantenible;
+* responsive;
+* modular;
+* reutilizable;
+* consistente con el proyecto.
 
-`POST /v1/payphone/NotificacionPago`
+Evita:
 
-También deben retirarse del flujo operativo:
+* CSS duplicado;
+* estilos inline innecesarios;
+* componentes gigantes;
+* dependencias nuevas si pueden evitarse;
+* modificar funcionalidades que no tienen relación con esta pantalla.
 
-* Procesamiento automático de notificaciones.
-* Validación automática mediante API Sale.
-* Cambio automático de la cita a `PAID`.
-* Instrucciones que indiquen que cada barbería debe solicitar Notificación Externa.
-* Configuración del webhook `https://api.navacloud.app/v1/payphone/NotificacionPago`.
+Si el proyecto utiliza componentes como:
 
-No eliminar migraciones ya aplicadas ni reescribir su historial. Si el webhook debe conservarse temporalmente por compatibilidad, déjalo deshabilitado mediante configuración y sin incluirlo en el flujo del MVP. Documenta claramente la decisión.
+```text
+Button
+Input
+Card
+Typography
+Icon
+```
 
-### 3. Flujo público de pago
+reutilízalos.
 
-Después de verificar la reserva, si PayPhone está activo para el negocio:
+Si utiliza Tailwind, utiliza Tailwind.
 
-1. Mostrar el botón `Pagar ahora con PayPhone`.
-2. Solicitar al backend un API Link único para esa reserva.
-3. Abrir el enlace oficial de PayPhone.
-4. Permitir que el cliente complete el pago con tarjeta.
-5. No mostrar `Pago aprobado` al regresar o cerrar PayPhone.
-6. Mostrar un mensaje claro:
+Si utiliza CSS Modules, mantén CSS Modules.
 
-   `El pago será verificado por el negocio. Conserva tu comprobante de PayPhone.`
+Si utiliza styled-components u otro sistema, mantén el sistema existente.
 
-Nava no debe marcar la cita como pagada basándose en:
+**No cambies la tecnología de estilos solamente para implementar esta pantalla.**
 
-* Que el enlace haya sido creado.
-* Que el cliente haya abierto PayPhone.
-* Que el navegador haya regresado.
-* Una respuesta controlada por el cliente.
-* Una captura o parámetro de URL.
+---
 
-Crear o abrir el enlace solo representa un intento pendiente de verificación.
+# Iconos
 
-### 4. Confirmación manual desde la aplicación
+Usa la librería de iconos que ya tenga instalada el proyecto.
 
-En el detalle de una cita con pago pendiente, mostrar a los usuarios autorizados:
+Por ejemplo:
 
-`Registrar cobro PayPhone`
+```text
+Lucide
+Heroicons
+Material Icons
+```
 
-El botón debe estar disponible únicamente cuando:
+No agregues una nueva librería si ya existe una.
 
-* La cita pertenece a la organización del usuario autenticado.
-* Existe una configuración PayPhone activa.
-* La cita todavía está pendiente de pago.
-* Existe al menos un intento de pago PayPhone para esa cita.
-* El usuario tiene el permiso actualmente utilizado para cobrar o administrar citas.
+---
 
-No limitarlo exclusivamente al propietario si el sistema ya permite que administrador o recepción registren cobros. Respeta el modelo de permisos vigente.
+# Resultado visual esperado
 
-Al pulsarlo, mostrar una confirmación explícita:
+La pantalla debe transmitir:
 
-**Título:** `Confirmar cobro PayPhone`
+```text
+Premium
+Minimalista
+Tecnológica
+Elegante
+Profesional
+Moderna
+```
 
-**Mensaje:**
+Paleta predominante:
 
-`Antes de continuar, verifica en PayPhone Business que el pago fue aprobado y que el monto recibido coincide con el total de la cita. Nava no puede comprobar este pago automáticamente.`
+```text
+Blanco
+Negro
+Dorado
+Grises cálidos
+```
 
-Mostrar como mínimo:
+No utilizar:
 
-* Cliente.
-* Fecha de la cita.
-* Total esperado.
-* Moneda.
-* Fecha de generación del enlace.
-* Referencia interna del intento.
+```text
+azul
+morado
+verde
+rojo
+```
 
-Solicitar:
+como colores principales de la interfaz.
 
-* Confirmación obligatoria mediante checkbox:
+---
 
-  `Confirmo que verifiqué el pago aprobado en PayPhone Business.`
+# Antes de finalizar
 
-* Referencia o número de transacción PayPhone, si está disponible. Preferiblemente debe ser obligatorio para mejorar la trazabilidad; si la estructura actual no permite exigirlo sin afectar el MVP, justificar y documentar que queda opcional.
+Verifica:
 
-* Nota opcional.
+1. Que el proyecto compile.
+2. Que no existan errores TypeScript/JavaScript.
+3. Que el login existente continúe funcionando.
+4. Que mostrar/ocultar contraseña funcione.
+5. Que los enlaces respeten las rutas existentes.
+6. Que no exista overflow horizontal.
+7. Que funcione correctamente en móvil.
+8. Que no hayas agregado dependencias innecesarias.
+9. Que no hayas modificado otras pantallas accidentalmente.
 
-Acción final:
+Después de implementar, indícame brevemente:
 
-`Registrar como pagado`
+* archivos creados;
+* archivos modificados;
+* qué componentes reutilizaste;
+* cómo resolviste el responsive;
+* cualquier consideración importante de la implementación.
 
-### 5. Registro transaccional del cobro
-
-Crear un endpoint autenticado específico o adaptar cuidadosamente el endpoint de cobro existente.
-
-Ejemplo semántico:
-
-`POST /v1/appointments/:appointmentId/payphone/manual-confirmation`
-
-El servidor debe:
-
-1. Resolver la organización y los permisos desde la sesión, nunca desde valores confiados al cliente.
-2. Verificar que la cita pertenece a esa organización.
-3. Verificar que continúa pendiente.
-4. Verificar que existe un intento PayPhone relacionado.
-5. Tomar el importe y la moneda desde la cita o su snapshot persistido, no desde el cuerpo enviado por el cliente.
-6. Registrar que la fuente de confirmación fue manual.
-7. Guardar usuario, fecha, referencia y nota.
-8. Actualizar la cita a `PAID`.
-9. Ejecutar la conciliación de comisiones existente cuando corresponda.
-10. Registrar el movimiento financiero con método PayPhone o tarjeta, siguiendo el modelo contable actual.
-11. No incrementar el efectivo esperado de la caja física.
-12. Crear auditoría con actor, cita, intento relacionado, importe, referencia y origen manual.
-13. Ejecutar todo en una sola transacción de base de datos.
-
-El movimiento debe quedar identificado claramente como cobro externo mediante PayPhone. No presentarlo como confirmación validada automáticamente por el proveedor.
-
-### 6. Idempotencia y concurrencia
-
-La confirmación manual debe ser idempotente.
-
-* Dos pulsaciones simultáneas no pueden crear dos pagos.
-* No pueden duplicarse movimientos de Wallet.
-* No pueden duplicarse comisiones.
-* Si la cita ya está pagada por el mismo registro, devolver un resultado exitoso estable.
-* Si ya fue pagada mediante otro método, responder con un conflicto claro y no modificar datos.
-* Utilizar restricciones únicas y transacciones cuando corresponda.
-* No confiar solamente en comprobaciones previas realizadas en TypeScript.
-
-### 7. Estados y textos
-
-Distinguir claramente:
-
-* `Enlace generado`.
-* `Pendiente de verificación`.
-* `Confirmado manualmente`.
-* `Enlace vencido`.
-* `Cancelado`, si aplica.
-
-No utilizar nombres como:
-
-* `Verificado por PayPhone`.
-* `Confirmado por el proveedor`.
-* `Pago automático`.
-
-En Wallet y en el detalle de la cita debe mostrarse:
-
-`Confirmado manualmente por [usuario]`
-
-También debe mostrarse la fecha y la referencia registrada.
-
-El historial debe conservar intentos vencidos o anteriores sin duplicar ingresos.
-
-### 8. Seguridad
-
-* Solo la API puede descifrar el Token.
-* No enviar el Token a la aplicación móvil ni a la web pública.
-* No registrar el Token en logs.
-* No permitir que un usuario confirme pagos de otra organización.
-* No aceptar importe, moneda, StoreID u organización enviados por el cliente como fuente de verdad.
-* Aplicar rate limiting razonable a la generación de enlaces.
-* Mantener la protección contra enlaces duplicados.
-* Sanitizar la referencia y la nota.
-* No almacenar datos de tarjetas.
-* Nava no recibe, retiene ni distribuye fondos.
-
-### 9. Interfaz de configuración
-
-Actualizar las instrucciones de PayPhone en Wallet para explicar:
-
-1. Crear una cuenta PayPhone Business.
-2. Crear una aplicación API.
-3. Obtener Token y StoreID.
-4. Pegarlos en Nava.
-5. Probar la conexión.
-6. Activar PayPhone.
-7. Verificar los pagos desde PayPhone Business antes de registrarlos en Nava.
-
-Eliminar cualquier indicación de que el negocio debe:
-
-* Solicitar Notificación Externa.
-* Registrar un webhook.
-* Esperar una confirmación automática.
-
-Incluir esta advertencia visible:
-
-`Nava genera el enlace de cobro, pero PayPhone no comunica automáticamente el resultado. Verifica la transacción en PayPhone Business antes de registrarla como pagada.`
-
-Agregar un acceso externo seguro a PayPhone Business cuando sea apropiado.
-
-### 10. Migraciones
-
-Revisar estas migraciones existentes:
-
-* `20260811120000_payphone_configuration`
-* `20260811150000_payphone_payment_attempts`
-
-No borrarlas ni modificarlas si ya forman parte del historial.
-
-Crear una nueva migración solo si hace falta persistir datos como:
-
-* Tipo de confirmación.
-* Usuario que confirmó.
-* Fecha de confirmación.
-* Referencia PayPhone.
-* Nota.
-* Relación con el intento utilizado.
-
-Utilizar nombres compatibles con las convenciones actuales del esquema.
-
-### 11. Pruebas obligatorias
-
-Agregar o actualizar pruebas para comprobar:
-
-* Guardado cifrado de Token y StoreID.
-* El Token nunca se devuelve al cliente.
-* Generación correcta del API Link.
-* Importe correcto en centavos.
-* Expiración de una hora.
-* Idempotencia de generación.
-* Rechazo cuando PayPhone está desactivado.
-* Rechazo por permisos insuficientes.
-* Aislamiento entre organizaciones.
-* Confirmación manual correcta.
-* El importe se obtiene del servidor.
-* Creación de auditoría.
-* Registro en Wallet sin aumentar el efectivo físico esperado.
-* Conciliación de comisión cuando la cita está completada.
-* Confirmación antes de completar y conciliación posterior.
-* Doble confirmación secuencial.
-* Doble confirmación concurrente.
-* Conflicto si la cita fue cobrada con otro método.
-* Un enlace vencido no se considera pago.
-* El simple retorno desde PayPhone no marca la cita como `PAID`.
-* La interfaz no promete confirmación automática.
-
-Ejecutar:
-
-* Prisma format y validate.
-* Generación de Prisma Client.
-* Typecheck de API, cliente compartido, móvil y web.
-* ESLint de archivos modificados.
-* Pruebas unitarias.
-* Pruebas API/PostgreSQL.
-* Build de API.
-* Exportación o build de la web pública.
-* Pruebas de componentes relacionadas con Wallet y citas.
-
-No declarar aprobadas pruebas que no hayan sido ejecutadas.
-
-### 12. Documentación
-
-Actualizar:
-
-* `ProyectoMD/PAYPHONE_PUESTA_EN_MARCHA.md`
-* `ProyectoMD/ESTADO_PROYECTO.md`
-
-La documentación debe dejar claro que:
-
-* Para cobrar solo hacen falta una cuenta PayPhone Business activa, Token y StoreID.
-* Notificación Externa no forma parte del MVP.
-* Nava no confirma automáticamente el pago.
-* El negocio debe verificarlo en PayPhone Business.
-* La confirmación dentro de Nava es manual y administrativa.
-* No debe registrarse un cobro sin comprobar previamente la transacción.
-* El dinero llega directamente a la cuenta PayPhone del negocio.
-* Nava no custodia fondos.
-* Pueden existir comisiones normales de procesamiento cobradas por PayPhone.
-
-Eliminar de la lista de despliegue la solicitud de autorización del webhook.
-
-Mantener como pasos de despliegue:
-
-* Aplicar las migraciones necesarias.
-* Configurar `PAYPHONE_CREDENTIALS_ENCRYPTION_KEY`.
-* Reiniciar API y Web.
-* Configurar Token, StoreID y ambiente por negocio.
-* Probar la creación de un enlace en Pruebas.
-* Realizar un pago controlado.
-* Verificarlo en PayPhone Business.
-* Registrarlo manualmente en Nava.
-* Confirmar que la cita, Wallet, auditoría y comisión quedaron correctas.
-
-## Restricciones
-
-* No implementar webhook.
-* No implementar polling.
-* No incorporar token de terceros.
-* No implementar cobro de suscripciones de Nava.
-* No cambiar funcionalidades ajenas.
-* No eliminar cambios simultáneos existentes.
-* No realizar commits sin revisar primero el estado del árbol de trabajo.
-* No desplegar a producción sin autorización expresa.
-* No asumir que una cita está pagada solo porque existe un enlace.
-
-## Entrega esperada
-
-Al terminar, informar:
-
-1. Archivos modificados.
-2. Migración creada, si aplica.
-3. Endpoint y permisos utilizados.
-4. Funcionamiento exacto de la confirmación manual.
-5. Tratamiento contable en Wallet.
-6. Cambios realizados al webhook existente.
-7. Pruebas ejecutadas y resultados reales.
-8. Riesgos o validaciones manuales pendientes.
-9. Comandos exactos de migración y despliegue, sin ejecutarlos en producción.
+No quiero únicamente un mockup estático: **quiero la vista integrada correctamente dentro del proyecto existente y conservando la funcionalidad actual del login.**

@@ -130,11 +130,18 @@ async function request<T>(
   return (await response.json()) as T;
 }
 
-export async function signIn(email: string, password: string) {
-  return request<{ session: { expiresAt: string; token: string } }>(
-    '/v1/auth/login',
+export async function startPlatformLogin(email: string, password: string) {
+  return request<{ challengeToken: string; expiresAt: string }>(
+    '/v1/platform/login',
     { body: JSON.stringify({ email, password }), method: 'POST' },
   );
+}
+
+export async function startDevelopmentSession() {
+  return request<{
+    operator: Operator;
+    session: { expiresAt: string; token: string };
+  }>('/v1/platform/development-session', { method: 'POST' });
 }
 
 export async function signOut(token: string) {
@@ -154,7 +161,10 @@ export async function requestPlatformAccessCode(token: string) {
 }
 
 export async function verifyPlatformAccessCode(token: string, code: string) {
-  return request<{ operator: Operator }>(
+  return request<{
+    operator: Operator;
+    session: { expiresAt: string; token: string };
+  }>(
     '/v1/platform/verify-access-code',
     { body: JSON.stringify({ code }), method: 'POST' },
     token,
@@ -169,14 +179,18 @@ export async function getOrganizations(
   token: string,
   input: {
     readonly page: number;
+    readonly plan: string;
     readonly search: string;
     readonly status: string;
+    readonly trial: string;
   },
 ) {
   const query = new URLSearchParams({
     page: String(input.page),
     pageSize: '10',
+    plan: input.plan,
     status: input.status,
+    trial: input.trial,
   });
   if (input.search) query.set('search', input.search);
   return request<OrganizationList>(

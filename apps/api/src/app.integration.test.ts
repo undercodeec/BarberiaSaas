@@ -190,6 +190,8 @@ describeWithDatabase('API con PostgreSQL', () => {
     MOBILE_INVITATION_URL: 'barbersaas://accept-invitation',
     MOBILE_RESET_URL: 'barbersaas://reset-password',
     PLATFORM_ADMIN_EMAILS: 'platform@example.com',
+    PLATFORM_ADMIN_PASSWORD_HASH:
+      'scrypt$16384$8$1$A6C4FBINr3qyaQDaouJCtQ$R9u7ox1ELJJOHJni_JBpVpSp2WbG1NPt7Tm_8M8TWt-QKkYwRlro_MA54m-ZXYBemX_Fva0Lk7sppR3bj8P1JA',
   });
   const invitationMessages: InvitationMessage[] = [];
   const platformAccessMessages: PlatformAccessMessage[] = [];
@@ -3025,7 +3027,7 @@ describeWithDatabase('API con PostgreSQL', () => {
         },
         url: '/v1/cash-register/movements',
       });
-    expect((await movement('sale', 'cash', 2_000)).statusCode).toBe(201);
+    expect((await movement('sale', 'cash', 2_000)).statusCode).toBe(400);
     expect((await movement('deposit', 'cash', 800)).statusCode).toBe(201);
     expect((await movement('other_income', 'transfer', 200)).statusCode).toBe(
       201,
@@ -3084,7 +3086,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     });
     expect(salesCsv.statusCode).toBe(200);
     expect(salesCsv.headers['content-type']).toContain('text/csv');
-    expect(salesCsv.body).toContain('sale de prueba');
+    expect(salesCsv.body).not.toContain('sale de prueba');
 
     const businessSummary = await app.inject({
       headers: { authorization: `Bearer ${token}` },
@@ -3112,14 +3114,14 @@ describeWithDatabase('API con PostgreSQL', () => {
       expenses: { operatingCents: 500, totalCents: 500 },
       income: {
         otherIncomeCents: 1_000,
-        salesCents: 2_000,
-        totalCents: 3_000,
+        salesCents: 0,
+        totalCents: 1_000,
       },
-      netResultCents: 2_500,
+      netResultCents: 500,
       sales: {
-        grossCents: 2_000,
-        transactionCount: 1,
-        uncategorizedCents: 2_000,
+        grossCents: 0,
+        transactionCount: 0,
+        uncategorizedCents: 0,
       },
       withdrawalsCents: 300,
     });
@@ -3132,12 +3134,12 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(summary.statusCode).toBe(200);
     expect(
       summary.json<{ totals: { expectedCash: number } }>().totals.expectedCash,
-    ).toBe(3_500);
+    ).toBe(1_500);
 
     const closed = await app.inject({
       headers: { authorization: `Bearer ${token}` },
       method: 'POST',
-      payload: { closingAmountCents: 3_400, note: 'Faltante comprobado' },
+      payload: { closingAmountCents: 1_400, note: 'Faltante comprobado' },
       url: '/v1/cash-register/close',
     });
     expect(closed.statusCode).toBe(200);
@@ -3177,15 +3179,15 @@ describeWithDatabase('API con PostgreSQL', () => {
     ).toMatchObject({
       movements: expect.any(Array),
       session: {
-        closingAmountCents: 3_400,
+        closingAmountCents: 1_400,
         closingNote: 'Faltante comprobado',
       },
       totals: {
-        cashSales: 2_000,
+        cashSales: 0,
         deposits: 800,
-        expectedCash: 3_500,
+        expectedCash: 1_500,
         otherIncome: 200,
-        sales: 2_000,
+        sales: 0,
       },
     });
     const actions = await database.auditLog.findMany({
@@ -3204,8 +3206,9 @@ describeWithDatabase('API con PostgreSQL', () => {
   it('opera pilotos desde el panel interno con acceso exclusivo y soporte sin suplantación', async () => {
     const ownerToken = await register('pilot-owner@example.com');
     const pilot = await onboard(ownerToken, 'piloto-plataforma');
-    const platformToken = await register('platform@example.com');
+    const platformAccountToken = await register('platform@example.com');
     const outsiderToken = await register('not-platform@example.com');
+    let platformToken: string;
 
     const denied = await app.inject({
       headers: { authorization: `Bearer ${outsiderToken}` },
@@ -3218,7 +3221,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     );
 
     const session = await app.inject({
-      headers: { authorization: `Bearer ${platformToken}` },
+      headers: { authorization: `Bearer ${platformAccountToken}` },
       method: 'GET',
       url: '/v1/platform/session',
     });
@@ -3227,19 +3230,22 @@ describeWithDatabase('API con PostgreSQL', () => {
       'PLATFORM_ACCESS_CODE_REQUIRED',
     );
 
-    const requestedCode = await app.inject({
-      headers: { authorization: `Bearer ${platformToken}` },
+    const login = await app.inject({
       method: 'POST',
-      url: '/v1/platform/access-code',
+      payload: {
+        email: 'platform@example.com',
+        password: 'Clave-plataforma-123',
+      },
+      url: '/v1/platform/login',
     });
-    expect(requestedCode.statusCode).toBe(200);
-    expect(requestedCode.body).not.toContain('code');
+    expect(login.statusCode).toBe(200);
+    expect(login.body).not.toContain('code');
+    platformToken = login.json<{ challengeToken: string }>().challengeToken;
     expect(platformAccessMessages).toHaveLength(1);
     expect(platformAccessMessages[0]?.email).toBe('platform@example.com');
     expect(
-      new Date(
-        requestedCode.json<{ expiresAt: string }>().expiresAt,
-      ).getTime() - Date.now(),
+      new Date(login.json<{ expiresAt: string }>().expiresAt).getTime() -
+        Date.now(),
     ).toBeLessThanOrEqual(5 * 60 * 1000);
 
     const expiredChallenge =
@@ -3261,12 +3267,17 @@ describeWithDatabase('API con PostgreSQL', () => {
       'PLATFORM_ACCESS_CODE_EXPIRED',
     );
 
-    const requestedReplacement = await app.inject({
-      headers: { authorization: `Bearer ${platformToken}` },
+    const replacementLogin = await app.inject({
       method: 'POST',
-      url: '/v1/platform/access-code',
+      payload: {
+        email: 'platform@example.com',
+        password: 'Clave-plataforma-123',
+      },
+      url: '/v1/platform/login',
     });
-    expect(requestedReplacement.statusCode).toBe(200);
+    expect(replacementLogin.statusCode).toBe(200);
+    platformToken = replacementLogin.json<{ challengeToken: string }>()
+      .challengeToken;
     const accessCode = platformAccessMessages[1]?.code;
     expect(accessCode).toMatch(/^\d{6}$/u);
     const invalidCode = await app.inject({
@@ -3279,15 +3290,16 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(invalidCode.json<{ code: string }>().code).toBe(
       'INVALID_PLATFORM_ACCESS_CODE',
     );
+    const verifiedChallengeToken = platformToken;
     const verifiedSession = await app.inject({
-      headers: { authorization: `Bearer ${platformToken}` },
+      headers: { authorization: `Bearer ${verifiedChallengeToken}` },
       method: 'POST',
       payload: { code: accessCode },
       url: '/v1/platform/verify-access-code',
     });
     expect(verifiedSession.statusCode).toBe(200);
     const replayedCode = await app.inject({
-      headers: { authorization: `Bearer ${platformToken}` },
+      headers: { authorization: `Bearer ${verifiedChallengeToken}` },
       method: 'POST',
       payload: { code: accessCode },
       url: '/v1/platform/verify-access-code',
@@ -3296,6 +3308,9 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(replayedCode.json<{ code: string }>().code).toBe(
       'PLATFORM_ACCESS_CODE_USED',
     );
+    platformToken = verifiedSession.json<{
+      session: { token: string };
+    }>().session.token;
 
     const verifiedPlatformSession = await app.inject({
       headers: { authorization: `Bearer ${platformToken}` },

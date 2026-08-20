@@ -98,7 +98,7 @@ export default function NotificationsScreen() {
           onPress={() => void markAllRead.mutateAsync()}
           style={[styles.allRead, !unread && styles.disabled]}
         >
-          <Text style={styles.allReadText}>Leer todas</Text>
+          <Text style={styles.allReadText}>Marcar leídas</Text>
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={styles.content}>

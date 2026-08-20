@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs -- React Native Animated and PanResponder expose stable imperative values used by the floating control. */
 import { styles } from '../../src/features/screens/agenda.styles';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
@@ -10,7 +11,7 @@ import type {
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Alert,
@@ -21,6 +22,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -63,9 +65,89 @@ export default function AgendaScreen() {
   const { session } = useAuth();
   const tenant = useTenantScope();
   const layout = useNativeLayoutMetrics();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const router = useRouter();
   const { date: notificationDate } = useLocalSearchParams<{ date?: string }>();
   const queryClient = useQueryClient();
+  const floatingBookingOffset = useRef(new Animated.ValueXY()).current;
+  const floatingBookingOffsetRef = useRef({ x: 0, y: 0 });
+  const floatingBookingSizeRef = useRef({ height: 58, width: 150 });
+  const floatingBookingBoundsRef = useRef({
+    bottomInset: layout.bottomInset,
+    height: screenHeight,
+    topInset: layout.topInset,
+    width: screenWidth,
+  });
+  floatingBookingBoundsRef.current = {
+    bottomInset: layout.bottomInset,
+    height: screenHeight,
+    topInset: layout.topInset,
+    width: screenWidth,
+  };
+  const floatingBookingPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
+      onPanResponderMove: (_, gesture) => {
+        const bounds = floatingBookingBoundsRef.current;
+        const button = floatingBookingSizeRef.current;
+        const sideMargin = 16;
+        const navigationHeight = 72;
+        const navigationGap = 12;
+        const baseX = bounds.width - 20 - button.width;
+        const baseY = bounds.height - 94 - button.height;
+        const minimumX = sideMargin - baseX;
+        const maximumX = bounds.width - sideMargin - button.width - baseX;
+        const minimumY = bounds.topInset + sideMargin - baseY;
+        const maximumY =
+          bounds.height -
+          bounds.bottomInset -
+          navigationHeight -
+          navigationGap -
+          button.height -
+          baseY;
+        floatingBookingOffset.setValue({
+          x: Math.min(
+            maximumX,
+            Math.max(minimumX, floatingBookingOffsetRef.current.x + gesture.dx),
+          ),
+          y: Math.min(
+            maximumY,
+            Math.max(minimumY, floatingBookingOffsetRef.current.y + gesture.dy),
+          ),
+        });
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const bounds = floatingBookingBoundsRef.current;
+        const button = floatingBookingSizeRef.current;
+        const sideMargin = 16;
+        const navigationHeight = 72;
+        const navigationGap = 12;
+        const baseX = bounds.width - 20 - button.width;
+        const baseY = bounds.height - 94 - button.height;
+        floatingBookingOffsetRef.current = {
+          x: Math.min(
+            bounds.width - sideMargin - button.width - baseX,
+            Math.max(sideMargin - baseX, floatingBookingOffsetRef.current.x + gesture.dx),
+          ),
+          y: Math.min(
+            bounds.height -
+              bounds.bottomInset -
+              navigationHeight -
+              navigationGap -
+              button.height -
+              baseY,
+            Math.max(
+              bounds.topInset + sideMargin - baseY,
+              floatingBookingOffsetRef.current.y + gesture.dy,
+            ),
+          ),
+        };
+        floatingBookingOffset.setValue(floatingBookingOffsetRef.current);
+      },
+      onPanResponderTerminationRequest: () => false,
+    }),
+  ).current;
   const organizationQuery = useCurrentOrganization();
   const schedulesQuery = useQuery({
     enabled: Boolean(session),
@@ -1151,25 +1233,36 @@ export default function AgendaScreen() {
         sheetMaxHeight={layout.sheetMaxHeight}
         visible={manualPaymentSheetOpen}
       />
-      <Pressable
-        accessibilityLabel="Crear cita"
-        accessibilityRole="button"
-        onPress={() => {
-          if (
-            clientsQuery.isLoading ||
-            clientsQuery.isError ||
-            !clientsQuery.data?.clients.length
-          ) {
-            router.push('/clients');
-            return;
-          }
-          router.push('/new-booking');
+      <Animated.View
+        {...floatingBookingPanResponder.panHandlers}
+        onLayout={({ nativeEvent }) => {
+          floatingBookingSizeRef.current = nativeEvent.layout;
         }}
-        style={styles.floatingButton}
+        style={[
+          styles.floatingButton,
+          { transform: floatingBookingOffset.getTranslateTransform() },
+        ]}
       >
-        <Ionicons color="#ffffff" name="add" size={30} />
-        <Text style={styles.floatingLabel}>Nueva cita</Text>
-      </Pressable>
+        <Pressable
+          accessibilityLabel="Crear cita"
+          accessibilityRole="button"
+          onPress={() => {
+            if (
+              clientsQuery.isLoading ||
+              clientsQuery.isError ||
+              !clientsQuery.data?.clients.length
+            ) {
+              router.push('/clients');
+              return;
+            }
+            router.push('/new-booking');
+          }}
+          style={styles.floatingButtonContent}
+        >
+          <Ionicons color="#ffffff" name="add" size={30} />
+          <Text style={styles.floatingLabel}>Nueva cita</Text>
+        </Pressable>
+      </Animated.View>
 
       <BottomNavigation active="agenda" />
     </SafeAreaView>

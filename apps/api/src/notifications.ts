@@ -31,6 +31,19 @@ const pushTokenSchema = z.object({
   token: z.string().trim().min(10).max(255),
 });
 
+// Las notificaciones son avisos temporales, no un historial permanente. La
+// limpieza ocurre al consultar la bandeja, por lo que no depende de que el
+// cliente móvil esté actualizado ni de un proceso externo adicional.
+const NOTIFICATION_RETENTION_DAYS = 30;
+
+function notificationExpirationDate(now = new Date()) {
+  const expirationDate = new Date(now);
+  expirationDate.setUTCDate(
+    expirationDate.getUTCDate() - NOTIFICATION_RETENTION_DAYS,
+  );
+  return expirationDate;
+}
+
 function copyFor(kind: AppointmentNotificationKind, clientName: string) {
   if (kind === 'cancelled')
     return {
@@ -161,10 +174,18 @@ export function registerNotificationRoutes(
 ) {
   app.get('/v1/notifications', async (request) => {
     const { user } = await authenticate(database, request);
+    await database.appNotification.deleteMany({
+      where: {
+        createdAt: { lt: notificationExpirationDate() },
+        userId: user.id,
+      },
+    });
     const notifications = await database.appNotification.findMany({
       orderBy: { createdAt: 'desc' },
       take: 100,
-      where: { userId: user.id },
+      // Una notificación leída deja de ocupar la bandeja inmediatamente. Se
+      // conserva hasta que venza la retención para una limpieza controlada.
+      where: { readAt: null, userId: user.id },
     });
     return {
       notifications: notifications.map((notification) => ({

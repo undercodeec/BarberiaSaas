@@ -21,7 +21,9 @@ import {
   createServiceSchema,
   createTeamInvitationSchema,
   replaceWeeklySchedulesSchema,
+  signInSchema,
   updateServiceSchema,
+  updateMemberOnlineBookingSchema,
   updateTeamMemberSchema,
 } from '@barber-saas/validation';
 import { z } from 'zod';
@@ -34,6 +36,7 @@ import {
   createOpaqueToken,
   createVerificationCode,
   hashOpaqueToken,
+  verifyPassword,
 } from './security';
 import {
   assertCanCreateTeamMember,
@@ -90,6 +93,7 @@ const platformOrganizationParamsSchema = z.object({ id: z.uuid() });
 const platformOrganizationListSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  plan: z.enum(['all', 'free', 'essential', 'local', 'multi']).default('all'),
   search: z.string().trim().max(120).optional(),
   status: z
     .enum([
@@ -102,6 +106,7 @@ const platformOrganizationListSchema = z.object({
       'cancelled',
     ])
     .default('all'),
+  trial: z.enum(['all', 'ending_soon', 'expired']).default('all'),
 });
 const platformOrganizationActionSchema = z.discriminatedUnion('action', [
   z.object({
@@ -129,6 +134,7 @@ const platformAccessCodeSchema = z.object({
 });
 const PLATFORM_ACCESS_CODE_DURATION_MS = 5 * 60 * 1000;
 const PLATFORM_ACCESS_MAX_FAILED_ATTEMPTS = 5;
+const PLATFORM_SESSION_DURATION_MS = 12 * 60 * 60 * 1000;
 const SUBSCRIPTION_CONTROLLED_PREFIXES = [
   '/v1/appointments',
   '/v1/booking-settings',
@@ -168,6 +174,15 @@ function configuredPlatformEmails(config: ApiConfig) {
       .map((email) => email.trim().toLowerCase())
       .filter(Boolean),
   );
+}
+
+function platformChallengeToken(request: FastifyRequest): string {
+  const value = request.headers.authorization;
+  const match = value?.match(/^Bearer\s+(.+)$/iu);
+  if (!match?.[1]) {
+    throw new ApiError(401, 'UNAUTHENTICATED', 'La sesión no es válida.');
+  }
+  return match[1];
 }
 
 async function requirePlatformOperator(
@@ -350,13 +365,72 @@ function registerPlatformRoutes(
   config: ApiConfig,
   platformAccessMailer: PlatformAccessMailer | null,
 ) {
-  app.post('/v1/platform/access-code', async (request) => {
-    const identity = await requirePlatformOperator(
-      database,
-      authenticate,
-      request,
-      config,
-    );
+  app.post('/v1/platform/development-session', async () => {
+    if (config.PLATFORM_DEVELOPMENT_BYPASS !== 'true') {
+      throw new ApiError(404, 'NOT_FOUND', 'Ruta no disponible.');
+    }
+    const email = configuredPlatformEmails(config).values().next().value;
+    const user = email
+      ? await database.user.findUnique({ where: { email } })
+      : null;
+    if (!user || user.deletedAt || !user.emailVerifiedAt) {
+      throw new ApiError(
+        503,
+        'DEVELOPMENT_OPERATOR_UNAVAILABLE',
+        'No hay un operador de plataforma disponible para desarrollo.',
+      );
+    }
+
+    const now = new Date();
+    const token = createOpaqueToken();
+    const expiresAt = new Date(now.getTime() + PLATFORM_SESSION_DURATION_MS);
+    await database.$transaction(async (transaction) => {
+      const session = await transaction.session.create({
+        data: {
+          expiresAt,
+          lastActiveAt: now,
+          tokenHash: hashOpaqueToken(token),
+          userId: user.id,
+        },
+      });
+      await transaction.platformAdminAccessChallenge.create({
+        data: {
+          codeHash: hashOpaqueToken(createOpaqueToken()),
+          expiresAt,
+          sessionId: session.id,
+          usedAt: now,
+          userId: user.id,
+          verifiedAt: now,
+        },
+      });
+    });
+    return {
+      operator: { email: user.email, fullName: user.fullName, id: user.id },
+      session: { expiresAt: expiresAt.toISOString(), token },
+    };
+  });
+
+  app.post('/v1/platform/login', async (request) => {
+    const input = signInSchema.parse(request.body);
+    const email = input.email.trim().toLowerCase();
+    const passwordHash = config.PLATFORM_ADMIN_PASSWORD_HASH;
+    const authorized = configuredPlatformEmails(config).has(email);
+    const user = authorized
+      ? await database.user.findUnique({ where: { email } })
+      : null;
+    if (
+      !passwordHash ||
+      !user ||
+      user.deletedAt ||
+      !user.emailVerifiedAt ||
+      !(await verifyPassword(input.password, passwordHash))
+    ) {
+      throw new ApiError(
+        401,
+        'INVALID_PLATFORM_CREDENTIALS',
+        'El correo o la contraseña son incorrectos.',
+      );
+    }
     if (!platformAccessMailer) {
       throw new ApiError(
         503,
@@ -369,25 +443,86 @@ function registerPlatformRoutes(
       now.getTime() + PLATFORM_ACCESS_CODE_DURATION_MS,
     );
     const code = createVerificationCode();
+    const challengeToken = createOpaqueToken();
     await database.$transaction(async (transaction) => {
       await transaction.platformAdminAccessChallenge.updateMany({
         data: { usedAt: now },
         where: {
-          sessionId: identity.session.id,
+          userId: user.id,
           usedAt: null,
           verifiedAt: null,
         },
       });
       await transaction.platformAdminAccessChallenge.create({
         data: {
+          challengeTokenHash: hashOpaqueToken(challengeToken),
           codeHash: hashOpaqueToken(code),
           expiresAt,
-          sessionId: identity.session.id,
-          userId: identity.user.id,
+          userId: user.id,
         },
       });
     });
-    await platformAccessMailer.send({ code, email: identity.user.email });
+    try {
+      await platformAccessMailer.send({ code, email: user.email });
+    } catch (error) {
+      await database.platformAdminAccessChallenge.updateMany({
+        data: { usedAt: new Date() },
+        where: { challengeTokenHash: hashOpaqueToken(challengeToken) },
+      });
+      throw error;
+    }
+    return {
+      challengeToken,
+      expiresAt: expiresAt.toISOString(),
+      message: 'Enviamos un código de acceso a tu correo registrado.',
+    };
+  });
+
+  app.post('/v1/platform/access-code', async (request) => {
+    const challengeToken = platformChallengeToken(request);
+    const challenge = await database.platformAdminAccessChallenge.findUnique({
+      include: { user: true },
+      where: { challengeTokenHash: hashOpaqueToken(challengeToken) },
+    });
+    const now = new Date();
+    if (!challenge || challenge.usedAt || challenge.expiresAt <= now) {
+      throw new ApiError(
+        400,
+        'PLATFORM_ACCESS_CODE_REQUIRED',
+        'Inicia sesión nuevamente para solicitar un código.',
+      );
+    }
+    if (challenge.failedAttempts >= PLATFORM_ACCESS_MAX_FAILED_ATTEMPTS) {
+      throw new ApiError(
+        429,
+        'PLATFORM_ACCESS_CODE_RATE_LIMITED',
+        'Demasiados intentos. Inicia sesión nuevamente.',
+      );
+    }
+    if (!platformAccessMailer) {
+      throw new ApiError(
+        503,
+        'PLATFORM_ACCESS_DELIVERY_UNAVAILABLE',
+        'El envío de códigos de acceso no está disponible.',
+      );
+    }
+    const expiresAt = new Date(
+      now.getTime() + PLATFORM_ACCESS_CODE_DURATION_MS,
+    );
+    const code = createVerificationCode();
+    await database.platformAdminAccessChallenge.update({
+      data: { codeHash: hashOpaqueToken(code), expiresAt },
+      where: { id: challenge.id },
+    });
+    try {
+      await platformAccessMailer.send({ code, email: challenge.user.email });
+    } catch (error) {
+      await database.platformAdminAccessChallenge.update({
+        data: { usedAt: new Date() },
+        where: { id: challenge.id },
+      });
+      throw error;
+    }
     return {
       expiresAt: expiresAt.toISOString(),
       message: 'Enviamos un código de acceso a tu correo registrado.',
@@ -395,25 +530,24 @@ function registerPlatformRoutes(
   });
 
   app.post('/v1/platform/verify-access-code', async (request) => {
-    const identity = await requirePlatformOperator(
-      database,
-      authenticate,
-      request,
-      config,
-    );
+    const challengeToken = platformChallengeToken(request);
     const { code } = platformAccessCodeSchema.parse(request.body);
     const now = new Date();
-    await database.$transaction(async (transaction) => {
+    const sessionToken = createOpaqueToken();
+    const sessionExpiresAt = new Date(
+      now.getTime() + PLATFORM_SESSION_DURATION_MS,
+    );
+    const operator = await database.$transaction(async (transaction) => {
       const challenge =
-        await transaction.platformAdminAccessChallenge.findFirst({
-          orderBy: { createdAt: 'desc' },
-          where: { sessionId: identity.session.id, userId: identity.user.id },
+        await transaction.platformAdminAccessChallenge.findUnique({
+          include: { user: true },
+          where: { challengeTokenHash: hashOpaqueToken(challengeToken) },
         });
       if (!challenge) {
         throw new ApiError(
-          400,
+          401,
           'PLATFORM_ACCESS_CODE_REQUIRED',
-          'Solicita un código antes de continuar.',
+          'Inicia sesión nuevamente para continuar.',
         );
       }
       if (challenge.usedAt) {
@@ -458,16 +592,29 @@ function registerPlatformRoutes(
           'El código no es válido.',
         );
       }
+      const session = await transaction.session.create({
+        data: {
+          expiresAt: sessionExpiresAt,
+          lastActiveAt: now,
+          tokenHash: hashOpaqueToken(sessionToken),
+          userId: challenge.userId,
+        },
+      });
       await transaction.platformAdminAccessChallenge.update({
-        data: { usedAt: now, verifiedAt: now },
+        data: { sessionId: session.id, usedAt: now, verifiedAt: now },
         where: { id: challenge.id },
       });
+      return challenge.user;
     });
     return {
+      session: {
+        expiresAt: sessionExpiresAt.toISOString(),
+        token: sessionToken,
+      },
       operator: {
-        email: identity.user.email,
-        fullName: identity.user.fullName,
-        id: identity.user.id,
+        email: operator.email,
+        fullName: operator.fullName,
+        id: operator.id,
       },
     };
   });
@@ -550,10 +697,23 @@ function registerPlatformRoutes(
   app.get('/v1/platform/organizations', async (request) => {
     await requirePlatformAdmin(database, authenticate, request, config);
     const query = platformOrganizationListSchema.parse(request.query);
+    const now = new Date();
+    const trialWindowEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     const subscriptionStatus =
       query.status === 'all'
         ? undefined
         : (query.status.toUpperCase() as SubscriptionStatus);
+    const subscriptionWhere = {
+      ...(subscriptionStatus ? { status: subscriptionStatus } : {}),
+      ...(query.plan === 'all' ? {} : { plan: { code: query.plan } }),
+      ...(query.trial === 'ending_soon'
+        ? { trialEndsAt: { gte: now, lte: trialWindowEnd } }
+        : query.trial === 'expired'
+          ? { trialEndsAt: { lt: now } }
+          : {}),
+    };
+    const hasSubscriptionFilters =
+      query.status !== 'all' || query.plan !== 'all' || query.trial !== 'all';
     const where = {
       deletedAt: null,
       ...(query.search
@@ -568,8 +728,8 @@ function registerPlatformRoutes(
             ],
           }
         : {}),
-      ...(subscriptionStatus
-        ? { subscription: { is: { status: subscriptionStatus } } }
+      ...(hasSubscriptionFilters
+        ? { subscription: { is: subscriptionWhere } }
         : {}),
     };
     const [total, organizations] = await Promise.all([
@@ -1267,8 +1427,7 @@ export function registerOperationsRoutes(
       where: { isActive: true, organizationId: current.organizationId },
     });
     return {
-      canAdd:
-        locations.length < subscriptionUsage.limits.locations,
+      canAdd: locations.length < subscriptionUsage.limits.locations,
       limit: subscriptionUsage.limits.locations,
       locations: locations.map((location) => ({
         addressLine: location.addressLine,
@@ -1331,7 +1490,9 @@ export function registerOperationsRoutes(
             ...(input.googlePlaceId !== undefined
               ? { googlePlaceId: input.googlePlaceId }
               : {}),
-            ...(input.latitude !== undefined ? { latitude: input.latitude } : {}),
+            ...(input.latitude !== undefined
+              ? { latitude: input.latitude }
+              : {}),
             ...(input.longitude !== undefined
               ? { longitude: input.longitude }
               : {}),
@@ -1448,10 +1609,13 @@ export function registerOperationsRoutes(
       members: members.map((member) => ({
         commissionPercentage: commissionByMembership.get(member.id) ?? null,
         id: member.id,
-        locations: member.memberLocations.map(({ location }) => ({
-          id: location.id,
-          name: location.name,
-        })),
+        locations: member.memberLocations.map(
+          ({ location, onlineBookingEnabled }) => ({
+            id: location.id,
+            name: location.name,
+            onlineBookingEnabled,
+          }),
+        ),
         role: member.role.toLowerCase(),
         status: member.status.toLowerCase(),
         user: {
@@ -1468,6 +1632,86 @@ export function registerOperationsRoutes(
         id: invitation.id,
         role: invitation.role.toLowerCase(),
       })),
+    };
+  });
+
+  app.patch('/v1/team/members/:id/online-booking', async (request) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(database, user.id);
+    const { id } = teamRecordParamsSchema.parse(request.params);
+    const input = updateMemberOnlineBookingSchema.parse(request.body);
+    const canManageTeam = hasPermission(
+      permissionRole(current.role),
+      'membership.manage',
+    );
+    if (!canManageTeam && current.id !== id) {
+      throw new ApiError(
+        403,
+        'FORBIDDEN',
+        'Solo puedes cambiar tu disponibilidad para reservas.',
+      );
+    }
+    const member = await database.membership.findFirst({
+      where: {
+        id,
+        organizationId: current.organizationId,
+        role: { in: [MembershipRole.BARBER, MembershipRole.OWNER] },
+        status: MembershipStatus.ACTIVE,
+      },
+    });
+    if (!member) {
+      throw new ApiError(
+        404,
+        'PROFESSIONAL_NOT_FOUND',
+        'El profesional no existe o no está activo.',
+      );
+    }
+    await requireLocation(database, current.organizationId, input.locationId);
+    const memberLocation = await database.memberLocation.findUnique({
+      where: {
+        membershipId_locationId: {
+          locationId: input.locationId,
+          membershipId: member.id,
+        },
+      },
+    });
+    if (!memberLocation) {
+      throw new ApiError(
+        400,
+        'PROFESSIONAL_LOCATION_REQUIRED',
+        'El profesional no pertenece a la sucursal.',
+      );
+    }
+    const updated = await database.$transaction(async (transaction) => {
+      const updatedMemberLocation = await transaction.memberLocation.update({
+        data: { onlineBookingEnabled: input.onlineBookingEnabled },
+        where: {
+          membershipId_locationId: {
+            locationId: input.locationId,
+            membershipId: member.id,
+          },
+        },
+      });
+      await transaction.auditLog.create({
+        data: {
+          action: 'professional.online_booking.updated',
+          actorUserId: user.id,
+          afterData: { onlineBookingEnabled: input.onlineBookingEnabled },
+          beforeData: {
+            onlineBookingEnabled: memberLocation.onlineBookingEnabled,
+          },
+          entityId: member.id,
+          entityType: 'member_location',
+          locationId: input.locationId,
+          organizationId: current.organizationId,
+        },
+      });
+      return updatedMemberLocation;
+    });
+    return {
+      locationId: updated.locationId,
+      membershipId: updated.membershipId,
+      onlineBookingEnabled: updated.onlineBookingEnabled,
     };
   });
 

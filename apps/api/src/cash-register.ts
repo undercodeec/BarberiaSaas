@@ -383,6 +383,18 @@ export function registerCashRegisterRoutes(
     const hasCommissionProfessional = Boolean(input.professionalMembershipId);
     const hasProduct = Boolean(input.productId);
     const hasProductQuantity = input.productQuantity !== undefined;
+    if (
+      input.type === 'sale' &&
+      !input.appointmentId &&
+      !hasProduct &&
+      !hasCommissionService &&
+      !hasCommissionProfessional
+    )
+      throw new ApiError(
+        400,
+        'SALE_SOURCE_REQUIRED',
+        'Selecciona un servicio o producto para registrar la venta.',
+      );
     if (hasProduct !== hasProductQuantity)
       throw new ApiError(
         400,

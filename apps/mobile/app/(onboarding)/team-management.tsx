@@ -4,7 +4,7 @@ import type {
   TeamMember,
   TeamResponse,
 } from '@barber-saas/api-client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -88,6 +88,33 @@ export default function TeamManagementScreen() {
     queryFn: () => requireApiClient().request<TeamResponse>('/v1/team'),
     queryKey: tenant.key('team'),
   });
+  const updateOnlineBooking = useMutation({
+    mutationFn: (input: {
+      readonly membershipId: string;
+      readonly locationId: string;
+      readonly onlineBookingEnabled: boolean;
+    }) =>
+      requireApiClient().request(
+        `/v1/team/members/${input.membershipId}/online-booking`,
+        {
+          body: {
+            locationId: input.locationId,
+            onlineBookingEnabled: input.onlineBookingEnabled,
+          },
+          method: 'PATCH',
+        },
+      ),
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos actualizar las reservas',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('team'),
+      });
+    },
+  });
   if (!session) return <Redirect href="/(auth)/login" />;
   if (accountQuery.data?.accountType === 'professional') {
     return <Redirect href="/business-settings" />;
@@ -96,6 +123,34 @@ export default function TeamManagementScreen() {
   const canManageTeam =
     current?.membership.role === 'owner' ||
     current?.membership.role === 'manager';
+  const canToggleOnlineBooking = (member: TeamMember) =>
+    (member.role === 'barber' || member.role === 'owner') &&
+    (canManageTeam || member.user.id === user?.id);
+  const confirmOnlineBookingChange = (
+    member: TeamMember,
+    locationId: string,
+    onlineBookingEnabled: boolean,
+  ) => {
+    const nextState = !onlineBookingEnabled;
+    Alert.alert(
+      nextState ? 'Mostrar para reservas' : 'Pausar reservas online',
+      nextState
+        ? `${member.user.fullName} volverá a aparecer para nuevas reservas en esta sucursal.`
+        : `${member.user.fullName} dejará de aparecer para nuevas reservas. Sus citas ya agendadas no se modificarán.`,
+      [
+        { style: 'cancel', text: 'Cancelar' },
+        {
+          onPress: () =>
+            updateOnlineBooking.mutate({
+              locationId,
+              membershipId: member.id,
+              onlineBookingEnabled: nextState,
+            }),
+          text: nextState ? 'Activar' : 'Pausar',
+        },
+      ],
+    );
+  };
   const closeInvite = () => {
     if (isInviting) return;
     setInviteOpen(false);
@@ -314,41 +369,96 @@ export default function TeamManagementScreen() {
               canManageTeam &&
               member.role !== 'owner' &&
               member.user.id !== user?.id;
+            const currentLocation = current?.location
+              ? member.locations.find(
+                  (location) => location.id === current.location?.id,
+                )
+              : null;
+            const canToggle = canToggleOnlineBooking(member) && currentLocation;
             return (
-              <Pressable
-                key={member.id}
-                accessibilityLabel={
-                  editable
-                    ? `Editar ${member.user.fullName}`
-                    : member.user.fullName
-                }
-                accessibilityRole={editable ? 'button' : undefined}
-                disabled={!editable}
-                onPress={() => openMember(member)}
-                style={styles.memberCard}
-              >
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarLabel}>
-                    {member.user.fullName.trim().charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={styles.memberCopy}>
-                  <Text style={styles.memberName}>{member.user.fullName}</Text>
-                  <Text style={styles.memberMeta}>
-                    {ROLE_LABELS[member.role] ?? member.role} · Activo
-                  </Text>
-                  {member.commissionPercentage !== null ? (
-                    <Text style={styles.memberCommission}>
-                      Comisión: {member.commissionPercentage}%
+              <View key={member.id}>
+                <Pressable
+                  accessibilityLabel={
+                    editable
+                      ? `Editar ${member.user.fullName}`
+                      : member.user.fullName
+                  }
+                  accessibilityRole={editable ? 'button' : undefined}
+                  disabled={!editable}
+                  onPress={() => openMember(member)}
+                  style={styles.memberCard}
+                >
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarLabel}>
+                      {member.user.fullName.trim().charAt(0).toUpperCase()}
                     </Text>
-                  ) : null}
-                </View>
-                <Ionicons
-                  color={editable ? COLORS.text : '#2f8b57'}
-                  name={editable ? 'create-outline' : 'checkmark-circle'}
-                  size={22}
-                />
-              </Pressable>
+                  </View>
+                  <View style={styles.memberCopy}>
+                    <Text style={styles.memberName}>
+                      {member.user.fullName}
+                    </Text>
+                    <Text style={styles.memberMeta}>
+                      {ROLE_LABELS[member.role] ?? member.role} · Activo
+                    </Text>
+                    {member.commissionPercentage !== null ? (
+                      <Text style={styles.memberCommission}>
+                        Comisión: {member.commissionPercentage}%
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Ionicons
+                    color={editable ? COLORS.text : '#2f8b57'}
+                    name={editable ? 'create-outline' : 'checkmark-circle'}
+                    size={22}
+                  />
+                </Pressable>
+                {currentLocation &&
+                (member.role === 'barber' || member.role === 'owner') ? (
+                  <View style={styles.onlineBookingRow}>
+                    <View style={styles.memberCopy}>
+                      <Text style={styles.onlineBookingLabel}>
+                        Reservas online
+                      </Text>
+                      <Text style={styles.memberMeta}>
+                        {currentLocation.onlineBookingEnabled
+                          ? 'Visible para nuevas citas'
+                          : 'No disponible para nuevas citas'}
+                      </Text>
+                    </View>
+                    {canToggle ? (
+                      <Pressable
+                        accessibilityLabel={`Cambiar disponibilidad online de ${member.user.fullName}`}
+                        accessibilityRole="switch"
+                        accessibilityState={{
+                          checked: currentLocation.onlineBookingEnabled,
+                          disabled: updateOnlineBooking.isPending,
+                        }}
+                        disabled={updateOnlineBooking.isPending}
+                        onPress={() =>
+                          confirmOnlineBookingChange(
+                            member,
+                            currentLocation.id,
+                            currentLocation.onlineBookingEnabled,
+                          )
+                        }
+                        style={[
+                          styles.onlineBookingSwitch,
+                          currentLocation.onlineBookingEnabled &&
+                            styles.onlineBookingSwitchEnabled,
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.onlineBookingKnob,
+                            currentLocation.onlineBookingEnabled &&
+                              styles.onlineBookingKnobEnabled,
+                          ]}
+                        />
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ) : null}
+              </View>
             );
           })}
         </View>
@@ -751,6 +861,31 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   memberName: { color: COLORS.text, fontSize: 15, fontWeight: '800' },
+  onlineBookingKnob: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    height: 20,
+    width: 20,
+  },
+  onlineBookingKnobEnabled: { alignSelf: 'flex-end' },
+  onlineBookingLabel: { color: COLORS.text, fontSize: 14, fontWeight: '800' },
+  onlineBookingRow: {
+    alignItems: 'center',
+    borderBottomColor: COLORS.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    marginHorizontal: 12,
+    paddingBottom: 12,
+  },
+  onlineBookingSwitch: {
+    backgroundColor: '#98A1AD',
+    borderRadius: 14,
+    justifyContent: 'center',
+    padding: 4,
+    width: 48,
+  },
+  onlineBookingSwitchEnabled: { backgroundColor: appTheme.colors.accent },
   modalBackdrop: {
     ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(16, 28, 45, 0.5)',

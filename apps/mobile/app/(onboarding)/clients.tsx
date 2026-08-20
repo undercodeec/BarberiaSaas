@@ -12,13 +12,17 @@ import type {
 } from '@barber-saas/api-client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
+/* eslint-disable react-hooks/refs -- React Native Animated and PanResponder expose stable imperative values used by the floating control. */
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   Linking,
+  PanResponder,
   Platform,
   Pressable,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -57,8 +61,87 @@ export default function ClientsScreen() {
   const { session } = useAuth();
   const tenant = useTenantScope();
   const layout = useNativeLayoutMetrics();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const floatingClientOffset = useRef(new Animated.ValueXY()).current;
+  const floatingClientOffsetRef = useRef({ x: 0, y: 0 });
+  const floatingClientBoundsRef = useRef({
+    bottomInset: layout.bottomInset,
+    height: screenHeight,
+    topInset: layout.topInset,
+    width: screenWidth,
+  });
+  floatingClientBoundsRef.current = {
+    bottomInset: layout.bottomInset,
+    height: screenHeight,
+    topInset: layout.topInset,
+    width: screenWidth,
+  };
+  const floatingClientPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
+      onPanResponderMove: (_, gesture) => {
+        const bounds = floatingClientBoundsRef.current;
+        const buttonSize = 58;
+        const sideMargin = 16;
+        const navigationHeight = 72;
+        const navigationGap = 12;
+        const baseX = bounds.width - 24 - buttonSize;
+        const baseY = bounds.height - (bounds.bottomInset + 84) - buttonSize;
+        const minimumX = sideMargin - baseX;
+        const maximumX = bounds.width - sideMargin - buttonSize - baseX;
+        const minimumY = bounds.topInset + sideMargin - baseY;
+        const maximumY =
+          bounds.height -
+          bounds.bottomInset -
+          navigationHeight -
+          navigationGap -
+          buttonSize -
+          baseY;
+        floatingClientOffset.setValue({
+          x: Math.min(
+            maximumX,
+            Math.max(minimumX, floatingClientOffsetRef.current.x + gesture.dx),
+          ),
+          y: Math.min(
+            maximumY,
+            Math.max(minimumY, floatingClientOffsetRef.current.y + gesture.dy),
+          ),
+        });
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const bounds = floatingClientBoundsRef.current;
+        const buttonSize = 58;
+        const sideMargin = 16;
+        const navigationHeight = 72;
+        const navigationGap = 12;
+        const baseX = bounds.width - 24 - buttonSize;
+        const baseY = bounds.height - (bounds.bottomInset + 84) - buttonSize;
+        floatingClientOffsetRef.current = {
+          x: Math.min(
+            bounds.width - sideMargin - buttonSize - baseX,
+            Math.max(sideMargin - baseX, floatingClientOffsetRef.current.x + gesture.dx),
+          ),
+          y: Math.min(
+            bounds.height -
+              bounds.bottomInset -
+              navigationHeight -
+              navigationGap -
+              buttonSize -
+              baseY,
+            Math.max(
+              bounds.topInset + sideMargin - baseY,
+              floatingClientOffsetRef.current.y + gesture.dy,
+            ),
+          ),
+        };
+        floatingClientOffset.setValue(floatingClientOffsetRef.current);
+      },
+      onPanResponderTerminationRequest: () => false,
+    }),
+  ).current;
   const [search, setSearch] = useState('');
   const [activeLabelId, setActiveLabelId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -786,14 +869,23 @@ export default function ClientsScreen() {
         )}
       </ScrollView>
 
-      <Pressable
-        accessibilityLabel="Agregar cliente"
-        accessibilityRole="button"
-        onPress={() => setIsCreateOpen(true)}
-        style={[styles.floatingAdd, { bottom: layout.bottomInset + 84 }]}
+      <Animated.View
+        {...floatingClientPanResponder.panHandlers}
+        style={[
+          styles.floatingAdd,
+          { bottom: layout.bottomInset + 84 },
+          { transform: floatingClientOffset.getTranslateTransform() },
+        ]}
       >
-        <Ionicons color="#ffffff" name="add" size={29} />
-      </Pressable>
+        <Pressable
+          accessibilityLabel="Agregar cliente"
+          accessibilityRole="button"
+          onPress={() => setIsCreateOpen(true)}
+          style={styles.floatingAddContent}
+        >
+          <Ionicons color="#ffffff" name="add" size={29} />
+        </Pressable>
+      </Animated.View>
 
       <BottomNavigation active="clients" />
       <ClientFormSheet

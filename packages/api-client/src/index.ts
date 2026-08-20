@@ -579,6 +579,7 @@ export interface TeamMember {
   readonly locations: ReadonlyArray<{
     readonly id: string;
     readonly name: string;
+    readonly onlineBookingEnabled: boolean;
   }>;
   readonly role: 'barber' | 'manager' | 'owner' | 'receptionist';
   readonly status: 'active';

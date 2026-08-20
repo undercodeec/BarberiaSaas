@@ -1,0 +1,62 @@
+name: Mobile Android release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  android-release:
+    name: AAB Android verificado
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      EXPO_PUBLIC_API_ALLOWED_HOSTS: ${{ vars.MOBILE_API_ALLOWED_HOSTS }}
+      EXPO_PUBLIC_API_URL: ${{ vars.MOBILE_API_URL }}
+      EXPO_PUBLIC_APP_ENV: production
+      NODE_ENV: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: pnpm install --frozen-lockfile
+      - name: Preparar keystore de upload
+        shell: bash
+        env:
+          NAVA_UPLOAD_KEYSTORE_BASE64: ${{ secrets.NAVA_UPLOAD_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$NAVA_UPLOAD_KEYSTORE_BASE64"
+          printf '%s' "$NAVA_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nava-upload.jks"
+      - name: Construir AAB firmado
+        working-directory: apps/mobile/android
+        env:
+          NAVA_UPLOAD_CERT_SHA256: ${{ vars.NAVA_UPLOAD_CERT_SHA256 }}
+          NAVA_UPLOAD_KEY_ALIAS: ${{ secrets.NAVA_UPLOAD_KEY_ALIAS }}
+          NAVA_UPLOAD_KEY_PASSWORD: ${{ secrets.NAVA_UPLOAD_KEY_PASSWORD }}
+          NAVA_UPLOAD_STORE_PASSWORD: ${{ secrets.NAVA_UPLOAD_STORE_PASSWORD }}
+        run: >-
+          ./gradlew :app:bundleRelease --no-daemon
+          -PNAVA_UPLOAD_STORE_FILE="$RUNNER_TEMP/nava-upload.jks"
+          -PNAVA_UPLOAD_KEY_ALIAS="$NAVA_UPLOAD_KEY_ALIAS"
+          -PNAVA_UPLOAD_STORE_PASSWORD="$NAVA_UPLOAD_STORE_PASSWORD"
+          -PNAVA_UPLOAD_KEY_PASSWORD="$NAVA_UPLOAD_KEY_PASSWORD"
+          -PNAVA_UPLOAD_CERT_SHA256="$NAVA_UPLOAD_CERT_SHA256"
+      - name: Verificar manifest fusionado
+        run: >-
+          pnpm --filter @barber-saas/mobile verify:android-release
+          android/app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml
+      - name: Verificar firma del AAB
+        run: jarsigner -verify -strict apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nava-android-release
+          path: apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error

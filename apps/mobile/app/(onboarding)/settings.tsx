@@ -141,26 +141,9 @@ export default function SettingsScreen() {
     } catch {
       // signOut elimina la sesión local incluso si la API no responde.
     } finally {
-      queryClient.clear();
       router.replace('/(auth)/login');
       setIsSigningOut(false);
     }
-  };
-  const logout = () => {
-    const message =
-      '¿Estás seguro de que deseas cerrar sesión en este dispositivo?';
-    if (Platform.OS === 'web') {
-      if (globalThis.confirm(message)) void performLogout();
-      return;
-    }
-    Alert.alert('Cerrar sesión', message, [
-      { style: 'cancel', text: 'Cancelar' },
-      {
-        onPress: () => void performLogout(),
-        style: 'destructive',
-        text: 'Cerrar sesión',
-      },
-    ]);
   };
   const closeDeleteModal = () => {
     if (deleteAccountMutation.isPending) return;
@@ -281,7 +264,7 @@ export default function SettingsScreen() {
         <Pressable
           accessibilityRole="button"
           disabled={isSigningOut}
-          onPress={logout}
+          onPress={() => void performLogout()}
           style={({ pressed }) => [
             styles.logout,
             pressed && styles.pressed,

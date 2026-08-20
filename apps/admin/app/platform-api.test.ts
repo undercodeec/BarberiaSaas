@@ -6,7 +6,7 @@ import {
   getOrganizations,
   getPlatformSession,
   requestPlatformAccessCode,
-  signIn,
+  startPlatformLogin,
   verifyPlatformAccessCode,
 } from './platform-api';
 
@@ -19,18 +19,22 @@ describe('cliente del panel de plataforma', () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
-          session: { expiresAt: '2026-08-04T00:00:00.000Z', token: 'opaque' },
+          challengeToken: 'preauth-token',
+          expiresAt: '2026-08-04T00:05:00.000Z',
         }),
         { headers: { 'content-type': 'application/json' }, status: 200 },
       ),
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(signIn('admin@nava.ec', 'clave-segura')).resolves.toEqual({
-      session: { expiresAt: '2026-08-04T00:00:00.000Z', token: 'opaque' },
+    await expect(
+      startPlatformLogin('admin@nava.ec', 'clave-segura'),
+    ).resolves.toEqual({
+      challengeToken: 'preauth-token',
+      expiresAt: '2026-08-04T00:05:00.000Z',
     });
     const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe(`${API_URL}/v1/auth/login`);
+    expect(url).toBe(`${API_URL}/v1/platform/login`);
     expect(options.method).toBe('POST');
     expect(new Headers(options.headers).has('authorization')).toBe(false);
   });
@@ -49,14 +53,18 @@ describe('cliente del panel de plataforma', () => {
 
     await getOrganizations('session-token', {
       page: 2,
+      plan: 'local',
       search: 'Piloto Norte',
       status: 'trial',
+      trial: 'ending_soon',
     });
 
     const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toContain('page=2');
     expect(url).toContain('search=Piloto+Norte');
     expect(url).toContain('status=trial');
+    expect(url).toContain('plan=local');
+    expect(url).toContain('trial=ending_soon');
     expect(new Headers(options.headers).get('authorization')).toBe(
       'Bearer session-token',
     );

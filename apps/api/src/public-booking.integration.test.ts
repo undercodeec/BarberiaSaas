@@ -462,4 +462,48 @@ integrationDescribe('reservas públicas', () => {
     expect(cancelled.status).toBe(AppointmentStatus.CANCELLED);
     expect(cancelled.reservesSlot).toBe(false);
   });
+
+  it('oculta al profesional solo en su sucursal y rechaza nuevas reservas publicas', async () => {
+    const disabled = await app.inject({
+      headers: { authorization: `Bearer ${accessToken}` },
+      method: 'PATCH',
+      payload: { locationId, onlineBookingEnabled: false },
+      url: `/v1/team/members/${membershipId}/online-booking`,
+    });
+    expect(disabled.statusCode).toBe(200);
+    expect(
+      disabled.json<{ onlineBookingEnabled: boolean }>().onlineBookingEnabled,
+    ).toBe(false);
+
+    const catalog = await app.inject({
+      method: 'GET',
+      url: `/v1/public/${organizationSlug}/principal`,
+    });
+    expect(catalog.statusCode).toBe(200);
+    expect(
+      catalog.json<{ professionals: Array<{ id: string }> }>().professionals,
+    ).not.toContainEqual(expect.objectContaining({ id: membershipId }));
+
+    const availability = await app.inject({
+      method: 'GET',
+      url: `/v1/public/${organizationSlug}/principal/availability?date=${futureSlot(7, 9).slice(0, 10)}&membershipId=${membershipId}&serviceIds=${serviceId}`,
+    });
+    expect(availability.statusCode).toBe(404);
+
+    const newBooking = await app.inject({
+      headers: { 'idempotency-key': `unavailable-${randomUUID()}` },
+      method: 'POST',
+      payload: {
+        email: `unavailable-${suffix}@example.com`,
+        fullName: 'Cliente sin reserva',
+        membershipId,
+        phone: clientPhone,
+        policyAccepted: true,
+        serviceIds: [serviceId],
+        startsAt: futureSlot(7, 9),
+      },
+      url: `/v1/public/${organizationSlug}/principal/bookings`,
+    });
+    expect(newBooking.statusCode).toBe(404);
+  });
 });

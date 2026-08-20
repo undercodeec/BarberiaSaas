@@ -58,6 +58,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 52,
   },
+  confirmDisabled: { opacity: 0.45 },
   copy: {
     color: '#6E7785',
     fontSize: 15,
