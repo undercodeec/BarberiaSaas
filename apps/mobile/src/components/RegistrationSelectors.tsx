@@ -16,13 +16,57 @@ export interface CountryOption {
   readonly name: string;
 }
 
-const countryNames = new Intl.DisplayNames(['es'], { type: 'region' });
+type DisplayNamesConstructor = typeof Intl.DisplayNames;
+
+const FALLBACK_COUNTRY_NAMES: Readonly<Record<string, string>> = {
+  AR: 'Argentina',
+  BO: 'Bolivia',
+  BR: 'Brasil',
+  CA: 'Canadá',
+  CL: 'Chile',
+  CO: 'Colombia',
+  CR: 'Costa Rica',
+  CU: 'Cuba',
+  DO: 'República Dominicana',
+  EC: 'Ecuador',
+  ES: 'España',
+  GT: 'Guatemala',
+  HN: 'Honduras',
+  MX: 'México',
+  NI: 'Nicaragua',
+  PA: 'Panamá',
+  PE: 'Perú',
+  PR: 'Puerto Rico',
+  PY: 'Paraguay',
+  SV: 'El Salvador',
+  US: 'Estados Unidos',
+  UY: 'Uruguay',
+  VE: 'Venezuela',
+};
+
+export function resolveCountryName(
+  code: string,
+  DisplayNames: DisplayNamesConstructor | null | undefined = Intl.DisplayNames,
+) {
+  if (typeof DisplayNames === 'function') {
+    try {
+      return (
+        new DisplayNames(['es'], { type: 'region' }).of(code) ??
+        FALLBACK_COUNTRY_NAMES[code] ??
+        code
+      );
+    } catch {
+      // Hermes does not implement Intl.DisplayNames on every Android runtime.
+    }
+  }
+  return FALLBACK_COUNTRY_NAMES[code] ?? code;
+}
 
 export const COUNTRIES: readonly CountryOption[] = getCountries()
   .map((code) => ({
     code,
     dial: `+${getCountryCallingCode(code as CountryCode)}`,
-    name: countryNames.of(code) ?? code,
+    name: resolveCountryName(code),
   }))
   .sort((first, second) => first.name.localeCompare(second.name));
 

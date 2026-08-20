@@ -6,7 +6,15 @@ import {
   COUNTRIES,
   CountryCityFields,
   PhoneCountryField,
+  resolveCountryName,
 } from './RegistrationSelectors';
+
+describe('country names', () => {
+  it('funciona en Hermes cuando Intl.DisplayNames no existe', () => {
+    expect(resolveCountryName('EC', null)).toBe('Ecuador');
+    expect(resolveCountryName('ZZ', null)).toBe('ZZ');
+  });
+});
 
 function ControlledPhoneField({ onChangeText }: { onChangeText: jest.Mock }) {
   const [phone, setPhone] = useState('');
