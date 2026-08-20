@@ -308,6 +308,10 @@ Las cifras no demuestran por sí solas 89 fallos, porque algunos roles/labels pe
 
 ### MED-13 — Bundle y assets sobredimensionados
 
+**Estado:** [x] Corregido y verificado el 20 de agosto de 2026.
+
+**Evidencia de cierre:** mobile dejó de incluir estáticamente `country-state-city`; países y códigos telefónicos provienen de `libphonenumber-js/min` ya utilizado y la ciudad admite texto libre, conservando cobertura mundial sin cargar el catálogo global de ciudades. El bundle web bajó de aproximadamente 12 MB a 2.912.040 bytes (-75,7 %) y el export total de 19,1 MB a 11.118.896 bytes (-41,8 %). `verify-bundle-budget.mjs` fija límites de 3,2 MB JS y 12 MB totales; release Android activa R8 y `shrinkResources`. Verificado con 67 tests, typecheck, lint mobile, export web y puerta de presupuesto. La generación completa de AAB continúa protegida por las credenciales de firma de CI.
+
 **Evidencia:** export web de 19,1 MB, un único JS de 12 MB y PNG de 1,2–1,9 MB; AAB local de 87,18 MB.
 
 El tamaño web no equivale al download final Android y el AAB se divide por dispositivo, pero ambos revelan falta de presupuesto. `xlsx`, datos de países/ciudades y pantallas monolíticas entran en el bundle; varios PNG se pueden comprimir fuertemente.

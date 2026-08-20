@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { City, Country } from 'country-state-city';
-import { FlatList, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, type NativeScrollEvent, type NativeSyntheticEvent, type TextInputProps, View } from 'react-native';
+import { getCountries, getCountryCallingCode, type CountryCode } from 'libphonenumber-js/min';
+import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, TextInput, type NativeScrollEvent, type NativeSyntheticEvent, type TextInputProps, View } from 'react-native';
 import { useState } from 'react';
 
 import {
@@ -16,17 +16,15 @@ export interface CountryOption {
   readonly name: string;
 }
 
-export const COUNTRIES: readonly CountryOption[] = Country.getAllCountries()
-  .map((country) => ({
-    code: country.isoCode,
-    dial: country.phonecode.startsWith('+') ? country.phonecode : `+${country.phonecode}`,
-    name: country.name,
+const countryNames = new Intl.DisplayNames(['es'], { type: 'region' });
+
+export const COUNTRIES: readonly CountryOption[] = getCountries()
+  .map((code) => ({
+    code,
+    dial: `+${getCountryCallingCode(code as CountryCode)}`,
+    name: countryNames.of(code) ?? code,
   }))
   .sort((first, second) => first.name.localeCompare(second.name));
-
-function citiesForCountry(countryCode: string) {
-  return [...new Set((City.getCitiesOfCountry(countryCode) ?? []).map((city) => city.name))].sort((first, second) => first.localeCompare(second));
-}
 
 export function detectCountryCode() {
   try {
@@ -87,12 +85,30 @@ export function PhoneCountryField({ countryCode, error, onBlur, onChangeCountry,
 
 export function CountryCityFields({ city, countryCode, cityError, countryError, onCity, onCountry }: { readonly city: string; readonly countryCode: string; readonly cityError?: string | undefined; readonly countryError?: string | undefined; readonly onCity: (city: string) => void; readonly onCountry: (country: CountryOption) => void }) {
   const [countryOpen, setCountryOpen] = useState(false);
-  const [cityOpen, setCityOpen] = useState(false);
   const country = COUNTRIES.find((item) => item.code === countryCode) ?? COUNTRIES[0]!;
   return (
     <>
       <SelectionField error={countryError} icon="earth-outline" label="País" onPress={() => setCountryOpen(true)} value={`${flag(country.code)}  ${country.name}`} />
-      <SelectionField error={cityError} icon="location-outline" label="Ciudad" onPress={() => setCityOpen(true)} value={city || 'Selecciona una ciudad'} />
+      <View style={styles.field}>
+        <Text style={styles.label}>Ciudad</Text>
+        <View style={[styles.selection, cityError ? styles.errorBorder : null]}>
+          <Ionicons color="#101c2d" name="location-outline" size={22} />
+          <TextInput
+            accessibilityLabel="Ciudad"
+            autoCapitalize="words"
+            onChangeText={onCity}
+            placeholder="Escribe tu ciudad"
+            placeholderTextColor="#98a0ab"
+            style={styles.cityInput}
+            value={city}
+          />
+        </View>
+        {cityError ? (
+          <Text accessibilityRole="alert" style={styles.error}>
+            {cityError}
+          </Text>
+        ) : null}
+      </View>
       <OptionsModal
         onClose={() => setCountryOpen(false)}
         onSelect={(option) => {
@@ -102,16 +118,6 @@ export function CountryCityFields({ city, countryCode, cityError, countryError, 
         options={COUNTRIES}
         title="Selecciona tu país"
         visible={countryOpen}
-      />
-      <StringOptionsModal
-        onClose={() => setCityOpen(false)}
-        onSelect={(option) => {
-          onCity(option);
-          setCityOpen(false);
-        }}
-        options={citiesForCountry(country.code)}
-        title={`Ciudades de ${country.name}`}
-        visible={cityOpen}
       />
     </>
   );
@@ -193,34 +199,6 @@ function OptionsModal({ onClose, onSelect, options, title, visible }: { readonly
             )}
             windowSize={7}
           />
-        </View>
-      </View>
-    </Modal>
-  );
-}
-function StringOptionsModal({ onClose, onSelect, options, title, visible }: { readonly onClose: () => void; readonly onSelect: (option: string) => void; readonly options: readonly string[]; readonly title: string; readonly visible: boolean }) {
-  const layout = useNativeLayoutMetrics(0.7);
-  return (
-    <Modal animationType="fade" navigationBarTranslucent onRequestClose={onClose} statusBarTranslucent transparent visible={visible}>
-      <View style={styles.modalLayer}>
-        <Pressable onPress={onClose} style={styles.modalBackdrop} />
-        <View
-          style={[
-            styles.modalCard,
-            {
-              maxHeight: layout.sheetMaxHeight,
-              paddingBottom: layout.bottomInset + 6,
-            },
-          ]}
-        >
-          <Text style={styles.modalTitle}>{title}</Text>
-          <ScrollView>
-            {options.map((option) => (
-              <Pressable key={option} onPress={() => onSelect(option)} style={styles.option}>
-                <Text style={styles.optionText}>{option}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -335,6 +313,12 @@ const styles = StyleSheet.create({
     minHeight: 54,
   },
   confirmText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  cityInput: {
+    color: '#101c2d',
+    flex: 1,
+    fontSize: 16,
+    minHeight: 54,
+  },
   dial: { color: '#101c2d', fontSize: 15, fontWeight: '700' },
   dialButton: {
     alignItems: 'center',
