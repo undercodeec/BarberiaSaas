@@ -211,6 +211,8 @@ La propiedad `data.route` se devuelve sin allowlist; solo el listener nativo exi
 
 **Estado:** [ ] Implementación terminada; pendiente smoke test del share sheet en Android/iOS con Files, Drive, Excel y correo.
 
+**Prueba Android del 20 de agosto de 2026:** desde Clientes se seleccionó un contacto, se eligió la exportación de **Datos mínimos** y se abrió correctamente la hoja nativa de compartir. La operación se canceló antes de elegir un destino, por lo que no se compartió ningún archivo ni dato. Falta comprobar los destinos Files, Drive, Excel y correo, además de la pasada equivalente en iOS.
+
 **Evidencia:** `apps/mobile/app/(onboarding)/clients.tsx:363-424`; `reports.tsx:352-366`.
 
 La exportación de clientes escribe nombre, teléfono, correo, dirección, documento y notas en `cacheDirectory`, lo comparte y no elimina el archivo después. La exportación de reportes usa `Share.share({ message: csv })`; en móvil comparte texto largo, no un archivo `.csv`, por lo que varias apps destino no lo tratarán como documento.
