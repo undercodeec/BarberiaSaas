@@ -10,6 +10,7 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="exp+barber-saas-mobile"/>
+                <data android:scheme="barbersaas" android:host="expo-development-client"/>
             </intent-filter>
         </activity>
     </application>
