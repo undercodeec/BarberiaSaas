@@ -211,7 +211,7 @@ La propiedad `data.route` se devuelve sin allowlist; solo el listener nativo exi
 
 **Estado:** [ ] Implementación terminada; pendiente smoke test del share sheet en Android/iOS con Files, Drive, Excel y correo.
 
-**Prueba Android del 20 de agosto de 2026:** desde Clientes se seleccionó un contacto, se eligió la exportación de **Datos mínimos** y se abrió correctamente la hoja nativa de compartir. El destino Files abrió el CSV correctamente; el archivo de prueba se eliminó después. Drive recibió el archivo en su selector y la subida fue cancelada antes de confirmar. Falta comprobar Excel y correo, además de la pasada equivalente en iOS.
+**Prueba Android del 20 de agosto de 2026:** desde Clientes se seleccionó un contacto, se eligió la exportación de **Datos mínimos** y se abrió correctamente la hoja nativa de compartir. El destino Files abrió el CSV correctamente; el archivo de prueba se eliminó después. Drive recibió el archivo en su selector y la subida fue cancelada antes de confirmar; Excel lo abrió para importar y se cerró sin guardar cambios. Falta comprobar correo, además de la pasada equivalente en iOS.
 
 **Evidencia:** `apps/mobile/app/(onboarding)/clients.tsx:363-424`; `reports.tsx:352-366`.
 
