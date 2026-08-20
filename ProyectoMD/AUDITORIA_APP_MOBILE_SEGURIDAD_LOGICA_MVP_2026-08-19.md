@@ -280,6 +280,8 @@ Una configuración release equivocada puede incrustar `http://`. Android/iOS pro
 
 **Avance verificado el 20 de agosto de 2026:** los 11 parches detectados tras la publicación de Expo SDK 57 se alinearon (`expo` 57.0.15, router 57.0.15 y módulos relacionados), se actualizaron las reglas de convergencia de `expo-constants`/`expo-asset` y Expo Doctor finaliza 20/20. El check de sincronización CNG se desactiva explícitamente porque el proyecto conserva y revisa el árbol nativo bajo el modelo bare/native documentado; los demás checks permanecen activos. La casilla continúa abierta hasta ejecutar el smoke test en Android/iOS reales.
 
+**Prueba Android del 20 de agosto de 2026:** el development client se instaló y abrió en dispositivo físico; se comprobó inicio de sesión, dashboard, encuesta, Clientes, Caja, Wallet, hoja de compartir y accesibilidad. La pasada Android queda completada; falta iOS.
+
 **Evidencia:** Expo Doctor detectó 12 mismatches patch: Expo core, router, asset, constants, contacts, file-system, image-picker, linking, location, notifications, sharing y metro runtime.
 
 **Corrección:** `expo install --check`, actualizar en una rama, regenerar/probar nativo según el modelo elegido y ejecutar smoke tests en Android/iOS reales. No mezclar la actualización con refactors funcionales.
@@ -310,7 +312,7 @@ La app puede conservar datos de agenda/caja obsoletos tras volver de background 
 
 **Estado:** [ ] Pendiente auditoría manual con TalkBack/VoiceOver, fuente al 200 %, foco modal y objetivos táctiles en Android/iOS reales.
 
-**Prueba Android del 20 de agosto de 2026:** con el tamaño de fuente máximo (200 % o equivalente), Dashboard y Clientes conservaron textos legibles, botones accesibles y sin contenido cortado. TalkBack anunció el diálogo de exportación de Clientes y mantuvo el foco en sus acciones. Faltan la revisión completa de objetivos táctiles y la comprobación equivalente en iOS.
+**Prueba Android del 20 de agosto de 2026:** con el tamaño de fuente máximo (200 % o equivalente), Dashboard y Clientes conservaron textos legibles, botones accesibles y sin contenido cortado. TalkBack anunció el diálogo de exportación de Clientes y mantuvo el foco en sus acciones. Los controles de Agenda (Ajustes de agenda, Día, Semana y Completo) respondieron al primer toque. Falta la comprobación equivalente en iOS.
 
 **Evidencia estática:** 349 `Pressable`, 260 apariciones de `accessibilityRole`, 197 de `accessibilityLabel`; 37 modales frente a 10 apariciones de propiedades de modalidad/foco. Hay múltiples objetivos visuales de 24–42 px.
 
