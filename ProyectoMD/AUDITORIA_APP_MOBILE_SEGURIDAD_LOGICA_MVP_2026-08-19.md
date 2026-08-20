@@ -278,6 +278,10 @@ Una configuración release equivocada puede incrustar `http://`. Android/iOS pro
 
 ### MED-10 — Sin Error Boundary ni validación runtime general de respuestas
 
+**Estado:** [x] Corregido y verificado el 19 de agosto de 2026.
+
+**Evidencia de cierre:** Error Boundaries recuperables en raíz y navegación mediante `apps/mobile/src/components/MobileErrorBoundary.tsx`; canal de telemetría con metadatos redactados en `apps/mobile/src/lib/error-reporting.ts`; validación Zod central antes de entregar respuestas de sesión, autenticación, tenant, caja, comisiones y PayPhone en `apps/mobile/src/lib/runtime-responses.ts` y `apps/mobile/src/lib/api.ts`. Los errores de contrato no incluyen el payload sensible. Verificado con 52 tests, typecheck, lint aislado y export web.
+
 **Evidencia:** no existe Error Boundary de ruta/global; la mayoría de `request<T>()` confía en tipos TypeScript sin parsear la respuesta.
 
 Una respuesta incompleta, valor de fecha inválido o error de render puede dejar pantalla blanca o cerrar la app. Solo clientes tiene normalización parcial.

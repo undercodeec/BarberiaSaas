@@ -17,6 +17,7 @@ import {
   goldButtonShadow,
 } from '../src/components/BottomNavigation';
 import { GlobalNotificationsBanner } from '../src/components/GlobalNotificationsBanner';
+import { MobileErrorBoundary } from '../src/components/MobileErrorBoundary';
 import { NavaPreloader } from '../src/components/NavaPreloader';
 import { NetworkStatusBanner } from '../src/components/NetworkStatusBanner';
 import { PrivacyShield } from '../src/components/PrivacyShield';
@@ -123,10 +124,12 @@ function SessionStateGate() {
 
   return (
     <>
-      <Stack screenOptions={{ headerShown: false }} />
-      <NativePushNotifications />
-      <GlobalNotificationsBanner />
-      <NetworkStatusBanner />
+      <MobileErrorBoundary scope="navigation">
+        <Stack screenOptions={{ headerShown: false }} />
+        <NativePushNotifications />
+        <GlobalNotificationsBanner />
+        <NetworkStatusBanner />
+      </MobileErrorBoundary>
     </>
   );
 }
@@ -138,14 +141,16 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <View style={styles.root}>
-      <AppProviders>
-        <StatusBar style="dark" />
-        <SessionStateGate />
-      </AppProviders>
-      {showPreloader ? <NavaPreloader onFinish={finishPreloader} /> : null}
-      <PrivacyShield />
-    </View>
+    <MobileErrorBoundary scope="root">
+      <View style={styles.root}>
+        <AppProviders>
+          <StatusBar style="dark" />
+          <SessionStateGate />
+        </AppProviders>
+        {showPreloader ? <NavaPreloader onFinish={finishPreloader} /> : null}
+        <PrivacyShield />
+      </View>
+    </MobileErrorBoundary>
   );
 }
 

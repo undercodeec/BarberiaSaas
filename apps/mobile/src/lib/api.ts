@@ -1,7 +1,14 @@
-import { type ApiClientError, createApiClient } from '@barber-saas/api-client';
+import {
+  type ApiClient,
+  type ApiClientError,
+  type ApiRequestOptions,
+  createApiClient,
+} from '@barber-saas/api-client';
 import { publicApiConfigSchema } from '@barber-saas/validation';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+
+import { validateMobileApiResponse } from './runtime-responses';
 
 const SESSION_TOKEN_KEY = 'barber-saas.session-token';
 const configResult = publicApiConfigSchema.safeParse({
@@ -41,13 +48,25 @@ export async function clearSessionToken(): Promise<void> {
   await SecureStore.deleteItemAsync(SESSION_TOKEN_KEY);
 }
 
-export const apiClient = configResult.success
+const rawApiClient = configResult.success
   ? createApiClient({
       baseUrl: configResult.data.url,
       getAccessToken: getStoredSessionToken,
       onAuthenticationFailure: (error) => authenticationFailureHandler?.(error),
       timeoutMs: 20_000,
     })
+  : null;
+
+export const apiClient: ApiClient | null = rawApiClient
+  ? {
+      async request<TResponse>(
+        path: string,
+        options?: ApiRequestOptions,
+      ): Promise<TResponse> {
+        const payload = await rawApiClient.request<unknown>(path, options);
+        return validateMobileApiResponse(path, payload) as TResponse;
+      },
+    }
   : null;
 
 export const apiConfigurationError = configResult.success
