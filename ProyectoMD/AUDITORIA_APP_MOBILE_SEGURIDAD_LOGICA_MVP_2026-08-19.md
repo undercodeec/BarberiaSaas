@@ -75,11 +75,11 @@ Expo Doctor detectó:
 
 ### HIGH-01 — Polling explosivo de agenda y actividad en background
 
-**Estado:** [ ] Corrección implementada y checks automatizados verdes; pendiente medición de 5 minutos en las tres vistas y en dispositivo real.
+**Estado:** [x] Corregido y verificado en Android el 20 de agosto de 2026.
 
-**Avance verificado el 20 de agosto de 2026:** `agendaRange()` centraliza un único rango civil para las vistas día, semana y mes; la pantalla realiza una sola consulta `/v1/appointments` por rango, cada 30 segundos y nunca en background. Las pruebas cubren domingo, semana completa, febrero bisiesto y cambio de año. La medición física exigida para el cierre continúa pendiente.
+**Avance verificado el 20 de agosto de 2026:** `agendaRange()` centraliza un único rango civil para las vistas día, semana y mes; la pantalla realiza una sola consulta `/v1/appointments` por rango, cada 30 segundos y nunca en background. Las pruebas cubren domingo, semana completa, febrero bisiesto y cambio de año. La medición física exigida para el cierre se completó en Android.
 
-**Prueba Android del 20 de agosto de 2026:** antes del despliegue, en la vista Día la app envió un único rango válido `from/to` y un `locationId` UUID, pero `https://api.navacloud.app` respondió `400 VALIDATION_ERROR`. React Query ejecutó el único reintento configurado aproximadamente 1,5 segundos después de cada intervalo de 30 segundos. Tras desplegar la API con el contrato de rango, la vista Día permaneció cinco minutos en primer plano sin volver a mostrar el error. Faltan las ventanas físicas Semana/Completo y la comprobación en background; este avance no autoriza aún marcar HIGH-01 como terminado.
+**Prueba Android del 20 de agosto de 2026:** antes del despliegue, en la vista Día la app envió un único rango válido `from/to` y un `locationId` UUID, pero `https://api.navacloud.app` respondió `400 VALIDATION_ERROR`. React Query ejecutó el único reintento configurado aproximadamente 1,5 segundos después de cada intervalo de 30 segundos. Tras desplegar la API con el contrato de rango, Día, Semana y Completo permanecieron cinco minutos cada una en primer plano sin volver a mostrar el error. La app también permaneció cinco minutos en segundo plano desde Completo y se reanudó sin error ni recarga en bucle.
 
 **Evidencia:** `apps/mobile/app/(onboarding)/agenda.tsx:457-486`.
 
