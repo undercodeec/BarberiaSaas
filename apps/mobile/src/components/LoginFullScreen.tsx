@@ -21,10 +21,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import {
-  appTheme,
-  goldShadow,
-} from './BottomNavigation';
+import { appTheme, goldShadow } from './BottomNavigation';
 import { NavaButton } from './NavaButton';
 import { useAuth } from '../providers/AuthProvider';
 
@@ -168,7 +165,9 @@ export function LoginFullScreen() {
                         onBlur={field.onBlur}
                         onChangeText={field.onChange}
                         onFocus={keepFieldVisible}
-                        onSubmitEditing={() => passwordInputRef.current?.focus()}
+                        onSubmitEditing={() =>
+                          passwordInputRef.current?.focus()
+                        }
                         placeholder="correo@ejemplo.com"
                         placeholderTextColor={appTheme.colors.textMuted}
                         returnKeyType="next"
@@ -240,6 +239,12 @@ export function LoginFullScreen() {
                   </View>
                 )}
               />
+              <Pressable
+                accessibilityRole="link"
+                onPress={() => router.push('/(auth)/forgot-password' as never)}
+              >
+                <Text style={styles.forgot}>Olvidé mi contraseña</Text>
+              </Pressable>
               <NavaButton
                 disabled={formState.isSubmitting}
                 icon="log-in-outline"

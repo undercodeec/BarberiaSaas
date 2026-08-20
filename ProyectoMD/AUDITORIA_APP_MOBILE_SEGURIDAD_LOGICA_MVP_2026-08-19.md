@@ -133,6 +133,10 @@ Si la sesión vence o el servidor la revoca mientras la app está abierta, cada 
 
 ### HIGH-05 — Recuperación de contraseña ausente en la app
 
+**Estado:** [x] Corregido y verificado el 19 de agosto de 2026.
+
+**Evidencia de cierre:** flujo no enumerativo y reenvío controlado en `apps/mobile/src/components/PasswordRecoveryScreen.tsx`; rutas `forgot-password` y `reset-password` compatibles con Expo Router/deep link; validación compartida de correo, token y contraseñas en `apps/mobile/src/lib/password-recovery.ts`; acceso desde `LoginFullScreen.tsx`. Verificado con 46 tests, typecheck, lint de los archivos modificados y export web.
+
 **Evidencia:** no existen usos de `/v1/auth/recover` o `/v1/auth/reset-password` en `apps/mobile`; `LoginFullScreen.tsx` contiene un estilo `forgot` sin control renderizado.
 
 Una cuenta que olvida su contraseña no puede recuperarse desde la aplicación, pese a que los contratos compartidos incluyen los esquemas. Es un bloqueo directo de soporte y retención del MVP.
