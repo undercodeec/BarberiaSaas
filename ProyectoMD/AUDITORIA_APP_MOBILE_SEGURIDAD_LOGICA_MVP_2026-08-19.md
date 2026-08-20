@@ -402,6 +402,8 @@ Corregir archivos a UTF-8, eliminar código inalcanzable y añadir check que det
 
 **Estado:** [ ] Pendiente refactor progresivo de los ocho módulos enumerados; las extracciones funcionales realizadas durante la remediación reducen riesgo, pero las pantallas principales todavía superan 1.200 líneas.
 
+**Avance verificado el 20 de agosto de 2026:** se extrajeron 3.651 líneas de estilos y tokens visuales a módulos `*.styles.ts` fuera del árbol de rutas, reduciendo wallet, caja, inventario y registro a aproximadamente 1.000–1.068 líneas. Las reglas de rango de agenda, permisos, fecha civil, exportación, sesión y transición de tenant también viven en módulos puros con pruebas. Dashboard (2.467), agenda (1.507), clientes (1.350) y detalle de cliente (1.231) todavía requieren separar hooks de datos y componentes presentacionales antes del cierre. Verificado con 74 tests, typecheck, lint, export web y presupuesto de bundle.
+
 Mayores archivos:
 
 | Archivo                | Líneas aproximadas |
