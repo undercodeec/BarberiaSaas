@@ -240,6 +240,10 @@ Referencias:
 
 ### MED-06 — Datos sensibles visibles en capturas y selector de apps recientes
 
+**Estado:** [x] Corregido y verificado el 19 de agosto de 2026.
+
+**Evidencia de cierre:** `PrivacyShield.tsx` cubre el contenido con una vista opaca al pasar a estado `inactive`, `background`, `unknown` o `extension`; `MainActivity.kt` activa `FLAG_SECURE` para impedir capturas, grabación y miniaturas sensibles en Android. Verificado con 47 tests, typecheck, lint aislado y compilación Kotlin Android.
+
 **Evidencia:** no existe uso de `expo-screen-capture`, `FLAG_SECURE` ni una cubierta al pasar a background; la app muestra PII, caja, pagos y un token PayPhone.
 
 **Corrección:** ocultar o difuminar la interfaz en el app switcher; bloquear captura al mostrar credenciales/finanzas si el negocio lo requiere; añadir reautenticación biométrica/PIN después de inactividad para pantallas sensibles. Mantener una política equilibrada para no impedir soporte donde no haga falta.
