@@ -1,9 +1,4 @@
-import {
-  forwardRef,
-  useEffect,
-  useRef,
-  type ForwardedRef,
-} from 'react';
+import { forwardRef, useEffect, useRef, type ForwardedRef } from 'react';
 import {
   Keyboard,
   Platform,
@@ -65,6 +60,7 @@ export const KeyboardAwareScrollView = forwardRef<
   };
 
   useEffect(() => {
+    const currentInstanceId = instanceId.current;
     const keyboardShow = Keyboard.addListener('keyboardDidShow', () => {
       focusedInputRef.current = null;
       revealFocusedInput();
@@ -81,7 +77,7 @@ export const KeyboardAwareScrollView = forwardRef<
       keyboardHide.remove();
       clearInterval(focusPoll);
       if (delayedScrollRef.current) clearTimeout(delayedScrollRef.current);
-      if (activeKeyboardScroll === instanceId.current)
+      if (activeKeyboardScroll === currentInstanceId)
         activeKeyboardScroll = null;
     };
   });

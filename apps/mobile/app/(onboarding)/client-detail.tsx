@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/refs -- React Native Animated and PanResponder expose stable imperative values that are intentionally read by animated styles and gesture handlers. */
+/* eslint-disable react-hooks/set-state-in-effect -- API data hydrates an editable local draft after the client query resolves. */
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
   ClientDetailResponse,

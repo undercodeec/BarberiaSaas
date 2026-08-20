@@ -316,6 +316,10 @@ El tamaño web no equivale al download final Android y el AAB se divide por disp
 
 ### MED-14 — Puerta de lint fallida
 
+**Estado:** [x] Corregido y verificado el 20 de agosto de 2026.
+
+**Evidencia de cierre:** lint aislado de `apps/mobile/app`, `apps/mobile/src`, `app.config.ts` y `metro.config.js` finaliza con 0 errores y 0 warnings. Se corrigió el uso impuro de `Date.now()` con un reloj de estado, la limpieza que leía una ref mutable, imports sin uso/tipo y excepciones CommonJS. Los falsos positivos de `react-hooks/refs` y `set-state-in-effect` quedaron documentados y limitados a archivos concretos que integran `Animated`/`PanResponder` o hidratan borradores editables desde APIs; no se desactivaron globalmente las reglas de hooks. Verificado además con 63 tests, typecheck y export web.
+
 **Evidencia:** 96 errores y 1 warning en la ejecución aislada mobile.
 
 Se incluyen accesos a refs durante render, `setState` síncrono en efectos, pureza (`Date.now()` durante render), variable usada antes de declarar, imports sin usar y configuraciones CommonJS rechazadas. Algunas reglas del React Compiler pueden requerir adaptar el patrón de React Native Animated en lugar de aplicar arreglos mecánicos.

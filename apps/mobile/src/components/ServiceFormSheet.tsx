@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useRef, useState } from 'react';
-import { Image, Keyboard, KeyboardAvoidingView, LayoutAnimation, Modal, Platform, Pressable, ScrollView as NativeScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View, type GestureResponderEvent } from 'react-native';
+import { Image, Keyboard, KeyboardAvoidingView, LayoutAnimation, Modal, Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View, type GestureResponderEvent, type ScrollView as NativeScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { appTheme, goldButtonShadow } from './BottomNavigation';

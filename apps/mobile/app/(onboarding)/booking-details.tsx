@@ -8,7 +8,7 @@ import type {
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -220,12 +220,18 @@ export default function BookingDetailsScreen() {
     ),
   });
 
+  const [scheduleClock, setScheduleClock] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setScheduleClock(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
   const scheduleSlots = useMemo<ScheduleSlot[]>(() => {
-    const now = Date.now();
     const availableSlots = (availabilityQuery.data?.slots ?? []).map(
       (slot): ScheduleSlot => ({
         ...slot,
-        state: Date.parse(slot.startsAt) <= now ? 'past' : 'available',
+        state:
+          Date.parse(slot.startsAt) <= scheduleClock ? 'past' : 'available',
       }),
     );
     const unavailableSlots = (
@@ -233,12 +239,16 @@ export default function BookingDetailsScreen() {
     ).map((slot): ScheduleSlot => ({
       endsAt: slot.endsAt,
       startsAt: slot.startsAt,
-      state: Date.parse(slot.startsAt) <= now ? 'past' : slot.reason,
+      state: Date.parse(slot.startsAt) <= scheduleClock ? 'past' : slot.reason,
     }));
     return [...availableSlots, ...unavailableSlots].sort(
       (left, right) => Date.parse(left.startsAt) - Date.parse(right.startsAt),
     );
-  }, [availabilityQuery.data?.slots, availabilityQuery.data?.unavailableSlots]);
+  }, [
+    availabilityQuery.data?.slots,
+    availabilityQuery.data?.unavailableSlots,
+    scheduleClock,
+  ]);
   const filteredSlots = scheduleSlots.filter((slot) =>
     slotMatchesPeriod(slot.startsAt, timePeriod, timeZone),
   );

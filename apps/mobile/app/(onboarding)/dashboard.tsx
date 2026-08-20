@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/refs -- React Native Animated and PanResponder expose stable imperative values that are intentionally read by animated styles and gesture handlers. */
+/* eslint-disable react-hooks/set-state-in-effect -- Effects coordinate persisted prompts, permissions, focus, and modal state with external APIs. */
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
   AppointmentRecord,
@@ -2357,6 +2359,7 @@ export default function DashboardScreen() {
               <Image
                 accessibilityLabel="Corona dorada de suscripcion"
                 resizeMode="contain"
+                // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
                 source={require('../../assets/suscripcion.png')}
                 style={styles.subscriptionCrown}
               />
@@ -2416,6 +2419,7 @@ export default function DashboardScreen() {
               <Image
                 accessibilityLabel="Silla de barbería"
                 resizeMode="contain"
+                // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
                 source={require('../../assets/silla.png')}
                 style={styles.reservationChair}
               />

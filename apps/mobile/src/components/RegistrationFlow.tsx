@@ -25,7 +25,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import {
   SafeAreaView,
   useSafeAreaInsets,

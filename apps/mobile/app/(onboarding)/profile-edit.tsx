@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect -- API profile and account responses hydrate editable local drafts after queries resolve. */
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
   OnboardingAccountDetailsResponse,

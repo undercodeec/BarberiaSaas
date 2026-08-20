@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs -- React Native Animated and PanResponder expose stable imperative values that are intentionally read by animated styles and gesture handlers. */
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
   CashMovementRecord,

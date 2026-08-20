@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs -- React Native Animated exposes stable imperative values that are intentionally read by animated styles. */
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
