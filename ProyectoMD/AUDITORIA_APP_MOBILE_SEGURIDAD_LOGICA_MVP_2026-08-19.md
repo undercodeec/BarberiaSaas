@@ -346,6 +346,8 @@ Se incluyen accesos a refs durante render, `setState` síncrono en efectos, pure
 
 **Avance verificado el 20 de agosto de 2026:** 24 suites y 74 pruebas cubren restauración offline, 401 concurrentes, cambio de tenant, rango único de agenda, fecha civil de wallet, recovery/deep links, push logout, navegación de notificaciones, limpieza de exportaciones, validación runtime, permisos concedidos/denegados/bloqueados y controles de release. `agenda-range.ts` y `permission-access.ts` extraen reglas puras reutilizadas por las pantallas para evitar que las pruebas repliquen la implementación. Typecheck y lint mobile permanecen verdes.
 
+**Prueba Android del 20 de agosto de 2026:** el flujo autenticado completó dashboard, encuesta de bienvenida, Clientes y Caja en un dispositivo físico. Agenda no puede cerrarse por el `400 VALIDATION_ERROR` documentado en HIGH-01; faltan Wallet y la pasada E2E equivalente en iOS.
+
 **Evidencia:** 4 archivos de test y 6 casos para 45 archivos de rutas y ~34.990 líneas.
 
 No hay pruebas mobile para AuthProvider, API/token, logout/cache, cambio de tenant, agenda, caja, clientes, wallet, notificaciones, deep links, permisos, exportación, fechas ni navegación. Los tests actuales se concentran en cuatro componentes.
