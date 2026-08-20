@@ -79,7 +79,7 @@ Expo Doctor detectó:
 
 **Avance verificado el 20 de agosto de 2026:** `agendaRange()` centraliza un único rango civil para las vistas día, semana y mes; la pantalla realiza una sola consulta `/v1/appointments` por rango, cada 30 segundos y nunca en background. Las pruebas cubren domingo, semana completa, febrero bisiesto y cambio de año. La medición física exigida para el cierre continúa pendiente.
 
-**Prueba Android del 20 de agosto de 2026:** en la vista Día, la app envió un único rango válido `from/to` y un `locationId` UUID, pero `https://api.navacloud.app` respondió `400 VALIDATION_ERROR`. React Query ejecutó el único reintento configurado aproximadamente 1,5 segundos después de cada intervalo de 30 segundos. El código de `apps/api` ya acepta el contrato `from/to`; falta alinear o desplegar ese contrato en la API conectada al dispositivo y repetir las ventanas físicas Día/Semana/Completo. Este resultado bloquea el cierre de HIGH-01, no autoriza marcarlo como terminado.
+**Prueba Android del 20 de agosto de 2026:** antes del despliegue, en la vista Día la app envió un único rango válido `from/to` y un `locationId` UUID, pero `https://api.navacloud.app` respondió `400 VALIDATION_ERROR`. React Query ejecutó el único reintento configurado aproximadamente 1,5 segundos después de cada intervalo de 30 segundos. Tras desplegar la API con el contrato de rango, la vista Día permaneció cinco minutos en primer plano sin volver a mostrar el error. Faltan las ventanas físicas Semana/Completo y la comprobación en background; este avance no autoriza aún marcar HIGH-01 como terminado.
 
 **Evidencia:** `apps/mobile/app/(onboarding)/agenda.tsx:457-486`.
 
