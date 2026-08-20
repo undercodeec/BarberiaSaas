@@ -15,15 +15,12 @@ import {
   Animated,
   Alert,
   Easing,
-  KeyboardAvoidingView,
   Linking,
   Modal,
   PanResponder,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -45,128 +42,22 @@ import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-}
-
-function mondayOfWeek(date: Date): Date {
-  const day = date.getDay();
-  return addDays(date, day === 0 ? -6 : 1 - day);
-}
-
-function sameDate(first: Date, second: Date): boolean {
-  return (
-    first.getFullYear() === second.getFullYear() &&
-    first.getMonth() === second.getMonth() &&
-    first.getDate() === second.getDate()
-  );
-}
-
-function calendarDateForTimeZone(
-  timeZone: string,
-  dateValue = new Date(),
-): Date {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    day: '2-digit',
-    month: '2-digit',
-    timeZone,
-    year: 'numeric',
-  }).formatToParts(dateValue);
-  const value = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((part) => part.type === type)?.value);
-
-  return new Date(value('year'), value('month') - 1, value('day'), 12);
-}
-
-function daysInMonth(date: Date): Date[] {
-  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1, 12);
-  const numberOfDays = new Date(
-    date.getFullYear(),
-    date.getMonth() + 1,
-    0,
-  ).getDate();
-  return Array.from({ length: numberOfDays }, (_, index) =>
-    addDays(firstDay, index),
-  );
-}
-
-function calendarGrid(date: Date): ReadonlyArray<Date | null> {
-  const monthDays = daysInMonth(date);
-  const firstWeekday = monthDays[0]?.getDay() ?? 1;
-  const leadingDays = firstWeekday === 0 ? 6 : firstWeekday - 1;
-  return [...Array<Date | null>(leadingDays).fill(null), ...monthDays];
-}
-
-function formatMinute(minute: number): string {
-  const hours = Math.floor(minute / 60);
-  return (
-    String(hours).padStart(2, '0') + ':' + String(minute % 60).padStart(2, '0')
-  );
-}
-
-function minuteAtTimeZone(value: string, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    hour: '2-digit',
-    hourCycle: 'h23',
-    minute: '2-digit',
-    timeZone,
-  }).formatToParts(new Date(value));
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((item) => item.type === type)?.value ?? 0);
-  return part('hour') * 60 + part('minute');
-}
-
-type PayphoneManualConfirmationResponse = {
-  readonly activeConfiguration: boolean;
-  readonly appointment: {
-    readonly clientName: string;
-    readonly startsAt: string;
-    readonly totalCents: number;
-  };
-  readonly eligible: boolean;
-  readonly paymentStatus: 'paid' | 'pending';
-  readonly attempt: {
-    readonly confirmedAt: string | null;
-    readonly confirmedByName: string | null;
-    readonly currencyCode: string;
-    readonly expiresAt: string;
-    readonly note: string | null;
-    readonly reference: string | null;
-    readonly status: 'confirmed_manually' | 'expired' | 'pending_verification';
-    readonly transactionReference: string;
-  } | null;
-};
-type AgendaStatusFilter =
-  | 'active'
-  | 'all'
-  | 'completed'
-  | 'confirmed'
-  | 'in_progress'
-  | 'no_show'
-  | 'paid'
-  | 'scheduled'
-  | 'waiting';
-
-function timelineMinutes(
-  schedules: ReadonlyArray<{
-    readonly endMinute: number;
-    readonly startMinute: number;
-  }>,
-): number[] {
-  const times = new Set<number>();
-  for (const schedule of schedules) {
-    for (
-      let minute = schedule.startMinute;
-      minute < schedule.endMinute;
-      minute += 60
-    )
-      times.add(minute);
-    times.add(schedule.endMinute);
-  }
-  return [...times].sort((first, second) => first - second);
-}
+import {
+  AgendaCalendarModal,
+  PayphonePaymentModal,
+} from '../../src/features/screens/agenda-components';
+import {
+  addDays,
+  calendarDateForTimeZone,
+  calendarGrid,
+  formatMinute,
+  minuteAtTimeZone,
+  mondayOfWeek,
+  sameDate,
+  timelineMinutes,
+  type AgendaStatusFilter,
+  type PayphoneManualConfirmationResponse,
+} from '../../src/features/screens/agenda-model';
 
 export default function AgendaScreen() {
   const { session } = useAuth();
@@ -843,133 +734,21 @@ export default function AgendaScreen() {
         </ScrollView>
       </Animated.View>
 
-      <Modal
-        animationType="fade"
-        navigationBarTranslucent
-        onRequestClose={() => setIsCalendarOpen(false)}
-        statusBarTranslucent
-        transparent
+      <AgendaCalendarModal
+        bottomInset={layout.bottomInset}
+        calendarMonth={calendarMonth}
+        days={monthDays}
+        onClose={() => setIsCalendarOpen(false)}
+        onMonthChange={setCalendarMonth}
+        onSelectDay={(day) => {
+          setSelectedDay(day);
+          setIsCalendarOpen(false);
+        }}
+        selectedDay={selectedDay}
+        today={today}
+        topInset={layout.topInset}
         visible={isCalendarOpen}
-      >
-        <View
-          style={[
-            styles.calendarModalBackdrop,
-            {
-              paddingBottom: layout.bottomInset,
-              paddingTop: layout.topInset,
-            },
-          ]}
-        >
-          <View style={styles.calendarModal}>
-            <View style={styles.calendarModalHeader}>
-              <Pressable
-                accessibilityLabel="Mes anterior"
-                accessibilityRole="button"
-                onPress={() =>
-                  setCalendarMonth(
-                    (month) =>
-                      new Date(
-                        month.getFullYear(),
-                        month.getMonth() - 1,
-                        1,
-                        12,
-                      ),
-                  )
-                }
-                style={styles.monthControl}
-              >
-                <Ionicons
-                  color={appTheme.colors.accentDark}
-                  name="chevron-back"
-                  size={22}
-                />
-              </Pressable>
-              <Text style={styles.calendarMonthLabel}>
-                {calendarMonth.toLocaleDateString('es-EC', {
-                  month: 'long',
-                  year: 'numeric',
-                })}
-              </Text>
-              <Pressable
-                accessibilityLabel="Mes siguiente"
-                accessibilityRole="button"
-                onPress={() =>
-                  setCalendarMonth(
-                    (month) =>
-                      new Date(
-                        month.getFullYear(),
-                        month.getMonth() + 1,
-                        1,
-                        12,
-                      ),
-                  )
-                }
-                style={styles.monthControl}
-              >
-                <Ionicons
-                  color={appTheme.colors.accentDark}
-                  name="chevron-forward"
-                  size={22}
-                />
-              </Pressable>
-            </View>
-            <View style={styles.monthWeekdays}>
-              {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((weekday) => (
-                <Text key={weekday} style={styles.monthWeekday}>
-                  {weekday}
-                </Text>
-              ))}
-            </View>
-            <View style={styles.monthGrid}>
-              {monthDays.map((day, index) => {
-                if (!day)
-                  return (
-                    <View key={'blank-' + index} style={styles.monthDate} />
-                  );
-                const isSelected = sameDate(day, selectedDay);
-                const isToday = sameDate(day, today);
-                return (
-                  <Pressable
-                    accessibilityLabel={day.toLocaleDateString('es-EC', {
-                      day: 'numeric',
-                      month: 'long',
-                      weekday: 'long',
-                    })}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: isSelected }}
-                    key={day.toISOString()}
-                    onPress={() => {
-                      setSelectedDay(day);
-                      setIsCalendarOpen(false);
-                    }}
-                    style={[
-                      styles.monthDate,
-                      isSelected && styles.monthDateSelected,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.monthDateLabel,
-                        isSelected && styles.monthDateLabelSelected,
-                        isToday && !isSelected && styles.monthDateToday,
-                      ]}
-                    >
-                      {day.getDate()}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setIsCalendarOpen(false)}
-              style={styles.calendarClose}
-            >
-              <Text style={styles.calendarCloseLabel}>Cerrar</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+      />
 
       <Modal
         animationType="none"
@@ -1357,130 +1136,21 @@ export default function AgendaScreen() {
         </Pressable>
       </Modal>
 
-      <Modal
-        animationType="slide"
-        navigationBarTranslucent
-        onRequestClose={() => setManualPaymentSheetOpen(false)}
-        statusBarTranslucent
-        transparent
+      <PayphonePaymentModal
+        bottomInset={layout.bottomInset}
+        confirmed={manualPaymentConfirmed}
+        data={manualPaymentQuery.data}
+        note={manualPaymentNote}
+        onClose={() => setManualPaymentSheetOpen(false)}
+        onConfirmedChange={setManualPaymentConfirmed}
+        onNoteChange={setManualPaymentNote}
+        onReferenceChange={setManualPaymentReference}
+        onSubmit={() => confirmPayphonePayment.mutate()}
+        pending={confirmPayphonePayment.isPending}
+        reference={manualPaymentReference}
+        sheetMaxHeight={layout.sheetMaxHeight}
         visible={manualPaymentSheetOpen}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.paymentSheetRoot}
-        >
-          <Pressable
-            onPress={() => setManualPaymentSheetOpen(false)}
-            style={styles.appointmentModalBackdrop}
-          />
-          <ScrollView
-            contentContainerStyle={[
-              styles.paymentSheet,
-              { paddingBottom: layout.bottomInset + 20 },
-            ]}
-            style={{ maxHeight: layout.sheetMaxHeight }}
-          >
-            <Text style={styles.appointmentModalTitle}>
-              Confirmar cobro PayPhone
-            </Text>
-            <Text style={styles.paymentWarning}>
-              Antes de continuar, verifica en PayPhone Business que el pago fue
-              aprobado y que el monto recibido coincide con el total de la cita.
-              Nava no puede comprobar este pago automáticamente.
-            </Text>
-            <View style={styles.paymentDetails}>
-              <Text style={styles.paymentDetail}>
-                Cliente:{' '}
-                {manualPaymentQuery.data?.appointment.clientName ?? '-'}
-              </Text>
-              <Text style={styles.paymentDetail}>
-                Fecha:{' '}
-                {manualPaymentQuery.data?.appointment.startsAt
-                  ? new Date(
-                      manualPaymentQuery.data.appointment.startsAt,
-                    ).toLocaleString('es-EC')
-                  : '-'}
-              </Text>
-              <Text style={styles.paymentDetail}>
-                Total esperado: $
-                {(
-                  (manualPaymentQuery.data?.appointment.totalCents ?? 0) / 100
-                ).toFixed(2)}{' '}
-                {manualPaymentQuery.data?.attempt?.currencyCode ?? 'USD'}
-              </Text>
-              <Text style={styles.paymentDetail}>
-                Enlace generado:{' '}
-                {manualPaymentQuery.data?.attempt
-                  ? new Date(
-                      new Date(
-                        manualPaymentQuery.data.attempt.expiresAt,
-                      ).getTime() -
-                        60 * 60 * 1000,
-                    ).toLocaleString('es-EC')
-                  : '-'}
-              </Text>
-              <Text style={styles.paymentDetail}>
-                Referencia interna:{' '}
-                {manualPaymentQuery.data?.attempt?.transactionReference ?? '-'}
-              </Text>
-            </View>
-            <Text style={styles.inputLabel}>Referencia de PayPhone</Text>
-            <TextInput
-              autoCapitalize="characters"
-              editable={!confirmPayphonePayment.isPending}
-              onChangeText={setManualPaymentReference}
-              placeholder="Número de transacción verificado"
-              placeholderTextColor={appTheme.colors.textMuted}
-              style={styles.paymentInput}
-              value={manualPaymentReference}
-            />
-            <Text style={styles.inputLabel}>Nota (opcional)</Text>
-            <TextInput
-              editable={!confirmPayphonePayment.isPending}
-              multiline
-              onChangeText={setManualPaymentNote}
-              placeholder="Detalle de la verificación"
-              placeholderTextColor={appTheme.colors.textMuted}
-              style={[styles.paymentInput, styles.paymentNoteInput]}
-              value={manualPaymentNote}
-            />
-            <Pressable
-              onPress={() => setManualPaymentConfirmed((value) => !value)}
-              style={styles.confirmationCheck}
-            >
-              <Ionicons
-                color={
-                  manualPaymentConfirmed
-                    ? appTheme.colors.accentDark
-                    : appTheme.colors.textMuted
-                }
-                name={
-                  manualPaymentConfirmed ? 'checkbox-outline' : 'square-outline'
-                }
-                size={23}
-              />
-              <Text style={styles.confirmationCheckText}>
-                Confirmo que verifiqué el pago aprobado en PayPhone Business.
-              </Text>
-            </Pressable>
-            <Pressable
-              disabled={
-                !manualPaymentConfirmed ||
-                !manualPaymentReference.trim() ||
-                confirmPayphonePayment.isPending
-              }
-              onPress={() => confirmPayphonePayment.mutate()}
-              style={styles.modalPrimaryAction}
-            >
-              <Text style={styles.modalPrimaryText}>
-                {confirmPayphonePayment.isPending
-                  ? 'Registrando...'
-                  : 'Registrar como pagado'}
-              </Text>
-            </Pressable>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </Modal>
+      />
       <Pressable
         accessibilityLabel="Crear cita"
         accessibilityRole="button"

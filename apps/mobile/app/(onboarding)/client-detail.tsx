@@ -34,46 +34,16 @@ import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 import { useNativeLayoutMetrics } from '../../src/components/BottomNavigation';
 
-type Tab = 'comments' | 'history' | 'information' | 'notes';
-type HistoryOrder = 'newest' | 'oldest';
-type HistoryStatusFilter =
-  'all' | 'active' | 'paid' | 'cancelled' | 'completed';
-
-const emptyValue = (value: string | null | undefined) =>
-  value || 'Sin registrar';
-
-function formatDate(value: string | null) {
-  if (!value) return 'Sin registrar';
-  return new Intl.DateTimeFormat('es-EC', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(value));
-}
-
-function formatMoney(cents: number) {
-  return new Intl.NumberFormat('es-EC', {
-    currency: 'USD',
-    maximumFractionDigits: 0,
-    style: 'currency',
-  }).format(cents / 100);
-}
-
-function statusLabel(
-  status: ClientDetailResponse['history'][number]['status'],
-) {
-  const labels = {
-    cancelled: 'Cancelada',
-    checked_in: 'En espera',
-    completed: 'Completada',
-    confirmed: 'Confirmada',
-    in_progress: 'En curso',
-    no_show: 'No asistió',
-    scheduled: 'Agendada',
-    waiting: 'En espera',
-  } as const;
-  return labels[status];
-}
+import { InfoRow } from '../../src/features/screens/client-detail-components';
+import {
+  emptyValue,
+  formatDate,
+  formatMoney,
+  statusLabel,
+  type HistoryOrder,
+  type HistoryStatusFilter,
+  type Tab,
+} from '../../src/features/screens/client-detail-model';
 
 export default function ClientDetailScreen() {
   const tenant = useTenantScope();
@@ -1201,31 +1171,5 @@ export default function ClientDetailScreen() {
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
-  );
-}
-
-function InfoRow({
-  icon,
-  label,
-  last = false,
-  value,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  last?: boolean;
-  value: string | null;
-}) {
-  return (
-    <View style={[styles.infoRow, last && styles.infoRowLast]}>
-      <View style={styles.infoIcon}>
-        <Ionicons color="#101c2d" name={icon} size={19} />
-      </View>
-      <View style={styles.infoCopy}>
-        <Text style={styles.infoLabel}>{label}</Text>
-        <Text style={[styles.infoValue, !value && styles.secondary]}>
-          {emptyValue(value)}
-        </Text>
-      </View>
-    </View>
   );
 }
