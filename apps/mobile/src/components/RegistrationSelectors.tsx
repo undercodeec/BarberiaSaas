@@ -1,6 +1,22 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { getCountries, getCountryCallingCode, type CountryCode } from 'libphonenumber-js/min';
-import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, TextInput, type NativeScrollEvent, type NativeSyntheticEvent, type TextInputProps, View } from 'react-native';
+import {
+  getCountries,
+  getCountryCallingCode,
+  type CountryCode,
+} from 'libphonenumber-js/min';
+import {
+  FlatList,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type TextInputProps,
+  View,
+} from 'react-native';
 import { useState } from 'react';
 
 import {
@@ -85,26 +101,63 @@ export function detectCountryCode() {
     if (zones[zone]) return zones[zone];
     const locale = Intl.DateTimeFormat().resolvedOptions().locale;
     const region = locale.split('-')[1]?.toUpperCase();
-    if (region && COUNTRIES.some((country) => country.code === region)) return region;
+    if (region && COUNTRIES.some((country) => country.code === region))
+      return region;
     return 'EC';
   } catch {
     return 'EC';
   }
 }
 
-export function PhoneCountryField({ countryCode, error, onBlur, onChangeCountry, onChangeText, onFocus, value }: { readonly countryCode: string; readonly error?: string | undefined; readonly onBlur?: TextInputProps['onBlur']; readonly onChangeCountry: (code: string) => void; readonly onChangeText: (value: string) => void; readonly onFocus?: TextInputProps['onFocus']; readonly value: string }) {
+export function PhoneCountryField({
+  countryCode,
+  error,
+  onBlur,
+  onChangeCountry,
+  onChangeText,
+  onFocus,
+  value,
+}: {
+  readonly countryCode: string;
+  readonly error?: string | undefined;
+  readonly onBlur?: TextInputProps['onBlur'];
+  readonly onChangeCountry: (code: string) => void;
+  readonly onChangeText: (value: string) => void;
+  readonly onFocus?: TextInputProps['onFocus'];
+  readonly value: string;
+}) {
   const [open, setOpen] = useState(false);
-  const country = COUNTRIES.find((item) => item.code === countryCode) ?? COUNTRIES[0]!;
+  const country =
+    COUNTRIES.find((item) => item.code === countryCode) ?? COUNTRIES[0]!;
   return (
     <View style={styles.field}>
       <Text style={styles.label}>Número telefónico</Text>
       <View style={[styles.phoneRow, error ? styles.errorBorder : null]}>
-        <Pressable accessibilityRole="button" onPress={() => setOpen(true)} style={styles.dialButton}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setOpen(true)}
+          style={styles.dialButton}
+        >
           <Text style={styles.flag}>{flag(country.code)}</Text>
           <Text style={styles.dial}>{country.dial}</Text>
           <Ionicons color="#667080" name="chevron-down" size={18} />
         </Pressable>
-        <TextInput autoComplete="tel" accessibilityLabel="Número telefónico" inputMode="tel" keyboardType={Platform.OS === 'web' ? 'numeric' : 'phone-pad'} maxLength={24} onBlur={onBlur} onChangeText={(text) => onChangeText(text.replace(/[^\d+()\s-]/gu, ''))} onFocus={onFocus} placeholder="Número telefónico" placeholderTextColor="#98a0ab" style={styles.phoneInput} value={value} />
+        <TextInput
+          autoComplete="tel"
+          accessibilityLabel="Número telefónico"
+          inputMode="tel"
+          keyboardType={Platform.OS === 'web' ? 'numeric' : 'phone-pad'}
+          maxLength={24}
+          onBlur={onBlur}
+          onChangeText={(text) =>
+            onChangeText(text.replace(/[^\d+()\s-]/gu, ''))
+          }
+          onFocus={onFocus}
+          placeholder="Número telefónico"
+          placeholderTextColor="#98a0ab"
+          style={styles.phoneInput}
+          value={value}
+        />
       </View>
       {error ? (
         <Text accessibilityRole="alert" style={styles.error}>
@@ -127,12 +180,33 @@ export function PhoneCountryField({ countryCode, error, onBlur, onChangeCountry,
   );
 }
 
-export function CountryCityFields({ city, countryCode, cityError, countryError, onCity, onCountry }: { readonly city: string; readonly countryCode: string; readonly cityError?: string | undefined; readonly countryError?: string | undefined; readonly onCity: (city: string) => void; readonly onCountry: (country: CountryOption) => void }) {
+export function CountryCityFields({
+  city,
+  countryCode,
+  cityError,
+  countryError,
+  onCity,
+  onCountry,
+}: {
+  readonly city: string;
+  readonly countryCode: string;
+  readonly cityError?: string | undefined;
+  readonly countryError?: string | undefined;
+  readonly onCity: (city: string) => void;
+  readonly onCountry: (country: CountryOption) => void;
+}) {
   const [countryOpen, setCountryOpen] = useState(false);
-  const country = COUNTRIES.find((item) => item.code === countryCode) ?? COUNTRIES[0]!;
+  const country =
+    COUNTRIES.find((item) => item.code === countryCode) ?? COUNTRIES[0]!;
   return (
     <>
-      <SelectionField error={countryError} icon="earth-outline" label="País" onPress={() => setCountryOpen(true)} value={`${flag(country.code)}  ${country.name}`} />
+      <SelectionField
+        error={countryError}
+        icon="earth-outline"
+        label="País"
+        onPress={() => setCountryOpen(true)}
+        value={`${flag(country.code)}  ${country.name}`}
+      />
       <View style={styles.field}>
         <Text style={styles.label}>Ciudad</Text>
         <View style={[styles.selection, cityError ? styles.errorBorder : null]}>
@@ -167,11 +241,27 @@ export function CountryCityFields({ city, countryCode, cityError, countryError, 
   );
 }
 
-export function TimeField({ error, label, onChange, value }: { readonly error?: string | undefined; readonly label: string; readonly onChange: (value: string) => void; readonly value: string }) {
+export function TimeField({
+  error,
+  label,
+  onChange,
+  value,
+}: {
+  readonly error?: string | undefined;
+  readonly label: string;
+  readonly onChange: (value: string) => void;
+  readonly value: string;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <SelectionField error={error} icon="time-outline" label={label} onPress={() => setOpen(true)} value={value || 'Selecciona una hora'} />
+      <SelectionField
+        error={error}
+        icon="time-outline"
+        label={label}
+        onPress={() => setOpen(true)}
+        value={value || 'Selecciona una hora'}
+      />
       {open ? (
         <TimeWheelModal
           label={label}
@@ -187,11 +277,27 @@ export function TimeField({ error, label, onChange, value }: { readonly error?: 
   );
 }
 
-function SelectionField({ error, icon, label, onPress, value }: { readonly error?: string | undefined; readonly icon: 'earth-outline' | 'location-outline' | 'time-outline'; readonly label: string; readonly onPress: () => void; readonly value: string }) {
+function SelectionField({
+  error,
+  icon,
+  label,
+  onPress,
+  value,
+}: {
+  readonly error?: string | undefined;
+  readonly icon: 'earth-outline' | 'location-outline' | 'time-outline';
+  readonly label: string;
+  readonly onPress: () => void;
+  readonly value: string;
+}) {
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
-      <Pressable accessibilityRole="button" onPress={onPress} style={[styles.selection, error ? styles.errorBorder : null]}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        style={[styles.selection, error ? styles.errorBorder : null]}
+      >
         <Ionicons color="#101c2d" name={icon} size={22} />
         <Text style={styles.selectionText}>{value}</Text>
         <Ionicons color="#667080" name="chevron-down" size={20} />
@@ -204,10 +310,29 @@ function SelectionField({ error, icon, label, onPress, value }: { readonly error
     </View>
   );
 }
-function OptionsModal({ onClose, onSelect, options, title, visible }: { readonly onClose: () => void; readonly onSelect: (option: CountryOption) => void; readonly options: readonly CountryOption[]; readonly title: string; readonly visible: boolean }) {
+function OptionsModal({
+  onClose,
+  onSelect,
+  options,
+  title,
+  visible,
+}: {
+  readonly onClose: () => void;
+  readonly onSelect: (option: CountryOption) => void;
+  readonly options: readonly CountryOption[];
+  readonly title: string;
+  readonly visible: boolean;
+}) {
   const layout = useNativeLayoutMetrics(0.7);
   return (
-    <Modal animationType="fade" navigationBarTranslucent onRequestClose={onClose} statusBarTranslucent transparent visible={visible}>
+    <Modal
+      animationType="fade"
+      navigationBarTranslucent
+      onRequestClose={onClose}
+      statusBarTranslucent
+      transparent
+      visible={visible}
+    >
       <View style={styles.modalLayer}>
         <Pressable onPress={onClose} style={styles.modalBackdrop} />
         <View
@@ -232,10 +357,7 @@ function OptionsModal({ onClose, onSelect, options, title, visible }: { readonly
             keyboardShouldPersistTaps="handled"
             maxToRenderPerBatch={16}
             renderItem={({ item: option }) => (
-              <Pressable
-                onPress={() => onSelect(option)}
-                style={styles.option}
-              >
+              <Pressable onPress={() => onSelect(option)} style={styles.option}>
                 <Text style={styles.flag}>{flag(option.code)}</Text>
                 <Text style={styles.optionText}>{option.name}</Text>
                 <Text style={styles.optionMeta}>{option.dial}</Text>
@@ -248,18 +370,50 @@ function OptionsModal({ onClose, onSelect, options, title, visible }: { readonly
     </Modal>
   );
 }
-function TimeWheelModal({ label, onClose, onConfirm, value }: { readonly label: string; readonly onClose: () => void; readonly onConfirm: (value: string) => void; readonly value: string }) {
+function TimeWheelModal({
+  label,
+  onClose,
+  onConfirm,
+  value,
+}: {
+  readonly label: string;
+  readonly onClose: () => void;
+  readonly onConfirm: (value: string) => void;
+  readonly value: string;
+}) {
   const layout = useNativeLayoutMetrics();
-  const hours = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, '0'));
-  const minutes = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, '0'));
+  const hours = Array.from({ length: 24 }, (_, index) =>
+    String(index).padStart(2, '0'),
+  );
+  const minutes = Array.from({ length: 60 }, (_, index) =>
+    String(index).padStart(2, '0'),
+  );
   const [initialHour = '09', initialMinute = '00'] = value.split(':');
-  const [hour, setHour] = useState(hours.includes(initialHour) ? initialHour : '09');
-  const [minute, setMinute] = useState(minutes.includes(initialMinute) ? initialMinute : '00');
-  const selectFromScroll = (event: NativeSyntheticEvent<NativeScrollEvent>, options: string[], select: (next: string) => void) => {
-    const index = Math.max(0, Math.min(options.length - 1, Math.round(event.nativeEvent.contentOffset.y / 52)));
+  const [hour, setHour] = useState(
+    hours.includes(initialHour) ? initialHour : '09',
+  );
+  const [minute, setMinute] = useState(
+    minutes.includes(initialMinute) ? initialMinute : '00',
+  );
+  const selectFromScroll = (
+    event: NativeSyntheticEvent<NativeScrollEvent>,
+    options: string[],
+    select: (next: string) => void,
+  ) => {
+    const index = Math.max(
+      0,
+      Math.min(
+        options.length - 1,
+        Math.round(event.nativeEvent.contentOffset.y / 52),
+      ),
+    );
     select(options[index]!);
   };
-  const renderWheel = (options: string[], selected: string, select: (next: string) => void) => (
+  const renderWheel = (
+    options: string[],
+    selected: string,
+    select: (next: string) => void,
+  ) => (
     <FlatList
       contentContainerStyle={styles.wheelContent}
       data={options}
@@ -271,7 +425,14 @@ function TimeWheelModal({ label, onClose, onConfirm, value }: { readonly label: 
       onScrollEndDrag={(event) => selectFromScroll(event, options, select)}
       renderItem={({ item }) => (
         <Pressable onPress={() => select(item)} style={styles.wheelItem}>
-          <Text style={[styles.wheelText, item === selected ? styles.wheelTextSelected : null]}>{item}</Text>
+          <Text
+            style={[
+              styles.wheelText,
+              item === selected ? styles.wheelTextSelected : null,
+            ]}
+          >
+            {item}
+          </Text>
         </Pressable>
       )}
       showsVerticalScrollIndicator={false}
@@ -281,17 +442,23 @@ function TimeWheelModal({ label, onClose, onConfirm, value }: { readonly label: 
     />
   );
   return (
-    <Modal animationType="fade" navigationBarTranslucent onRequestClose={onClose} statusBarTranslucent transparent visible>
+    <Modal
+      animationType="fade"
+      navigationBarTranslucent
+      onRequestClose={onClose}
+      statusBarTranslucent
+      transparent
+      visible
+    >
       <View style={styles.modalLayer}>
         <Pressable onPress={onClose} style={styles.modalBackdrop} />
         <View
-          style={[
-            styles.timeCard,
-            { paddingBottom: layout.bottomInset + 12 },
-          ]}
+          style={[styles.timeCard, { paddingBottom: layout.bottomInset + 12 }]}
         >
           <Text style={styles.modalTitle}>{label}</Text>
-          <Text style={styles.timeHint}>Desliza para seleccionar la hora y los minutos</Text>
+          <Text style={styles.timeHint}>
+            Desliza para seleccionar la hora y los minutos
+          </Text>
           <View style={styles.wheelLabels}>
             <Text style={styles.wheelLabel}>Hora</Text>
             <Text style={styles.wheelLabel}>Minutos</Text>

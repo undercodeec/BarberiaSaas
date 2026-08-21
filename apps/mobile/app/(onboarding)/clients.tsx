@@ -122,7 +122,10 @@ export default function ClientsScreen() {
         floatingClientOffsetRef.current = {
           x: Math.min(
             bounds.width - sideMargin - buttonSize - baseX,
-            Math.max(sideMargin - baseX, floatingClientOffsetRef.current.x + gesture.dx),
+            Math.max(
+              sideMargin - baseX,
+              floatingClientOffsetRef.current.x + gesture.dx,
+            ),
           ),
           y: Math.min(
             bounds.height -

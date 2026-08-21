@@ -11,7 +11,10 @@ import {
 
 import { appTheme } from '../../components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../components/KeyboardAwareScrollView';
-import { sameDate, type PayphoneManualConfirmationResponse } from './agenda-model';
+import {
+  sameDate,
+  type PayphoneManualConfirmationResponse,
+} from './agenda-model';
 import { styles } from './agenda.styles';
 
 type AgendaCalendarModalProps = {

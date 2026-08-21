@@ -396,8 +396,8 @@ export default function CashRegisterScreen() {
       ? Boolean(movementServiceId && movementProfessionalId)
       : Boolean(
           movementProductId &&
-            Number.isInteger(productQuantityValue) &&
-            productQuantityValue > 0,
+          Number.isInteger(productQuantityValue) &&
+          productQuantityValue > 0,
         );
   const isMovementReady =
     Number.isFinite(movementAmountValue) &&
@@ -992,7 +992,9 @@ export default function CashRegisterScreen() {
                       <Text style={styles.exitText}>Salir</Text>
                     </Pressable>
                     <Pressable
-                      accessibilityState={{ disabled: isRegisterMovementDisabled }}
+                      accessibilityState={{
+                        disabled: isRegisterMovementDisabled,
+                      }}
                       disabled={isRegisterMovementDisabled}
                       onPress={() => registerMovement.mutate()}
                       style={[

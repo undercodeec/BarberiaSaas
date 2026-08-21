@@ -10,11 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import {
-  appStyles,
-  appTheme,
-  goldButtonShadow,
-} from './BottomNavigation';
+import { appStyles, appTheme, goldButtonShadow } from './BottomNavigation';
 import { NavaButton } from './NavaButton';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports

@@ -17,7 +17,8 @@ export const SUBSCRIPTION_NOTICE_ACTIVE_DAYS = 7;
 export const DASHBOARD_BANNER_DELAY_MS = 10_000;
 export const LOCATION_BANNER_DELAY_MS = 500;
 export const WELCOME_SURVEY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
-export const WELCOME_SURVEY_RESPONSE_KEY = 'barber-saas.welcome-survey-response';
+export const WELCOME_SURVEY_RESPONSE_KEY =
+  'barber-saas.welcome-survey-response';
 export const QUICK_ACTIONS_STORAGE_KEY = 'barber-saas.dashboard-quick-actions';
 export const WELCOME_SURVEY_OPTIONS = [
   'Publicidad',
@@ -475,7 +476,9 @@ export function dateInTimeZone(timeZone: string): string {
   return `${part('year')}-${part('month')}-${part('day')}`;
 }
 
-export function appointmentStatusLabel(status: AppointmentRecord['status']): string {
+export function appointmentStatusLabel(
+  status: AppointmentRecord['status'],
+): string {
   if (status === 'awaiting_confirmation') return 'Por confirmar';
   if (status === 'checked_in') return 'Cliente en el local';
   if (status === 'confirmed') return 'Confirmada';
@@ -486,7 +489,10 @@ export function appointmentStatusLabel(status: AppointmentRecord['status']): str
   return 'Próxima cita';
 }
 
-export function formatOperationMoney(value: number, currencyCode: string): string {
+export function formatOperationMoney(
+  value: number,
+  currencyCode: string,
+): string {
   return new Intl.NumberFormat('es-EC', {
     currency: currencyCode,
     maximumFractionDigits: 2,

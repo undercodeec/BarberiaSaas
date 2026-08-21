@@ -15,13 +15,7 @@ import * as Notifications from 'expo-notifications';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import {
-  Image,
-  Platform,
-  Pressable,
-  Text,
-  View,
-} from 'react-native';
+import { Image, Platform, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 

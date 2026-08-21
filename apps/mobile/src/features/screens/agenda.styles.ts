@@ -1,6 +1,10 @@
 import { StyleSheet } from 'react-native';
 
-import { appStyles, appTheme, goldShadow } from '../../components/BottomNavigation';
+import {
+  appStyles,
+  appTheme,
+  goldShadow,
+} from '../../components/BottomNavigation';
 
 export const styles = StyleSheet.create({
   appointmentCard: {
@@ -561,7 +565,44 @@ export const styles = StyleSheet.create({
     color: appTheme.colors.accentDark,
     textDecorationLine: 'underline',
   },
+  monthAppointmentCount: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.accent,
+    borderRadius: 10,
+    height: 20,
+    justifyContent: 'center',
+    marginTop: 7,
+    minWidth: 20,
+  },
+  monthAppointmentCountLabel: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  monthCell: {
+    alignItems: 'center',
+    borderColor: appTheme.colors.border,
+    borderRightWidth: 1,
+    borderTopWidth: 1,
+    justifyContent: 'flex-start',
+    minHeight: 72,
+    paddingTop: 9,
+    width: '14.2857%',
+  },
+  monthCellNumber: {
+    color: appTheme.colors.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  monthCellNumberSelected: { color: '#FFFFFF' },
+  monthCellSelected: { backgroundColor: appTheme.colors.accent },
   monthGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 },
+  monthHint: {
+    color: appTheme.colors.textMuted,
+    fontSize: 13,
+    marginTop: 16,
+    textAlign: 'center',
+  },
   monthWeekday: {
     color: appTheme.colors.textMuted,
     fontSize: 12,
@@ -570,6 +611,68 @@ export const styles = StyleSheet.create({
     width: '14.2857%',
   },
   monthWeekdays: { flexDirection: 'row', marginTop: 22 },
+  weekAppointmentCard: {
+    backgroundColor: appTheme.colors.accentWash,
+    borderLeftColor: appTheme.colors.accent,
+    borderLeftWidth: 3,
+    borderRadius: 8,
+    marginBottom: 5,
+    padding: 5,
+  },
+  weekAppointmentClient: {
+    color: appTheme.colors.text,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  weekAppointmentTime: {
+    color: appTheme.colors.accentDark,
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  weekCell: {
+    borderColor: appTheme.colors.border,
+    borderLeftWidth: 1,
+    minHeight: 80,
+    padding: 4,
+    width: 96,
+  },
+  weekDayHeader: {
+    alignItems: 'center',
+    borderColor: appTheme.colors.border,
+    borderLeftWidth: 1,
+    justifyContent: 'center',
+    minHeight: 54,
+    width: 96,
+  },
+  weekDayHeaderSelected: { backgroundColor: appTheme.colors.accentWash },
+  weekDayName: {
+    color: appTheme.colors.textMuted,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  weekDayNumber: {
+    color: appTheme.colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+    marginTop: 2,
+  },
+  weekHour: {
+    color: appTheme.colors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
+    width: 52,
+  },
+  weekHourHeader: {
+    color: appTheme.colors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
+    paddingTop: 16,
+    width: 52,
+  },
+  weekHourRow: { flexDirection: 'row' },
+  weekTimeline: { paddingBottom: 2 },
+  weekTimelineHeader: { flexDirection: 'row' },
+  weekTimelineScroll: { marginHorizontal: -20 },
   weekSelector: {
     backgroundColor: appTheme.colors.accentWash,
     borderRadius: 23,

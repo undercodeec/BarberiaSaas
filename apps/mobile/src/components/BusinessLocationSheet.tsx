@@ -328,134 +328,136 @@ export function BusinessLocationSheet({
               },
             ]}
           >
-          <View {...panResponder.panHandlers} style={styles.dragArea}>
-            <View style={styles.handle} />
-          </View>
-          <ScrollView
-            contentContainerStyle={styles.content}
-            keyboardShouldPersistTaps="handled"
-            overScrollMode="never"
-            showsVerticalScrollIndicator={false}
-            style={styles.scroll}
-          >
-            <Text accessibilityRole="header" style={styles.title}>
-              Ubicación del negocio
-            </Text>
-            <Text style={styles.description}>
-              Busca el nombre del negocio o las calles, o carga tu ubicación
-              actual y confirma el punto antes de guardarlo.
-            </Text>
-
-            <View style={styles.inputWrap}>
-              <Ionicons color="#555a63" name="search-outline" size={21} />
-              <TextInput
-                accessibilityLabel="Buscar negocio o dirección"
-                editable={!isSubmitted}
-                onChangeText={(value) => {
-                  setAddress(value);
-                  setCandidate(null);
-                  setError(null);
-                  setSuggestions([]);
-                }}
-                placeholder="Nombre del negocio, avenida o calles"
-                placeholderTextColor="#8e939b"
-                style={styles.input}
-                value={address}
-              />
-              {isSearching ? <ActivityIndicator color="#101C2D" /> : null}
+            <View {...panResponder.panHandlers} style={styles.dragArea}>
+              <View style={styles.handle} />
             </View>
-
-            {suggestions.length > 0 ? (
-              <View style={styles.suggestions}>
-                {suggestions.map((suggestion) => (
-                  <Pressable
-                    accessibilityRole="button"
-                    key={suggestion.placeId}
-                    onPress={() => void selectSuggestion(suggestion)}
-                    style={styles.suggestion}
-                  >
-                    <Ionicons
-                      color="#101C2D"
-                      name="location-outline"
-                      size={19}
-                    />
-                    <View style={styles.suggestionCopy}>
-                      <Text style={styles.suggestionMain}>
-                        {suggestion.mainText}
-                      </Text>
-                      {suggestion.secondaryText ? (
-                        <Text style={styles.suggestionSecondary}>
-                          {suggestion.secondaryText}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-
-            <Pressable
-              accessibilityRole="button"
-              disabled={isLocating || isSubmitted}
-              onPress={() => void requestCurrentLocation()}
-              style={styles.locateButton}
+            <ScrollView
+              contentContainerStyle={styles.content}
+              keyboardShouldPersistTaps="handled"
+              overScrollMode="never"
+              showsVerticalScrollIndicator={false}
+              style={styles.scroll}
             >
-              {isLocating ? (
-                <ActivityIndicator color="#101C2D" size="small" />
-              ) : (
-                <Ionicons color="#101C2D" name="navigate-outline" size={20} />
-              )}
-              <Text style={styles.locateLabel}>Usar mi ubicación actual</Text>
-            </Pressable>
+              <Text accessibilityRole="header" style={styles.title}>
+                Ubicación del negocio
+              </Text>
+              <Text style={styles.description}>
+                Busca el nombre del negocio o las calles, o carga tu ubicación
+                actual y confirma el punto antes de guardarlo.
+              </Text>
 
-            <BusinessLocationMap
-              coordinate={coordinate}
-              onCoordinateChange={(next) => void resolveCoordinates(next)}
-            />
-            <Text style={styles.mapHint}>
-              Toca el mapa para ajustar el marcador y actualizar la dirección.
-            </Text>
+              <View style={styles.inputWrap}>
+                <Ionicons color="#555a63" name="search-outline" size={21} />
+                <TextInput
+                  accessibilityLabel="Buscar negocio o dirección"
+                  editable={!isSubmitted}
+                  onChangeText={(value) => {
+                    setAddress(value);
+                    setCandidate(null);
+                    setError(null);
+                    setSuggestions([]);
+                  }}
+                  placeholder="Nombre del negocio, avenida o calles"
+                  placeholderTextColor="#8e939b"
+                  style={styles.input}
+                  value={address}
+                />
+                {isSearching ? <ActivityIndicator color="#101C2D" /> : null}
+              </View>
 
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-            {error?.includes('Ajustes') ? (
+              {suggestions.length > 0 ? (
+                <View style={styles.suggestions}>
+                  {suggestions.map((suggestion) => (
+                    <Pressable
+                      accessibilityRole="button"
+                      key={suggestion.placeId}
+                      onPress={() => void selectSuggestion(suggestion)}
+                      style={styles.suggestion}
+                    >
+                      <Ionicons
+                        color="#101C2D"
+                        name="location-outline"
+                        size={19}
+                      />
+                      <View style={styles.suggestionCopy}>
+                        <Text style={styles.suggestionMain}>
+                          {suggestion.mainText}
+                        </Text>
+                        {suggestion.secondaryText ? (
+                          <Text style={styles.suggestionSecondary}>
+                            {suggestion.secondaryText}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+
               <Pressable
                 accessibilityRole="button"
-                onPress={() => void Linking.openSettings()}
-                style={styles.settingsButton}
+                disabled={isLocating || isSubmitted}
+                onPress={() => void requestCurrentLocation()}
+                style={styles.locateButton}
               >
-                <Text style={styles.settingsLabel}>Abrir ajustes</Text>
+                {isLocating ? (
+                  <ActivityIndicator color="#101C2D" size="small" />
+                ) : (
+                  <Ionicons color="#101C2D" name="navigate-outline" size={20} />
+                )}
+                <Text style={styles.locateLabel}>Usar mi ubicación actual</Text>
               </Pressable>
-            ) : null}
-            {isSubmitted ? (
-              <Text accessibilityLiveRegion="polite" style={styles.success}>
-                Ubicación guardada
+
+              <BusinessLocationMap
+                coordinate={coordinate}
+                onCoordinateChange={(next) => void resolveCoordinates(next)}
+              />
+              <Text style={styles.mapHint}>
+                Toca el mapa para ajustar el marcador y actualizar la dirección.
               </Text>
-            ) : null}
-          </ScrollView>
-          <View style={styles.actions}>
-            <Pressable
-              accessibilityRole="button"
-              disabled={isSubmitting || isSubmitted}
-              onPress={dismissWithAnimation}
-              style={styles.secondaryButton}
-            >
-              <Text style={styles.secondaryLabel}>Ahora no</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              disabled={isLocating || isSubmitting || isSubmitted || !candidate}
-              onPress={() => void submit()}
-              style={[
-                styles.primaryButton,
-                (isLocating || isSubmitting || isSubmitted || !candidate) &&
-                  styles.disabled,
-              ]}
-            >
-              <Text style={styles.primaryLabel}>
-                {isSubmitting ? 'Guardando…' : 'Guardar ubicación'}
-              </Text>
-            </Pressable>
-          </View>
+
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+              {error?.includes('Ajustes') ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void Linking.openSettings()}
+                  style={styles.settingsButton}
+                >
+                  <Text style={styles.settingsLabel}>Abrir ajustes</Text>
+                </Pressable>
+              ) : null}
+              {isSubmitted ? (
+                <Text accessibilityLiveRegion="polite" style={styles.success}>
+                  Ubicación guardada
+                </Text>
+              ) : null}
+            </ScrollView>
+            <View style={styles.actions}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={isSubmitting || isSubmitted}
+                onPress={dismissWithAnimation}
+                style={styles.secondaryButton}
+              >
+                <Text style={styles.secondaryLabel}>Ahora no</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={
+                  isLocating || isSubmitting || isSubmitted || !candidate
+                }
+                onPress={() => void submit()}
+                style={[
+                  styles.primaryButton,
+                  (isLocating || isSubmitting || isSubmitted || !candidate) &&
+                    styles.disabled,
+                ]}
+              >
+                <Text style={styles.primaryLabel}>
+                  {isSubmitting ? 'Guardando…' : 'Guardar ubicación'}
+                </Text>
+              </Pressable>
+            </View>
           </Animated.View>
         </KeyboardAvoidingView>
       </View>

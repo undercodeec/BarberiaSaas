@@ -128,7 +128,10 @@ export default function AgendaScreen() {
         floatingBookingOffsetRef.current = {
           x: Math.min(
             bounds.width - sideMargin - button.width - baseX,
-            Math.max(sideMargin - baseX, floatingBookingOffsetRef.current.x + gesture.dx),
+            Math.max(
+              sideMargin - baseX,
+              floatingBookingOffsetRef.current.x + gesture.dx,
+            ),
           ),
           y: Math.min(
             bounds.height -
@@ -311,7 +314,15 @@ export default function AgendaScreen() {
     (offset: number) => {
       if (isDayTransitioning) return;
       setIsDayTransitioning(true);
-      const nextDay = addDays(selectedDay, offset);
+      const nextDay =
+        calendarView === 'month'
+          ? new Date(
+              selectedDay.getFullYear(),
+              selectedDay.getMonth() + offset,
+              1,
+              12,
+            )
+          : addDays(selectedDay, calendarView === 'week' ? offset * 7 : offset);
       const exitOffset = offset > 0 ? -28 : 28;
       Animated.parallel([
         Animated.timing(dayContentOpacity, {
@@ -350,6 +361,7 @@ export default function AgendaScreen() {
     },
     [
       dayContentOpacity,
+      calendarView,
       isDayTransitioning,
       selectedDay,
       setCalendarMonth,
@@ -558,6 +570,35 @@ export default function AgendaScreen() {
   const displayedTimeline = showAllHours
     ? Array.from({ length: 25 }, (_, index) => index * 60)
     : configuredTimeline;
+  const appointmentsForDay = (day: Date) =>
+    filteredAppointments.filter((appointment) =>
+      sameDate(
+        calendarDateForTimeZone(timeZone, new Date(appointment.startsAt)),
+        day,
+      ),
+    );
+  const weekTimeline = useMemo(() => {
+    if (showAllHours)
+      return Array.from({ length: 25 }, (_, index) => index * 60);
+    return timelineMinutes(
+      weekDays.flatMap((day) => {
+        const businessDay = businessScheduleQuery.data?.days.find(
+          (schedule) => schedule.weekday === day.getDay(),
+        );
+        return businessDay?.isOpen
+          ? [
+              {
+                endMinute: businessDay.endMinute,
+                startMinute: businessDay.startMinute,
+              },
+            ]
+          : [];
+      }),
+    );
+  }, [businessScheduleQuery.data?.days, showAllHours, weekDays]);
+  const moveCalendarPeriod = (offset: number) => {
+    moveSelectedDay(offset);
+  };
 
   if (!session) return <Redirect href="/(auth)/login" />;
 
@@ -609,7 +650,7 @@ export default function AgendaScreen() {
         <Pressable
           accessibilityLabel="Dia anterior"
           accessibilityRole="button"
-          onPress={() => moveSelectedDay(-1)}
+          onPress={() => moveCalendarPeriod(-1)}
           style={styles.viewControl}
         >
           <Ionicons
@@ -633,7 +674,7 @@ export default function AgendaScreen() {
         <Pressable
           accessibilityLabel="Dia siguiente"
           accessibilityRole="button"
-          onPress={() => moveSelectedDay(1)}
+          onPress={() => moveCalendarPeriod(1)}
           style={styles.viewControl}
         >
           <Ionicons
@@ -732,88 +773,262 @@ export default function AgendaScreen() {
           },
         ]}
       >
-        <ScrollView
-          contentContainerStyle={[
-            styles.timelineContent,
-            { paddingBottom: layout.bottomInset + 84 },
-          ]}
-          showsVerticalScrollIndicator={false}
-          style={styles.timelinePage}
-        >
-          <View style={styles.timelineHeader}>
-            <Text style={styles.timelineTitle}>Citas y horario</Text>
-          </View>
-          <View style={styles.timeline}>
-            {displayedTimeline.length ? (
-              displayedTimeline.map((minute, index) => (
-                <View key={minute} style={styles.hourRow}>
-                  <Text style={styles.hour}>{formatMinute(minute)}</Text>
-                  <View style={styles.hourContent}>
-                    <View style={styles.hourDivider} />
-                    {filteredAppointments
-                      .filter((appointment) => {
-                        const startsAtMinute = minuteAtTimeZone(
-                          appointment.startsAt,
-                          timeZone,
-                        );
-                        const nextMinute =
-                          displayedTimeline[index + 1] ?? minute + 60;
-                        return (
-                          startsAtMinute >= minute &&
-                          startsAtMinute < nextMinute
-                        );
-                      })
-                      .map((appointment) => (
-                        <Pressable
-                          key={appointment.id}
-                          onPress={() => manageAppointment(appointment)}
-                          style={styles.appointmentCard}
-                        >
-                          <Text style={styles.appointmentTime}>
-                            {new Date(appointment.startsAt).toLocaleTimeString(
-                              'es-EC',
-                              {
+        {calendarView === 'day' ? (
+          <ScrollView
+            contentContainerStyle={[
+              styles.timelineContent,
+              { paddingBottom: layout.bottomInset + 84 },
+            ]}
+            showsVerticalScrollIndicator={false}
+            style={styles.timelinePage}
+          >
+            <View style={styles.timelineHeader}>
+              <Text style={styles.timelineTitle}>Citas y horario</Text>
+            </View>
+            <View style={styles.timeline}>
+              {displayedTimeline.length ? (
+                displayedTimeline.map((minute, index) => (
+                  <View key={minute} style={styles.hourRow}>
+                    <Text style={styles.hour}>{formatMinute(minute)}</Text>
+                    <View style={styles.hourContent}>
+                      <View style={styles.hourDivider} />
+                      {filteredAppointments
+                        .filter((appointment) => {
+                          const startsAtMinute = minuteAtTimeZone(
+                            appointment.startsAt,
+                            timeZone,
+                          );
+                          const nextMinute =
+                            displayedTimeline[index + 1] ?? minute + 60;
+                          return (
+                            startsAtMinute >= minute &&
+                            startsAtMinute < nextMinute
+                          );
+                        })
+                        .map((appointment) => (
+                          <Pressable
+                            key={appointment.id}
+                            onPress={() => manageAppointment(appointment)}
+                            style={styles.appointmentCard}
+                          >
+                            <Text style={styles.appointmentTime}>
+                              {new Date(
+                                appointment.startsAt,
+                              ).toLocaleTimeString('es-EC', {
                                 hour: '2-digit',
                                 minute: '2-digit',
                                 timeZone,
-                              },
-                            )}
-                          </Text>
-                          <View style={styles.appointmentCopy}>
-                            <Text style={styles.appointmentClient}>
-                              {appointment.clientName}
+                              })}
                             </Text>
-                            <Text
-                              style={styles.appointmentMeta}
-                              numberOfLines={1}
-                            >
-                              {appointment.services
-                                .map((service) => service.serviceName)
-                                .join(', ') || 'Sin servicio'}
-                            </Text>
-                            {appointment.source === 'public_booking' ? (
-                              <Text style={styles.publicBookingBadge}>
-                                Reserva online
+                            <View style={styles.appointmentCopy}>
+                              <Text style={styles.appointmentClient}>
+                                {appointment.clientName}
                               </Text>
-                            ) : null}
-                          </View>
-                          <Ionicons
-                            color={appTheme.colors.accentDark}
-                            name="ellipsis-vertical"
-                            size={18}
-                          />
-                        </Pressable>
-                      ))}
+                              <Text
+                                style={styles.appointmentMeta}
+                                numberOfLines={1}
+                              >
+                                {appointment.services
+                                  .map((service) => service.serviceName)
+                                  .join(', ') || 'Sin servicio'}
+                              </Text>
+                              {appointment.source === 'public_booking' ? (
+                                <Text style={styles.publicBookingBadge}>
+                                  Reserva online
+                                </Text>
+                              ) : null}
+                            </View>
+                            <Ionicons
+                              color={appTheme.colors.accentDark}
+                              name="ellipsis-vertical"
+                              size={18}
+                            />
+                          </Pressable>
+                        ))}
+                    </View>
                   </View>
+                ))
+              ) : (
+                <Text style={styles.emptySchedule}>
+                  No hay horarios de atención configurados para este día.
+                </Text>
+              )}
+            </View>
+          </ScrollView>
+        ) : calendarView === 'week' ? (
+          <ScrollView
+            contentContainerStyle={[
+              styles.timelineContent,
+              { paddingBottom: layout.bottomInset + 84 },
+            ]}
+            showsVerticalScrollIndicator={false}
+            style={styles.timelinePage}
+          >
+            <View style={styles.timelineHeader}>
+              <Text style={styles.timelineTitle}>Semana</Text>
+            </View>
+            {weekTimeline.length ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.weekTimelineScroll}
+              >
+                <View style={styles.weekTimeline}>
+                  <View style={styles.weekTimelineHeader}>
+                    <Text style={styles.weekHourHeader}>Hora</Text>
+                    {weekDays.map((day) => (
+                      <Pressable
+                        key={day.toISOString()}
+                        onPress={() => {
+                          setSelectedDay(day);
+                          setCalendarMonth(day);
+                        }}
+                        style={[
+                          styles.weekDayHeader,
+                          sameDate(day, selectedDay) &&
+                            styles.weekDayHeaderSelected,
+                        ]}
+                      >
+                        <Text style={styles.weekDayName}>
+                          {day
+                            .toLocaleDateString('es-EC', { weekday: 'short' })
+                            .replace('.', '')
+                            .toUpperCase()}
+                        </Text>
+                        <Text style={styles.weekDayNumber}>
+                          {day.getDate()}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  {weekTimeline.map((minute, index) => {
+                    const nextMinute = weekTimeline[index + 1] ?? minute + 60;
+                    return (
+                      <View key={minute} style={styles.weekHourRow}>
+                        <Text style={styles.weekHour}>
+                          {formatMinute(minute)}
+                        </Text>
+                        {weekDays.map((day) => (
+                          <View key={day.toISOString()} style={styles.weekCell}>
+                            {appointmentsForDay(day)
+                              .filter((appointment) => {
+                                const startsAtMinute = minuteAtTimeZone(
+                                  appointment.startsAt,
+                                  timeZone,
+                                );
+                                return (
+                                  startsAtMinute >= minute &&
+                                  startsAtMinute < nextMinute
+                                );
+                              })
+                              .map((appointment) => (
+                                <Pressable
+                                  key={appointment.id}
+                                  onPress={() => manageAppointment(appointment)}
+                                  style={styles.weekAppointmentCard}
+                                >
+                                  <Text
+                                    numberOfLines={1}
+                                    style={styles.weekAppointmentTime}
+                                  >
+                                    {new Date(
+                                      appointment.startsAt,
+                                    ).toLocaleTimeString('es-EC', {
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                      timeZone,
+                                    })}
+                                  </Text>
+                                  <Text
+                                    numberOfLines={2}
+                                    style={styles.weekAppointmentClient}
+                                  >
+                                    {appointment.clientName}
+                                  </Text>
+                                </Pressable>
+                              ))}
+                          </View>
+                        ))}
+                      </View>
+                    );
+                  })}
                 </View>
-              ))
+              </ScrollView>
             ) : (
               <Text style={styles.emptySchedule}>
-                No hay horarios de atención configurados para este día.
+                No hay horarios de atención configurados para esta semana.
               </Text>
             )}
-          </View>
-        </ScrollView>
+          </ScrollView>
+        ) : (
+          <ScrollView
+            contentContainerStyle={[
+              styles.timelineContent,
+              { paddingBottom: layout.bottomInset + 84 },
+            ]}
+            showsVerticalScrollIndicator={false}
+            style={styles.timelinePage}
+          >
+            <View style={styles.timelineHeader}>
+              <Text style={styles.timelineTitle}>
+                {calendarMonth.toLocaleDateString('es-EC', {
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              </Text>
+            </View>
+            <View style={styles.monthWeekdays}>
+              {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((weekday) => (
+                <Text key={weekday} style={styles.monthWeekday}>
+                  {weekday}
+                </Text>
+              ))}
+            </View>
+            <View style={styles.monthGrid}>
+              {monthDays.map((day, index) => {
+                if (!day)
+                  return (
+                    <View key={`empty-${index}`} style={styles.monthCell} />
+                  );
+                const appointments = appointmentsForDay(day);
+                const isSelected = sameDate(day, selectedDay);
+                return (
+                  <Pressable
+                    key={day.toISOString()}
+                    onPress={() => {
+                      setSelectedDay(day);
+                      setCalendarMonth(day);
+                      setCalendarView('day');
+                    }}
+                    style={[
+                      styles.monthCell,
+                      isSelected && styles.monthCellSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.monthCellNumber,
+                        isSelected && styles.monthCellNumberSelected,
+                      ]}
+                    >
+                      {day.getDate()}
+                    </Text>
+                    {appointments.length ? (
+                      <View style={styles.monthAppointmentCount}>
+                        <Text style={styles.monthAppointmentCountLabel}>
+                          {appointments.length}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={styles.monthHint}>
+              Toca un día para abrir su agenda detallada.
+            </Text>
+          </ScrollView>
+        )}
       </Animated.View>
 
       <AgendaCalendarModal

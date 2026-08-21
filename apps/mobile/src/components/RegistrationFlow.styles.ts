@@ -1,6 +1,11 @@
 import { StyleSheet } from 'react-native';
 
-import { appStyles, appTheme, goldButtonShadow, goldShadow } from './BottomNavigation';
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+  goldShadow,
+} from './BottomNavigation';
 
 export const s = StyleSheet.create({
   art: { ...StyleSheet.absoluteFill, overflow: 'hidden' },

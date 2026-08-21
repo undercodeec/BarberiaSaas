@@ -4,11 +4,7 @@ type NotificationData = {
   readonly type?: unknown;
 };
 
-export type NotificationRole =
-  | 'barber'
-  | 'manager'
-  | 'owner'
-  | 'receptionist';
+export type NotificationRole = 'barber' | 'manager' | 'owner' | 'receptionist';
 
 const APPOINTMENT_NOTIFICATION_TYPES = new Set([
   'appointment_cancelled',

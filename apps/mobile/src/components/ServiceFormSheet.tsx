@@ -1,7 +1,22 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useRef, useState } from 'react';
-import { Image, Keyboard, KeyboardAvoidingView, LayoutAnimation, Modal, Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View, type GestureResponderEvent, type ScrollView as NativeScrollView } from 'react-native';
+import {
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  LayoutAnimation,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+  type GestureResponderEvent,
+  type ScrollView as NativeScrollView,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { appTheme, goldButtonShadow } from './BottomNavigation';
@@ -45,7 +60,48 @@ const PRICE_TYPES: Record<PriceType, string> = {
   hidden: 'No mostrar',
 };
 
-const AGENDA_COLORS = ['#EF4444', '#F97316', '#F59E0B', '#EAB308', '#84CC16', '#22C55E', '#10B981', '#14B8A6', '#06B6D4', '#0EA5E9', '#3B82F6', '#2563EB', '#4F46E5', '#6366F1', '#8B5CF6', '#A855F7', '#C026D3', '#DB2777', '#E11D48', '#F43F5E', '#7F1D1D', '#9A3412', '#92400E', '#854D0E', '#3F6212', '#166534', '#065F46', '#115E59', '#155E75', '#075985', '#2464E8', '#1E40AF', '#3730A3', '#5B21B6', '#6B21A8', '#86198F', '#9D174D', '#BE123C', '#475569', '#111827'] as const;
+const AGENDA_COLORS = [
+  '#EF4444',
+  '#F97316',
+  '#F59E0B',
+  '#EAB308',
+  '#84CC16',
+  '#22C55E',
+  '#10B981',
+  '#14B8A6',
+  '#06B6D4',
+  '#0EA5E9',
+  '#3B82F6',
+  '#2563EB',
+  '#4F46E5',
+  '#6366F1',
+  '#8B5CF6',
+  '#A855F7',
+  '#C026D3',
+  '#DB2777',
+  '#E11D48',
+  '#F43F5E',
+  '#7F1D1D',
+  '#9A3412',
+  '#92400E',
+  '#854D0E',
+  '#3F6212',
+  '#166534',
+  '#065F46',
+  '#115E59',
+  '#155E75',
+  '#075985',
+  '#2464E8',
+  '#1E40AF',
+  '#3730A3',
+  '#5B21B6',
+  '#6B21A8',
+  '#86198F',
+  '#9D174D',
+  '#BE123C',
+  '#475569',
+  '#111827',
+] as const;
 
 interface ServiceFormSheetProps {
   readonly initialValue?: ServiceDraft | null;
@@ -59,29 +115,57 @@ function isPositiveNumber(value: string) {
   return Number.isFinite(parsed) && parsed > 0;
 }
 
-export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible }: ServiceFormSheetProps) {
+export function ServiceFormSheet({
+  initialValue = null,
+  onClose,
+  onSave,
+  visible,
+}: ServiceFormSheetProps) {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const formScrollRef = useRef<NativeScrollView>(null);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const sheetMaxHeight = Math.min(Math.max(320, height - insets.top - 12), Math.round(height * 0.9));
+  const sheetMaxHeight = Math.min(
+    Math.max(320, height - insets.top - 12),
+    Math.round(height * 0.9),
+  );
   const [name, setName] = useState(initialValue?.name ?? '');
-  const [description, setDescription] = useState(initialValue?.description ?? '');
-  const [duration, setDuration] = useState(initialValue ? String(initialValue.durationMinutes) : '');
-  const [price, setPrice] = useState(initialValue ? String(initialValue.price) : '');
-  const [priceType, setPriceType] = useState<PriceType>(initialValue?.priceType ?? 'fixed');
+  const [description, setDescription] = useState(
+    initialValue?.description ?? '',
+  );
+  const [duration, setDuration] = useState(
+    initialValue ? String(initialValue.durationMinutes) : '',
+  );
+  const [price, setPrice] = useState(
+    initialValue ? String(initialValue.price) : '',
+  );
+  const [priceType, setPriceType] = useState<PriceType>(
+    initialValue?.priceType ?? 'fixed',
+  );
   const [priceMenuOpen, setPriceMenuOpen] = useState(false);
   const [additionalOpen, setAdditionalOpen] = useState(false);
-  const [onlineBooking, setOnlineBooking] = useState(initialValue?.onlineBooking ?? true);
-  const [showServiceTime, setShowServiceTime] = useState(initialValue?.showServiceTime ?? true);
-  const [category, setCategory] = useState<ServiceCategory | null>(initialValue?.category ?? null);
+  const [onlineBooking, setOnlineBooking] = useState(
+    initialValue?.onlineBooking ?? true,
+  );
+  const [showServiceTime, setShowServiceTime] = useState(
+    initialValue?.showServiceTime ?? true,
+  );
+  const [category, setCategory] = useState<ServiceCategory | null>(
+    initialValue?.category ?? null,
+  );
   const [tax, setTax] = useState<ServiceTax | null>(initialValue?.tax ?? null);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [taxModalOpen, setTaxModalOpen] = useState(false);
-  const [imageUri, setImageUri] = useState<string | null>(initialValue?.imageUri ?? null);
+  const [imageUri, setImageUri] = useState<string | null>(
+    initialValue?.imageUri ?? null,
+  );
   const [imageError, setImageError] = useState<string | null>(null);
-  const [agendaColor, setAgendaColor] = useState(initialValue?.agendaColor ?? '#111827');
-  const [downPaymentPercentage, setDownPaymentPercentage] = useState(initialValue?.downPaymentPercentage ?? 20);
+  const [agendaColor, setAgendaColor] = useState(
+    initialValue?.agendaColor ?? '#111827',
+  );
+  const [downPaymentPercentage, setDownPaymentPercentage] = useState(
+    initialValue?.downPaymentPercentage ?? 20,
+  );
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -116,7 +200,12 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
     setSaveError(null);
     const normalizedName = name.trim();
     const needsPrice = priceType === 'fixed' || priceType === 'from';
-    if (!normalizedName || !isPositiveNumber(duration) || (needsPrice && !isPositiveNumber(price))) return;
+    if (
+      !normalizedName ||
+      !isPositiveNumber(duration) ||
+      (needsPrice && !isPositiveNumber(price))
+    )
+      return;
 
     try {
       setSaving(true);
@@ -136,7 +225,11 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
       });
       reset();
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'No fue posible guardar el servicio. Int\u00e9ntalo nuevamente.');
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : 'No fue posible guardar el servicio. Int\u00e9ntalo nuevamente.',
+      );
     } finally {
       setSaving(false);
     }
@@ -181,22 +274,57 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
   }, []);
 
   return (
-    <Modal animationType="fade" navigationBarTranslucent onRequestClose={close} statusBarTranslucent transparent visible={visible}>
+    <Modal
+      animationType="fade"
+      navigationBarTranslucent
+      onRequestClose={close}
+      statusBarTranslucent
+      transparent
+      visible={visible}
+    >
       <View style={styles.layer}>
-        <Pressable accessibilityLabel="Cerrar formulario de servicio" accessibilityRole="button" onPress={close} style={styles.backdrop} />
+        <Pressable
+          accessibilityLabel="Cerrar formulario de servicio"
+          accessibilityRole="button"
+          onPress={close}
+          style={styles.backdrop}
+        />
 
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} pointerEvents="box-none" style={styles.keyboardArea}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          pointerEvents="box-none"
+          style={styles.keyboardArea}
+        >
           <View style={[styles.sheet, { maxHeight: sheetMaxHeight }]}>
             <View style={styles.handle} />
-            <ScrollView contentContainerStyle={[styles.content, keyboardVisible ? styles.contentWithKeyboard : null]} keyboardDismissMode="on-drag" keyboardExtraOffset={36} keyboardShouldPersistTaps="handled" overScrollMode="never" ref={formScrollRef} showsVerticalScrollIndicator={false} style={styles.scroll}>
+            <ScrollView
+              contentContainerStyle={[
+                styles.content,
+                keyboardVisible ? styles.contentWithKeyboard : null,
+              ]}
+              keyboardDismissMode="on-drag"
+              keyboardExtraOffset={36}
+              keyboardShouldPersistTaps="handled"
+              overScrollMode="never"
+              ref={formScrollRef}
+              showsVerticalScrollIndicator={false}
+              style={styles.scroll}
+            >
               <View style={styles.header}>
                 <View style={styles.headerCopy}>
                   <Text accessibilityRole="header" style={styles.title}>
                     Añadir servicio
                   </Text>
-                  <Text style={styles.subtitle}>Define lo que ofrecerás a tus clientes.</Text>
+                  <Text style={styles.subtitle}>
+                    Define lo que ofrecerás a tus clientes.
+                  </Text>
                 </View>
-                <Pressable accessibilityLabel="Cerrar" accessibilityRole="button" onPress={close} style={styles.closeButton}>
+                <Pressable
+                  accessibilityLabel="Cerrar"
+                  accessibilityRole="button"
+                  onPress={close}
+                  style={styles.closeButton}
+                >
                   <Ionicons color="#667080" name="close" size={24} />
                 </Pressable>
               </View>
@@ -205,9 +333,20 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
                 <Text style={styles.label}>
                   Nombre del servicio <Text style={styles.required}>*</Text>
                 </Text>
-                <View style={[styles.inputShell, submitted && !name.trim() ? styles.inputError : null]}>
+                <View
+                  style={[
+                    styles.inputShell,
+                    submitted && !name.trim() ? styles.inputError : null,
+                  ]}
+                >
                   <Ionicons color="#667080" name="cut-outline" size={21} />
-                  <TextInput onChangeText={setName} placeholder="Ej. Corte clásico" placeholderTextColor="#98a0ab" style={styles.input} value={name} />
+                  <TextInput
+                    onChangeText={setName}
+                    placeholder="Ej. Corte clásico"
+                    placeholderTextColor="#98a0ab"
+                    style={styles.input}
+                    value={name}
+                  />
                 </View>
                 {submitted && !name.trim() ? (
                   <Text accessibilityRole="alert" style={styles.error}>
@@ -217,8 +356,18 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
               </View>
 
               <View style={styles.field}>
-                <Text style={styles.label}>Descripción del servicio (opcional)</Text>
-                <TextInput multiline onChangeText={setDescription} placeholder="Describe brevemente el servicio" placeholderTextColor="#98a0ab" style={[styles.inputShell, styles.textArea]} textAlignVertical="top" value={description} />
+                <Text style={styles.label}>
+                  Descripción del servicio (opcional)
+                </Text>
+                <TextInput
+                  multiline
+                  onChangeText={setDescription}
+                  placeholder="Describe brevemente el servicio"
+                  placeholderTextColor="#98a0ab"
+                  style={[styles.inputShell, styles.textArea]}
+                  textAlignVertical="top"
+                  value={description}
+                />
               </View>
 
               <View style={styles.fieldRow}>
@@ -226,9 +375,24 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
                   <Text style={styles.label}>
                     Duración <Text style={styles.required}>*</Text>
                   </Text>
-                  <View style={[styles.inputShell, submitted && !isPositiveNumber(duration) ? styles.inputError : null]}>
+                  <View
+                    style={[
+                      styles.inputShell,
+                      submitted && !isPositiveNumber(duration)
+                        ? styles.inputError
+                        : null,
+                    ]}
+                  >
                     <Ionicons color="#667080" name="time-outline" size={21} />
-                    <TextInput accessibilityLabel="Duración en minutos" keyboardType="number-pad" onChangeText={setDuration} placeholder="30 min" placeholderTextColor="#98a0ab" style={styles.input} value={duration} />
+                    <TextInput
+                      accessibilityLabel="Duración en minutos"
+                      keyboardType="number-pad"
+                      onChangeText={setDuration}
+                      placeholder="30 min"
+                      placeholderTextColor="#98a0ab"
+                      style={styles.input}
+                      value={duration}
+                    />
                   </View>
                   {submitted && !isPositiveNumber(duration) ? (
                     <Text accessibilityRole="alert" style={styles.error}>
@@ -238,12 +402,41 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
                 </View>
 
                 <View style={styles.rowField}>
-                  <Text style={styles.label}>Precio {priceType === 'fixed' || priceType === 'from' ? <Text style={styles.required}>*</Text> : null}</Text>
-                  <View style={[styles.inputShell, submitted && (priceType === 'fixed' || priceType === 'from') && !isPositiveNumber(price) ? styles.inputError : null]}>
+                  <Text style={styles.label}>
+                    Precio{' '}
+                    {priceType === 'fixed' || priceType === 'from' ? (
+                      <Text style={styles.required}>*</Text>
+                    ) : null}
+                  </Text>
+                  <View
+                    style={[
+                      styles.inputShell,
+                      submitted &&
+                      (priceType === 'fixed' || priceType === 'from') &&
+                      !isPositiveNumber(price)
+                        ? styles.inputError
+                        : null,
+                    ]}
+                  >
                     <Text style={styles.currency}>$</Text>
-                    <TextInput accessibilityLabel="Precio del servicio" editable={priceType === 'fixed' || priceType === 'from'} keyboardType="decimal-pad" onChangeText={setPrice} placeholder={priceType === 'fixed' || priceType === 'from' ? '15.00' : 'No aplica'} placeholderTextColor="#98a0ab" style={styles.input} value={price} />
+                    <TextInput
+                      accessibilityLabel="Precio del servicio"
+                      editable={priceType === 'fixed' || priceType === 'from'}
+                      keyboardType="decimal-pad"
+                      onChangeText={setPrice}
+                      placeholder={
+                        priceType === 'fixed' || priceType === 'from'
+                          ? '15.00'
+                          : 'No aplica'
+                      }
+                      placeholderTextColor="#98a0ab"
+                      style={styles.input}
+                      value={price}
+                    />
                   </View>
-                  {submitted && (priceType === 'fixed' || priceType === 'from') && !isPositiveNumber(price) ? (
+                  {submitted &&
+                  (priceType === 'fixed' || priceType === 'from') &&
+                  !isPositiveNumber(price) ? (
                     <Text accessibilityRole="alert" style={styles.error}>
                       Ingresa un precio válido.
                     </Text>
@@ -251,40 +444,82 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
                 </View>
               </View>
 
-              <Pressable accessibilityRole="button" onPress={toggleAdditional} style={styles.additionalToggle}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={toggleAdditional}
+                style={styles.additionalToggle}
+              >
                 <View style={styles.additionalHeading}>
                   <Ionicons color="#101c2d" name="options-outline" size={21} />
-                  <Text style={styles.additionalTitle}>Configuración adicional</Text>
+                  <Text style={styles.additionalTitle}>
+                    Configuración adicional
+                  </Text>
                 </View>
-                <Ionicons color="#667080" name={additionalOpen ? 'chevron-up' : 'chevron-down'} size={21} />
+                <Ionicons
+                  color="#667080"
+                  name={additionalOpen ? 'chevron-up' : 'chevron-down'}
+                  size={21}
+                />
               </Pressable>
               {additionalOpen ? (
                 <View style={styles.additionalContent}>
-                  <CheckRow checked={onlineBooking} label="Se puede reservar online" onPress={() => setOnlineBooking((current) => !current)} />
-                  <CheckRow checked={showServiceTime} label="Mostrar tiempo de servicio" onPress={() => setShowServiceTime((current) => !current)} />
+                  <CheckRow
+                    checked={onlineBooking}
+                    label="Se puede reservar online"
+                    onPress={() => setOnlineBooking((current) => !current)}
+                  />
+                  <CheckRow
+                    checked={showServiceTime}
+                    label="Mostrar tiempo de servicio"
+                    onPress={() => setShowServiceTime((current) => !current)}
+                  />
 
                   <View style={styles.field}>
                     <Text style={styles.label}>Tipo de precio</Text>
-                    <Pressable accessibilityRole="button" onPress={() => setPriceMenuOpen((current) => !current)} style={styles.select}>
-                      <Ionicons color="#667080" name="pricetag-outline" size={21} />
-                      <Text style={styles.selectText}>{PRICE_TYPES[priceType]}</Text>
-                      <Ionicons color="#667080" name={priceMenuOpen ? 'chevron-up' : 'chevron-down'} size={20} />
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => setPriceMenuOpen((current) => !current)}
+                      style={styles.select}
+                    >
+                      <Ionicons
+                        color="#667080"
+                        name="pricetag-outline"
+                        size={21}
+                      />
+                      <Text style={styles.selectText}>
+                        {PRICE_TYPES[priceType]}
+                      </Text>
+                      <Ionicons
+                        color="#667080"
+                        name={priceMenuOpen ? 'chevron-up' : 'chevron-down'}
+                        size={20}
+                      />
                     </Pressable>
                     {priceMenuOpen ? (
                       <View style={styles.optionMenu}>
-                        {(Object.keys(PRICE_TYPES) as PriceType[]).map((option) => (
-                          <Pressable
-                            key={option}
-                            onPress={() => {
-                              setPriceType(option);
-                              setPriceMenuOpen(false);
-                            }}
-                            style={styles.option}
-                          >
-                            <Text style={styles.optionText}>{PRICE_TYPES[option]}</Text>
-                            {priceType === option ? <Ionicons color="#101c2d" name="checkmark" size={20} /> : null}
-                          </Pressable>
-                        ))}
+                        {(Object.keys(PRICE_TYPES) as PriceType[]).map(
+                          (option) => (
+                            <Pressable
+                              key={option}
+                              onPress={() => {
+                                setPriceType(option);
+                                setPriceMenuOpen(false);
+                              }}
+                              style={styles.option}
+                            >
+                              <Text style={styles.optionText}>
+                                {PRICE_TYPES[option]}
+                              </Text>
+                              {priceType === option ? (
+                                <Ionicons
+                                  color="#101c2d"
+                                  name="checkmark"
+                                  size={20}
+                                />
+                              ) : null}
+                            </Pressable>
+                          ),
+                        )}
                       </View>
                     ) : null}
                   </View>
@@ -292,40 +527,121 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
                   <View style={styles.field}>
                     <View style={styles.labelRow}>
                       <Text style={styles.label}>Categoría de servicio</Text>
-                      <Pressable accessibilityLabel="Información sobre categorías" onPress={() => setCategoryModalOpen(true)} style={styles.infoButton}>
-                        <Ionicons color="#101c2d" name="information" size={18} />
+                      <Pressable
+                        accessibilityLabel="Información sobre categorías"
+                        onPress={() => setCategoryModalOpen(true)}
+                        style={styles.infoButton}
+                      >
+                        <Ionicons
+                          color="#101c2d"
+                          name="information"
+                          size={18}
+                        />
                       </Pressable>
                     </View>
-                    <Pressable accessibilityRole="button" onPress={() => setCategoryModalOpen(true)} style={styles.select}>
-                      <Ionicons color="#667080" name="folder-outline" size={21} />
-                      <Text style={[styles.selectText, !category ? styles.placeholder : null]}>{category?.name ?? 'Selecciona o crea una categoría'}</Text>
-                      <Ionicons color="#667080" name="chevron-forward" size={20} />
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => setCategoryModalOpen(true)}
+                      style={styles.select}
+                    >
+                      <Ionicons
+                        color="#667080"
+                        name="folder-outline"
+                        size={21}
+                      />
+                      <Text
+                        style={[
+                          styles.selectText,
+                          !category ? styles.placeholder : null,
+                        ]}
+                      >
+                        {category?.name ?? 'Selecciona o crea una categoría'}
+                      </Text>
+                      <Ionicons
+                        color="#667080"
+                        name="chevron-forward"
+                        size={20}
+                      />
                     </Pressable>
                   </View>
 
                   <View style={styles.field}>
                     <View style={styles.labelRow}>
                       <Text style={styles.label}>Establece el impuesto</Text>
-                      <Pressable accessibilityLabel="Información sobre impuestos" onPress={() => setTaxModalOpen(true)} style={styles.infoButton}>
-                        <Ionicons color="#101c2d" name="information" size={18} />
+                      <Pressable
+                        accessibilityLabel="Información sobre impuestos"
+                        onPress={() => setTaxModalOpen(true)}
+                        style={styles.infoButton}
+                      >
+                        <Ionicons
+                          color="#101c2d"
+                          name="information"
+                          size={18}
+                        />
                       </Pressable>
                     </View>
-                    <Pressable accessibilityRole="button" onPress={() => setTaxModalOpen(true)} style={styles.select}>
-                      <Ionicons color="#667080" name="receipt-outline" size={21} />
-                      <Text style={[styles.selectText, !tax ? styles.placeholder : null]}>{tax ? `${tax.name} (${tax.percentage}%)` : 'Selecciona o crea un impuesto'}</Text>
-                      <Ionicons color="#667080" name="chevron-forward" size={20} />
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => setTaxModalOpen(true)}
+                      style={styles.select}
+                    >
+                      <Ionicons
+                        color="#667080"
+                        name="receipt-outline"
+                        size={21}
+                      />
+                      <Text
+                        style={[
+                          styles.selectText,
+                          !tax ? styles.placeholder : null,
+                        ]}
+                      >
+                        {tax
+                          ? `${tax.name} (${tax.percentage}%)`
+                          : 'Selecciona o crea un impuesto'}
+                      </Text>
+                      <Ionicons
+                        color="#667080"
+                        name="chevron-forward"
+                        size={20}
+                      />
                     </Pressable>
                   </View>
 
                   <View style={styles.field}>
                     <Text style={styles.label}>Imagen del servicio</Text>
-                    <Pressable accessibilityRole="button" onPress={selectImage} style={styles.imageField}>
-                      <View style={styles.imagePreview}>{imageUri ? <Image source={{ uri: imageUri }} style={styles.imagePreviewPhoto} /> : <Ionicons color="#667080" name="image-outline" size={28} />}</View>
-                      <View style={styles.imageCopy}>
-                        <Text style={styles.imageTitle}>Imagen del servicio</Text>
-                        <Text style={styles.imageHint}>{imageUri ? 'Cambiar imagen' : 'Cargar imagen'}</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={selectImage}
+                      style={styles.imageField}
+                    >
+                      <View style={styles.imagePreview}>
+                        {imageUri ? (
+                          <Image
+                            source={{ uri: imageUri }}
+                            style={styles.imagePreviewPhoto}
+                          />
+                        ) : (
+                          <Ionicons
+                            color="#667080"
+                            name="image-outline"
+                            size={28}
+                          />
+                        )}
                       </View>
-                      <Ionicons color="#101c2d" name="chevron-forward" size={21} />
+                      <View style={styles.imageCopy}>
+                        <Text style={styles.imageTitle}>
+                          Imagen del servicio
+                        </Text>
+                        <Text style={styles.imageHint}>
+                          {imageUri ? 'Cambiar imagen' : 'Cargar imagen'}
+                        </Text>
+                      </View>
+                      <Ionicons
+                        color="#101c2d"
+                        name="chevron-forward"
+                        size={21}
+                      />
                     </Pressable>
                     {imageError ? (
                       <Text accessibilityRole="alert" style={styles.error}>
@@ -336,18 +652,36 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
 
                   <View style={styles.field}>
                     <Text style={styles.label}>Color de la agenda</Text>
-                    <Text style={styles.fieldHint}>Elige uno de los 40 colores para identificar este servicio.</Text>
+                    <Text style={styles.fieldHint}>
+                      Elige uno de los 40 colores para identificar este
+                      servicio.
+                    </Text>
                     <View style={styles.colorGrid}>
                       {AGENDA_COLORS.map((color) => (
-                        <Pressable key={color} accessibilityLabel={`Color ${color}`} onPress={() => setAgendaColor(color)} style={[styles.colorOption, { backgroundColor: color }, agendaColor === color ? styles.colorSelected : null]}>
-                          {agendaColor === color ? <Ionicons color="#fff" name="checkmark" size={18} /> : null}
+                        <Pressable
+                          key={color}
+                          accessibilityLabel={`Color ${color}`}
+                          onPress={() => setAgendaColor(color)}
+                          style={[
+                            styles.colorOption,
+                            { backgroundColor: color },
+                            agendaColor === color ? styles.colorSelected : null,
+                          ]}
+                        >
+                          {agendaColor === color ? (
+                            <Ionicons color="#fff" name="checkmark" size={18} />
+                          ) : null}
                         </Pressable>
                       ))}
                     </View>
                   </View>
 
                   <View style={styles.depositField}>
-                    <PercentageSlider label="Valor del abono para reserva" onChange={setDownPaymentPercentage} value={downPaymentPercentage} />
+                    <PercentageSlider
+                      label="Valor del abono para reserva"
+                      onChange={setDownPaymentPercentage}
+                      value={downPaymentPercentage}
+                    />
                   </View>
                 </View>
               ) : null}
@@ -356,7 +690,10 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
               style={[
                 styles.sheetFooter,
                 {
-                  paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 12 : 8),
+                  paddingBottom: Math.max(
+                    insets.bottom,
+                    Platform.OS === 'android' ? 12 : 8,
+                  ),
                 },
               ]}
             >
@@ -365,7 +702,15 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
                   {saveError}
                 </Text>
               ) : null}
-              <NavaButton foregroundColor={appTheme.colors.accentDark} loading={saving} icon="checkmark-outline" label="Guardar servicio" onPress={save} style={styles.saveButton} variant="outline" />
+              <NavaButton
+                foregroundColor={appTheme.colors.accentDark}
+                loading={saving}
+                icon="checkmark-outline"
+                label="Guardar servicio"
+                onPress={save}
+                style={styles.saveButton}
+                variant="outline"
+              />
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -390,19 +735,53 @@ export function ServiceFormSheet({ initialValue = null, onClose, onSave, visible
   );
 }
 
-function CheckRow({ checked, label, onPress }: { readonly checked: boolean; readonly label: string; readonly onPress: () => void }) {
+function CheckRow({
+  checked,
+  label,
+  onPress,
+}: {
+  readonly checked: boolean;
+  readonly label: string;
+  readonly onPress: () => void;
+}) {
   return (
-    <Pressable accessibilityRole="checkbox" accessibilityState={{ checked }} onPress={onPress} style={styles.checkboxRow}>
-      <Ionicons color="#101c2d" name={checked ? 'checkbox' : 'square-outline'} size={25} />
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked }}
+      onPress={onPress}
+      style={styles.checkboxRow}
+    >
+      <Ionicons
+        color="#101c2d"
+        name={checked ? 'checkbox' : 'square-outline'}
+        size={25}
+      />
       <Text style={styles.checkboxLabel}>{label}</Text>
     </Pressable>
   );
 }
 
-function PercentageSlider({ label, onChange, value }: { readonly label: string; readonly onChange: (value: number) => void; readonly value: number }) {
+function PercentageSlider({
+  label,
+  onChange,
+  value,
+}: {
+  readonly label: string;
+  readonly onChange: (value: number) => void;
+  readonly value: number;
+}) {
   const [trackWidth, setTrackWidth] = useState(0);
   const setValue = (event: GestureResponderEvent) => {
-    if (trackWidth) onChange(Math.max(0, Math.min(100, Math.round((event.nativeEvent.locationX * 100) / trackWidth))));
+    if (trackWidth)
+      onChange(
+        Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round((event.nativeEvent.locationX * 100) / trackWidth),
+          ),
+        ),
+      );
   };
   return (
     <View>
@@ -410,15 +789,40 @@ function PercentageSlider({ label, onChange, value }: { readonly label: string; 
         <Text style={styles.sliderLabel}>{label}</Text>
         <Text style={styles.sliderValue}>{value}%</Text>
       </View>
-      <View accessibilityLabel={`${label}: ${value}%`} accessibilityRole="adjustable" onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)} onMoveShouldSetResponder={() => true} onResponderGrant={setValue} onResponderMove={setValue} onResponderRelease={setValue} onResponderTerminationRequest={() => false} onStartShouldSetResponder={() => true} style={styles.sliderTrack}>
-        <View pointerEvents="none" style={[styles.sliderFill, { width: `${value}%` }]} />
-        <View pointerEvents="none" style={[styles.sliderThumb, { left: `${value}%` }]} />
+      <View
+        accessibilityLabel={`${label}: ${value}%`}
+        accessibilityRole="adjustable"
+        onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
+        onMoveShouldSetResponder={() => true}
+        onResponderGrant={setValue}
+        onResponderMove={setValue}
+        onResponderRelease={setValue}
+        onResponderTerminationRequest={() => false}
+        onStartShouldSetResponder={() => true}
+        style={styles.sliderTrack}
+      >
+        <View
+          pointerEvents="none"
+          style={[styles.sliderFill, { width: `${value}%` }]}
+        />
+        <View
+          pointerEvents="none"
+          style={[styles.sliderThumb, { left: `${value}%` }]}
+        />
       </View>
     </View>
   );
 }
 
-function Dialog({ children, onClose, visible }: { readonly children: React.ReactNode; readonly onClose: () => void; readonly visible: boolean }) {
+function Dialog({
+  children,
+  onClose,
+  visible,
+}: {
+  readonly children: React.ReactNode;
+  readonly onClose: () => void;
+  readonly visible: boolean;
+}) {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   return (
@@ -446,7 +850,11 @@ function Dialog({ children, onClose, visible }: { readonly children: React.React
             },
           ]}
         >
-          <Pressable accessibilityLabel="Cerrar" onPress={onClose} style={styles.dialogClose}>
+          <Pressable
+            accessibilityLabel="Cerrar"
+            onPress={onClose}
+            style={styles.dialogClose}
+          >
             <Ionicons color="#667080" name="close" size={21} />
           </Pressable>
           {children}
@@ -456,7 +864,15 @@ function Dialog({ children, onClose, visible }: { readonly children: React.React
   );
 }
 
-function CategoryDialog({ onClose, onSave, visible }: { readonly onClose: () => void; readonly onSave: (category: ServiceCategory) => void; readonly visible: boolean }) {
+function CategoryDialog({
+  onClose,
+  onSave,
+  visible,
+}: {
+  readonly onClose: () => void;
+  readonly onSave: (category: ServiceCategory) => void;
+  readonly visible: boolean;
+}) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -479,12 +895,34 @@ function CategoryDialog({ onClose, onSave, visible }: { readonly onClose: () => 
       {creating ? (
         <>
           <Text style={styles.dialogTitle}>Añadir categoría de servicio</Text>
-          <Text style={styles.dialogCopy}>Añade los detalles de la categoría.</Text>
+          <Text style={styles.dialogCopy}>
+            Añade los detalles de la categoría.
+          </Text>
           <Text style={styles.label}>Nombre</Text>
-          <TextInput onChangeText={setName} placeholder="Ej. Cortes" placeholderTextColor="#98a0ab" style={styles.dialogInput} value={name} />
+          <TextInput
+            onChangeText={setName}
+            placeholder="Ej. Cortes"
+            placeholderTextColor="#98a0ab"
+            style={styles.dialogInput}
+            value={name}
+          />
           <Text style={styles.label}>Descripción</Text>
-          <TextInput multiline onChangeText={setDescription} placeholder="Describe esta categoría" placeholderTextColor="#98a0ab" style={[styles.dialogInput, styles.dialogTextArea]} textAlignVertical="top" value={description} />
-          <NavaButton icon="checkmark-outline" label="Guardar cambios" onPress={save} style={styles.dialogButton} variant="primary" />
+          <TextInput
+            multiline
+            onChangeText={setDescription}
+            placeholder="Describe esta categoría"
+            placeholderTextColor="#98a0ab"
+            style={[styles.dialogInput, styles.dialogTextArea]}
+            textAlignVertical="top"
+            value={description}
+          />
+          <NavaButton
+            icon="checkmark-outline"
+            label="Guardar cambios"
+            onPress={save}
+            style={styles.dialogButton}
+            variant="primary"
+          />
         </>
       ) : (
         <>
@@ -492,15 +930,32 @@ function CategoryDialog({ onClose, onSave, visible }: { readonly onClose: () => 
             <Ionicons color="#101c2d" name="information" size={28} />
           </View>
           <Text style={styles.dialogTitle}>Categoría de servicio</Text>
-          <Text style={styles.dialogCopy}>Debes crear una categoría y añadir sus detalles antes de asociarla a este servicio.</Text>
-          <NavaButton icon="add-outline" label="Crear categoría" onPress={() => setCreating(true)} style={styles.dialogButton} variant="primary" />
+          <Text style={styles.dialogCopy}>
+            Debes crear una categoría y añadir sus detalles antes de asociarla a
+            este servicio.
+          </Text>
+          <NavaButton
+            icon="add-outline"
+            label="Crear categoría"
+            onPress={() => setCreating(true)}
+            style={styles.dialogButton}
+            variant="primary"
+          />
         </>
       )}
     </Dialog>
   );
 }
 
-function TaxDialog({ onClose, onSave, visible }: { readonly onClose: () => void; readonly onSave: (tax: ServiceTax) => void; readonly visible: boolean }) {
+function TaxDialog({
+  onClose,
+  onSave,
+  visible,
+}: {
+  readonly onClose: () => void;
+  readonly onSave: (tax: ServiceTax) => void;
+  readonly visible: boolean;
+}) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [percentage, setPercentage] = useState(15);
@@ -533,20 +988,53 @@ function TaxDialog({ onClose, onSave, visible }: { readonly onClose: () => void;
         <>
           <Text style={styles.dialogTitle}>Añadir impuesto</Text>
           <Text style={styles.label}>Nombre</Text>
-          <TextInput onChangeText={setName} placeholder="Ej. IVA" placeholderTextColor="#98a0ab" style={styles.dialogInput} value={name} />
-          <PercentageSlider label="Valor de impuesto" onChange={setPercentage} value={percentage} />
+          <TextInput
+            onChangeText={setName}
+            placeholder="Ej. IVA"
+            placeholderTextColor="#98a0ab"
+            style={styles.dialogInput}
+            value={name}
+          />
+          <PercentageSlider
+            label="Valor de impuesto"
+            onChange={setPercentage}
+            value={percentage}
+          />
           <View style={styles.taxOptions}>
             <View style={styles.taxHeader}>
               <Text style={styles.label}>Aplicación del impuesto</Text>
-              <Pressable accessibilityLabel="Información sobre impuesto" onPress={() => setShowInfo((current) => !current)} style={styles.infoButton}>
+              <Pressable
+                accessibilityLabel="Información sobre impuesto"
+                onPress={() => setShowInfo((current) => !current)}
+                style={styles.infoButton}
+              >
                 <Ionicons color="#101c2d" name="information" size={18} />
               </Pressable>
             </View>
-            {showInfo ? <Text style={styles.taxInfo}>Puedes añadir el impuesto durante el checkout o aplicarlo al finalizar la compra.</Text> : null}
-            <CheckRow checked={checkout} label="Añadir el impuesto en el servicio con checkout" onPress={() => setCheckout((current) => !current)} />
-            <CheckRow checked={purchaseEnd} label="Añadir impuesto al finalizar la compra" onPress={() => setPurchaseEnd((current) => !current)} />
+            {showInfo ? (
+              <Text style={styles.taxInfo}>
+                Puedes añadir el impuesto durante el checkout o aplicarlo al
+                finalizar la compra.
+              </Text>
+            ) : null}
+            <CheckRow
+              checked={checkout}
+              label="Añadir el impuesto en el servicio con checkout"
+              onPress={() => setCheckout((current) => !current)}
+            />
+            <CheckRow
+              checked={purchaseEnd}
+              label="Añadir impuesto al finalizar la compra"
+              onPress={() => setPurchaseEnd((current) => !current)}
+            />
           </View>
-          <NavaButton icon="checkmark-outline" label="Guardar" onPress={save} style={styles.dialogButton} variant="primary" />
+          <NavaButton
+            icon="checkmark-outline"
+            label="Guardar"
+            onPress={save}
+            style={styles.dialogButton}
+            variant="primary"
+          />
         </>
       ) : (
         <>
@@ -554,8 +1042,16 @@ function TaxDialog({ onClose, onSave, visible }: { readonly onClose: () => void;
             <Ionicons color="#101c2d" name="information" size={28} />
           </View>
           <Text style={styles.dialogTitle}>Impuesto del servicio</Text>
-          <Text style={styles.dialogCopy}>Crea un impuesto y define cómo debe aplicarse a este servicio.</Text>
-          <NavaButton icon="add-outline" label="Crear impuesto" onPress={() => setCreating(true)} style={styles.dialogButton} variant="primary" />
+          <Text style={styles.dialogCopy}>
+            Crea un impuesto y define cómo debe aplicarse a este servicio.
+          </Text>
+          <NavaButton
+            icon="add-outline"
+            label="Crear impuesto"
+            onPress={() => setCreating(true)}
+            style={styles.dialogButton}
+            variant="primary"
+          />
         </>
       )}
     </Dialog>

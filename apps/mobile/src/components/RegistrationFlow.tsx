@@ -31,9 +31,7 @@ import {
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 
-import {
-  appTheme,
-} from './BottomNavigation';
+import { appTheme } from './BottomNavigation';
 import { NavaButton } from './NavaButton';
 import {
   COUNTRIES,

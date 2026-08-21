@@ -1,9 +1,6 @@
 import { styles } from './clients.styles';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type {
-  ClientLabelRecord,
-  ClientRecord,
-} from '@barber-saas/api-client';
+import type { ClientLabelRecord, ClientRecord } from '@barber-saas/api-client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import {

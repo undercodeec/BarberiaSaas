@@ -1,13 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Redirect, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 

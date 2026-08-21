@@ -1,6 +1,10 @@
 import { Platform, StyleSheet } from 'react-native';
 
-import { appStyles, appTheme, goldButtonShadow } from '../../components/BottomNavigation';
+import {
+  appStyles,
+  appTheme,
+  goldButtonShadow,
+} from '../../components/BottomNavigation';
 
 export const styles = StyleSheet.create({
   addQuickAction: {

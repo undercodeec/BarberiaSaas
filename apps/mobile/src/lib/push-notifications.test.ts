@@ -22,7 +22,10 @@ describe('revokeCurrentDevicePushToken', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'android',
+    });
   });
 
   afterAll(() => {

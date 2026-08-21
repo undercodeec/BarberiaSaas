@@ -1,6 +1,10 @@
 import { StyleSheet } from 'react-native';
 
-import { appStyles, appTheme, goldShadow } from '../../components/BottomNavigation';
+import {
+  appStyles,
+  appTheme,
+  goldShadow,
+} from '../../components/BottomNavigation';
 
 export const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 10, marginTop: 24 },

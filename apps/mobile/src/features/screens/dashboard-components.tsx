@@ -38,7 +38,8 @@ import {
   type DashboardOperation,
 } from './dashboard-model';
 
-export const PRIMARY_WAVE_PATH = 'M0 10 Q25 0 50 10 T100 10 T150 10 T200 10 V20 H0 Z';
+export const PRIMARY_WAVE_PATH =
+  'M0 10 Q25 0 50 10 T100 10 T150 10 T200 10 V20 H0 Z';
 export const SECONDARY_WAVE_PATH =
   'M0 10 Q25 20 50 10 T100 10 T150 10 T200 10 V20 H0 Z';
 
