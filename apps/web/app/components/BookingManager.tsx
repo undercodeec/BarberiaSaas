@@ -361,7 +361,9 @@ export function BookingManager({
               <p className="text-[10px] font-black tracking-[0.18em] text-[#956816] uppercase">
                 Agenda
               </p>
-              <h1 className="mt-1 text-3xl font-black tracking-[-0.04em]">Nuevo horario</h1>
+              <h1 className="mt-1 text-3xl font-black tracking-[-0.04em]">
+                Nuevo horario
+              </h1>
               <p className="mt-2 text-[#555A63]">
                 Tu horario actual se mantiene hasta confirmar el cambio.
               </p>
@@ -426,7 +428,9 @@ export function BookingManager({
               >
                 ← Regresar
               </button>
-              <h1 className="text-3xl font-black tracking-[-0.04em]">Tu experiencia</h1>
+              <h1 className="text-3xl font-black tracking-[-0.04em]">
+                Tu experiencia
+              </h1>
               <p className="mt-2 text-[#555A63]">
                 La reseña se publicará automáticamente y el negocio podrá
                 ocultarla, pero no editarla.
@@ -446,7 +450,7 @@ export function BookingManager({
                 ))}
               </div>
               <textarea
-                className="mt-5 min-h-32 w-full rounded-[17px] border border-[#E4E1DA] bg-[#FAF9F6] p-4 outline-none transition focus:border-[#C79532]"
+                className="mt-5 min-h-32 w-full rounded-[17px] border border-[#E4E1DA] bg-[#FAF9F6] p-4 transition outline-none focus:border-[#C79532]"
                 maxLength={1000}
                 onChange={(event) => setComment(event.target.value)}
                 placeholder="Comentario opcional"
@@ -476,7 +480,9 @@ function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex gap-4 py-4">
       <dt className="w-24 text-sm font-semibold text-[#555A63]">{label}</dt>
-      <dd className="flex-1 text-right text-sm font-black text-[#1C1C1C]">{value}</dd>
+      <dd className="flex-1 text-right text-sm font-black text-[#1C1C1C]">
+        {value}
+      </dd>
     </div>
   );
 }
@@ -499,7 +505,9 @@ function StatusPage({
   return (
     <main className="grid min-h-screen place-items-center bg-[#FAF9F6] px-5 text-[#1C1C1C] [color-scheme:light]">
       <div className="max-w-md rounded-[30px] border border-[#E4E1DA] bg-white p-8 text-center shadow-[0_18px_52px_rgba(28,28,28,.07)]">
-        <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#F7EBD1] text-xl font-black text-[#956816]">N</span>
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#F7EBD1] text-xl font-black text-[#956816]">
+          N
+        </span>
         <h1 className="mt-4 text-3xl font-black tracking-[-0.04em]">{title}</h1>
         <p className="mt-3 text-[#555A63]">{copy}</p>
       </div>

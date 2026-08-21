@@ -63,7 +63,12 @@ const styles = {
     width: '100%',
   },
   description: { color: '#555A63', fontSize: 16, lineHeight: 1.55, margin: 0 },
-  eyebrow: { color: '#956816', fontSize: 12, fontWeight: 900, letterSpacing: '0.14em' },
+  eyebrow: {
+    color: '#956816',
+    fontSize: 12,
+    fontWeight: 900,
+    letterSpacing: '0.14em',
+  },
   screen: {
     alignItems: 'center',
     background: '#FAF9F6',
@@ -73,5 +78,10 @@ const styles = {
     minHeight: '100vh',
     padding: 24,
   },
-  title: { color: '#1C1C1C', fontSize: 30, lineHeight: 1.15, margin: '8px 0 12px' },
+  title: {
+    color: '#1C1C1C',
+    fontSize: 30,
+    lineHeight: 1.15,
+    margin: '8px 0 12px',
+  },
 };

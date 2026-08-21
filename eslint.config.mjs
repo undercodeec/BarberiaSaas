@@ -7,11 +7,18 @@ export default tseslint.config(
   {
     ignores: [
       '**/.expo/**',
+      '**/.eas-archive/**',
       '**/.next/**',
       '**/.turbo/**',
       '**/coverage/**',
       '**/dist/**',
+      '**/.cxx/**',
+      '**/.gradle/**',
+      '**/android/**/build/**',
       '**/node_modules/**',
+      '**/src/generated/**',
+      '**/.tools/**',
+      'phase12-admin-staging/**',
       'playwright-report/**',
       'test-results/**',
     ],

@@ -35,28 +35,28 @@ Debe ocupar aproximadamente:
 
 Características:
 
-* Fondo negro / carbón muy oscuro.
-* Apariencia premium.
-* Bordes limpios.
-* La zona inferior/derecha puede tener una terminación curva similar a la referencia.
-* Incorporar detalles dorados sutiles.
-* Evitar saturar visualmente la interfaz.
+- Fondo negro / carbón muy oscuro.
+- Apariencia premium.
+- Bordes limpios.
+- La zona inferior/derecha puede tener una terminación curva similar a la referencia.
+- Incorporar detalles dorados sutiles.
+- Evitar saturar visualmente la interfaz.
 
 Paleta aproximada:
 
 ```css
 --background-dark: #111111;
---background-dark-secondary: #1C1C1C;
+--background-dark-secondary: #1c1c1c;
 
---gold: #C9A227;
---gold-light: #E4C45A;
---gold-dark: #A67C00;
+--gold: #c9a227;
+--gold-light: #e4c45a;
+--gold-dark: #a67c00;
 
---white: #FFFFFF;
---off-white: #FAF9F6;
+--white: #ffffff;
+--off-white: #faf9f6;
 
---gray-light: #EEECE7;
---gray: #9A9A9A;
+--gray-light: #eeece7;
+--gray: #9a9a9a;
 --text-dark: #111111;
 ```
 
@@ -93,12 +93,12 @@ Tipografía limpia, moderna y profesional.
 
 Recrear el concepto visual de la referencia:
 
-* ondas digitales;
-* partículas;
-* líneas;
-* pequeños puntos;
-* brillos dorados;
-* sensación tecnológica y premium.
+- ondas digitales;
+- partículas;
+- líneas;
+- pequeños puntos;
+- brillos dorados;
+- sensación tecnológica y premium.
 
 IMPORTANTE:
 
@@ -106,12 +106,12 @@ No hace falta copiar pixel por pixel la ilustración.
 
 Puede recrearse utilizando:
 
-* CSS gradients;
-* radial-gradient;
-* pseudo-elementos;
-* SVG;
-* canvas;
-* o una combinación ligera de efectos.
+- CSS gradients;
+- radial-gradient;
+- pseudo-elementos;
+- SVG;
+- canvas;
+- o una combinación ligera de efectos.
 
 Prioriza rendimiento.
 
@@ -180,8 +180,7 @@ sombra extremadamente suave
 Ejemplo conceptual:
 
 ```css
-box-shadow:
-  0 20px 60px rgba(0, 0, 0, 0.06);
+box-shadow: 0 20px 60px rgba(0, 0, 0, 0.06);
 ```
 
 No exagerar las sombras.
@@ -252,8 +251,8 @@ Input de contraseña.
 
 Agregar:
 
-* icono de candado a la izquierda;
-* botón de mostrar/ocultar contraseña a la derecha.
+- icono de candado a la izquierda;
+- botón de mostrar/ocultar contraseña a la derecha.
 
 El botón debe funcionar realmente.
 
@@ -291,28 +290,24 @@ Debe ocupar prácticamente todo el ancho disponible.
 
 Estilo:
 
-* fondo dorado;
-* degradado dorado muy sutil;
-* texto blanco o negro dependiendo del contraste;
-* border-radius aproximadamente 10-14px;
-* transición suave;
-* icono/flecha a la derecha.
+- fondo dorado;
+- degradado dorado muy sutil;
+- texto blanco o negro dependiendo del contraste;
+- border-radius aproximadamente 10-14px;
+- transición suave;
+- icono/flecha a la derecha.
 
 Ejemplo conceptual:
 
 ```css
-background: linear-gradient(
-  135deg,
-  #C9A227,
-  #D9B743
-);
+background: linear-gradient(135deg, #c9a227, #d9b743);
 ```
 
 Hover:
 
-* ligera elevación;
-* pequeño cambio de brillo;
-* transición de 200-300ms.
+- ligera elevación;
+- pequeño cambio de brillo;
+- transición de 200-300ms.
 
 No agregar animaciones excesivas.
 
@@ -373,13 +368,13 @@ Puede mantenerse el panel izquierdo reducido o simplificado si existe espacio su
 
 En resoluciones pequeñas:
 
-* ocultar el panel visual izquierdo;
-* formulario ocupando toda la pantalla;
-* mantener logo;
-* mantener buen padding lateral;
-* card sin sombra excesiva;
-* evitar scroll horizontal;
-* mantener inputs y botón cómodos para interacción táctil.
+- ocultar el panel visual izquierdo;
+- formulario ocupando toda la pantalla;
+- mantener logo;
+- mantener buen padding lateral;
+- card sin sombra excesiva;
+- evitar scroll horizontal;
+- mantener inputs y botón cómodos para interacción táctil.
 
 Ejemplo:
 
@@ -399,8 +394,8 @@ Agregar únicamente microinteracciones sutiles:
 
 Al hacer focus:
 
-* borde dorado;
-* pequeño glow dorado con baja opacidad.
+- borde dorado;
+- pequeño glow dorado con baja opacidad.
 
 ### Botón
 
@@ -435,14 +430,14 @@ No implementar animaciones innecesarias.
 
 Mantener:
 
-* labels reales asociados a inputs;
-* navegación mediante teclado;
-* estados `focus-visible`;
-* contraste correcto;
-* botones accesibles;
-* `autocomplete="email"`;
-* `autocomplete="current-password"`;
-* atributos `aria-label` cuando sean necesarios.
+- labels reales asociados a inputs;
+- navegación mediante teclado;
+- estados `focus-visible`;
+- contraste correcto;
+- botones accesibles;
+- `autocomplete="email"`;
+- `autocomplete="current-password"`;
+- atributos `aria-label` cuando sean necesarios.
 
 ---
 
@@ -450,20 +445,20 @@ Mantener:
 
 Quiero código:
 
-* limpio;
-* mantenible;
-* responsive;
-* modular;
-* reutilizable;
-* consistente con el proyecto.
+- limpio;
+- mantenible;
+- responsive;
+- modular;
+- reutilizable;
+- consistente con el proyecto.
 
 Evita:
 
-* CSS duplicado;
-* estilos inline innecesarios;
-* componentes gigantes;
-* dependencias nuevas si pueden evitarse;
-* modificar funcionalidades que no tienen relación con esta pantalla.
+- CSS duplicado;
+- estilos inline innecesarios;
+- componentes gigantes;
+- dependencias nuevas si pueden evitarse;
+- modificar funcionalidades que no tienen relación con esta pantalla.
 
 Si el proyecto utiliza componentes como:
 
@@ -554,10 +549,10 @@ Verifica:
 
 Después de implementar, indícame brevemente:
 
-* archivos creados;
-* archivos modificados;
-* qué componentes reutilizaste;
-* cómo resolviste el responsive;
-* cualquier consideración importante de la implementación.
+- archivos creados;
+- archivos modificados;
+- qué componentes reutilizaste;
+- cómo resolviste el responsive;
+- cualquier consideración importante de la implementación.
 
 No quiero únicamente un mockup estático: **quiero la vista integrada correctamente dentro del proyecto existente y conservando la funcionalidad actual del login.**

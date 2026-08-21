@@ -24,16 +24,16 @@ Este documento reúne las reglas aplicables al uso de **Nava**, su política de 
 
 Nava es una plataforma tecnológica para la gestión de barberías y negocios relacionados con servicios de belleza y cuidado personal.
 
-| Dato | Información |
-|---|---|
-| Nombre comercial | Nava |
-| Titular o razón social | Christopher Alexander Gallardo Campos |
-| RUC o identificación tributaria | 1727155671001 |
-| Domicilio | Quito, Ecuador |
-| Correo de soporte | soport@navacloud.app |
-| Correo de privacidad | soport@navacloud.app |
-| Teléfono | No disponible |
-| Sitio web | https://navacloud.app |
+| Dato                            | Información                           |
+| ------------------------------- | ------------------------------------- |
+| Nombre comercial                | Nava                                  |
+| Titular o razón social          | Christopher Alexander Gallardo Campos |
+| RUC o identificación tributaria | 1727155671001                         |
+| Domicilio                       | Quito, Ecuador                        |
+| Correo de soporte               | soport@navacloud.app                  |
+| Correo de privacidad            | soport@navacloud.app                  |
+| Teléfono                        | No disponible                         |
+| Sitio web                       | https://navacloud.app                 |
 
 En este documento, **“Nava”**, **“la Plataforma”**, **“nosotros”** o **“nuestro”** se refieren al titular identificado anteriormente. **“Negocio”** o **“barbería”** se refiere a la persona o entidad que contrata y utiliza Nava. **“Usuario”** se refiere a propietarios, administradores, empleados o profesionales autorizados para acceder. **“Cliente final”** se refiere a la persona que reserva o recibe servicios de un negocio que utiliza Nava.
 
@@ -60,15 +60,15 @@ El tratamiento se realizará de acuerdo con la **Ley Orgánica de Protección de
 
 La responsabilidad sobre los datos depende del contexto en que fueron recopilados:
 
-| Contexto | Responsable | Función de Nava |
-|---|---|---|
-| Registro de la cuenta del negocio | Nava | Responsable del tratamiento |
-| Suscripción, pagos, soporte y seguridad | Nava | Responsable del tratamiento |
-| Analítica y comunicaciones propias de Nava | Nava | Responsable del tratamiento |
-| Clientes registrados por una barbería | La barbería | Responsable del tratamiento; Nava actúa como encargado |
-| Reservas, servicios e historial del cliente | La barbería | Responsable del tratamiento; Nava actúa como encargado |
-| Información de empleados y profesionales | La barbería, salvo excepciones | Responsable del tratamiento; Nava actúa como encargado |
-| Marketing realizado por una barbería | La barbería | Responsable del tratamiento; Nava actúa como proveedor tecnológico/encargado |
+| Contexto                                    | Responsable                    | Función de Nava                                                              |
+| ------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------- |
+| Registro de la cuenta del negocio           | Nava                           | Responsable del tratamiento                                                  |
+| Suscripción, pagos, soporte y seguridad     | Nava                           | Responsable del tratamiento                                                  |
+| Analítica y comunicaciones propias de Nava  | Nava                           | Responsable del tratamiento                                                  |
+| Clientes registrados por una barbería       | La barbería                    | Responsable del tratamiento; Nava actúa como encargado                       |
+| Reservas, servicios e historial del cliente | La barbería                    | Responsable del tratamiento; Nava actúa como encargado                       |
+| Información de empleados y profesionales    | La barbería, salvo excepciones | Responsable del tratamiento; Nava actúa como encargado                       |
+| Marketing realizado por una barbería        | La barbería                    | Responsable del tratamiento; Nava actúa como proveedor tecnológico/encargado |
 
 Cuando Nava actúa como encargado, tratará los datos únicamente siguiendo instrucciones documentadas del negocio, salvo que una obligación legal exija actuar de otra manera.
 
@@ -139,20 +139,20 @@ Si una barbería registra datos que no obtuvo directamente del cliente, será re
 
 ## 2.5. Finalidades y bases de legitimación
 
-| Finalidad | Datos utilizados | Base aplicable |
-|---|---|---|
-| Crear y administrar una cuenta | Identificación, contacto y credenciales | Ejecución del contrato y medidas precontractuales |
-| Prestar las funciones de Nava | Usuarios, clientes, citas y configuración | Ejecución del contrato |
-| Gestionar reservas | Contacto, servicio, horario y profesional | Ejecución del servicio solicitado; instrucciones de la barbería |
-| Procesar suscripciones y pagos | Facturación y referencias de pago | Ejecución contractual y obligación legal |
-| Enviar avisos operativos | Correo, teléfono y datos de la cita | Ejecución contractual o interés legítimo, según el caso |
-| Enviar publicidad de Nava | Datos de contacto y preferencias | Consentimiento cuando sea exigible |
-| Enviar campañas de una barbería | Datos de contacto de sus clientes | Base determinada por la barbería |
-| Brindar soporte | Cuenta, mensajes y registros técnicos | Ejecución contractual e interés legítimo |
-| Proteger la plataforma | IP, sesiones, actividad y registros | Interés legítimo y obligación de seguridad |
-| Prevenir fraude o abuso | Cuenta, pagos y registros técnicos | Interés legítimo y cumplimiento legal |
-| Cumplir obligaciones legales | Datos requeridos por la autoridad | Obligación legal |
-| Analizar y mejorar Nava | Datos de uso y métricas | Consentimiento o interés legítimo, según la herramienta y la normativa |
+| Finalidad                       | Datos utilizados                          | Base aplicable                                                         |
+| ------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------- |
+| Crear y administrar una cuenta  | Identificación, contacto y credenciales   | Ejecución del contrato y medidas precontractuales                      |
+| Prestar las funciones de Nava   | Usuarios, clientes, citas y configuración | Ejecución del contrato                                                 |
+| Gestionar reservas              | Contacto, servicio, horario y profesional | Ejecución del servicio solicitado; instrucciones de la barbería        |
+| Procesar suscripciones y pagos  | Facturación y referencias de pago         | Ejecución contractual y obligación legal                               |
+| Enviar avisos operativos        | Correo, teléfono y datos de la cita       | Ejecución contractual o interés legítimo, según el caso                |
+| Enviar publicidad de Nava       | Datos de contacto y preferencias          | Consentimiento cuando sea exigible                                     |
+| Enviar campañas de una barbería | Datos de contacto de sus clientes         | Base determinada por la barbería                                       |
+| Brindar soporte                 | Cuenta, mensajes y registros técnicos     | Ejecución contractual e interés legítimo                               |
+| Proteger la plataforma          | IP, sesiones, actividad y registros       | Interés legítimo y obligación de seguridad                             |
+| Prevenir fraude o abuso         | Cuenta, pagos y registros técnicos        | Interés legítimo y cumplimiento legal                                  |
+| Cumplir obligaciones legales    | Datos requeridos por la autoridad         | Obligación legal                                                       |
+| Analizar y mejorar Nava         | Datos de uso y métricas                   | Consentimiento o interés legítimo, según la herramienta y la normativa |
 
 Cuando el tratamiento se base en consentimiento, el titular podrá retirarlo en cualquier momento. La retirada no afectará la licitud del tratamiento realizado previamente.
 
@@ -182,15 +182,15 @@ Las comunicaciones promocionales requerirán la base legal correspondiente y deb
 
 Nava podrá permitir el acceso estrictamente necesario a proveedores que apoyen la operación de la Plataforma. Antes de publicar esta Política debe completarse la lista real:
 
-| Proveedor | Servicio | Datos posibles | Ubicación |
-|---|---|---|---|
-| Neon | Base de datos PostgreSQL | Cuentas, citas y datos operativos | Virginia, Estados Unidos |
-| Dinoranck | Infraestructura y alojamiento | Datos del sistema y registros | Virginia, Estados Unidos |
-| Hostinger | Correos transaccionales | Nombre, correo y contenido | Estados Unidos |
-| PayPhone | Cobro de suscripciones | Identificación y pago | Ecuador |
-| No se utiliza actualmente | No se envían recordatorios por WhatsApp ni SMS | No aplica | No aplica |
-| Google Analytics (GA4) | Métricas de uso | IP, dispositivo y eventos | Estados Unidos y otros países donde Google procese los datos |
-| Neon | Base de datos | Datos registrados en la aplicación, incluidos datos de usuarios y contenido multimedia | Virginia, Estados Unidos |
+| Proveedor                 | Servicio                                       | Datos posibles                                                                         | Ubicación                                                    |
+| ------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Neon                      | Base de datos PostgreSQL                       | Cuentas, citas y datos operativos                                                      | Virginia, Estados Unidos                                     |
+| Dinoranck                 | Infraestructura y alojamiento                  | Datos del sistema y registros                                                          | Virginia, Estados Unidos                                     |
+| Hostinger                 | Correos transaccionales                        | Nombre, correo y contenido                                                             | Estados Unidos                                               |
+| PayPhone                  | Cobro de suscripciones                         | Identificación y pago                                                                  | Ecuador                                                      |
+| No se utiliza actualmente | No se envían recordatorios por WhatsApp ni SMS | No aplica                                                                              | No aplica                                                    |
+| Google Analytics (GA4)    | Métricas de uso                                | IP, dispositivo y eventos                                                              | Estados Unidos y otros países donde Google procese los datos |
+| Neon                      | Base de datos                                  | Datos registrados en la aplicación, incluidos datos de usuarios y contenido multimedia | Virginia, Estados Unidos                                     |
 
 Los proveedores solo podrán tratar los datos para prestar el servicio contratado, deberán guardar confidencialidad y aplicar medidas de seguridad apropiadas.
 
@@ -208,16 +208,16 @@ La lista actualizada de proveedores, países y garantías podrá solicitarse al 
 
 Los datos se conservarán únicamente durante el tiempo necesario para las finalidades informadas y para cumplir obligaciones legales o defender reclamaciones.
 
-| Categoría | Periodo o criterio inicial |
-|---|---|
-| Cuenta activa | Mientras exista la cuenta y la relación contractual |
-| Datos de clientes de una barbería | Mientras lo indique la barbería o permanezca vigente el servicio |
-| Copias de seguridad | Se realizan cada 30 días y se conservan por un máximo de 90 días |
-| Registros de seguridad | Entre 6 y 12 meses, según su utilidad técnica y de seguridad |
-| Solicitudes de soporte | Entre 1 y 2 años, según sea necesario para seguimiento y defensa de reclamaciones |
-| Consentimientos y aceptaciones | Mientras sean necesarios para demostrar cumplimiento |
-| Información contable o tributaria | Durante el plazo exigido por la legislación aplicable |
-| Solicitudes de derechos | Durante el plazo necesario para demostrar su atención |
+| Categoría                         | Periodo o criterio inicial                                                        |
+| --------------------------------- | --------------------------------------------------------------------------------- |
+| Cuenta activa                     | Mientras exista la cuenta y la relación contractual                               |
+| Datos de clientes de una barbería | Mientras lo indique la barbería o permanezca vigente el servicio                  |
+| Copias de seguridad               | Se realizan cada 30 días y se conservan por un máximo de 90 días                  |
+| Registros de seguridad            | Entre 6 y 12 meses, según su utilidad técnica y de seguridad                      |
+| Solicitudes de soporte            | Entre 1 y 2 años, según sea necesario para seguimiento y defensa de reclamaciones |
+| Consentimientos y aceptaciones    | Mientras sean necesarios para demostrar cumplimiento                              |
+| Información contable o tributaria | Durante el plazo exigido por la legislación aplicable                             |
+| Solicitudes de derechos           | Durante el plazo necesario para demostrar su atención                             |
 
 Al finalizar el periodo aplicable, los datos serán eliminados, anonimizados o bloqueados cuando exista una obligación de conservación.
 
@@ -358,14 +358,14 @@ Nava podrá ofrecer planes gratuitos, periodos de prueba o suscripciones de pago
 
 Configuración comercial pendiente:
 
-| Condición | Regla de Nava |
-|---|---|
-| Duración de prueba | 12 días |
-| Precio y periodicidad | Nava Free: USD 0/mes; Nava Esencial: USD 9,83/mes; Nava Local: USD 29,99/mes. Los límites y funciones de cada plan se informarán en la oferta vigente. |
-| Renovación automática | No se aplica. Cada renovación o pago debe realizarse manualmente por el usuario. |
-| Aviso previo al cobro | 5 días antes del vencimiento o cobro aplicable |
-| Periodo de gracia por impago | 3 días |
-| Reembolsos | Los pagos son finales y no reembolsables, sin perjuicio de los derechos irrenunciables que reconozca la ley. |
+| Condición                    | Regla de Nava                                                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Duración de prueba           | 12 días                                                                                                                                                |
+| Precio y periodicidad        | Nava Free: USD 0/mes; Nava Esencial: USD 9,83/mes; Nava Local: USD 29,99/mes. Los límites y funciones de cada plan se informarán en la oferta vigente. |
+| Renovación automática        | No se aplica. Cada renovación o pago debe realizarse manualmente por el usuario.                                                                       |
+| Aviso previo al cobro        | 5 días antes del vencimiento o cobro aplicable                                                                                                         |
+| Periodo de gracia por impago | 3 días                                                                                                                                                 |
+| Reembolsos                   | Los pagos son finales y no reembolsables, sin perjuicio de los derechos irrenunciables que reconozca la ley.                                           |
 
 Si existe renovación automática, se informará de manera visible antes del pago y el usuario podrá cancelarla mediante un mecanismo razonablemente sencillo.
 
@@ -535,22 +535,22 @@ Las cookies son pequeños archivos o identificadores que un sitio guarda o consu
 
 Nava podrá utilizar las siguientes categorías únicamente si las herramientas correspondientes están realmente instaladas:
 
-| Categoría | Finalidad | Consentimiento |
-|---|---|---|
-| Necesarias | Sesión, seguridad, autenticación y funciones solicitadas | No se desactivan si son imprescindibles |
-| Preferencias | Idioma, zona horaria y configuración visual | Según su naturaleza y normativa aplicable |
-| Analítica | Medir uso, rendimiento y errores | Requiere aceptación cuando corresponda |
-| Publicidad | Medir campañas y personalizar anuncios | Requiere aceptación previa |
-| Terceros | Habilitar servicios externos | Depende de su finalidad |
+| Categoría    | Finalidad                                                | Consentimiento                            |
+| ------------ | -------------------------------------------------------- | ----------------------------------------- |
+| Necesarias   | Sesión, seguridad, autenticación y funciones solicitadas | No se desactivan si son imprescindibles   |
+| Preferencias | Idioma, zona horaria y configuración visual              | Según su naturaleza y normativa aplicable |
+| Analítica    | Medir uso, rendimiento y errores                         | Requiere aceptación cuando corresponda    |
+| Publicidad   | Medir campañas y personalizar anuncios                   | Requiere aceptación previa                |
+| Terceros     | Habilitar servicios externos                             | Depende de su finalidad                   |
 
 ## 4.3. Cookies concretas
 
 El siguiente inventario corresponde a la implementación prevista de Google Analytics 4. Debe verificarse nuevamente en producción si se añaden integraciones o etiquetas adicionales:
 
-| Nombre | Proveedor | Finalidad | Duración | Categoría |
-|---|---|---|---|---|
-| `_ga` | Google Analytics 4 | Distinguir usuarios únicos y medir el uso del sitio | Hasta 2 años, sujeto a los límites del navegador | Analítica |
-| `_ga_<identificador-del-contenedor>` | Google Analytics 4 | Mantener el estado de la sesión | Hasta 2 años, sujeto a los límites del navegador | Analítica |
+| Nombre                               | Proveedor          | Finalidad                                           | Duración                                         | Categoría |
+| ------------------------------------ | ------------------ | --------------------------------------------------- | ------------------------------------------------ | --------- |
+| `_ga`                                | Google Analytics 4 | Distinguir usuarios únicos y medir el uso del sitio | Hasta 2 años, sujeto a los límites del navegador | Analítica |
+| `_ga_<identificador-del-contenedor>` | Google Analytics 4 | Mantener el estado de la sesión                     | Hasta 2 años, sujeto a los límites del navegador | Analítica |
 
 ## 4.4. Gestión del consentimiento
 
