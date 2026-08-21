@@ -94,8 +94,8 @@ Mobile / Web pública / Admin
 - [x] Pipeline CI con calidad, build, Playwright y PostgreSQL aislado.
 - [ ] Recuperar el gate local de lint y formato; hoy no cumple la Definition of
       Done aunque los comandos existan.
-- [ ] Actualizar `README.md`, `docs/product/mvp-scope.md` y
-      `docs/testing/strategy.md`, que todavía describen un alcance anterior.
+- [x] Actualizar `README.md`, `docs/product/mvp-scope.md` y
+      `docs/testing/strategy.md` con el alcance y las pruebas vigentes.
 
 ### Fase 1 — Identidad, organización y onboarding: funcional
 
@@ -247,8 +247,9 @@ Mobile / Web pública / Admin
 - [x] Límites backend para profesionales, sedes, clientes y reservas móviles.
 - [x] Panel interno para cambiar plan, suspender, reactivar y conceder soporte.
 - [x] La app Android solo consume el estado y no enlaza un checkout externo.
-- [ ] No existe facturación real de Nava, renovación, webhook ni checkout Web
-      de suscripción.
+- [ ] No existe facturación real de Nava, renovación ni webhook verificable. El
+      checkout Web autenticado existe para sandbox y permanece deshabilitado
+      hasta completar la validación con PayPhone y las decisiones comerciales.
 - [ ] El endpoint de simulación sigue siendo parte de la operación del MVP y no
       sustituye un sistema de cobro.
 

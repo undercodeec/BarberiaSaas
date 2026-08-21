@@ -33,6 +33,19 @@ El móvil consulta `/v1/appointment-events` cada dos segundos y vuelve a cargar
 agenda y disponibilidad cuando recibe eventos nuevos. Esta estrategia sustituye
 Realtime en la arquitectura vigente.
 
+## Cobros y suscripciones
+
+La suite de pagos de suscripción cubre cálculo del período calendario,
+minimización de payloads, idempotencia del checkout, aislamiento entre tenants,
+validación de importe/moneda/store, rechazo, expiración y aplicación única de un
+pago previamente verificado. Las integraciones usan el mismo
+`TEST_DATABASE_URL` aislado.
+
+No se ejecutan pagos reales desde las pruebas. Hasta que PayPhone proporcione
+credenciales sandbox y un contrato verificable de notificación externa, los
+casos de proveedor se prueban con dobles controlados y el checkout permanece
+deshabilitado por configuración.
+
 ## Comandos
 
 ```bash
@@ -43,6 +56,11 @@ pnpm test
 pnpm build
 pnpm test:e2e
 ```
+
+`pnpm test` ejecuta unitarias e integraciones cuando `TEST_DATABASE_URL` está
+definida. `pnpm test:e2e` cubre actualmente la web pública; los recorridos E2E
+de autenticación, operación móvil, Caja, inventario, suscripción y panel interno
+siguen siendo pendientes de salida.
 
 Para integración local use una base exclusiva:
 

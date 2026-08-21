@@ -878,6 +878,7 @@ model SubscriptionInvoice {
   totalCents             Int                          @map("total_cents")
   currencyCode           String                       @default("USD") @map("currency_code") @db.Char(3)
   billingPeriodMonths    Int                          @default(1) @map("billing_period_months")
+  billingPeriodDays      Int                          @default(30) @map("billing_period_days")
   commercialTermsVersion String                       @map("commercial_terms_version") @db.VarChar(40)
   periodStartsAt         DateTime?                    @map("period_starts_at") @db.Timestamptz(3)
   periodEndsAt           DateTime?                    @map("period_ends_at") @db.Timestamptz(3)

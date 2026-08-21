@@ -23,7 +23,7 @@ import { decryptPlatformPaymentCredential } from './security';
 import { ensureOrganizationSubscription } from './subscription-policy';
 
 const CHECKOUT_EXPIRATION_MS = 24 * 60 * 60 * 1000;
-const BILLING_PERIOD_MONTHS = 1;
+const BILLING_PERIOD_DAYS = 30;
 
 const checkoutSchema = z.object({
   planCode: z.string().trim().min(1).max(40),
@@ -120,16 +120,8 @@ export function platformPaymentEventHash(
     .digest('hex');
 }
 
-export function addCalendarMonths(date: Date, months: number) {
-  const result = new Date(date);
-  const originalDay = result.getUTCDate();
-  result.setUTCDate(1);
-  result.setUTCMonth(result.getUTCMonth() + months);
-  const lastDay = new Date(
-    Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0),
-  ).getUTCDate();
-  result.setUTCDate(Math.min(originalDay, lastDay));
-  return result;
+export function addBillingDays(date: Date, days: number) {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 }
 
 function internalReference() {
@@ -384,9 +376,9 @@ export async function applyVerifiedPlatformPayment(
     const periodStartsAt = renewsCurrentPeriod
       ? subscription.currentPeriodEnd
       : now;
-    const periodEndsAt = addCalendarMonths(
+    const periodEndsAt = addBillingDays(
       periodStartsAt,
-      attempt.invoice.billingPeriodMonths,
+      attempt.invoice.billingPeriodDays,
     );
     const kind = renewsCurrentPeriod
       ? SubscriptionChangeKind.RENEWED
@@ -658,7 +650,8 @@ export function registerSubscriptionPaymentRoutes(
       const expiresAt = new Date(Date.now() + CHECKOUT_EXPIRATION_MS);
       const invoice = await transaction.subscriptionInvoice.create({
         data: {
-          billingPeriodMonths: BILLING_PERIOD_MONTHS,
+          billingPeriodDays: BILLING_PERIOD_DAYS,
+          billingPeriodMonths: 1,
           commercialTermsVersion: config.PLATFORM_SUBSCRIPTION_TERMS_VERSION!,
           currencyCode: plan.currencyCode,
           dueAt: expiresAt,

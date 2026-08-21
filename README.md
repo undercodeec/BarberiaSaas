@@ -1,13 +1,19 @@
-# SaaS móvil para barberías
+# Nava — SaaS para barberías
 
-Monorepositorio del MVP descrito en `INSTRUCCIONES_CODEX_BARBER_SAAS.md`. La decisión vigente es PostgreSQL + Prisma + API Node propia desplegada en VPS; consulte [`ADR 0003`](./docs/adr/0003-postgresql-prisma-y-api-en-vps.md).
+Monorepositorio del MVP descrito en `ProyectoMD/INSTRUCCIONES_CODEX_BARBER_SAAS.md`. La arquitectura vigente es PostgreSQL + Prisma + API Node/Fastify propia desplegada en VPS; consulte [`ADR 0003`](./docs/adr/0003-postgresql-prisma-y-api-en-vps.md).
 
 ## Estado
 
-Las fases 0–3 contienen la base técnica, autenticación y onboarding, equipo,
-servicios, horarios y el motor interno de agenda. La reserva web pública, clientes,
-caja y comisiones comienzan en las fases siguientes. El estado verificable y sus
-pendientes viven en [`ESTADO_PROYECTO.md`](./ESTADO_PROYECTO.md).
+El MVP ya cubre identidad y onboarding multi-tenant, equipo, agenda, reservas
+públicas, clientes, Caja, comisiones, inventario, notificaciones, reportes,
+planes con límites y un panel interno. Los pagos reales de suscripción Nava y la
+verificación automática de PayPhone permanecen deshabilitados hasta disponer de
+credenciales sandbox, contrato de notificaciones y decisiones comerciales.
+
+El estado verificable y sus pendientes viven en
+[`ProyectoMD/ESTADO_PROYECTO.md`](./ProyectoMD/ESTADO_PROYECTO.md). El avance
+del plan de pagos está en
+[`ProyectoMD/AVANCE_PLAN_DESARROLLO_INTEGRAL_2026-08-20.md`](./ProyectoMD/AVANCE_PLAN_DESARROLLO_INTEGRAL_2026-08-20.md).
 
 Las invitaciones de equipo y la recuperación de contraseña usan SMTP. En local
 puede utilizarse Mailpit; en producción debe configurarse un proveedor real.
@@ -85,7 +91,7 @@ URL como `DATABASE_URL`.
 apps/
   api/         API Fastify, autenticación y autorización multi-tenant
   mobile/      Aplicación React Native con Expo SDK para módulos locales
-  web/         Sitio público y futura reserva web
+  web/         Sitio público y reserva web
   admin/       Panel interno del operador
 packages/
   api-client/  Transporte y contratos HTTP compartidos

@@ -16,7 +16,7 @@ import { buildApi } from './app';
 import { readConfig } from './config';
 import { hashOpaqueToken } from './security';
 import {
-  addCalendarMonths,
+  addBillingDays,
   applyVerifiedPlatformPayment,
   expireStaleSubscriptionPayments,
   platformPaymentEventHash,
@@ -24,12 +24,9 @@ import {
 } from './subscription-payments';
 
 describe('dominio de pagos de suscripción', () => {
-  it('calcula un mes calendario sin desbordar el último día', () => {
-    expect(addCalendarMonths(new Date('2026-01-31T12:00:00Z'), 1)).toEqual(
-      new Date('2026-02-28T12:00:00Z'),
-    );
-    expect(addCalendarMonths(new Date('2028-01-31T12:00:00Z'), 1)).toEqual(
-      new Date('2028-02-29T12:00:00Z'),
+  it('calcula el período comercial exacto de 30 días', () => {
+    expect(addBillingDays(new Date('2026-01-31T12:00:00Z'), 30)).toEqual(
+      new Date('2026-03-02T12:00:00Z'),
     );
   });
 
