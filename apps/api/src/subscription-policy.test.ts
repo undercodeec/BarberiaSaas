@@ -1,8 +1,12 @@
-import { SubscriptionStatus } from '@barber-saas/database';
+import {
+  PlatformOverrideKind,
+  SubscriptionStatus,
+} from '@barber-saas/database';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
   ensureOrganizationSubscription,
+  getEntitlements,
   GRACE_DAYS,
   TRIAL_DAYS,
   planDefinition,
@@ -26,6 +30,7 @@ interface StoredSubscription {
 
 function subscriptionTransaction(initial: StoredSubscription) {
   let current = { ...initial };
+  const findOverrides = vi.fn(async (): Promise<unknown[]> => []);
   const update = vi.fn(
     async ({ data }: { data: Partial<StoredSubscription> }) => {
       current = { ...current, ...data, updatedAt: new Date() };
@@ -34,11 +39,23 @@ function subscriptionTransaction(initial: StoredSubscription) {
   );
   const transaction = {
     plan: {
-      upsert: vi.fn(async ({ where }: { where: { code: string } }) => ({
-        code: where.code,
-        id: `plan-${where.code}`,
-      })),
+      upsert: vi.fn(
+        async ({
+          create,
+          where,
+        }: {
+          create: Record<string, unknown>;
+          where: { code: string };
+        }) => ({
+          ...create,
+          code: where.code,
+          id: `plan-${where.code}`,
+        }),
+      ),
       findUnique: vi.fn(async () => null),
+    },
+    platformFeatureOverride: {
+      findMany: findOverrides,
     },
     organization: {
       update: vi.fn(async () => ({})),
@@ -50,6 +67,7 @@ function subscriptionTransaction(initial: StoredSubscription) {
   };
   return {
     current: () => current,
+    findOverrides,
     transaction: transaction as never,
     update,
   };
@@ -241,5 +259,47 @@ describe('política de suscripciones', () => {
       name: 'Nava Multi',
     });
     expect(multi?.featureFlags).toMatchObject({ multiLocation: true });
+  });
+
+  it('aplica excepciones temporales activas a los entitlements reales', async () => {
+    const now = new Date('2026-08-10T12:00:00.000Z');
+    const original = storedSubscription({ planId: 'plan-free' });
+    const context = subscriptionTransaction(original);
+    context.findOverrides.mockResolvedValue([
+      {
+        booleanValue: true,
+        createdAt: now,
+        expiresAt: new Date(now.getTime() + DAY_MS),
+        id: 'override-feature',
+        integerValue: null,
+        key: 'inventory',
+        kind: PlatformOverrideKind.FEATURE,
+        organizationId: original.organizationId,
+        reason: 'Piloto controlado de inventario',
+        revokedAt: null,
+      },
+      {
+        booleanValue: null,
+        createdAt: now,
+        expiresAt: new Date(now.getTime() + DAY_MS),
+        id: 'override-limit',
+        integerValue: 250,
+        key: 'clients',
+        kind: PlatformOverrideKind.LIMIT,
+        organizationId: original.organizationId,
+        reason: 'Ampliación temporal de clientes',
+        revokedAt: null,
+      },
+    ]);
+
+    const result = await getEntitlements(
+      context.transaction,
+      original.organizationId,
+      now,
+    );
+
+    expect(result.featureFlags.inventory).toBe(true);
+    expect(result.limits.clients).toBe(250);
+    expect(result.activeOverrides).toHaveLength(2);
   });
 });

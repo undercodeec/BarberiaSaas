@@ -192,6 +192,7 @@ integrationDescribe('reservas públicas', () => {
     await database.businessWeeklySchedule.deleteMany({
       where: { locationId },
     });
+    await database.auditLog.deleteMany({ where: { organizationId } });
     await database.memberLocation.deleteMany({ where: { locationId } });
     await database.service.deleteMany({ where: { organizationId } });
     await database.location.deleteMany({ where: { organizationId } });

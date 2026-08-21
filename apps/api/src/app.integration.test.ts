@@ -6,7 +6,9 @@ import { readConfig } from './config';
 import type {
   InvitationMessage,
   PlatformAccessMessage,
+  VerificationMessage,
 } from './recovery-mailer';
+import { GRACE_DAYS, TRIAL_DAYS } from './subscription-policy';
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 if (testDatabaseUrl) {
@@ -195,6 +197,7 @@ describeWithDatabase('API con PostgreSQL', () => {
   });
   const invitationMessages: InvitationMessage[] = [];
   const platformAccessMessages: PlatformAccessMessage[] = [];
+  const verificationMessages: VerificationMessage[] = [];
   let app: Awaited<ReturnType<typeof buildApi>>;
 
   beforeEach(async () => {
@@ -213,9 +216,26 @@ describeWithDatabase('API con PostgreSQL', () => {
           return Promise.resolve();
         },
       },
+      verificationMailer: {
+        send: (message) => {
+          verificationMessages.push(message);
+          return Promise.resolve();
+        },
+      },
     });
     invitationMessages.length = 0;
     platformAccessMessages.length = 0;
+    verificationMessages.length = 0;
+    await database.platformSupportCaseEvent.deleteMany();
+    await database.platformSupportCase.deleteMany();
+    await database.platformOrganizationNote.deleteMany();
+    await database.platformConfigurationVersion.deleteMany();
+    await database.platformPrivacyRequest.deleteMany();
+    await database.platformFeatureOverride.deleteMany();
+    await database.platformAlert.deleteMany();
+    await database.platformExport.deleteMany();
+    await database.platformAuditLog.deleteMany();
+    await database.platformOperator.deleteMany();
     await database.onboardingCollaborator.deleteMany();
     await database.commissionSettlementAdvance.deleteMany();
     await database.professionalAdvance.deleteMany();
@@ -1093,8 +1113,8 @@ describeWithDatabase('API con PostgreSQL', () => {
     const trialEnd = createdSubscription?.trialEndsAt?.getTime() ?? 0;
     const periodEnd = createdSubscription?.currentPeriodEnd.getTime() ?? 0;
     const dayMilliseconds = 24 * 60 * 60 * 1000;
-    expect(trialEnd - periodStart).toBe(14 * dayMilliseconds);
-    expect(periodEnd - periodStart).toBe(14 * dayMilliseconds);
+    expect(trialEnd - periodStart).toBe(TRIAL_DAYS * dayMilliseconds);
+    expect(periodEnd - periodStart).toBe(TRIAL_DAYS * dayMilliseconds);
     expect(createdSubscription?.graceEndsAt).toBeNull();
 
     const subscriptionResponse = await app.inject({
@@ -1144,7 +1164,11 @@ describeWithDatabase('API con PostgreSQL', () => {
       graceResponse.json<{
         current: { planCode: string; readOnly: boolean; status: string };
       }>().current,
-    ).toMatchObject({ planCode: 'free', readOnly: false, status: 'free' });
+    ).toMatchObject({
+      planCode: 'local',
+      readOnly: false,
+      status: 'past_due',
+    });
     await database.subscription.update({
       data: { graceEndsAt: new Date(Date.now() - 1_000) },
       where: { organizationId: organization.organizationId },
@@ -1159,17 +1183,6 @@ describeWithDatabase('API con PostgreSQL', () => {
         current: { readOnly: boolean; status: string };
       }>().current,
     ).toMatchObject({ readOnly: false, status: 'free' });
-    expect(
-      (
-        await app.inject({
-          headers: { authorization: `Bearer ${ownerToken}` },
-          method: 'POST',
-          payload: { status: 'active' },
-          url: '/v1/subscription/simulate',
-        })
-      ).statusCode,
-    ).toBe(200);
-
     const limitResponse = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },
       method: 'POST',
@@ -1193,6 +1206,17 @@ describeWithDatabase('API con PostgreSQL', () => {
         where: { organizationId: organization.organizationId },
       }),
     ).toBe(1);
+
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${ownerToken}` },
+          method: 'POST',
+          payload: { status: 'active' },
+          url: '/v1/subscription/simulate',
+        })
+      ).statusCode,
+    ).toBe(200);
 
     const serviceBeforeSuspension = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },
@@ -1332,7 +1356,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(
       (activatedSubscription?.graceEndsAt?.getTime() ?? 0) -
         (activatedSubscription?.currentPeriodEnd.getTime() ?? 0),
-    ).toBe(7 * 24 * 60 * 60 * 1000);
+    ).toBe(GRACE_DAYS * 24 * 60 * 60 * 1000);
 
     const expiredPeriodEnd = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
     await database.subscription.update({
@@ -1355,7 +1379,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     }>().current;
     expect(grace).toMatchObject({ readOnly: false, status: 'past_due' });
     expect(new Date(grace.graceEndsAt).getTime()).toBe(
-      expiredPeriodEnd.getTime() + 7 * 24 * 60 * 60 * 1000,
+      expiredPeriodEnd.getTime() + GRACE_DAYS * 24 * 60 * 60 * 1000,
     );
 
     await database.subscription.update({
@@ -2791,7 +2815,7 @@ describeWithDatabase('API con PostgreSQL', () => {
       headers: { authorization: `Bearer ${token}` },
       method: 'PATCH',
       payload: {
-        initialStock: 8,
+        initialStock: 5,
         locationId: organization.locationId,
       },
       url: `/v1/inventory/products/${productId}`,
@@ -2800,7 +2824,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(
       edited.json<{ product: { quantityOnHand: number } }>().product
         .quantityOnHand,
-    ).toBe(8);
+    ).toBe(5);
 
     const secondToken = await register('inventory-other@example.com');
     await onboard(secondToken, 'inventario-aislado');
@@ -3371,6 +3395,298 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(organizationsBody.organizations[0]?.owner.email).toContain('***');
     expect(JSON.stringify(organizationsBody)).not.toContain('password');
 
+    const organizationDetail = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'GET',
+      url: `/v1/platform/organizations/${pilot.organizationId}`,
+    });
+    expect(organizationDetail.statusCode).toBe(200);
+    expect(organizationDetail.body).toContain('appointmentsLast30Days');
+    expect(organizationDetail.body).toContain('openCashRegisters');
+    expect(organizationDetail.body).not.toContain('pilot-owner@example.com');
+    expect(organizationDetail.body).not.toContain('encryptedToken');
+
+    for (const resource of [
+      'bookings',
+      'orders',
+      'cash-health',
+      'commissions-health',
+      'inventory-health',
+      'payphone-health',
+    ]) {
+      const operationalView = await app.inject({
+        headers: { authorization: `Bearer ${platformToken}` },
+        method: 'GET',
+        url: `/v1/platform/${resource}?organizationId=${pilot.organizationId}`,
+      });
+      expect(operationalView.statusCode, resource).toBe(200);
+      expect(operationalView.body).not.toContain('pilot-owner@example.com');
+      expect(operationalView.body).not.toContain('encryptedToken');
+    }
+
+    const operators = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'GET',
+      url: '/v1/platform/operators',
+    });
+    expect(operators.statusCode).toBe(200);
+    expect(operators.body).toContain('super_admin');
+
+    const createdOperator = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'POST',
+      payload: {
+        email: 'not-platform@example.com',
+        isActive: true,
+        role: 'support',
+      },
+      url: '/v1/platform/operators',
+    });
+    expect(createdOperator.statusCode).toBe(201);
+    const createdOperatorBody = createdOperator.json<{
+      operator: { id: string; role: string; userId: string };
+    }>();
+    expect(createdOperatorBody.operator.role).toBe('support');
+
+    const supportLogin = await app.inject({
+      method: 'POST',
+      payload: {
+        email: 'not-platform@example.com',
+        password: 'Clave-segura-123',
+      },
+      url: '/v1/platform/login',
+    });
+    expect(supportLogin.statusCode).toBe(200);
+    const supportVerification = await app.inject({
+      headers: {
+        authorization: `Bearer ${supportLogin.json<{ challengeToken: string }>().challengeToken}`,
+      },
+      method: 'POST',
+      payload: { code: platformAccessMessages[2]?.code },
+      url: '/v1/platform/verify-access-code',
+    });
+    expect(supportVerification.statusCode).toBe(200);
+    const supportToken = supportVerification.json<{
+      session: { token: string };
+    }>().session.token;
+    const deniedForSupport = await app.inject({
+      headers: { authorization: `Bearer ${supportToken}` },
+      method: 'PATCH',
+      payload: {
+        action: 'suspend',
+        reason: 'Soporte no debe poder suspender una organización.',
+      },
+      url: `/v1/platform/organizations/${pilot.organizationId}`,
+    });
+    expect(deniedForSupport.statusCode).toBe(403);
+    expect(deniedForSupport.json<{ code: string }>().code).toBe(
+      'PLATFORM_PERMISSION_REQUIRED',
+    );
+
+    const promotedOperator = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'PATCH',
+      payload: { isActive: true, role: 'super_admin' },
+      url: `/v1/platform/operators/${createdOperatorBody.operator.id}`,
+    });
+    expect(promotedOperator.statusCode).toBe(200);
+    const configurationDraft = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'POST',
+      payload: {
+        key: 'support.default_sla_hours',
+        reason: 'Definir SLA inicial para las incidencias del piloto.',
+        value: { hours: 12 },
+      },
+      url: '/v1/platform/configurations',
+    });
+    expect(configurationDraft.statusCode).toBe(201);
+    const configurationId = configurationDraft.json<{ id: string }>().id;
+    const sameActorApproval = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'POST',
+      payload: { reason: 'Intento de autoaprobación que debe bloquearse.' },
+      url: `/v1/platform/configurations/${configurationId}/publish`,
+    });
+    expect(sameActorApproval.statusCode).toBe(409);
+    const approvedConfiguration = await app.inject({
+      headers: { authorization: `Bearer ${supportToken}` },
+      method: 'POST',
+      payload: { reason: 'Segundo operador valida el SLA del piloto.' },
+      url: `/v1/platform/configurations/${configurationId}/publish`,
+    });
+    expect(approvedConfiguration.statusCode).toBe(200);
+    const replacementDraft = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'POST',
+      payload: {
+        key: 'support.default_sla_hours',
+        reason: 'Probar una segunda versión antes del rollback.',
+        value: { hours: 18 },
+      },
+      url: '/v1/platform/configurations',
+    });
+    const replacementId = replacementDraft.json<{ id: string }>().id;
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${supportToken}` },
+          method: 'POST',
+          payload: { reason: 'Aprobar temporalmente la segunda versión.' },
+          url: `/v1/platform/configurations/${replacementId}/publish`,
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${platformToken}` },
+          method: 'POST',
+          payload: { reason: 'Restaurar el SLA previamente aprobado.' },
+          url: `/v1/platform/configurations/${configurationId}/rollback`,
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      await database.platformConfigurationVersion.findFirst({
+        orderBy: { version: 'desc' },
+        select: { value: true },
+        where: {
+          key: 'support.default_sla_hours',
+          status: 'PUBLISHED',
+        },
+      }),
+    ).toMatchObject({ value: { hours: 12 } });
+
+    const sessions = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'GET',
+      url: '/v1/platform/sessions',
+    });
+    expect(sessions.statusCode).toBe(200);
+    expect(
+      sessions.json<{ sessions: unknown[] }>().sessions.length,
+    ).toBeGreaterThan(0);
+
+    const createdCase = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'POST',
+      payload: {
+        category: 'notificaciones',
+        description: 'El propietario solicita revisar la entrega de avisos.',
+        organizationId: pilot.organizationId,
+        priority: 'high',
+        title: 'Avisos sin entregar al piloto',
+      },
+      url: '/v1/platform/support-cases',
+    });
+    expect(createdCase.statusCode).toBe(201);
+    const supportCaseId = createdCase.json<{ id: string }>().id;
+    const storedCase = await database.platformSupportCase.findUniqueOrThrow({
+      where: { id: supportCaseId },
+    });
+    expect(storedCase.slaDueAt).not.toBeNull();
+    expect(
+      Math.round(
+        ((storedCase.slaDueAt?.getTime() ?? 0) -
+          storedCase.createdAt.getTime()) /
+          3_600_000,
+      ),
+    ).toBe(12);
+    const updatedCase = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'PATCH',
+      payload: {
+        assignedToUserId: createdOperatorBody.operator.userId,
+        note: 'Diagnóstico iniciado y asignado al operador de turno.',
+        slaDueAt: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
+        status: 'in_progress',
+      },
+      url: `/v1/platform/support-cases/${supportCaseId}`,
+    });
+    expect(updatedCase.statusCode).toBe(200);
+    const cases = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'GET',
+      url: `/v1/platform/support-cases?organizationId=${pilot.organizationId}`,
+    });
+    expect(cases.statusCode).toBe(200);
+    expect(cases.body).toContain('in_progress');
+    expect(cases.body).toContain('running');
+
+    const pendingRegistration = await database.pendingRegistration.create({
+      data: {
+        codeHash: '0'.repeat(64),
+        email: 'pending-admin@example.com',
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        fullName: 'Cuenta pendiente',
+        passwordHash: 'hash-de-prueba',
+      },
+    });
+    const onboarding = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'GET',
+      url: '/v1/platform/onboarding',
+    });
+    expect(onboarding.statusCode).toBe(200);
+    expect(onboarding.body).toContain('progressPercent');
+    expect(onboarding.body).not.toContain('pilot-owner@example.com');
+    expect(onboarding.body).not.toContain('pending-admin@example.com');
+
+    const verificationMessageCountBeforeResend = verificationMessages.length;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const resend = await app.inject({
+        headers: { authorization: `Bearer ${platformToken}` },
+        method: 'POST',
+        payload: {
+          reason: 'Soporte confirma el reenvío solicitado por el titular.',
+        },
+        url: `/v1/platform/onboarding/pending/${pendingRegistration.id}/resend-verification`,
+      });
+      expect(resend.statusCode).toBe(200);
+    }
+    expect(verificationMessages).toHaveLength(
+      verificationMessageCountBeforeResend + 3,
+    );
+    expect(verificationMessages.at(-1)?.email).toBe(
+      'pending-admin@example.com',
+    );
+    const blockedResend = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'POST',
+      payload: {
+        reason: 'Cuarto reenvío dentro de la misma ventana de seguridad.',
+      },
+      url: `/v1/platform/onboarding/pending/${pendingRegistration.id}/resend-verification`,
+    });
+    expect(blockedResend.statusCode).toBe(429);
+    expect(blockedResend.json<{ code: string }>().code).toBe(
+      'PLATFORM_VERIFICATION_RESEND_RATE_LIMITED',
+    );
+
+    const commercialNote = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'POST',
+      payload: {
+        category: 'commercial',
+        note: 'Piloto autorizado para seguimiento comercial prioritario.',
+      },
+      url: `/v1/platform/organizations/${pilot.organizationId}/notes`,
+    });
+    expect(commercialNote.statusCode).toBe(201);
+
+    const reducedTrial = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'PATCH',
+      payload: {
+        action: 'reduce_trial',
+        days: 1,
+        reason: 'Ajuste solicitado para validar la reducción controlada.',
+      },
+      url: `/v1/platform/organizations/${pilot.organizationId}`,
+    });
+    expect(reducedTrial.statusCode).toBe(200);
+
     const notificationErrors = await app.inject({
       headers: { authorization: `Bearer ${platformToken}` },
       method: 'GET',
@@ -3381,6 +3697,38 @@ describeWithDatabase('API con PostgreSQL', () => {
       notificationErrors.json<{ errors: Array<{ channel: string }> }>().errors,
     ).toEqual([expect.objectContaining({ channel: 'email' })]);
     expect(notificationErrors.body).not.toContain('No se expone en el panel.');
+
+    const alerts = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'GET',
+      url: `/v1/platform/alerts?organizationId=${pilot.organizationId}&status=all`,
+    });
+    expect(alerts.statusCode).toBe(200);
+    const notificationAlert = alerts
+      .json<{ alerts: Array<{ id: string; type: string }> }>()
+      .alerts.find(({ type }) => type === 'notification_failed');
+    expect(notificationAlert).toBeDefined();
+    const resolvedAlert = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'PATCH',
+      payload: {
+        note: 'Entrega revisada por soporte del piloto.',
+        status: 'resolved',
+      },
+      url: `/v1/platform/alerts/${notificationAlert?.id}`,
+    });
+    expect(resolvedAlert.statusCode).toBe(200);
+
+    const systemHealth = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'GET',
+      url: '/v1/platform/system-health',
+    });
+    expect(systemHealth.statusCode).toBe(200);
+    expect(
+      systemHealth.json<{ components: { api: { status: string } } }>()
+        .components.api.status,
+    ).toBe('operational');
 
     const changePlan = await app.inject({
       headers: { authorization: `Bearer ${platformToken}` },
@@ -3481,6 +3829,21 @@ describeWithDatabase('API con PostgreSQL', () => {
         'platform.organization.suspend',
       ]),
     );
+
+    const exportQuery = new URLSearchParams({
+      from: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      organizationId: pilot.organizationId,
+      to: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    });
+    const auditExport = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'GET',
+      url: `/v1/platform/exports/audit.csv?${exportQuery.toString()}`,
+    });
+    expect(auditExport.statusCode).toBe(200);
+    expect(auditExport.headers['content-type']).toContain('text/csv');
+    expect(auditExport.body).toContain('platform.organization.change_plan');
+    expect(await database.platformExport.count()).toBe(1);
   });
 
   it('recorre autenticación, onboarding, reserva pública y cierre de sesión de extremo a extremo', async () => {

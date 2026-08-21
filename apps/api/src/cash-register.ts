@@ -593,22 +593,36 @@ export function registerCashRegisterRoutes(
               },
             },
           });
-          if (inventory.quantityOnHand < input.productQuantity)
+          const decremented = await transaction.locationInventory.updateMany({
+            data: { quantityOnHand: { decrement: input.productQuantity } },
+            where: {
+              locationId: session.locationId,
+              productId: product.id,
+              quantityOnHand: { gte: input.productQuantity },
+            },
+          });
+          if (decremented.count === 0)
             throw new ApiError(
               409,
               'INSUFFICIENT_STOCK',
               `Solo quedan ${inventory.quantityOnHand} unidades disponibles.`,
             );
-          resultingQuantity = inventory.quantityOnHand - input.productQuantity;
-          await transaction.locationInventory.update({
-            data: { quantityOnHand: resultingQuantity },
-            where: {
-              locationId_productId: {
-                locationId: session.locationId,
-                productId: product.id,
+          const updatedInventory =
+            await transaction.locationInventory.findUnique({
+              where: {
+                locationId_productId: {
+                  locationId: session.locationId,
+                  productId: product.id,
+                },
               },
-            },
-          });
+            });
+          if (!updatedInventory)
+            throw new ApiError(
+              409,
+              'INVENTORY_NOT_AVAILABLE',
+              'No fue posible actualizar las existencias.',
+            );
+          resultingQuantity = updatedInventory.quantityOnHand;
         }
         productSale = {
           costCents: product.costCents,

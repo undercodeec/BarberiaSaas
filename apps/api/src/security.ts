@@ -95,6 +95,17 @@ function paymentCredentialsKey(encodedKey: string): Buffer {
   return key;
 }
 
+function platformPaymentCredentialsKey(encodedKey: string): Buffer {
+  const key = Buffer.from(encodedKey, 'base64');
+  if (key.length !== 32)
+    throw new Error(
+      'PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY debe codificar exactamente 32 bytes.',
+    );
+  return key;
+}
+
+const PLATFORM_PAYMENT_CREDENTIAL_AAD = 'nava:platform:payphone:v1';
+
 /** Cifra secretos de un comercio y los liga criptograficamente a su organizacion. */
 export function encryptPaymentCredential({
   organizationId,
@@ -142,6 +153,56 @@ export function decryptPaymentCredential({
     Buffer.from(ivValue, 'base64url'),
   );
   decipher.setAAD(Buffer.from(organizationId));
+  decipher.setAuthTag(Buffer.from(tagValue, 'base64url'));
+  return Buffer.concat([
+    decipher.update(Buffer.from(value, 'base64url')),
+    decipher.final(),
+  ]).toString('utf8');
+}
+
+/** Cifra el secreto de la cuenta PayPhone propiedad de Nava, aislado de tenants. */
+export function encryptPlatformPaymentCredential({
+  secret,
+  encodedKey,
+}: {
+  readonly encodedKey: string;
+  readonly secret: string;
+}): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv(
+    'aes-256-gcm',
+    platformPaymentCredentialsKey(encodedKey),
+    iv,
+  );
+  cipher.setAAD(Buffer.from(PLATFORM_PAYMENT_CREDENTIAL_AAD));
+  const encrypted = Buffer.concat([
+    cipher.update(secret, 'utf8'),
+    cipher.final(),
+  ]);
+  return [
+    'v1',
+    iv.toString('base64url'),
+    cipher.getAuthTag().toString('base64url'),
+    encrypted.toString('base64url'),
+  ].join('.');
+}
+
+export function decryptPlatformPaymentCredential({
+  encryptedSecret,
+  encodedKey,
+}: {
+  readonly encodedKey: string;
+  readonly encryptedSecret: string;
+}): string {
+  const [version, ivValue, tagValue, value] = encryptedSecret.split('.');
+  if (version !== 'v1' || !ivValue || !tagValue || !value)
+    throw new Error('El formato de la credencial cifrada no es valido.');
+  const decipher = createDecipheriv(
+    'aes-256-gcm',
+    platformPaymentCredentialsKey(encodedKey),
+    Buffer.from(ivValue, 'base64url'),
+  );
+  decipher.setAAD(Buffer.from(PLATFORM_PAYMENT_CREDENTIAL_AAD));
   decipher.setAuthTag(Buffer.from(tagValue, 'base64url'));
   return Buffer.concat([
     decipher.update(Buffer.from(value, 'base64url')),

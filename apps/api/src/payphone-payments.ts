@@ -49,12 +49,14 @@ function clientTransactionId() {
 export async function requestPayphoneLink({
   amountCents,
   clientTransactionId: transactionId,
+  expireInHours = 1,
   reference = 'Reserva Nava',
   storeId,
   token,
 }: {
   readonly amountCents: number;
   readonly clientTransactionId: string;
+  readonly expireInHours?: number;
   readonly reference?: string;
   readonly storeId: string;
   readonly token: string;
@@ -67,7 +69,7 @@ export async function requestPayphoneLink({
         amountWithoutTax: amountCents,
         clientTransactionId: transactionId,
         currency: 'USD',
-        expireIn: 1,
+        expireIn: expireInHours,
         isAmountEditable: false,
         oneTime: true,
         reference,
@@ -327,7 +329,6 @@ export function registerPayphonePaymentRoutes(
   app: FastifyInstance,
   database: DatabaseClient,
   authenticate: Authenticate,
-  config: ApiConfig,
 ) {
   app.get(
     '/v1/appointments/:appointmentId/payphone/manual-confirmation',

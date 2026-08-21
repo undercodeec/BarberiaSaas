@@ -24,8 +24,9 @@
     "db:validate": "pnpm --filter @barber-saas/database db:validate",
     "test": "turbo run test",
     "test:e2e": "playwright test",
+    "test:e2e:admin": "playwright test --config playwright.admin.config.ts",
     "test:performance": "node tests/performance/api-smoke.mjs",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "pnpm db:generate && turbo run typecheck"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",

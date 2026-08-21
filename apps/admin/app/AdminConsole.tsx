@@ -8,12 +8,14 @@ import navaLogo from '../../mobile/assets/nava-logo.png';
 import {
   PlatformApiError,
   accessSupport,
+  downloadAuditExport,
   getAuditLogs,
   getNotificationFailures,
   getOrganizations,
   getOverview,
   getPlatformSession,
   requestPlatformAccessCode,
+  retryNotificationDelivery,
   signOut,
   startDevelopmentSession,
   startPlatformLogin,
@@ -29,18 +31,44 @@ import {
 } from './platform-api';
 import ParticleField from './ParticleField';
 import PlatformLogin from './PlatformLogin';
+import {
+  OrganizationDetailModal,
+  PlatformOperations,
+} from './PlatformOperations';
 
 const SESSION_KEY = 'nava.platform.session';
 const dateFormatter = new Intl.DateTimeFormat('es-EC', {
   dateStyle: 'medium',
   timeStyle: 'short',
 });
+const auditDefaultTo = new Date().toISOString().slice(0, 10);
+const auditDefaultFrom = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  .toISOString()
+  .slice(0, 10);
 
-type View = 'audit' | 'notifications' | 'organizations' | 'overview';
+type View =
+  | 'alerts'
+  | 'audit'
+  | 'cases'
+  | 'content'
+  | 'configuration'
+  | 'health'
+  | 'notifications'
+  | 'operations'
+  | 'overrides'
+  | 'organizations'
+  | 'overview'
+  | 'privacy'
+  | 'security';
 type ModalState = {
   readonly organization: PlatformOrganization;
   readonly type: 'change_plan' | 'reactivate' | 'support' | 'suspend';
 } | null;
+type AdminPermissions = {
+  readonly billing: boolean;
+  readonly operations: boolean;
+  readonly support: boolean;
+};
 
 const statusLabels: Readonly<Record<string, string>> = {
   free: 'Gratuita',
@@ -407,10 +435,14 @@ function Overview({
 
 function OrganizationDetails({
   onAction,
+  onInspect,
   organization,
+  permissions,
 }: {
   readonly onAction: (type: NonNullable<ModalState>['type']) => void;
+  readonly onInspect: () => void;
   readonly organization: PlatformOrganization;
+  readonly permissions: AdminPermissions;
 }) {
   const canSuspend =
     organization.status !== 'suspended' && organization.status !== 'cancelled';
@@ -468,7 +500,14 @@ function OrganizationDetails({
         </div>
       </div>
       <div className="detail-actions">
-        {canSuspend ? (
+        <button
+          className="button button--primary"
+          onClick={onInspect}
+          type="button"
+        >
+          Abrir ficha 360°
+        </button>
+        {permissions.operations && canSuspend ? (
           <button
             className="button button--danger-outline"
             onClick={() => onAction('suspend')}
@@ -476,7 +515,7 @@ function OrganizationDetails({
           >
             Suspender cuenta
           </button>
-        ) : (
+        ) : permissions.operations ? (
           <button
             className="button button--success"
             onClick={() => onAction('reactivate')}
@@ -484,21 +523,25 @@ function OrganizationDetails({
           >
             Reactivar cuenta
           </button>
-        )}
-        <button
-          className="button button--secondary"
-          onClick={() => onAction('change_plan')}
-          type="button"
-        >
-          Cambiar plan
-        </button>
-        <button
-          className="button button--ghost"
-          onClick={() => onAction('support')}
-          type="button"
-        >
-          Diagnóstico de soporte
-        </button>
+        ) : null}
+        {permissions.billing ? (
+          <button
+            className="button button--secondary"
+            onClick={() => onAction('change_plan')}
+            type="button"
+          >
+            Cambiar plan
+          </button>
+        ) : null}
+        {permissions.support ? (
+          <button
+            className="button button--ghost"
+            onClick={() => onAction('support')}
+            type="button"
+          >
+            Diagnóstico de soporte
+          </button>
+        ) : null}
       </div>
       <p className="detail-disclaimer">
         Soporte consulta contadores y contacto enmascarado. Nunca suplanta al
@@ -513,8 +556,10 @@ function Organizations({
   loading,
   onAction,
   onFilters,
+  onInspect,
   onPage,
   onSelect,
+  permissions,
   selected,
 }: {
   readonly data: OrganizationList | null;
@@ -526,8 +571,10 @@ function Organizations({
     plan: string,
     trial: string,
   ) => void;
+  readonly onInspect: () => void;
   readonly onPage: (page: number) => void;
   readonly onSelect: (organization: PlatformOrganization) => void;
+  readonly permissions: AdminPermissions;
   readonly selected: PlatformOrganization | null;
 }) {
   const [search, setSearch] = useState('');
@@ -704,7 +751,12 @@ function Organizations({
           ) : null}
         </section>
         {selected ? (
-          <OrganizationDetails onAction={onAction} organization={selected} />
+          <OrganizationDetails
+            onAction={onAction}
+            onInspect={onInspect}
+            organization={selected}
+            permissions={permissions}
+          />
         ) : (
           <aside className="detail-panel detail-panel--empty">
             <Icon name="building" />
@@ -720,9 +772,15 @@ function Organizations({
 }
 
 function Notifications({
+  busy,
+  canRetry,
   errors,
+  onRetry,
 }: {
+  readonly busy: boolean;
+  readonly canRetry: boolean;
   readonly errors: readonly NotificationFailure[];
+  readonly onRetry: (failure: NotificationFailure) => Promise<void>;
 }) {
   return (
     <>
@@ -750,6 +808,16 @@ function Notifications({
                   {error.attempts} intento{error.attempts === 1 ? '' : 's'}
                 </strong>
                 <time>{formatDate(error.createdAt)}</time>
+                {canRetry ? (
+                  <button
+                    className="button button--ghost"
+                    disabled={busy}
+                    onClick={() => void onRetry(error)}
+                    type="button"
+                  >
+                    Reintentar
+                  </button>
+                ) : null}
               </div>
             </article>
           ))
@@ -759,13 +827,76 @@ function Notifications({
   );
 }
 
-function Audit({ logs }: { readonly logs: readonly PlatformAuditLog[] }) {
+function Audit({
+  logs,
+  onToast,
+  token,
+}: {
+  readonly logs: readonly PlatformAuditLog[];
+  readonly onToast: (message: string) => void;
+  readonly token: string;
+}) {
+  const [from, setFrom] = useState(auditDefaultFrom);
+  const [to, setTo] = useState(auditDefaultTo);
+  const [exporting, setExporting] = useState(false);
+  async function exportAudit() {
+    setExporting(true);
+    try {
+      const result = await downloadAuditExport(token, {
+        from: new Date(`${from}T00:00:00.000Z`).toISOString(),
+        to: new Date(`${to}T23:59:59.999Z`).toISOString(),
+      });
+      const url = URL.createObjectURL(result.blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = result.filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      onToast('Exportación generada y registrada en auditoría.');
+    } catch (error) {
+      onToast(
+        error instanceof Error
+          ? error.message
+          : 'No fue posible exportar la auditoría.',
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
   return (
     <>
       <SectionHeader
         description="Trazabilidad de operaciones sensibles realizadas desde este panel."
         title="Auditoría de plataforma"
       />
+      <div className="filters audit-export-controls">
+        <label>
+          <span>Desde</span>
+          <input
+            max={to}
+            onChange={(event) => setFrom(event.target.value)}
+            type="date"
+            value={from}
+          />
+        </label>
+        <label>
+          <span>Hasta</span>
+          <input
+            min={from}
+            onChange={(event) => setTo(event.target.value)}
+            type="date"
+            value={to}
+          />
+        </label>
+        <button
+          className="button button--primary"
+          disabled={exporting || !from || !to}
+          onClick={() => void exportAudit()}
+          type="button"
+        >
+          {exporting ? 'Generando…' : 'Exportar CSV'}
+        </button>
+      </div>
       <section className="table-card">
         {logs.length === 0 ? (
           <EmptyState>Todavía no hay acciones de plataforma.</EmptyState>
@@ -983,6 +1114,8 @@ export default function AdminConsole() {
   const [trial, setTrial] = useState('all');
   const [selected, setSelected] = useState<PlatformOrganization | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
+  const [detailOrganization, setDetailOrganization] =
+    useState<PlatformOrganization | null>(null);
   const [modalBusy, setModalBusy] = useState(false);
   const [diagnostics, setDiagnostics] = useState<SupportDiagnostics | null>(
     null,
@@ -1084,6 +1217,16 @@ export default function AdminConsole() {
     return () => window.clearTimeout(timeout);
   }, [toast]);
 
+  const operatorPermissions: AdminPermissions = {
+    billing: operator?.role === 'super_admin' || operator?.role === 'billing',
+    operations:
+      operator?.role === 'super_admin' || operator?.role === 'operations',
+    support:
+      operator?.role === 'super_admin' ||
+      operator?.role === 'operations' ||
+      operator?.role === 'support',
+  };
+
   const navigation = useMemo(
     () => [
       { icon: 'dashboard', id: 'overview' as const, label: 'Resumen' },
@@ -1098,9 +1241,43 @@ export default function AdminConsole() {
         id: 'notifications' as const,
         label: 'Notificaciones',
       },
+      { icon: 'dashboard', id: 'operations' as const, label: 'Operación' },
+      { icon: 'bell', id: 'alerts' as const, label: 'Alertas' },
+      ...(operatorPermissions.support
+        ? [{ icon: 'shield', id: 'cases' as const, label: 'Incidencias' }]
+        : []),
+      ...(operatorPermissions.support
+        ? [
+            {
+              icon: 'building',
+              id: 'content' as const,
+              label: 'Onboarding y reseñas',
+            },
+            { icon: 'shield', id: 'privacy' as const, label: 'Privacidad' },
+          ]
+        : []),
+      ...(operatorPermissions.billing
+        ? [{ icon: 'audit', id: 'overrides' as const, label: 'Excepciones' }]
+        : []),
+      { icon: 'dashboard', id: 'health' as const, label: 'Estado técnico' },
+      ...(operator?.role === 'super_admin'
+        ? [
+            { icon: 'shield', id: 'security' as const, label: 'Seguridad' },
+            {
+              icon: 'audit',
+              id: 'configuration' as const,
+              label: 'Configuración global',
+            },
+          ]
+        : []),
       { icon: 'audit', id: 'audit' as const, label: 'Auditoría' },
     ],
-    [notificationErrors.length],
+    [
+      notificationErrors.length,
+      operator?.role,
+      operatorPermissions.billing,
+      operatorPermissions.support,
+    ],
   );
 
   async function login(email: string, password: string) {
@@ -1238,6 +1415,33 @@ export default function AdminConsole() {
         error instanceof Error
           ? error.message
           : 'No fue posible completar la operación.',
+      );
+    } finally {
+      setModalBusy(false);
+    }
+  }
+
+  async function retryNotification(failure: NotificationFailure) {
+    if (!token) return;
+    const reason = window.prompt(
+      'Motivo del reintento (mínimo 10 caracteres):',
+    );
+    if (!reason) return;
+    setModalBusy(true);
+    try {
+      await retryNotificationDelivery(
+        token,
+        failure.notificationId,
+        failure.channel,
+        reason,
+      );
+      setToast('Reintento encolado y registrado en auditoría.');
+      setRefreshKey((value) => value + 1);
+    } catch (error) {
+      setToast(
+        error instanceof Error
+          ? error.message
+          : 'No fue posible reintentar la entrega.',
       );
     } finally {
       setModalBusy(false);
@@ -1389,18 +1593,49 @@ export default function AdminConsole() {
                 setPlan(nextPlan);
                 setTrial(nextTrial);
               }}
+              onInspect={() => {
+                if (selected) setDetailOrganization(selected);
+              }}
               onPage={(nextPage) => {
                 setOrganizationsLoading(true);
                 setPage(nextPage);
               }}
               onSelect={setSelected}
+              permissions={operatorPermissions}
               selected={selected}
             />
           ) : null}
           {view === 'notifications' ? (
-            <Notifications errors={notificationErrors} />
+            <Notifications
+              busy={modalBusy}
+              canRetry={operatorPermissions.operations}
+              errors={notificationErrors}
+              onRetry={retryNotification}
+            />
           ) : null}
-          {view === 'audit' ? <Audit logs={auditLogs} /> : null}
+          {view === 'audit' && token ? (
+            <Audit logs={auditLogs} onToast={setToast} token={token} />
+          ) : null}
+          {token &&
+          operator &&
+          (view === 'alerts' ||
+            view === 'cases' ||
+            view === 'configuration' ||
+            view === 'content' ||
+            view === 'health' ||
+            view === 'operations' ||
+            view === 'overrides' ||
+            view === 'privacy' ||
+            view === 'security') ? (
+            <PlatformOperations
+              currentOperatorId={operator.id}
+              currentRole={operator.role}
+              onToast={setToast}
+              organizations={organizations?.organizations ?? []}
+              token={token}
+              view={view}
+            />
+          ) : null}
         </div>
       </main>
       {modal ? (
@@ -1416,6 +1651,15 @@ export default function AdminConsole() {
             }
           }}
           onSubmit={submitOperation}
+        />
+      ) : null}
+      {detailOrganization && token ? (
+        <OrganizationDetailModal
+          onClose={() => setDetailOrganization(null)}
+          onMutated={() => setRefreshKey((value) => value + 1)}
+          organization={detailOrganization}
+          allowExtendTrial={operatorPermissions.billing}
+          token={token}
         />
       ) : null}
       {toast ? (

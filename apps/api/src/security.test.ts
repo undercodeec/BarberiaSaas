@@ -5,8 +5,10 @@ import {
   decryptPaymentCredential,
   encryptPaymentCredential,
   createVerificationCode,
+  decryptPlatformPaymentCredential,
   hashOpaqueToken,
   hashPassword,
+  encryptPlatformPaymentCredential,
   verifyPassword,
 } from './security';
 
@@ -55,6 +57,29 @@ describe('seguridad de credenciales', () => {
         encodedKey,
         encryptedSecret: encryptedToken,
         organizationId: 'e5cf4e5b-cbe8-40b5-aec9-aed5f3a201a8',
+      }),
+    ).toThrow();
+  });
+
+  it('aísla la credencial PayPhone de Nava de las credenciales de tenants', () => {
+    const encodedKey = Buffer.alloc(32, 11).toString('base64');
+    const encryptedToken = encryptPlatformPaymentCredential({
+      encodedKey,
+      secret: 'token-plataforma',
+    });
+
+    expect(encryptedToken).not.toContain('token-plataforma');
+    expect(
+      decryptPlatformPaymentCredential({
+        encodedKey,
+        encryptedSecret: encryptedToken,
+      }),
+    ).toBe('token-plataforma');
+    expect(() =>
+      decryptPaymentCredential({
+        encodedKey,
+        encryptedSecret: encryptedToken,
+        organizationId: 'f025f4bd-e0dd-4b20-92a3-aa1158848c04',
       }),
     ).toThrow();
   });

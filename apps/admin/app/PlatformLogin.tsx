@@ -73,17 +73,6 @@ export default function PlatformLogin({
           <h1>
             Bienvenido a <em>Nava</em>
           </h1>
-
-        </div>
-
-        <div className={styles.visualTrust}>
-          <span className={styles.trustIcon}>
-            <ShieldIcon />
-          </span>
-          <p>
-            Seguro, confiable y diseñado
-            <br /> para equipos modernos.
-          </p>
         </div>
       </section>
 
@@ -96,9 +85,7 @@ export default function PlatformLogin({
               priority
               src={navaLogo}
             />
-            <span className={styles.operatorPill}>
-              <ShieldIcon /> Operador interno
-            </span>
+
             <h2>Iniciar sesión</h2>
             <p>Ingresa tus credenciales para continuar</p>
           </div>

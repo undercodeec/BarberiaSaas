@@ -7,7 +7,13 @@ export interface FcmDeliveryResult {
   readonly failed: number;
 }
 
-export async function sendFcmNotifications({ body, config, data, title, tokens }: {
+export async function sendFcmNotifications({
+  body,
+  config,
+  data,
+  title,
+  tokens,
+}: {
   readonly body: string;
   readonly config: ApiConfig;
   readonly data: Record<string, string | undefined>;
@@ -23,33 +29,43 @@ export async function sendFcmNotifications({ body, config, data, title, tokens }
   });
   const [accessToken, projectId] = await Promise.all([
     auth.getAccessToken(),
-    config.FCM_PROJECT_ID ? Promise.resolve(config.FCM_PROJECT_ID) : auth.getProjectId(),
+    config.FCM_PROJECT_ID
+      ? Promise.resolve(config.FCM_PROJECT_ID)
+      : auth.getProjectId(),
   ]);
   if (!accessToken || !projectId) throw new Error('No se pudo autorizar FCM.');
   const payloadData = Object.fromEntries(
-    Object.entries(data).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+    Object.entries(data).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string',
+    ),
   );
-  const results = await Promise.allSettled(tokens.map(async (token) => {
-    const response = await fetch(
-      `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/messages:send`,
-      {
-        body: JSON.stringify({
-          message: {
-            android: {
-              notification: { channel_id: 'appointments', sound: 'default' },
-              priority: 'high',
+  const results = await Promise.allSettled(
+    tokens.map(async (token) => {
+      const response = await fetch(
+        `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/messages:send`,
+        {
+          body: JSON.stringify({
+            message: {
+              android: {
+                notification: { channel_id: 'appointments', sound: 'default' },
+                priority: 'high',
+              },
+              data: payloadData,
+              notification: { body, title },
+              token,
             },
-            data: payloadData,
-            notification: { body, title },
-            token,
+          }),
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            'content-type': 'application/json',
           },
-        }),
-        headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
-        method: 'POST',
-      },
-    );
-    if (!response.ok) throw new Error(`FCM rechazó el envío (${response.status}).`);
-  }));
+          method: 'POST',
+        },
+      );
+      if (!response.ok)
+        throw new Error(`FCM rechazó el envío (${response.status}).`);
+    }),
+  );
   const delivered = results.filter(
     (result) => result.status === 'fulfilled',
   ).length;

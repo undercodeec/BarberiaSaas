@@ -1,6 +1,7 @@
 import {
   MembershipStatus,
   OrganizationStatus,
+  PlatformOverrideKind,
   SubscriptionStatus,
   type DatabaseClient,
   type Prisma,
@@ -375,9 +376,58 @@ export async function getEntitlements(
   );
   const plan = plans.find(({ id }) => id === subscription.planId);
   if (!plan) throw new Error('La suscripcion no tiene un plan valido.');
+  const overrides = await database.platformFeatureOverride.findMany({
+    orderBy: { createdAt: 'desc' },
+    where: {
+      expiresAt: { gt: now },
+      organizationId,
+      revokedAt: null,
+    },
+  });
+  const featureFlags = {
+    ...parsePlanFeatureFlags(plan.featureFlags),
+  } as { -readonly [Key in keyof PlanFeatureFlags]: PlanFeatureFlags[Key] };
+  const limits = {
+    ...parsePlanLimits(plan.limits),
+  } as { -readonly [Key in keyof PlanLimits]: PlanLimits[Key] };
+  const appliedKeys = new Set<string>();
+  const appliedOverrideIds = new Set<string>();
+  for (const override of overrides) {
+    if (appliedKeys.has(override.key)) continue;
+    if (
+      override.kind === PlatformOverrideKind.FEATURE &&
+      override.key in featureFlags &&
+      override.booleanValue !== null
+    ) {
+      featureFlags[override.key as keyof PlanFeatureFlags] =
+        override.booleanValue;
+      appliedKeys.add(override.key);
+      appliedOverrideIds.add(override.id);
+    }
+    if (override.kind === PlatformOverrideKind.LIMIT) {
+      if (override.key === 'locations' && override.integerValue !== null) {
+        limits.locations = override.integerValue;
+        appliedKeys.add(override.key);
+        appliedOverrideIds.add(override.id);
+      } else if (override.key === 'clients') {
+        limits.clients = override.integerValue;
+        appliedKeys.add(override.key);
+        appliedOverrideIds.add(override.id);
+      } else if (override.key === 'rolling30DayBookings') {
+        limits.rolling30DayBookings = override.integerValue;
+        appliedKeys.add(override.key);
+        appliedOverrideIds.add(override.id);
+      } else if (override.key === 'teamMembers') {
+        limits.teamMembers = override.integerValue;
+        appliedKeys.add(override.key);
+        appliedOverrideIds.add(override.id);
+      }
+    }
+  }
   return {
-    featureFlags: parsePlanFeatureFlags(plan.featureFlags),
-    limits: parsePlanLimits(plan.limits),
+    activeOverrides: overrides.filter(({ id }) => appliedOverrideIds.has(id)),
+    featureFlags,
+    limits,
     plan,
     subscription,
   };

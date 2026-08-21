@@ -5,8 +5,17 @@ import {
   MembershipRole,
   MembershipStatus,
   OrganizationStatus,
+  PlatformAlertStatus,
+  PlatformConfigurationStatus,
+  PlatformOperatorRole,
+  PlatformSupportCaseStatus,
+  ProductOrderStatus,
   SubscriptionStatus,
   type DatabaseClient,
+  type PlatformOverrideKind,
+  type PlatformPrivacyRequestStatus,
+  type PlatformPrivacyRequestType,
+  type PlatformSupportCasePriority,
 } from '@barber-saas/database';
 import {
   hasPermission,
@@ -122,15 +131,197 @@ const platformOrganizationActionSchema = z.discriminatedUnion('action', [
     planCode: z.string().trim().min(1).max(40),
     reason: z.string().trim().min(10).max(500),
   }),
+  z.object({
+    action: z.literal('extend_trial'),
+    days: z.number().int().min(1).max(90),
+    reason: z.string().trim().min(10).max(500),
+  }),
+  z.object({
+    action: z.literal('reduce_trial'),
+    days: z.number().int().min(1).max(90),
+    reason: z.string().trim().min(10).max(500),
+  }),
 ]);
+const platformOrganizationNoteSchema = z.object({
+  category: z.enum(['commercial', 'support']).default('commercial'),
+  note: z.string().trim().min(5).max(2000),
+});
 const platformSupportSchema = z.object({
   reason: z.string().trim().min(10).max(500),
 });
 const platformOrganizationFilterSchema = z.object({
   organizationId: z.uuid().optional(),
 });
+const platformNotificationParamsSchema = z.object({ id: z.uuid() });
+const platformNotificationRetrySchema = z.object({
+  channel: z.enum(['email', 'push']),
+  reason: z.string().trim().min(10).max(500),
+});
 const platformAccessCodeSchema = z.object({
   code: z.string().regex(/^\d{6}$/u),
+});
+const platformOperatorParamsSchema = z.object({ id: z.uuid() });
+const platformOperatorInputSchema = z.object({
+  email: z.email(),
+  isActive: z.boolean().default(true),
+  role: z.enum([
+    'super_admin',
+    'support',
+    'billing',
+    'operations',
+    'read_only',
+  ]),
+});
+const platformSessionParamsSchema = z.object({ id: z.uuid() });
+const platformCaseParamsSchema = z.object({ id: z.uuid() });
+const platformCaseListSchema = z.object({
+  organizationId: z.uuid().optional(),
+  status: z
+    .enum(['all', 'open', 'in_progress', 'waiting', 'closed'])
+    .default('all'),
+});
+const platformCaseCreateSchema = z.object({
+  category: z.string().trim().min(2).max(60),
+  description: z.string().trim().min(10).max(2000),
+  organizationId: z.uuid(),
+  priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
+  slaDueAt: z.iso.datetime().nullable().optional(),
+  title: z.string().trim().min(5).max(160),
+});
+const platformCaseUpdateSchema = z.object({
+  assignedToUserId: z.uuid().nullable().optional(),
+  note: z.string().trim().min(3).max(2000),
+  priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+  slaDueAt: z.iso.datetime().nullable().optional(),
+  status: z.enum(['open', 'in_progress', 'waiting', 'closed']).optional(),
+});
+const platformAlertListSchema = z.object({
+  organizationId: z.uuid().optional(),
+  status: z.enum(['all', 'open', 'acknowledged', 'resolved']).default('open'),
+});
+const platformAlertParamsSchema = z.object({ id: z.uuid() });
+const platformAlertActionSchema = z.object({
+  note: z.string().trim().min(5).max(500),
+  status: z.enum(['acknowledged', 'resolved']),
+});
+const platformAuditListSchema = z.object({
+  action: z.string().trim().max(100).optional(),
+  organizationId: z.uuid().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+});
+const platformOperationalListSchema = z.object({
+  organizationId: z.uuid().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+});
+const platformAuditExportSchema = z.object({
+  from: z.iso.datetime(),
+  organizationId: z.uuid().optional(),
+  to: z.iso.datetime(),
+});
+const platformPrivacyParamsSchema = z.object({ id: z.uuid() });
+const platformPrivacyListSchema = z.object({
+  status: z
+    .enum(['all', 'open', 'in_progress', 'completed', 'rejected'])
+    .default('all'),
+});
+const platformPrivacyCreateSchema = z
+  .object({
+    dueAt: z.iso.datetime().nullable().optional(),
+    organizationId: z.uuid().nullable().optional(),
+    reason: z.string().trim().min(10).max(1000),
+    subjectUserId: z.uuid().nullable().optional(),
+    type: z.enum(['data_export', 'deletion']),
+  })
+  .refine((value) => value.organizationId || value.subjectUserId, {
+    message: 'Debes indicar una organización o una persona solicitante.',
+  });
+const platformPrivacyUpdateSchema = z.object({
+  assignedToUserId: z.uuid().nullable().optional(),
+  resolutionNote: z.string().trim().min(5).max(1000),
+  status: z.enum(['open', 'in_progress', 'completed', 'rejected']),
+});
+const PLATFORM_FEATURE_KEYS = [
+  'commissions',
+  'inventory',
+  'multiLocation',
+  'publicBooking',
+  'reports',
+  'team',
+  'wallet',
+] as const;
+const PLATFORM_LIMIT_KEYS = [
+  'clients',
+  'locations',
+  'rolling30DayBookings',
+  'teamMembers',
+] as const;
+const platformOverrideParamsSchema = z.object({ id: z.uuid() });
+const platformOverrideListSchema = z.object({
+  organizationId: z.uuid().optional(),
+});
+const platformOverrideCreateSchema = z.discriminatedUnion('kind', [
+  z.object({
+    booleanValue: z.boolean(),
+    expiresAt: z.iso.datetime(),
+    key: z.enum(PLATFORM_FEATURE_KEYS),
+    kind: z.literal('feature'),
+    organizationId: z.uuid(),
+    reason: z.string().trim().min(10).max(500),
+  }),
+  z.object({
+    expiresAt: z.iso.datetime(),
+    integerValue: z.number().int().min(0).max(1_000_000).nullable(),
+    key: z.enum(PLATFORM_LIMIT_KEYS),
+    kind: z.literal('limit'),
+    organizationId: z.uuid(),
+    reason: z.string().trim().min(10).max(500),
+  }),
+]);
+const platformOverrideRevokeSchema = z.object({
+  reason: z.string().trim().min(10).max(500),
+});
+const platformReviewParamsSchema = z.object({ id: z.uuid() });
+const platformReviewActionSchema = z.object({
+  isVisible: z.boolean(),
+  reason: z.string().trim().min(10).max(500),
+});
+const platformPendingRegistrationParamsSchema = z.object({ id: z.uuid() });
+const platformVerificationResendSchema = z.object({
+  reason: z.string().trim().min(10).max(500),
+});
+const PLATFORM_CONFIGURATION_KEYS = [
+  'alerts.cash_open_hours',
+  'exports.retention_days',
+  'onboarding.abandoned_hours',
+  'support.default_sla_hours',
+] as const;
+const platformConfigurationParamsSchema = z.object({ id: z.uuid() });
+const platformConfigurationCreateSchema = z.discriminatedUnion('key', [
+  z.object({
+    key: z.literal('alerts.cash_open_hours'),
+    reason: z.string().trim().min(10).max(500),
+    value: z.object({ hours: z.number().int().min(1).max(720) }),
+  }),
+  z.object({
+    key: z.literal('exports.retention_days'),
+    reason: z.string().trim().min(10).max(500),
+    value: z.object({ days: z.number().int().min(1).max(90) }),
+  }),
+  z.object({
+    key: z.literal('onboarding.abandoned_hours'),
+    reason: z.string().trim().min(10).max(500),
+    value: z.object({ hours: z.number().int().min(1).max(2160) }),
+  }),
+  z.object({
+    key: z.literal('support.default_sla_hours'),
+    reason: z.string().trim().min(10).max(500),
+    value: z.object({ hours: z.number().int().min(1).max(720) }),
+  }),
+]);
+const platformConfigurationActionSchema = z.object({
+  reason: z.string().trim().min(10).max(500),
 });
 const PLATFORM_ACCESS_CODE_DURATION_MS = 5 * 60 * 1000;
 const PLATFORM_ACCESS_MAX_FAILED_ATTEMPTS = 5;
@@ -193,14 +384,23 @@ async function requirePlatformOperator(
 ) {
   const identity = await authenticate(database, request);
   const { user } = identity;
-  if (!configuredPlatformEmails(config).has(user.email.trim().toLowerCase())) {
+  const storedOperator = await database.platformOperator.findUnique({
+    where: { userId: user.id },
+  });
+  const bootstrapOperator = configuredPlatformEmails(config).has(
+    user.email.trim().toLowerCase(),
+  );
+  if (storedOperator ? !storedOperator.isActive : !bootstrapOperator) {
     throw new ApiError(
       403,
       'PLATFORM_ADMIN_REQUIRED',
       'Esta sección está reservada para operadores de plataforma.',
     );
   }
-  return identity;
+  return {
+    ...identity,
+    role: storedOperator?.role ?? PlatformOperatorRole.SUPER_ADMIN,
+  };
 }
 
 async function requirePlatformAdmin(
@@ -229,7 +429,97 @@ async function requirePlatformAdmin(
       'Confirma el código enviado a tu correo para acceder al panel.',
     );
   }
-  return identity.user;
+  return {
+    ...identity.user,
+    role: identity.role,
+    sessionId: identity.session.id,
+  };
+}
+
+type PlatformPermission =
+  | 'export'
+  | 'manage_billing'
+  | 'manage_operations'
+  | 'manage_operators'
+  | 'support'
+  | 'view';
+
+const PLATFORM_ROLE_PERMISSIONS: Readonly<
+  Record<PlatformOperatorRole, readonly PlatformPermission[]>
+> = {
+  BILLING: ['manage_billing', 'view'],
+  OPERATIONS: ['export', 'manage_operations', 'support', 'view'],
+  READ_ONLY: ['view'],
+  SUPER_ADMIN: [
+    'manage_billing',
+    'export',
+    'manage_operations',
+    'manage_operators',
+    'support',
+    'view',
+  ],
+  SUPPORT: ['export', 'support', 'view'],
+};
+
+function requirePlatformPermission(
+  role: PlatformOperatorRole,
+  permission: PlatformPermission,
+) {
+  if (!PLATFORM_ROLE_PERMISSIONS[role].includes(permission)) {
+    throw new ApiError(
+      403,
+      'PLATFORM_PERMISSION_REQUIRED',
+      'Tu rol de plataforma no permite realizar esta operación.',
+    );
+  }
+}
+
+function platformRole(value: string): PlatformOperatorRole {
+  return value.toUpperCase() as PlatformOperatorRole;
+}
+
+async function createPlatformAudit(
+  database: DatabaseClient,
+  input: {
+    readonly action: string;
+    readonly actorUserId?: string | null;
+    readonly afterData?: unknown;
+    readonly beforeData?: unknown;
+    readonly entityId?: string | null;
+    readonly entityType: string;
+    readonly metadata?: Record<string, unknown>;
+  },
+) {
+  await database.platformAuditLog.create({
+    data: {
+      action: input.action,
+      actorUserId: input.actorUserId ?? null,
+      afterData: input.afterData as never,
+      beforeData: input.beforeData as never,
+      entityId: input.entityId ?? null,
+      entityType: input.entityType,
+      metadata: (input.metadata ?? {}) as never,
+    },
+  });
+}
+
+async function publishedPlatformNumber(
+  database: DatabaseClient,
+  key: (typeof PLATFORM_CONFIGURATION_KEYS)[number],
+  field: 'days' | 'hours',
+  fallback: number,
+) {
+  const configuration = await database.platformConfigurationVersion.findFirst({
+    orderBy: { version: 'desc' },
+    select: { value: true },
+    where: { key, status: PlatformConfigurationStatus.PUBLISHED },
+  });
+  if (!configuration?.value || typeof configuration.value !== 'object')
+    return fallback;
+  const value = (configuration.value as Record<string, unknown>)[field];
+  return typeof value === 'number' && Number.isInteger(value) && value > 0
+    ? value
+    : fallback;
 }
 
 function notificationDeliveryFailures(value: unknown) {
@@ -239,13 +529,24 @@ function notificationDeliveryFailures(value: unknown) {
   return Object.entries(delivery as Record<string, unknown>).flatMap(
     ([channel, attempt]) => {
       if (!attempt || typeof attempt !== 'object') return [];
-      const record = attempt as { attempts?: unknown; state?: unknown };
+      const record = attempt as {
+        attempts?: unknown;
+        error?: unknown;
+        nextAttemptAt?: unknown;
+        state?: unknown;
+      };
       return record.state === 'failed'
         ? [
             {
               attempts:
                 typeof record.attempts === 'number' ? record.attempts : 0,
               channel,
+              error: typeof record.error === 'string' ? record.error : null,
+              nextAttemptAt:
+                typeof record.nextAttemptAt === 'string'
+                  ? record.nextAttemptAt
+                  : null,
+              state: 'failed' as const,
             },
           ]
         : [];
@@ -256,6 +557,195 @@ function notificationDeliveryFailures(value: unknown) {
 function maskedEmail(email: string) {
   const [name = '', domain = ''] = email.split('@');
   return `${name.slice(0, 2)}${'*'.repeat(Math.max(2, name.length - 2))}@${domain}`;
+}
+
+function maskedName(name: string) {
+  return name
+    .trim()
+    .split(/\s+/u)
+    .filter(Boolean)
+    .map((part) => `${part.slice(0, 1)}.`)
+    .join(' ');
+}
+
+function csvCell(value: unknown) {
+  const text = value === null || value === undefined ? '' : String(value);
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+async function refreshPlatformAlerts(
+  database: DatabaseClient,
+  now = new Date(),
+) {
+  const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const cashOpenHours = await publishedPlatformNumber(
+    database,
+    'alerts.cash_open_hours',
+    'hours',
+    24,
+  );
+  const staleCashThreshold = new Date(
+    now.getTime() - cashOpenHours * 60 * 60 * 1000,
+  );
+  const [
+    trials,
+    cashRegisters,
+    inventoryRows,
+    orders,
+    notificationRows,
+    breachedCases,
+  ] = await Promise.all([
+    database.subscription.findMany({
+      include: { organization: { select: { id: true, name: true } } },
+      where: {
+        status: SubscriptionStatus.TRIAL,
+        trialEndsAt: { gt: now, lte: nextWeek },
+      },
+    }),
+    database.cashRegisterSession.findMany({
+      where: {
+        openedAt: { lt: staleCashThreshold },
+        organizationId: { not: null },
+        status: CashRegisterStatus.OPEN,
+      },
+    }),
+    database.locationInventory.findMany({
+      include: {
+        location: { select: { name: true } },
+        product: {
+          select: {
+            isActive: true,
+            minimumStock: true,
+            name: true,
+            organization: { select: { id: true, name: true } },
+          },
+        },
+      },
+      where: { product: { isActive: true, stockTrackingEnabled: true } },
+    }),
+    database.productOrder.findMany({
+      include: { organization: { select: { id: true, name: true } } },
+      where: {
+        expiresAt: { lte: now },
+        status: {
+          in: [ProductOrderStatus.PENDING_PAYMENT, ProductOrderStatus.RESERVED],
+        },
+      },
+    }),
+    database.appNotification.findMany({
+      include: { organization: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    }),
+    database.platformSupportCase.findMany({
+      include: { organization: { select: { id: true, name: true } } },
+      where: {
+        slaDueAt: { lt: now },
+        status: { not: PlatformSupportCaseStatus.CLOSED },
+      },
+    }),
+  ]);
+  const organizationIds = [
+    ...new Set(
+      cashRegisters.flatMap((row) =>
+        row.organizationId ? [row.organizationId] : [],
+      ),
+    ),
+  ];
+  const cashOrganizations = await database.organization.findMany({
+    select: { id: true, name: true },
+    where: { id: { in: organizationIds } },
+  });
+  const organizationNames = new Map(
+    cashOrganizations.map((organization) => [
+      organization.id,
+      organization.name,
+    ]),
+  );
+  const candidates = [
+    ...trials.map((trial) => ({
+      detail: `El periodo de prueba vence el ${trial.trialEndsAt?.toISOString() ?? 'sin fecha'}.`,
+      fingerprint: `trial-ending:${trial.organizationId}`,
+      occurredAt: trial.trialEndsAt ?? now,
+      organizationId: trial.organizationId,
+      severity: 'warning',
+      title: `Trial próximo a vencer: ${trial.organization.name}`,
+      type: 'trial_ending',
+    })),
+    ...cashRegisters.flatMap((cash) =>
+      cash.organizationId
+        ? [
+            {
+              detail: `La caja permanece abierta desde ${cash.openedAt.toISOString()}.`,
+              fingerprint: `cash-open:${cash.id}`,
+              occurredAt: cash.openedAt,
+              organizationId: cash.organizationId,
+              severity: 'critical',
+              title: `Caja abierta por más de 24 h: ${organizationNames.get(cash.organizationId) ?? 'Organización'}`,
+              type: 'cash_open_too_long',
+            },
+          ]
+        : [],
+    ),
+    ...inventoryRows
+      .filter(
+        (row) =>
+          row.quantityOnHand - row.quantityReserved <= row.product.minimumStock,
+      )
+      .map((row) => ({
+        detail: `${row.product.name} tiene ${row.quantityOnHand - row.quantityReserved} unidades disponibles en ${row.location.name}.`,
+        fingerprint: `low-stock:${row.locationId}:${row.productId}`,
+        occurredAt: row.updatedAt,
+        organizationId: row.product.organization.id,
+        severity: 'warning',
+        title: `Stock crítico: ${row.product.organization.name}`,
+        type: 'low_stock',
+      })),
+    ...orders.map((order) => ({
+      detail: `El pedido ${order.id} venció sin completar su flujo.`,
+      fingerprint: `order-expired:${order.id}`,
+      occurredAt: order.expiresAt,
+      organizationId: order.organizationId,
+      severity: 'warning',
+      title: `Pedido pendiente vencido: ${order.organization.name}`,
+      type: 'order_expired_pending',
+    })),
+    ...notificationRows.flatMap((notification) =>
+      notificationDeliveryFailures(notification.data).map((failure) => ({
+        detail: `Canal ${failure.channel}; ${failure.attempts} intentos agotados.`,
+        fingerprint: `notification-failed:${notification.id}:${failure.channel}`,
+        occurredAt: notification.createdAt,
+        organizationId: notification.organizationId,
+        severity: failure.attempts >= 5 ? 'critical' : 'warning',
+        title: `Fallo de notificación: ${notification.organization.name}`,
+        type: 'notification_failed',
+      })),
+    ),
+    ...breachedCases.map((supportCase) => ({
+      detail: `La incidencia ${supportCase.title} superó su SLA el ${supportCase.slaDueAt?.toISOString() ?? 'sin fecha'}.`,
+      fingerprint: `support-sla-breached:${supportCase.id}`,
+      occurredAt: supportCase.slaDueAt ?? now,
+      organizationId: supportCase.organizationId,
+      severity: 'critical',
+      title: `SLA vencido: ${supportCase.organization.name}`,
+      type: 'support_sla_breached',
+    })),
+  ];
+  await Promise.all(
+    candidates.map((candidate) =>
+      database.platformAlert.upsert({
+        create: { ...candidate, status: PlatformAlertStatus.OPEN },
+        update: {
+          detail: candidate.detail,
+          occurredAt: candidate.occurredAt,
+          severity: candidate.severity,
+          title: candidate.title,
+        },
+        where: { fingerprint: candidate.fingerprint },
+      }),
+    ),
+  );
+  return candidates.length;
 }
 
 function permissionRole(role: MembershipRole): PermissionRole {
@@ -364,6 +854,9 @@ function registerPlatformRoutes(
   authenticate: Authenticate,
   config: ApiConfig,
   platformAccessMailer: PlatformAccessMailer | null,
+  resendPendingVerification: (
+    pendingRegistrationId: string,
+  ) => Promise<{ readonly verificationExpiresAt: string }>,
 ) {
   app.post('/v1/platform/development-session', async () => {
     if (config.PLATFORM_DEVELOPMENT_BYPASS !== 'true') {
@@ -405,7 +898,12 @@ function registerPlatformRoutes(
       });
     });
     return {
-      operator: { email: user.email, fullName: user.fullName, id: user.id },
+      operator: {
+        email: user.email,
+        fullName: user.fullName,
+        id: user.id,
+        role: PlatformOperatorRole.SUPER_ADMIN.toLowerCase(),
+      },
       session: { expiresAt: expiresAt.toISOString(), token },
     };
   });
@@ -413,18 +911,33 @@ function registerPlatformRoutes(
   app.post('/v1/platform/login', async (request) => {
     const input = signInSchema.parse(request.body);
     const email = input.email.trim().toLowerCase();
-    const passwordHash = config.PLATFORM_ADMIN_PASSWORD_HASH;
-    const authorized = configuredPlatformEmails(config).has(email);
-    const user = authorized
-      ? await database.user.findUnique({ where: { email } })
-      : null;
+    const user = await database.user.findUnique({
+      include: { platformOperator: true },
+      where: { email },
+    });
+    const authorized = user?.platformOperator
+      ? user.platformOperator.isActive
+      : configuredPlatformEmails(config).has(email);
+    const passwordHash = user?.platformOperator
+      ? user.passwordHash
+      : config.PLATFORM_ADMIN_PASSWORD_HASH;
     if (
+      !authorized ||
       !passwordHash ||
       !user ||
       user.deletedAt ||
       !user.emailVerifiedAt ||
       !(await verifyPassword(input.password, passwordHash))
     ) {
+      if (user) {
+        await createPlatformAudit(database, {
+          action: 'platform.login.failed',
+          actorUserId: user.id,
+          entityId: user.id,
+          entityType: 'platform_operator',
+          metadata: { reason: 'invalid_credentials_or_inactive' },
+        });
+      }
       throw new ApiError(
         401,
         'INVALID_PLATFORM_CREDENTIALS',
@@ -461,6 +974,12 @@ function registerPlatformRoutes(
           userId: user.id,
         },
       });
+    });
+    await createPlatformAudit(database, {
+      action: 'platform.login.challenge_requested',
+      actorUserId: user.id,
+      entityId: user.id,
+      entityType: 'platform_operator',
     });
     try {
       await platformAccessMailer.send({ code, email: user.email });
@@ -540,7 +1059,7 @@ function registerPlatformRoutes(
     const operator = await database.$transaction(async (transaction) => {
       const challenge =
         await transaction.platformAdminAccessChallenge.findUnique({
-          include: { user: true },
+          include: { user: { include: { platformOperator: true } } },
           where: { challengeTokenHash: hashOpaqueToken(challengeToken) },
         });
       if (!challenge) {
@@ -548,6 +1067,18 @@ function registerPlatformRoutes(
           401,
           'PLATFORM_ACCESS_CODE_REQUIRED',
           'Inicia sesión nuevamente para continuar.',
+        );
+      }
+      const authorized = challenge.user.platformOperator
+        ? challenge.user.platformOperator.isActive
+        : configuredPlatformEmails(config).has(
+            challenge.user.email.trim().toLowerCase(),
+          );
+      if (!authorized) {
+        throw new ApiError(
+          403,
+          'PLATFORM_ADMIN_REQUIRED',
+          'El acceso de este operador fue revocado.',
         );
       }
       if (challenge.usedAt) {
@@ -606,6 +1137,12 @@ function registerPlatformRoutes(
       });
       return challenge.user;
     });
+    await createPlatformAudit(database, {
+      action: 'platform.login.succeeded',
+      actorUserId: operator.id,
+      entityId: operator.id,
+      entityType: 'platform_operator',
+    });
     return {
       session: {
         expiresAt: sessionExpiresAt.toISOString(),
@@ -615,6 +1152,7 @@ function registerPlatformRoutes(
         email: operator.email,
         fullName: operator.fullName,
         id: operator.id,
+        role: operator.platformOperator?.role.toLowerCase() ?? 'super_admin',
       },
     };
   });
@@ -627,8 +1165,243 @@ function registerPlatformRoutes(
       config,
     );
     return {
-      operator: { email: user.email, fullName: user.fullName, id: user.id },
+      operator: {
+        email: user.email,
+        fullName: user.fullName,
+        id: user.id,
+        role: user.role.toLowerCase(),
+      },
     };
+  });
+
+  app.get('/v1/platform/operators', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'view');
+    const configuredEmails = [...configuredPlatformEmails(config)];
+    const [stored, bootstrapUsers] = await Promise.all([
+      database.platformOperator.findMany({
+        include: { user: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+      database.user.findMany({
+        where: { deletedAt: null, email: { in: configuredEmails } },
+      }),
+    ]);
+    const byUserId = new Map(
+      stored.map((entry) => [
+        entry.userId,
+        {
+          createdAt: entry.createdAt.toISOString(),
+          email: entry.user.email,
+          fullName: entry.user.fullName,
+          id: entry.id,
+          isActive: entry.isActive,
+          role: entry.role.toLowerCase(),
+          userId: entry.userId,
+        },
+      ]),
+    );
+    for (const user of bootstrapUsers) {
+      if (!byUserId.has(user.id)) {
+        byUserId.set(user.id, {
+          createdAt: user.createdAt.toISOString(),
+          email: user.email,
+          fullName: user.fullName,
+          id: `bootstrap:${user.id}`,
+          isActive: true,
+          role: 'super_admin',
+          userId: user.id,
+        });
+      }
+    }
+    return { operators: [...byUserId.values()] };
+  });
+
+  app.post('/v1/platform/operators', async (request, reply) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'manage_operators');
+    const input = platformOperatorInputSchema.parse(request.body);
+    const user = await database.user.findUnique({
+      where: { email: input.email.trim().toLowerCase() },
+    });
+    if (!user || user.deletedAt || !user.emailVerifiedAt) {
+      throw new ApiError(
+        404,
+        'PLATFORM_OPERATOR_USER_NOT_FOUND',
+        'El operador debe tener una cuenta verificada en Nava.',
+      );
+    }
+    const before = await database.platformOperator.findUnique({
+      where: { userId: user.id },
+    });
+    const saved = await database.platformOperator.upsert({
+      create: {
+        createdByUserId: operator.id,
+        isActive: input.isActive,
+        role: platformRole(input.role),
+        userId: user.id,
+      },
+      update: {
+        isActive: input.isActive,
+        role: platformRole(input.role),
+      },
+      where: { userId: user.id },
+    });
+    await createPlatformAudit(database, {
+      action: before
+        ? 'platform.operator.updated'
+        : 'platform.operator.created',
+      actorUserId: operator.id,
+      afterData: { isActive: saved.isActive, role: saved.role },
+      beforeData: before
+        ? { isActive: before.isActive, role: before.role }
+        : null,
+      entityId: saved.id,
+      entityType: 'platform_operator',
+      metadata: { targetUserId: user.id },
+    });
+    return reply.code(before ? 200 : 201).send({
+      operator: {
+        email: user.email,
+        fullName: user.fullName,
+        id: saved.id,
+        isActive: saved.isActive,
+        role: saved.role.toLowerCase(),
+        userId: user.id,
+      },
+    });
+  });
+
+  app.patch('/v1/platform/operators/:id', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'manage_operators');
+    const { id } = platformOperatorParamsSchema.parse(request.params);
+    const input = platformOperatorInputSchema
+      .omit({ email: true })
+      .parse(request.body);
+    const before = await database.platformOperator.findUnique({
+      where: { id },
+    });
+    if (!before) {
+      throw new ApiError(
+        404,
+        'PLATFORM_OPERATOR_NOT_FOUND',
+        'El operador no existe.',
+      );
+    }
+    if (before.userId === operator.id && !input.isActive) {
+      throw new ApiError(
+        409,
+        'PLATFORM_OPERATOR_SELF_DEACTIVATION',
+        'No puedes desactivar tu propio acceso.',
+      );
+    }
+    const saved = await database.platformOperator.update({
+      data: { isActive: input.isActive, role: platformRole(input.role) },
+      where: { id },
+    });
+    if (!saved.isActive) {
+      await database.session.updateMany({
+        data: { revokedAt: new Date() },
+        where: { revokedAt: null, userId: saved.userId },
+      });
+    }
+    await createPlatformAudit(database, {
+      action: 'platform.operator.updated',
+      actorUserId: operator.id,
+      afterData: { isActive: saved.isActive, role: saved.role },
+      beforeData: { isActive: before.isActive, role: before.role },
+      entityId: saved.id,
+      entityType: 'platform_operator',
+      metadata: { targetUserId: saved.userId },
+    });
+    return {
+      operator: {
+        id: saved.id,
+        isActive: saved.isActive,
+        role: saved.role.toLowerCase(),
+      },
+    };
+  });
+
+  app.get('/v1/platform/sessions', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    const canManageAll =
+      PLATFORM_ROLE_PERMISSIONS[operator.role].includes('manage_operators');
+    const sessions = await database.session.findMany({
+      include: { user: { select: { email: true, fullName: true } } },
+      orderBy: { lastActiveAt: 'desc' },
+      take: 100,
+      where: {
+        expiresAt: { gt: new Date() },
+        revokedAt: null,
+        ...(canManageAll ? {} : { userId: operator.id }),
+        platformAccessChallenges: { some: { verifiedAt: { not: null } } },
+      },
+    });
+    return {
+      sessions: sessions.map((session) => ({
+        createdAt: session.createdAt.toISOString(),
+        current: session.id === operator.sessionId,
+        expiresAt: session.expiresAt.toISOString(),
+        id: session.id,
+        lastActiveAt: session.lastActiveAt.toISOString(),
+        operator: session.user,
+      })),
+    };
+  });
+
+  app.delete('/v1/platform/sessions/:id', async (request, reply) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    const { id } = platformSessionParamsSchema.parse(request.params);
+    const session = await database.session.findUnique({ where: { id } });
+    if (!session) {
+      throw new ApiError(
+        404,
+        'PLATFORM_SESSION_NOT_FOUND',
+        'La sesión no existe.',
+      );
+    }
+    if (session.userId !== operator.id) {
+      requirePlatformPermission(operator.role, 'manage_operators');
+    }
+    await database.session.update({
+      data: { revokedAt: new Date() },
+      where: { id },
+    });
+    await createPlatformAudit(database, {
+      action: 'platform.session.revoked',
+      actorUserId: operator.id,
+      entityId: id,
+      entityType: 'session',
+      metadata: { targetUserId: session.userId },
+    });
+    return reply.code(204).send();
   });
 
   app.get('/v1/platform/overview', async (request) => {
@@ -788,6 +1561,263 @@ function registerPlatformRoutes(
     };
   });
 
+  app.get('/v1/platform/organizations/:id', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'view');
+    const { id } = platformOrganizationParamsSchema.parse(request.params);
+    const organization = await database.organization.findFirst({
+      include: {
+        locations: {
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, isActive: true, name: true, timezone: true },
+        },
+        memberships: {
+          include: { user: { select: { email: true, fullName: true } } },
+          orderBy: { createdAt: 'asc' },
+          where: { role: MembershipRole.OWNER },
+        },
+        payphoneConfiguration: {
+          select: {
+            connectionStatus: true,
+            environment: true,
+            isEnabled: true,
+            lastErrorCode: true,
+            lastTestedAt: true,
+          },
+        },
+        subscription: { include: { plan: true } },
+      },
+      where: { deletedAt: null, id },
+    });
+    if (!organization) {
+      throw new ApiError(
+        404,
+        'ORGANIZATION_NOT_FOUND',
+        'La organización no existe.',
+      );
+    }
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const [
+      usage,
+      appointmentsByStatus,
+      ordersByStatus,
+      openCashRegisters,
+      pendingSettlements,
+      inventoryRows,
+      notificationRows,
+      recentAudit,
+      supportCases,
+      subscriptionHistory,
+      commercialNotes,
+    ] = await Promise.all([
+      getSubscriptionUsage(database, id),
+      database.appointment.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+        where: { createdAt: { gte: thirtyDaysAgo }, organizationId: id },
+      }),
+      database.productOrder.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+        where: { createdAt: { gte: thirtyDaysAgo }, organizationId: id },
+      }),
+      database.cashRegisterSession.count({
+        where: { organizationId: id, status: CashRegisterStatus.OPEN },
+      }),
+      database.commissionSettlement.count({
+        where: {
+          organizationId: id,
+          status: { in: ['DRAFT', 'APPROVED'] },
+        },
+      }),
+      database.locationInventory.findMany({
+        include: { product: { select: { minimumStock: true } } },
+        where: { product: { isActive: true, organizationId: id } },
+      }),
+      database.appNotification.findMany({
+        orderBy: { createdAt: 'desc' },
+        select: { data: true },
+        take: 200,
+        where: { organizationId: id },
+      }),
+      database.auditLog.findMany({
+        orderBy: { createdAt: 'desc' },
+        select: {
+          action: true,
+          actor: { select: { fullName: true } },
+          createdAt: true,
+          entityType: true,
+          id: true,
+        },
+        take: 15,
+        where: { organizationId: id },
+      }),
+      database.platformSupportCase.count({
+        where: {
+          organizationId: id,
+          status: { not: PlatformSupportCaseStatus.CLOSED },
+        },
+      }),
+      database.platformAuditLog.findMany({
+        include: { actor: { select: { fullName: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        where: {
+          action: {
+            in: [
+              'platform.organization.change_plan',
+              'platform.organization.reactivate',
+              'platform.organization.suspend',
+              'platform.organization.extend_trial',
+              'platform.organization.reduce_trial',
+            ],
+          },
+          entityId: id,
+        },
+      }),
+      database.platformOrganizationNote.findMany({
+        include: { createdBy: { select: { fullName: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 30,
+        where: { organizationId: id },
+      }),
+    ]);
+    const owner = organization.memberships[0]?.user;
+    return {
+      activity: {
+        appointmentsLast30Days: Object.fromEntries(
+          appointmentsByStatus.map((row) => [
+            row.status.toLowerCase(),
+            row._count._all,
+          ]),
+        ),
+        ordersLast30Days: Object.fromEntries(
+          ordersByStatus.map((row) => [
+            row.status.toLowerCase(),
+            row._count._all,
+          ]),
+        ),
+        recentAudit: recentAudit.map((entry) => ({
+          ...entry,
+          actor: entry.actor?.fullName ?? null,
+          createdAt: entry.createdAt.toISOString(),
+        })),
+      },
+      health: {
+        lowStockItems: inventoryRows.filter(
+          (row) =>
+            row.quantityOnHand - row.quantityReserved <=
+            row.product.minimumStock,
+        ).length,
+        notificationFailures: notificationRows.reduce(
+          (total, row) => total + notificationDeliveryFailures(row.data).length,
+          0,
+        ),
+        openCashRegisters,
+        openSupportCases: supportCases,
+        pendingCommissionSettlements: pendingSettlements,
+      },
+      notes: commercialNotes.map((note) => ({
+        category: note.category,
+        createdAt: note.createdAt.toISOString(),
+        createdBy: note.createdBy?.fullName ?? 'Sistema',
+        id: note.id,
+        note: note.note,
+      })),
+      organization: {
+        createdAt: organization.createdAt.toISOString(),
+        currencyCode: organization.currencyCode,
+        defaultTimezone: organization.defaultTimezone,
+        id: organization.id,
+        locations: organization.locations,
+        name: organization.name,
+        owner: owner
+          ? { email: maskedEmail(owner.email), fullName: owner.fullName }
+          : null,
+        slug: organization.slug,
+        status: organization.status.toLowerCase(),
+      },
+      payphone: organization.payphoneConfiguration
+        ? {
+            ...organization.payphoneConfiguration,
+            connectionStatus:
+              organization.payphoneConfiguration.connectionStatus.toLowerCase(),
+            environment:
+              organization.payphoneConfiguration.environment.toLowerCase(),
+            lastTestedAt:
+              organization.payphoneConfiguration.lastTestedAt?.toISOString() ??
+              null,
+          }
+        : null,
+      subscription: {
+        currentPeriodEnd: usage.subscription.currentPeriodEnd.toISOString(),
+        currentPeriodStart: usage.subscription.currentPeriodStart.toISOString(),
+        effectiveBookingLimit: usage.effectiveBookingLimit,
+        features: usage.featureFlags,
+        graceEndsAt: usage.subscription.graceEndsAt?.toISOString() ?? null,
+        history: subscriptionHistory.map((entry) => ({
+          action: entry.action,
+          actor: entry.actor?.fullName ?? 'Sistema',
+          createdAt: entry.createdAt.toISOString(),
+          id: entry.id,
+          metadata: entry.metadata,
+        })),
+        limits: usage.limits,
+        plan: usage.plan.code,
+        status: usage.subscription.status.toLowerCase(),
+        trialEndsAt: usage.subscription.trialEndsAt?.toISOString() ?? null,
+        usage: usage.usage,
+      },
+    };
+  });
+
+  app.post('/v1/platform/organizations/:id/notes', async (request, reply) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    const { id } = platformOrganizationParamsSchema.parse(request.params);
+    const input = platformOrganizationNoteSchema.parse(request.body);
+    requirePlatformPermission(
+      operator.role,
+      input.category === 'commercial' ? 'manage_billing' : 'support',
+    );
+    const organization = await database.organization.findFirst({
+      select: { id: true },
+      where: { deletedAt: null, id },
+    });
+    if (!organization)
+      throw new ApiError(
+        404,
+        'ORGANIZATION_NOT_FOUND',
+        'La organización no existe.',
+      );
+    const note = await database.platformOrganizationNote.create({
+      data: {
+        category: input.category,
+        createdByUserId: operator.id,
+        note: input.note,
+        organizationId: id,
+      },
+    });
+    await createPlatformAudit(database, {
+      action: 'platform.organization.note_created',
+      actorUserId: operator.id,
+      afterData: { category: note.category },
+      entityId: note.id,
+      entityType: 'organization_note',
+      metadata: { organizationId: id, reason: input.note },
+    });
+    return reply.code(201).send({ id: note.id });
+  });
+
   app.get('/v1/platform/notification-errors', async (request) => {
     await requirePlatformAdmin(database, authenticate, request, config);
     const query = platformOrganizationFilterSchema.parse(request.query);
@@ -815,23 +1845,1665 @@ function registerPlatformRoutes(
     };
   });
 
-  app.get('/v1/platform/audit', async (request) => {
-    await requirePlatformAdmin(database, authenticate, request, config);
-    const query = platformOrganizationFilterSchema.parse(request.query);
-    const logs = await database.auditLog.findMany({
-      include: {
-        actor: { select: { email: true, fullName: true } },
-        organization: { select: { name: true } },
+  app.post('/v1/platform/notifications/:id/retry', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'manage_operations');
+    const { id } = platformNotificationParamsSchema.parse(request.params);
+    const input = platformNotificationRetrySchema.parse(request.body);
+    const notification = await database.appNotification.findUnique({
+      where: { id },
+    });
+    if (!notification) {
+      throw new ApiError(
+        404,
+        'PLATFORM_NOTIFICATION_NOT_FOUND',
+        'La notificación no existe.',
+      );
+    }
+    const data =
+      notification.data && typeof notification.data === 'object'
+        ? (notification.data as Record<string, unknown>)
+        : {};
+    const delivery =
+      data.delivery && typeof data.delivery === 'object'
+        ? (data.delivery as Record<string, unknown>)
+        : {};
+    const attempt = delivery[input.channel];
+    if (
+      !attempt ||
+      typeof attempt !== 'object' ||
+      (attempt as { state?: unknown }).state !== 'failed'
+    ) {
+      throw new ApiError(
+        409,
+        'PLATFORM_NOTIFICATION_NOT_FAILED',
+        'Ese canal no tiene una entrega fallida pendiente de reintento.',
+      );
+    }
+    await database.appNotification.update({
+      data: {
+        data: {
+          ...data,
+          delivery: {
+            ...delivery,
+            [input.channel]: { attempts: 0, state: 'pending' },
+          },
+        } as never,
       },
-      orderBy: { createdAt: 'desc' },
+      where: { id },
+    });
+    await createPlatformAudit(database, {
+      action: 'platform.notification.retry_requested',
+      actorUserId: operator.id,
+      entityId: id,
+      entityType: 'app_notification',
+      metadata: {
+        channel: input.channel,
+        organizationId: notification.organizationId,
+        reason: input.reason,
+      },
+    });
+    return { id, queued: true };
+  });
+
+  app.get('/v1/platform/support-cases', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'support');
+    const query = platformCaseListSchema.parse(request.query);
+    const cases = await database.platformSupportCase.findMany({
+      include: {
+        assignedTo: { select: { fullName: true, id: true } },
+        createdBy: { select: { fullName: true, id: true } },
+        events: {
+          include: { actor: { select: { fullName: true } } },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        },
+        organization: { select: { id: true, name: true } },
+      },
+      orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }],
       take: 100,
       where: {
-        action: { startsWith: 'platform.' },
         ...(query.organizationId
           ? { organizationId: query.organizationId }
           : {}),
+        ...(query.status === 'all'
+          ? {}
+          : {
+              status: query.status.toUpperCase() as PlatformSupportCaseStatus,
+            }),
       },
     });
+    const supportOperators = await database.platformOperator.findMany({
+      include: { user: { select: { fullName: true, id: true } } },
+      orderBy: { user: { fullName: 'asc' } },
+      where: {
+        isActive: true,
+        role: {
+          in: [
+            PlatformOperatorRole.SUPER_ADMIN,
+            PlatformOperatorRole.OPERATIONS,
+            PlatformOperatorRole.SUPPORT,
+          ],
+        },
+      },
+    });
+    const now = new Date();
+    return {
+      cases: cases.map((supportCase) => ({
+        ...supportCase,
+        createdAt: supportCase.createdAt.toISOString(),
+        events: supportCase.events.map((event) => ({
+          ...event,
+          createdAt: event.createdAt.toISOString(),
+        })),
+        priority: supportCase.priority.toLowerCase(),
+        sla: supportCase.slaDueAt
+          ? (() => {
+              const reference = supportCase.closedAt ?? now;
+              const differenceMinutes = Math.round(
+                (supportCase.slaDueAt.getTime() - reference.getTime()) / 60_000,
+              );
+              return {
+                breachedByMinutes: Math.max(0, -differenceMinutes),
+                remainingMinutes: Math.max(0, differenceMinutes),
+                state:
+                  differenceMinutes < 0
+                    ? 'breached'
+                    : supportCase.closedAt
+                      ? 'met'
+                      : 'running',
+              };
+            })()
+          : { breachedByMinutes: 0, remainingMinutes: 0, state: 'no_due' },
+        slaDueAt: supportCase.slaDueAt?.toISOString() ?? null,
+        status: supportCase.status.toLowerCase(),
+        updatedAt: supportCase.updatedAt.toISOString(),
+      })),
+      operators: supportOperators.map(({ user }) => user),
+      summary: {
+        breached: cases.filter(
+          ({ closedAt, slaDueAt }) =>
+            slaDueAt !== null && (closedAt ?? now) > slaDueAt,
+        ).length,
+        open: cases.filter(
+          ({ status }) => status !== PlatformSupportCaseStatus.CLOSED,
+        ).length,
+      },
+    };
+  });
+
+  app.post('/v1/platform/support-cases', async (request, reply) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'support');
+    const input = platformCaseCreateSchema.parse(request.body);
+    const organization = await database.organization.findFirst({
+      where: { deletedAt: null, id: input.organizationId },
+    });
+    if (!organization) {
+      throw new ApiError(
+        404,
+        'ORGANIZATION_NOT_FOUND',
+        'La organización no existe.',
+      );
+    }
+    const defaultSlaHours = await publishedPlatformNumber(
+      database,
+      'support.default_sla_hours',
+      'hours',
+      24,
+    );
+    const supportCase = await database.platformSupportCase.create({
+      data: {
+        assignedToUserId: operator.id,
+        category: input.category,
+        createdByUserId: operator.id,
+        description: input.description,
+        organizationId: input.organizationId,
+        priority: input.priority.toUpperCase() as PlatformSupportCasePriority,
+        slaDueAt: input.slaDueAt
+          ? new Date(input.slaDueAt)
+          : new Date(Date.now() + defaultSlaHours * 60 * 60 * 1000),
+        title: input.title,
+        events: {
+          create: {
+            actorUserId: operator.id,
+            note: input.description,
+            type: 'created',
+          },
+        },
+      },
+    });
+    await createPlatformAudit(database, {
+      action: 'platform.support_case.created',
+      actorUserId: operator.id,
+      afterData: { priority: supportCase.priority, status: supportCase.status },
+      entityId: supportCase.id,
+      entityType: 'support_case',
+      metadata: { organizationId: input.organizationId },
+    });
+    return reply.code(201).send({ id: supportCase.id });
+  });
+
+  app.patch('/v1/platform/support-cases/:id', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'support');
+    const { id } = platformCaseParamsSchema.parse(request.params);
+    const input = platformCaseUpdateSchema.parse(request.body);
+    const before = await database.platformSupportCase.findUnique({
+      where: { id },
+    });
+    if (!before) {
+      throw new ApiError(
+        404,
+        'PLATFORM_SUPPORT_CASE_NOT_FOUND',
+        'La incidencia no existe.',
+      );
+    }
+    if (input.assignedToUserId) {
+      const assignee = await database.platformOperator.findUnique({
+        where: { userId: input.assignedToUserId },
+      });
+      if (!assignee?.isActive) {
+        throw new ApiError(
+          400,
+          'PLATFORM_ASSIGNEE_INVALID',
+          'El responsable no es un operador activo.',
+        );
+      }
+    }
+    const status = input.status
+      ? (input.status.toUpperCase() as PlatformSupportCaseStatus)
+      : before.status;
+    const saved = await database.$transaction(async (transaction) => {
+      const updated = await transaction.platformSupportCase.update({
+        data: {
+          ...(input.assignedToUserId !== undefined
+            ? { assignedToUserId: input.assignedToUserId }
+            : {}),
+          ...(input.priority
+            ? {
+                priority:
+                  input.priority.toUpperCase() as PlatformSupportCasePriority,
+              }
+            : {}),
+          ...(input.status ? { status } : {}),
+          ...(input.slaDueAt !== undefined
+            ? {
+                slaDueAt: input.slaDueAt ? new Date(input.slaDueAt) : null,
+              }
+            : {}),
+          closedAt:
+            status === PlatformSupportCaseStatus.CLOSED
+              ? (before.closedAt ?? new Date())
+              : null,
+        },
+        where: { id },
+      });
+      await transaction.platformSupportCaseEvent.create({
+        data: {
+          actorUserId: operator.id,
+          caseId: id,
+          metadata: {
+            assignedToUserId: input.assignedToUserId,
+            priority: input.priority,
+            slaDueAt: input.slaDueAt,
+            status: input.status,
+          },
+          note: input.note,
+          type: input.status ? 'status_changed' : 'note_added',
+        },
+      });
+      return updated;
+    });
+    await createPlatformAudit(database, {
+      action: 'platform.support_case.updated',
+      actorUserId: operator.id,
+      afterData: {
+        assignedToUserId: saved.assignedToUserId,
+        priority: saved.priority,
+        slaDueAt: saved.slaDueAt,
+        status: saved.status,
+      },
+      beforeData: {
+        assignedToUserId: before.assignedToUserId,
+        priority: before.priority,
+        slaDueAt: before.slaDueAt,
+        status: before.status,
+      },
+      entityId: saved.id,
+      entityType: 'support_case',
+      metadata: { organizationId: saved.organizationId },
+    });
+    return { id: saved.id, status: saved.status.toLowerCase() };
+  });
+
+  app.get('/v1/platform/alerts', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'view');
+    const query = platformAlertListSchema.parse(request.query);
+    await refreshPlatformAlerts(database);
+    const alerts = await database.platformAlert.findMany({
+      include: { organization: { select: { id: true, name: true } } },
+      orderBy: [{ status: 'asc' }, { occurredAt: 'desc' }],
+      take: 200,
+      where: {
+        ...(query.organizationId
+          ? { organizationId: query.organizationId }
+          : {}),
+        ...(query.status === 'all'
+          ? {}
+          : { status: query.status.toUpperCase() as PlatformAlertStatus }),
+      },
+    });
+    return {
+      alerts: alerts.map((alert) => ({
+        ...alert,
+        actedAt: alert.actedAt?.toISOString() ?? null,
+        occurredAt: alert.occurredAt.toISOString(),
+        status: alert.status.toLowerCase(),
+      })),
+    };
+  });
+
+  app.patch('/v1/platform/alerts/:id', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'manage_operations');
+    const { id } = platformAlertParamsSchema.parse(request.params);
+    const input = platformAlertActionSchema.parse(request.body);
+    const before = await database.platformAlert.findUnique({ where: { id } });
+    if (!before) {
+      throw new ApiError(
+        404,
+        'PLATFORM_ALERT_NOT_FOUND',
+        'La alerta no existe.',
+      );
+    }
+    const saved = await database.platformAlert.update({
+      data: {
+        actedAt: new Date(),
+        actedByUserId: operator.id,
+        resolutionNote: input.note,
+        status: input.status.toUpperCase() as PlatformAlertStatus,
+      },
+      where: { id },
+    });
+    await createPlatformAudit(database, {
+      action: `platform.alert.${input.status}`,
+      actorUserId: operator.id,
+      afterData: { status: saved.status },
+      beforeData: { status: before.status },
+      entityId: saved.id,
+      entityType: 'platform_alert',
+      metadata: { organizationId: saved.organizationId, reason: input.note },
+    });
+    return { id: saved.id, status: saved.status.toLowerCase() };
+  });
+
+  app.get('/v1/platform/system-health', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'view');
+    const now = new Date();
+    const [databaseProbe, pendingNotifications, openCases, openAlerts] =
+      await Promise.all([
+        database.organization.count(),
+        database.appNotification.findMany({
+          orderBy: { createdAt: 'desc' },
+          select: { data: true },
+          take: 500,
+        }),
+        database.platformSupportCase.count({
+          where: { status: { not: PlatformSupportCaseStatus.CLOSED } },
+        }),
+        database.platformAlert.count({
+          where: { status: PlatformAlertStatus.OPEN },
+        }),
+      ]);
+    return {
+      checkedAt: now.toISOString(),
+      components: {
+        api: { status: 'operational' },
+        database: { organizations: databaseProbe, status: 'operational' },
+        notifications: {
+          failures: pendingNotifications.reduce(
+            (total, row) =>
+              total + notificationDeliveryFailures(row.data).length,
+            0,
+          ),
+          status: 'observed',
+        },
+      },
+      openAlerts,
+      openSupportCases: openCases,
+    };
+  });
+
+  app.get('/v1/platform/bookings', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'view');
+    const query = platformOperationalListSchema.parse(request.query);
+    const where = query.organizationId
+      ? { organizationId: query.organizationId }
+      : {};
+    const [total, appointments] = await Promise.all([
+      database.appointment.count({ where }),
+      database.appointment.findMany({
+        include: {
+          location: { select: { id: true, name: true } },
+          organization: { select: { id: true, name: true } },
+        },
+        orderBy: { startsAt: 'desc' },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+      }),
+    ]);
+    return {
+      bookings: appointments.map((appointment) => ({
+        createdAt: appointment.createdAt.toISOString(),
+        endsAt: appointment.endsAt.toISOString(),
+        id: appointment.id,
+        location: appointment.location,
+        organization: appointment.organization,
+        paymentStatus: appointment.paymentStatus.toLowerCase(),
+        source: appointment.source.toLowerCase(),
+        startsAt: appointment.startsAt.toISOString(),
+        status: appointment.status.toLowerCase(),
+      })),
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+      },
+    };
+  });
+
+  app.get('/v1/platform/orders', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'view');
+    const query = platformOperationalListSchema.parse(request.query);
+    const where = query.organizationId
+      ? { organizationId: query.organizationId }
+      : {};
+    const [total, orders] = await Promise.all([
+      database.productOrder.count({ where }),
+      database.productOrder.findMany({
+        include: {
+          location: { select: { id: true, name: true } },
+          organization: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+      }),
+    ]);
+    return {
+      orders: orders.map((order) => ({
+        createdAt: order.createdAt.toISOString(),
+        currencyCode: order.currencyCode,
+        expiresAt: order.expiresAt.toISOString(),
+        id: order.id,
+        location: order.location,
+        organization: order.organization,
+        paymentMethod: order.paymentMethod.toLowerCase(),
+        status: order.status.toLowerCase(),
+        totalCents: order.totalCents,
+      })),
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+      },
+    };
+  });
+
+  app.get('/v1/platform/cash-health', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'view');
+    const query = platformOperationalListSchema.parse(request.query);
+    const where = query.organizationId
+      ? { organizationId: query.organizationId }
+      : {};
+    const [total, sessions] = await Promise.all([
+      database.cashRegisterSession.count({ where }),
+      database.cashRegisterSession.findMany({
+        orderBy: { openedAt: 'desc' },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+      }),
+    ]);
+    const organizationIds = sessions.flatMap((session) =>
+      session.organizationId ? [session.organizationId] : [],
+    );
+    const organizations = await database.organization.findMany({
+      select: { id: true, name: true },
+      where: { id: { in: organizationIds } },
+    });
+    const names = new Map(
+      organizations.map((organization) => [organization.id, organization.name]),
+    );
+    return {
+      sessions: sessions.map((session) => ({
+        closedAt: session.closedAt?.toISOString() ?? null,
+        differenceCents: session.differenceCents,
+        expectedAmountCents: session.expectedAmountCents,
+        id: session.id,
+        openedAt: session.openedAt.toISOString(),
+        organization: session.organizationId
+          ? {
+              id: session.organizationId,
+              name: names.get(session.organizationId) ?? 'Organización',
+            }
+          : null,
+        status: session.status.toLowerCase(),
+      })),
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+      },
+    };
+  });
+
+  app.get('/v1/platform/commissions-health', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'view');
+    const query = platformOperationalListSchema.parse(request.query);
+    const where = query.organizationId
+      ? { organizationId: query.organizationId }
+      : {};
+    const [total, settlements] = await Promise.all([
+      database.commissionSettlement.count({ where }),
+      database.commissionSettlement.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+      }),
+    ]);
+    const organizations = await database.organization.findMany({
+      select: { id: true, name: true },
+      where: {
+        id: { in: settlements.map((settlement) => settlement.organizationId) },
+      },
+    });
+    const names = new Map(
+      organizations.map((organization) => [organization.id, organization.name]),
+    );
+    return {
+      settlements: settlements.map((settlement) => ({
+        commissionAmountCents: settlement.commissionAmountCents,
+        createdAt: settlement.createdAt.toISOString(),
+        id: settlement.id,
+        organization: {
+          id: settlement.organizationId,
+          name: names.get(settlement.organizationId) ?? 'Organización',
+        },
+        periodEnd: settlement.periodEnd.toISOString(),
+        periodStart: settlement.periodStart.toISOString(),
+        status: settlement.status.toLowerCase(),
+        totalPayableCents: settlement.totalPayableCents,
+      })),
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+      },
+    };
+  });
+
+  app.get('/v1/platform/inventory-health', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'view');
+    const query = platformOperationalListSchema.parse(request.query);
+    const where = query.organizationId
+      ? { product: { isActive: true, organizationId: query.organizationId } }
+      : { product: { isActive: true } };
+    const [total, rows] = await Promise.all([
+      database.locationInventory.count({ where }),
+      database.locationInventory.findMany({
+        include: {
+          location: { select: { id: true, name: true } },
+          product: {
+            select: {
+              id: true,
+              minimumStock: true,
+              name: true,
+              organization: { select: { id: true, name: true } },
+              sku: true,
+            },
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+      }),
+    ]);
+    return {
+      inventory: rows.map((row) => ({
+        available: row.quantityOnHand - row.quantityReserved,
+        location: row.location,
+        lowStock:
+          row.quantityOnHand - row.quantityReserved <= row.product.minimumStock,
+        minimumStock: row.product.minimumStock,
+        organization: row.product.organization,
+        product: {
+          id: row.product.id,
+          name: row.product.name,
+          sku: row.product.sku,
+        },
+        quantityOnHand: row.quantityOnHand,
+        quantityReserved: row.quantityReserved,
+        updatedAt: row.updatedAt.toISOString(),
+      })),
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+      },
+    };
+  });
+
+  app.get('/v1/platform/payphone-health', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'view');
+    const query = platformOperationalListSchema.parse(request.query);
+    const configurations = await database.payphoneConfiguration.findMany({
+      include: { organization: { select: { id: true, name: true } } },
+      orderBy: { updatedAt: 'desc' },
+      skip: (query.page - 1) * query.pageSize,
+      take: query.pageSize,
+      where: query.organizationId
+        ? { organizationId: query.organizationId }
+        : {},
+    });
+    const total = await database.payphoneConfiguration.count({
+      where: query.organizationId
+        ? { organizationId: query.organizationId }
+        : {},
+    });
+    return {
+      configurations: configurations.map((configuration) => ({
+        connectionStatus: configuration.connectionStatus.toLowerCase(),
+        environment: configuration.environment.toLowerCase(),
+        id: configuration.id,
+        isEnabled: configuration.isEnabled,
+        lastErrorCode: configuration.lastErrorCode,
+        lastTestedAt: configuration.lastTestedAt?.toISOString() ?? null,
+        organization: configuration.organization,
+        updatedAt: configuration.updatedAt.toISOString(),
+      })),
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+      },
+    };
+  });
+
+  app.get('/v1/platform/exports/audit.csv', async (request, reply) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'export');
+    const query = platformAuditExportSchema.parse(request.query);
+    const exportRetentionDays = await publishedPlatformNumber(
+      database,
+      'exports.retention_days',
+      'days',
+      7,
+    );
+    await database.platformExport.deleteMany({
+      where: { expiresAt: { lt: new Date() } },
+    });
+    const from = new Date(query.from);
+    const to = new Date(query.to);
+    const maximumRangeMs = 31 * 24 * 60 * 60 * 1000;
+    if (to <= from || to.getTime() - from.getTime() > maximumRangeMs) {
+      throw new ApiError(
+        400,
+        'PLATFORM_EXPORT_RANGE_INVALID',
+        'La exportación debe cubrir un periodo mayor a cero y de hasta 31 días.',
+      );
+    }
+    const logs = await database.platformAuditLog.findMany({
+      include: { actor: { select: { email: true, fullName: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 5_000,
+      where: {
+        createdAt: { gte: from, lte: to },
+        ...(query.organizationId
+          ? {
+              metadata: {
+                path: ['organizationId'],
+                equals: query.organizationId,
+              },
+            }
+          : {}),
+      },
+    });
+    const organizationIds = logs.flatMap((log) => {
+      const metadata = log.metadata as { organizationId?: unknown };
+      return typeof metadata.organizationId === 'string'
+        ? [metadata.organizationId]
+        : [];
+    });
+    const organizations = await database.organization.findMany({
+      select: { id: true, name: true },
+      where: { id: { in: organizationIds } },
+    });
+    const organizationNames = new Map(
+      organizations.map((organization) => [organization.id, organization.name]),
+    );
+    const rows = logs.map((log) => {
+      const metadata = log.metadata as {
+        organizationId?: unknown;
+        reason?: unknown;
+      };
+      const organizationId =
+        typeof metadata.organizationId === 'string'
+          ? metadata.organizationId
+          : null;
+      return [
+        log.createdAt.toISOString(),
+        log.action,
+        log.entityType,
+        log.entityId,
+        log.actor?.fullName ?? 'Sistema',
+        log.actor?.email ?? '',
+        organizationId
+          ? (organizationNames.get(organizationId) ?? organizationId)
+          : 'Plataforma Nava',
+        typeof metadata.reason === 'string' ? metadata.reason : '',
+      ]
+        .map(csvCell)
+        .join(',');
+    });
+    const exportRecord = await database.platformExport.create({
+      data: {
+        expiresAt: new Date(
+          Date.now() + exportRetentionDays * 24 * 60 * 60 * 1000,
+        ),
+        filters: {
+          from: from.toISOString(),
+          organizationId: query.organizationId ?? null,
+          to: to.toISOString(),
+        },
+        format: 'csv',
+        requestedByUserId: operator.id,
+        rowCount: logs.length,
+        type: 'platform_audit',
+      },
+    });
+    await createPlatformAudit(database, {
+      action: 'platform.export.downloaded',
+      actorUserId: operator.id,
+      entityId: exportRecord.id,
+      entityType: 'platform_export',
+      metadata: {
+        from: from.toISOString(),
+        organizationId: query.organizationId ?? null,
+        rowCount: logs.length,
+        to: to.toISOString(),
+      },
+    });
+    const csv = [
+      'fecha,accion,entidad,entidad_id,operador,correo_operador,organizacion,motivo',
+      ...rows,
+    ].join('\r\n');
+    return reply
+      .header('cache-control', 'no-store')
+      .header(
+        'content-disposition',
+        `attachment; filename="nava-auditoria-${from.toISOString().slice(0, 10)}-${to.toISOString().slice(0, 10)}.csv"`,
+      )
+      .type('text/csv; charset=utf-8')
+      .send(`\uFEFF${csv}`);
+  });
+
+  app.get('/v1/platform/privacy-requests', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'support');
+    const query = platformPrivacyListSchema.parse(request.query);
+    const requests = await database.platformPrivacyRequest.findMany({
+      include: {
+        assignedTo: { select: { fullName: true, id: true } },
+        organization: { select: { id: true, name: true } },
+        subject: { select: { email: true, fullName: true, id: true } },
+      },
+      orderBy: [{ status: 'asc' }, { dueAt: 'asc' }, { createdAt: 'desc' }],
+      take: 200,
+      where:
+        query.status === 'all'
+          ? {}
+          : {
+              status:
+                query.status.toUpperCase() as PlatformPrivacyRequestStatus,
+            },
+    });
+    return {
+      requests: requests.map((privacyRequest) => ({
+        assignedTo: privacyRequest.assignedTo,
+        completedAt: privacyRequest.completedAt?.toISOString() ?? null,
+        createdAt: privacyRequest.createdAt.toISOString(),
+        dueAt: privacyRequest.dueAt?.toISOString() ?? null,
+        id: privacyRequest.id,
+        organization: privacyRequest.organization,
+        reason: privacyRequest.reason,
+        resolutionNote: privacyRequest.resolutionNote,
+        status: privacyRequest.status.toLowerCase(),
+        subject: privacyRequest.subject
+          ? {
+              email: maskedEmail(privacyRequest.subject.email),
+              fullName: maskedName(privacyRequest.subject.fullName),
+              id: privacyRequest.subject.id,
+            }
+          : null,
+        type: privacyRequest.type.toLowerCase(),
+      })),
+    };
+  });
+
+  app.post('/v1/platform/privacy-requests', async (request, reply) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'support');
+    const input = platformPrivacyCreateSchema.parse(request.body);
+    const [organization, subject] = await Promise.all([
+      input.organizationId
+        ? database.organization.findFirst({
+            select: { id: true },
+            where: { deletedAt: null, id: input.organizationId },
+          })
+        : null,
+      input.subjectUserId
+        ? database.user.findFirst({
+            select: { id: true },
+            where: { deletedAt: null, id: input.subjectUserId },
+          })
+        : null,
+    ]);
+    if (input.organizationId && !organization)
+      throw new ApiError(
+        404,
+        'ORGANIZATION_NOT_FOUND',
+        'La organización no existe.',
+      );
+    if (input.subjectUserId && !subject)
+      throw new ApiError(
+        404,
+        'PRIVACY_SUBJECT_NOT_FOUND',
+        'La persona solicitante no existe.',
+      );
+    const saved = await database.platformPrivacyRequest.create({
+      data: {
+        assignedToUserId: operator.id,
+        createdByUserId: operator.id,
+        dueAt: input.dueAt ? new Date(input.dueAt) : null,
+        organizationId: input.organizationId ?? null,
+        reason: input.reason,
+        subjectUserId: input.subjectUserId ?? null,
+        type: input.type.toUpperCase() as PlatformPrivacyRequestType,
+      },
+    });
+    await createPlatformAudit(database, {
+      action: 'platform.privacy_request.created',
+      actorUserId: operator.id,
+      afterData: { status: saved.status, type: saved.type },
+      entityId: saved.id,
+      entityType: 'privacy_request',
+      metadata: { organizationId: saved.organizationId, reason: input.reason },
+    });
+    return reply.code(201).send({ id: saved.id });
+  });
+
+  app.patch('/v1/platform/privacy-requests/:id', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'support');
+    const { id } = platformPrivacyParamsSchema.parse(request.params);
+    const input = platformPrivacyUpdateSchema.parse(request.body);
+    const before = await database.platformPrivacyRequest.findUnique({
+      where: { id },
+    });
+    if (!before)
+      throw new ApiError(
+        404,
+        'PRIVACY_REQUEST_NOT_FOUND',
+        'La solicitud de privacidad no existe.',
+      );
+    const saved = await database.platformPrivacyRequest.update({
+      data: {
+        assignedToUserId:
+          input.assignedToUserId === undefined
+            ? before.assignedToUserId
+            : input.assignedToUserId,
+        completedAt: ['completed', 'rejected'].includes(input.status)
+          ? (before.completedAt ?? new Date())
+          : null,
+        resolutionNote: input.resolutionNote,
+        status: input.status.toUpperCase() as PlatformPrivacyRequestStatus,
+      },
+      where: { id },
+    });
+    await createPlatformAudit(database, {
+      action: 'platform.privacy_request.updated',
+      actorUserId: operator.id,
+      afterData: {
+        assignedToUserId: saved.assignedToUserId,
+        status: saved.status,
+      },
+      beforeData: {
+        assignedToUserId: before.assignedToUserId,
+        status: before.status,
+      },
+      entityId: id,
+      entityType: 'privacy_request',
+      metadata: {
+        organizationId: saved.organizationId,
+        reason: input.resolutionNote,
+      },
+    });
+    return { id, status: saved.status.toLowerCase() };
+  });
+
+  app.get('/v1/platform/overrides', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'manage_billing');
+    const query = platformOverrideListSchema.parse(request.query);
+    const overrides = await database.platformFeatureOverride.findMany({
+      include: {
+        createdBy: { select: { fullName: true } },
+        organization: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+      where: query.organizationId
+        ? { organizationId: query.organizationId }
+        : {},
+    });
+    return {
+      overrides: overrides.map((override) => ({
+        booleanValue: override.booleanValue,
+        createdAt: override.createdAt.toISOString(),
+        createdBy: override.createdBy,
+        expiresAt: override.expiresAt.toISOString(),
+        id: override.id,
+        integerValue: override.integerValue,
+        key: override.key,
+        kind: override.kind.toLowerCase(),
+        organization: override.organization,
+        reason: override.reason,
+        revokedAt: override.revokedAt?.toISOString() ?? null,
+      })),
+    };
+  });
+
+  app.post('/v1/platform/overrides', async (request, reply) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'manage_billing');
+    const input = platformOverrideCreateSchema.parse(request.body);
+    if (
+      input.kind === 'limit' &&
+      input.key === 'locations' &&
+      input.integerValue === null
+    )
+      throw new ApiError(
+        400,
+        'PLATFORM_OVERRIDE_VALUE_INVALID',
+        'El límite de sucursales debe ser un número.',
+      );
+    const now = new Date();
+    const expiresAt = new Date(input.expiresAt);
+    const maximum = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+    if (expiresAt <= now || expiresAt > maximum)
+      throw new ApiError(
+        400,
+        'PLATFORM_OVERRIDE_EXPIRATION_INVALID',
+        'La excepción debe vencer dentro de los próximos 90 días.',
+      );
+    const organization = await database.organization.findFirst({
+      select: { id: true },
+      where: { deletedAt: null, id: input.organizationId },
+    });
+    if (!organization)
+      throw new ApiError(
+        404,
+        'ORGANIZATION_NOT_FOUND',
+        'La organización no existe.',
+      );
+    const saved = await database.$transaction(async (transaction) => {
+      await transaction.platformFeatureOverride.updateMany({
+        data: { revokedAt: now, revokedByUserId: operator.id },
+        where: {
+          expiresAt: { gt: now },
+          key: input.key,
+          organizationId: input.organizationId,
+          revokedAt: null,
+        },
+      });
+      return transaction.platformFeatureOverride.create({
+        data: {
+          booleanValue: input.kind === 'feature' ? input.booleanValue : null,
+          createdByUserId: operator.id,
+          expiresAt,
+          integerValue: input.kind === 'limit' ? input.integerValue : null,
+          key: input.key,
+          kind: input.kind.toUpperCase() as PlatformOverrideKind,
+          organizationId: input.organizationId,
+          reason: input.reason,
+        },
+      });
+    });
+    await createPlatformAudit(database, {
+      action: 'platform.override.created',
+      actorUserId: operator.id,
+      afterData: {
+        booleanValue: saved.booleanValue,
+        expiresAt: saved.expiresAt,
+        integerValue: saved.integerValue,
+        key: saved.key,
+        kind: saved.kind,
+      },
+      entityId: saved.id,
+      entityType: 'feature_override',
+      metadata: { organizationId: saved.organizationId, reason: saved.reason },
+    });
+    return reply.code(201).send({ id: saved.id });
+  });
+
+  app.post('/v1/platform/overrides/:id/revoke', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'manage_billing');
+    const { id } = platformOverrideParamsSchema.parse(request.params);
+    const input = platformOverrideRevokeSchema.parse(request.body);
+    const before = await database.platformFeatureOverride.findUnique({
+      where: { id },
+    });
+    if (!before)
+      throw new ApiError(
+        404,
+        'PLATFORM_OVERRIDE_NOT_FOUND',
+        'La excepción no existe.',
+      );
+    const revokedAt = before.revokedAt ?? new Date();
+    const saved = await database.platformFeatureOverride.update({
+      data: { revokedAt, revokedByUserId: operator.id },
+      where: { id },
+    });
+    await createPlatformAudit(database, {
+      action: 'platform.override.revoked',
+      actorUserId: operator.id,
+      afterData: { revokedAt },
+      beforeData: { revokedAt: before.revokedAt },
+      entityId: id,
+      entityType: 'feature_override',
+      metadata: { organizationId: saved.organizationId, reason: input.reason },
+    });
+    return { id, revokedAt: revokedAt.toISOString() };
+  });
+
+  app.get('/v1/platform/onboarding', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'view');
+    const abandonedHours = await publishedPlatformNumber(
+      database,
+      'onboarding.abandoned_hours',
+      'hours',
+      24,
+    );
+    const abandonedBefore = new Date(
+      Date.now() - abandonedHours * 60 * 60 * 1000,
+    );
+    const [profiles, pendingRegistrations] = await Promise.all([
+      database.userRegistrationProfile.findMany({
+        include: {
+          user: {
+            include: {
+              memberships: {
+                include: {
+                  organization: {
+                    select: {
+                      _count: {
+                        select: {
+                          appointments: true,
+                          locations: true,
+                          memberships: true,
+                          services: true,
+                        },
+                      },
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+                take: 1,
+                where: { role: MembershipRole.OWNER },
+              },
+              _count: {
+                select: {
+                  onboardingCollaborators: true,
+                  onboardingServices: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      }),
+      database.pendingRegistration.findMany({
+        orderBy: { createdAt: 'desc' },
+        select: {
+          createdAt: true,
+          email: true,
+          expiresAt: true,
+          failedAttempts: true,
+          id: true,
+          lockedUntil: true,
+        },
+        take: 100,
+      }),
+    ]);
+    const mappedProfiles = profiles.map((profile) => {
+      const organization = profile.user.memberships[0]?.organization ?? null;
+      const stages = {
+        account: true,
+        businessProfile: true,
+        location: (organization?._count.locations ?? 0) > 0,
+        service:
+          (organization?._count.services ?? 0) > 0 ||
+          profile.user._count.onboardingServices > 0,
+        team:
+          (organization?._count.memberships ?? 0) > 1 ||
+          profile.user._count.onboardingCollaborators > 0,
+      };
+      const completedStages = Object.values(stages).filter(Boolean).length;
+      const completed = profile.onboardingCompletedAt !== null;
+      return {
+        abandoned: !completed && profile.updatedAt < abandonedBefore,
+        accountType: profile.accountType.toLowerCase(),
+        appointments: organization?._count.appointments ?? 0,
+        businessName: profile.businessName,
+        collaborators: profile.user._count.onboardingCollaborators,
+        completedAt: profile.onboardingCompletedAt?.toISOString() ?? null,
+        createdAt: profile.createdAt.toISOString(),
+        organization: organization
+          ? { id: organization.id, name: organization.name }
+          : null,
+        owner: {
+          email: maskedEmail(profile.user.email),
+          fullName: maskedName(profile.user.fullName),
+        },
+        progressPercent: completed
+          ? 100
+          : Math.round((completedStages / Object.keys(stages).length) * 100),
+        services: profile.user._count.onboardingServices,
+        stages,
+        updatedAt: profile.updatedAt.toISOString(),
+        userId: profile.userId,
+      };
+    });
+    return {
+      abandonedAfterHours: abandonedHours,
+      pendingRegistrations: pendingRegistrations.map((registration) => ({
+        abandoned: registration.createdAt < abandonedBefore,
+        createdAt: registration.createdAt.toISOString(),
+        email: maskedEmail(registration.email),
+        expired: registration.expiresAt < new Date(),
+        failedAttempts: registration.failedAttempts,
+        id: registration.id,
+        locked: Boolean(
+          registration.lockedUntil && registration.lockedUntil > new Date(),
+        ),
+      })),
+      profiles: mappedProfiles,
+      summary: {
+        abandoned: mappedProfiles.filter(({ abandoned }) => abandoned).length,
+        completed: mappedProfiles.filter(({ completedAt }) => completedAt)
+          .length,
+        pending: mappedProfiles.filter(({ completedAt }) => !completedAt)
+          .length,
+        pendingVerification: pendingRegistrations.length,
+      },
+    };
+  });
+
+  app.post(
+    '/v1/platform/onboarding/pending/:id/resend-verification',
+    async (request) => {
+      const operator = await requirePlatformAdmin(
+        database,
+        authenticate,
+        request,
+        config,
+      );
+      requirePlatformPermission(operator.role, 'support');
+      const { id } = platformPendingRegistrationParamsSchema.parse(
+        request.params,
+      );
+      const input = platformVerificationResendSchema.parse(request.body);
+      const pendingRegistration = await database.pendingRegistration.findUnique(
+        {
+          select: { id: true, lockedUntil: true },
+          where: { id },
+        },
+      );
+      if (!pendingRegistration)
+        throw new ApiError(
+          404,
+          'PENDING_REGISTRATION_NOT_FOUND',
+          'El registro pendiente ya no existe.',
+        );
+      if (
+        pendingRegistration.lockedUntil &&
+        pendingRegistration.lockedUntil > new Date()
+      )
+        throw new ApiError(
+          423,
+          'PENDING_REGISTRATION_LOCKED',
+          'El registro está bloqueado temporalmente y no admite reenvíos.',
+        );
+      const recentResends = await database.platformAuditLog.count({
+        where: {
+          action: 'platform.onboarding.verification_resent',
+          createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },
+          entityId: id,
+        },
+      });
+      if (recentResends >= 3)
+        throw new ApiError(
+          429,
+          'PLATFORM_VERIFICATION_RESEND_RATE_LIMITED',
+          'Se alcanzó el máximo de 3 reenvíos por hora para este registro.',
+        );
+      const verification = await resendPendingVerification(id);
+      await createPlatformAudit(database, {
+        action: 'platform.onboarding.verification_resent',
+        actorUserId: operator.id,
+        entityId: id,
+        entityType: 'pending_registration',
+        metadata: { reason: input.reason },
+      });
+      return {
+        id,
+        verificationExpiresAt: verification.verificationExpiresAt,
+      };
+    },
+  );
+
+  app.get('/v1/platform/reviews', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'support');
+    const reviews = await database.appointmentReview.findMany({
+      include: {
+        location: { select: { id: true, name: true } },
+        organization: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    return {
+      reviews: reviews.map((review) => ({
+        client: maskedName(review.clientName),
+        comment: review.comment,
+        createdAt: review.createdAt.toISOString(),
+        id: review.id,
+        isVisible: review.isVisible,
+        location: review.location,
+        organization: review.organization,
+        rating: review.rating,
+      })),
+    };
+  });
+
+  app.patch('/v1/platform/reviews/:id/visibility', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'support');
+    const { id } = platformReviewParamsSchema.parse(request.params);
+    const input = platformReviewActionSchema.parse(request.body);
+    const before = await database.appointmentReview.findUnique({
+      where: { id },
+    });
+    if (!before)
+      throw new ApiError(404, 'REVIEW_NOT_FOUND', 'La reseña no existe.');
+    const saved = await database.appointmentReview.update({
+      data: {
+        hiddenAt: input.isVisible ? null : new Date(),
+        hiddenByUserId: input.isVisible ? null : operator.id,
+        isVisible: input.isVisible,
+      },
+      where: { id },
+    });
+    await createPlatformAudit(database, {
+      action: input.isVisible
+        ? 'platform.review.restored'
+        : 'platform.review.hidden',
+      actorUserId: operator.id,
+      afterData: { isVisible: saved.isVisible },
+      beforeData: { isVisible: before.isVisible },
+      entityId: id,
+      entityType: 'appointment_review',
+      metadata: { organizationId: saved.organizationId, reason: input.reason },
+    });
+    return { id, isVisible: saved.isVisible };
+  });
+
+  app.get('/v1/platform/configurations', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'manage_operators');
+    const configurations = await database.platformConfigurationVersion.findMany(
+      {
+        include: {
+          approvedBy: { select: { fullName: true } },
+          createdBy: { select: { fullName: true } },
+        },
+        orderBy: [{ key: 'asc' }, { version: 'desc' }],
+        take: 300,
+      },
+    );
+    return {
+      allowedKeys: PLATFORM_CONFIGURATION_KEYS,
+      configurations: configurations.map((configuration) => ({
+        approvedBy: configuration.approvedBy?.fullName ?? null,
+        createdAt: configuration.createdAt.toISOString(),
+        createdBy: configuration.createdBy?.fullName ?? 'Sistema',
+        id: configuration.id,
+        key: configuration.key,
+        publishedAt: configuration.publishedAt?.toISOString() ?? null,
+        reason: configuration.reason,
+        rollbackOfVersionId: configuration.rollbackOfVersionId,
+        status: configuration.status.toLowerCase(),
+        value: configuration.value,
+        version: configuration.version,
+      })),
+    };
+  });
+
+  app.post('/v1/platform/configurations', async (request, reply) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'manage_operators');
+    const input = platformConfigurationCreateSchema.parse(request.body);
+    const saved = await database.$transaction(async (transaction) => {
+      const latest = await transaction.platformConfigurationVersion.findFirst({
+        orderBy: { version: 'desc' },
+        select: { version: true },
+        where: { key: input.key },
+      });
+      return transaction.platformConfigurationVersion.create({
+        data: {
+          createdByUserId: operator.id,
+          key: input.key,
+          reason: input.reason,
+          value: input.value,
+          version: (latest?.version ?? 0) + 1,
+        },
+      });
+    });
+    await createPlatformAudit(database, {
+      action: 'platform.configuration.draft_created',
+      actorUserId: operator.id,
+      afterData: { key: saved.key, value: saved.value, version: saved.version },
+      entityId: saved.id,
+      entityType: 'platform_configuration',
+      metadata: { reason: saved.reason },
+    });
+    return reply.code(201).send({ id: saved.id, version: saved.version });
+  });
+
+  app.post('/v1/platform/configurations/:id/publish', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'manage_operators');
+    const { id } = platformConfigurationParamsSchema.parse(request.params);
+    const input = platformConfigurationActionSchema.parse(request.body);
+    const target = await database.platformConfigurationVersion.findUnique({
+      where: { id },
+    });
+    if (!target)
+      throw new ApiError(
+        404,
+        'PLATFORM_CONFIGURATION_NOT_FOUND',
+        'La versión de configuración no existe.',
+      );
+    if (target.status !== PlatformConfigurationStatus.DRAFT)
+      throw new ApiError(
+        409,
+        'PLATFORM_CONFIGURATION_NOT_DRAFT',
+        'Solo se puede publicar una versión en borrador.',
+      );
+    if (target.createdByUserId === operator.id)
+      throw new ApiError(
+        409,
+        'PLATFORM_CONFIGURATION_APPROVAL_REQUIRED',
+        'Otro superadministrador debe aprobar este borrador.',
+      );
+    const published = await database.$transaction(async (transaction) => {
+      await transaction.platformConfigurationVersion.updateMany({
+        data: { status: PlatformConfigurationStatus.ARCHIVED },
+        where: {
+          key: target.key,
+          status: PlatformConfigurationStatus.PUBLISHED,
+        },
+      });
+      return transaction.platformConfigurationVersion.update({
+        data: {
+          approvedByUserId: operator.id,
+          publishedAt: new Date(),
+          reason: `${target.reason}\nAprobación: ${input.reason}`,
+          status: PlatformConfigurationStatus.PUBLISHED,
+        },
+        where: { id },
+      });
+    });
+    await createPlatformAudit(database, {
+      action: 'platform.configuration.published',
+      actorUserId: operator.id,
+      afterData: { key: published.key, version: published.version },
+      beforeData: { status: target.status },
+      entityId: id,
+      entityType: 'platform_configuration',
+      metadata: { reason: input.reason },
+    });
+    return { id, status: published.status.toLowerCase() };
+  });
+
+  app.post('/v1/platform/configurations/:id/rollback', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'manage_operators');
+    const { id } = platformConfigurationParamsSchema.parse(request.params);
+    const input = platformConfigurationActionSchema.parse(request.body);
+    const target = await database.platformConfigurationVersion.findUnique({
+      where: { id },
+    });
+    if (!target || target.status === PlatformConfigurationStatus.DRAFT)
+      throw new ApiError(
+        409,
+        'PLATFORM_CONFIGURATION_ROLLBACK_INVALID',
+        'Solo se puede restaurar una versión publicada anteriormente.',
+      );
+    const rolledBack = await database.$transaction(async (transaction) => {
+      const latest = await transaction.platformConfigurationVersion.findFirst({
+        orderBy: { version: 'desc' },
+        select: { version: true },
+        where: { key: target.key },
+      });
+      await transaction.platformConfigurationVersion.updateMany({
+        data: { status: PlatformConfigurationStatus.ARCHIVED },
+        where: {
+          key: target.key,
+          status: PlatformConfigurationStatus.PUBLISHED,
+        },
+      });
+      return transaction.platformConfigurationVersion.create({
+        data: {
+          approvedByUserId: operator.id,
+          createdByUserId: operator.id,
+          key: target.key,
+          publishedAt: new Date(),
+          reason: input.reason,
+          rollbackOfVersionId: target.id,
+          status: PlatformConfigurationStatus.PUBLISHED,
+          value: target.value as never,
+          version: (latest?.version ?? 0) + 1,
+        },
+      });
+    });
+    await createPlatformAudit(database, {
+      action: 'platform.configuration.rolled_back',
+      actorUserId: operator.id,
+      afterData: { key: rolledBack.key, version: rolledBack.version },
+      entityId: rolledBack.id,
+      entityType: 'platform_configuration',
+      metadata: { reason: input.reason, rollbackOfVersionId: id },
+    });
+    return { id: rolledBack.id, status: 'published' };
+  });
+
+  app.get('/v1/platform/audit', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'view');
+    const query = platformAuditListSchema.parse(request.query);
+    const where = {
+      ...(query.action
+        ? { action: { contains: query.action, mode: 'insensitive' as const } }
+        : {}),
+      ...(query.organizationId
+        ? {
+            metadata: {
+              path: ['organizationId'],
+              equals: query.organizationId,
+            },
+          }
+        : {}),
+    };
+    const [total, logs] = await Promise.all([
+      database.platformAuditLog.count({ where }),
+      database.platformAuditLog.findMany({
+        include: { actor: { select: { email: true, fullName: true } } },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+    const organizationIds = logs.flatMap((log) => {
+      const metadata = log.metadata as { organizationId?: unknown };
+      return typeof metadata.organizationId === 'string'
+        ? [metadata.organizationId]
+        : [];
+    });
+    const organizations = await database.organization.findMany({
+      select: { id: true, name: true },
+      where: { id: { in: organizationIds } },
+    });
+    const organizationNames = new Map(
+      organizations.map((organization) => [organization.id, organization.name]),
+    );
     return {
       logs: logs.map((log) => ({
         action: log.action,
@@ -840,12 +3512,21 @@ function registerPlatformRoutes(
           : null,
         createdAt: log.createdAt.toISOString(),
         id: log.id,
-        organization: log.organization.name,
+        organization:
+          organizationNames.get(
+            (log.metadata as { organizationId?: string }).organizationId ?? '',
+          ) ?? 'Plataforma Nava',
         reason:
           log.metadata && typeof log.metadata === 'object'
             ? ((log.metadata as { reason?: unknown }).reason ?? null)
             : null,
       })),
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+      },
     };
   });
 
@@ -858,6 +3539,14 @@ function registerPlatformRoutes(
     );
     const { id } = platformOrganizationParamsSchema.parse(request.params);
     const input = platformOrganizationActionSchema.parse(request.body);
+    requirePlatformPermission(
+      user.role,
+      input.action === 'change_plan' ||
+        input.action === 'extend_trial' ||
+        input.action === 'reduce_trial'
+        ? 'manage_billing'
+        : 'manage_operations',
+    );
     return database.$transaction(async (transaction) => {
       const organization = await transaction.organization.findFirst({
         where: { deletedAt: null, id },
@@ -876,6 +3565,7 @@ function registerPlatformRoutes(
         organizationStatus: organization.status,
         planId: subscription.planId,
         subscriptionStatus: subscription.status,
+        trialEndsAt: subscription.trialEndsAt,
       };
       let updated = subscription;
       if (input.action === 'suspend') {
@@ -908,7 +3598,7 @@ function registerPlatformRoutes(
           data: { status: OrganizationStatus.ACTIVE },
           where: { id: organization.id },
         });
-      } else {
+      } else if (input.action === 'change_plan') {
         const plan = await transaction.plan.findFirst({
           where: { code: input.planCode, isActive: true },
         });
@@ -940,12 +3630,56 @@ function registerPlatformRoutes(
           data: { status: OrganizationStatus.ACTIVE },
           where: { id: organization.id },
         });
+      } else if (input.action === 'extend_trial') {
+        const base =
+          subscription.trialEndsAt && subscription.trialEndsAt > new Date()
+            ? subscription.trialEndsAt
+            : new Date();
+        const trialEndsAt = new Date(
+          base.getTime() + input.days * 24 * 60 * 60 * 1000,
+        );
+        updated = await transaction.subscription.update({
+          data: {
+            currentPeriodEnd: trialEndsAt,
+            graceEndsAt: null,
+            status: SubscriptionStatus.TRIAL,
+            trialEndsAt,
+          },
+          where: { id: subscription.id },
+        });
+        await transaction.organization.update({
+          data: { status: OrganizationStatus.TRIAL },
+          where: { id: organization.id },
+        });
+      } else {
+        if (
+          subscription.status !== SubscriptionStatus.TRIAL ||
+          !subscription.trialEndsAt
+        )
+          throw new ApiError(
+            409,
+            'TRIAL_NOT_ACTIVE',
+            'La organización no tiene un trial activo.',
+          );
+        const trialEndsAt = new Date(
+          subscription.trialEndsAt.getTime() - input.days * 24 * 60 * 60 * 1000,
+        );
+        if (trialEndsAt <= new Date())
+          throw new ApiError(
+            409,
+            'TRIAL_REDUCTION_INVALID',
+            'La reducción debe conservar al menos un día de trial.',
+          );
+        updated = await transaction.subscription.update({
+          data: { currentPeriodEnd: trialEndsAt, trialEndsAt },
+          where: { id: subscription.id },
+        });
       }
       const organizationStatus =
         input.action === 'suspend'
           ? OrganizationStatus.SUSPENDED
-          : input.action === 'reactivate'
-            ? OrganizationStatus.ACTIVE
+          : input.action === 'extend_trial' || input.action === 'reduce_trial'
+            ? OrganizationStatus.TRIAL
             : OrganizationStatus.ACTIVE;
       await transaction.auditLog.create({
         data: {
@@ -955,12 +3689,37 @@ function registerPlatformRoutes(
             organizationStatus,
             planId: updated.planId,
             subscriptionStatus: updated.status,
+            trialEndsAt: updated.trialEndsAt,
           },
           beforeData: before,
           entityId: organization.id,
           entityType: 'organization',
-          metadata: { reason: input.reason, source: 'platform_admin' },
+          metadata: {
+            organizationId: organization.id,
+            reason: input.reason,
+            source: 'platform_admin',
+          },
           organizationId: organization.id,
+        },
+      });
+      await transaction.platformAuditLog.create({
+        data: {
+          action: `platform.organization.${input.action}`,
+          actorUserId: user.id,
+          afterData: {
+            organizationStatus,
+            planId: updated.planId,
+            subscriptionStatus: updated.status,
+            trialEndsAt: updated.trialEndsAt,
+          },
+          beforeData: before,
+          entityId: organization.id,
+          entityType: 'organization',
+          metadata: {
+            organizationId: organization.id,
+            reason: input.reason,
+            source: 'platform_admin',
+          },
         },
       });
       return {
@@ -980,6 +3739,7 @@ function registerPlatformRoutes(
       request,
       config,
     );
+    requirePlatformPermission(user.role, 'support');
     const { id } = platformOrganizationParamsSchema.parse(request.params);
     const input = platformSupportSchema.parse(request.body);
     const organization = await database.organization.findFirst({
@@ -1047,6 +3807,18 @@ function registerPlatformRoutes(
         organizationId: organization.id,
       },
     });
+    await createPlatformAudit(database, {
+      action: 'platform.organization.support_accessed',
+      actorUserId: user.id,
+      entityId: organization.id,
+      entityType: 'organization',
+      metadata: {
+        organizationId: organization.id,
+        reason: input.reason,
+        scope: 'operational_diagnostics',
+        source: 'platform_admin',
+      },
+    });
     const owner = organization.memberships[0]?.user;
     return {
       diagnostics: {
@@ -1087,6 +3859,9 @@ export function registerOperationsRoutes(
   invitationMailer: InvitationMailer | null,
   config: ApiConfig,
   platformAccessMailer: PlatformAccessMailer | null,
+  resendPendingVerification: (
+    pendingRegistrationId: string,
+  ) => Promise<{ readonly verificationExpiresAt: string }>,
 ) {
   registerPlatformRoutes(
     app,
@@ -1094,6 +3869,7 @@ export function registerOperationsRoutes(
     authenticate,
     config,
     platformAccessMailer,
+    resendPendingVerification,
   );
   app.addHook('preHandler', async (request) => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(request.method)) return;

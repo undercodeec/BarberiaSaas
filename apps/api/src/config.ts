@@ -5,6 +5,11 @@ const optionalText = z.preprocess(
   z.string().min(1).optional(),
 );
 
+const optionalBasisPoints = z.preprocess(
+  (value) => (value === '' || value === undefined ? undefined : value),
+  z.coerce.number().int().min(0).max(10_000).optional(),
+);
+
 const environmentSchema = z
   .object({
     API_HOST: z.string().min(1).default('0.0.0.0'),
@@ -56,6 +61,10 @@ const environmentSchema = z
     PLATFORM_ADMIN_EMAILS: z.string().default(''),
     PLATFORM_DEVELOPMENT_BYPASS: z.enum(['true', 'false']).default('false'),
     PLATFORM_ADMIN_PASSWORD_HASH: optionalText,
+    PLATFORM_PAYMENTS_ENABLED: z.enum(['true', 'false']).default('false'),
+    PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY: optionalText,
+    PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS: optionalBasisPoints,
+    PLATFORM_SUBSCRIPTION_TERMS_VERSION: optionalText,
     PAYPHONE_CREDENTIALS_ENCRYPTION_KEY: optionalText,
     PUBLIC_WEB_URL: z.url().default('https://book.nava.app'),
     SMTP_FROM: optionalText,
@@ -86,6 +95,51 @@ const environmentSchema = z
         message:
           'PLATFORM_ADMIN_PASSWORD_HASH es obligatorio cuando el panel interno está habilitado en producción.',
         path: ['PLATFORM_ADMIN_PASSWORD_HASH'],
+      });
+    }
+    if (
+      value.PLATFORM_PAYMENTS_ENABLED === 'true' &&
+      !value.PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY es obligatoria al habilitar cobros de plataforma.',
+        path: ['PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY'],
+      });
+    }
+    if (
+      value.PLATFORM_PAYMENTS_ENABLED === 'true' &&
+      value.PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS === undefined
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS es obligatoria al habilitar cobros de plataforma.',
+        path: ['PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS'],
+      });
+    }
+    if (
+      value.PLATFORM_PAYMENTS_ENABLED === 'true' &&
+      !value.PLATFORM_SUBSCRIPTION_TERMS_VERSION
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'PLATFORM_SUBSCRIPTION_TERMS_VERSION es obligatoria al habilitar cobros de plataforma.',
+        path: ['PLATFORM_SUBSCRIPTION_TERMS_VERSION'],
+      });
+    }
+    if (
+      value.PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY &&
+      value.PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY ===
+        value.PAYPHONE_CREDENTIALS_ENCRYPTION_KEY
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'La clave PayPhone de plataforma debe ser distinta de la clave usada para tenants.',
+        path: ['PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY'],
       });
     }
   });

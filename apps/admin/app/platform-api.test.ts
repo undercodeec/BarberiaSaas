@@ -3,10 +3,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   API_URL,
   PlatformApiError,
+  downloadAuditExport,
+  getOrganizationDetail,
   getOrganizations,
   getPlatformSession,
   requestPlatformAccessCode,
   startPlatformLogin,
+  updatePlatformAlert,
   verifyPlatformAccessCode,
 } from './platform-api';
 
@@ -139,5 +142,75 @@ describe('cliente del panel de plataforma', () => {
       message: 'Acceso restringido.',
       status: 403,
     });
+  });
+
+  it('consulta la ficha 360 de una organización con el identificador codificado', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ organization: { id: 'organization-id' } }),
+        {
+          headers: { 'content-type': 'application/json' },
+          status: 200,
+        },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await getOrganizationDetail('session-token', 'organization/id');
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_URL}/v1/platform/organizations/organization%2Fid`);
+    expect(options.body).toBeUndefined();
+    expect(new Headers(options.headers).get('authorization')).toBe(
+      'Bearer session-token',
+    );
+  });
+
+  it('envía la nota obligatoria al actualizar una alerta', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: 'alert-id', status: 'resolved' }), {
+        headers: { 'content-type': 'application/json' },
+        status: 200,
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await updatePlatformAlert('session-token', 'alert-id', {
+      note: 'Incidencia verificada.',
+      status: 'resolved',
+    });
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_URL}/v1/platform/alerts/alert-id`);
+    expect(options.method).toBe('PATCH');
+    expect(options.body).toBe(
+      JSON.stringify({ note: 'Incidencia verificada.', status: 'resolved' }),
+    );
+  });
+
+  it('descarga la auditoría con rango explícito y sesión autorizada', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('fecha,accion\n', {
+        headers: {
+          'content-disposition': 'attachment; filename="nava-auditoria.csv"',
+          'content-type': 'text/csv',
+        },
+        status: 200,
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await downloadAuditExport('session-token', {
+      from: '2026-08-01T00:00:00.000Z',
+      to: '2026-08-08T23:59:59.999Z',
+    });
+
+    expect(result.filename).toBe('nava-auditoria.csv');
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/v1/platform/exports/audit.csv?');
+    expect(url).toContain('from=2026-08-01T00%3A00%3A00.000Z');
+    expect(new Headers(options.headers).get('authorization')).toBe(
+      'Bearer session-token',
+    );
   });
 });
