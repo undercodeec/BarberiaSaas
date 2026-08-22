@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "turbo run build",
+    "build:vps": "pnpm --filter @barber-saas/api build && pnpm --filter @barber-saas/web build && pnpm --filter @barber-saas/admin build",
     "dev": "turbo run dev",
     "dev:admin": "pnpm --filter @barber-saas/admin dev",
     "dev:api": "pnpm --filter @barber-saas/api dev",

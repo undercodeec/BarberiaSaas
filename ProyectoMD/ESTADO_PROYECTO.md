@@ -385,10 +385,11 @@ pnpm install --frozen-lockfile
 pnpm db:migrate:deploy
 pnpm db:status
 pnpm db:generate
-pnpm build
+pnpm build:vps
 systemctl restart nava-api.service
 systemctl restart nava-web.service
-systemctl status nava-api.service nava-web.service --no-pager
+systemctl restart nava-admin.service
+systemctl status nava-api.service nava-web.service nava-admin.service --no-pager
 curl -fsS https://api.navacloud.app/health
 ```
 
