@@ -269,6 +269,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     await database.emailVerificationCode.deleteMany();
     await database.platformAdminAccessChallenge.deleteMany();
     await database.pendingRegistration.deleteMany();
+    await database.accountDeletionRetention.deleteMany();
     await database.session.deleteMany();
     await database.userPortfolioItem.deleteMany();
     await database.onboardingService.deleteMany();
@@ -608,6 +609,45 @@ describeWithDatabase('API con PostgreSQL', () => {
       passwordHash: null,
       phone: null,
     });
+    await expect(
+      database.accountDeletionRetention.findMany({
+        where: { userId: originalUser.id },
+      }),
+    ).resolves.toHaveLength(2);
+    const emailAvailability = await app.inject({
+      method: 'POST',
+      payload: { email },
+      url: '/v1/auth/registration-availability',
+    });
+    expect(emailAvailability.statusCode).toBe(200);
+    expect(emailAvailability.json()).toMatchObject({
+      conflicts: { email: 'Ese correo ya estÃ¡ registrado.' },
+    });
+    const phoneAvailability = await app.inject({
+      method: 'POST',
+      payload: { phone: originalUser.phone },
+      url: '/v1/auth/registration-availability',
+    });
+    expect(phoneAvailability.statusCode).toBe(200);
+    expect(phoneAvailability.json()).toMatchObject({
+      conflicts: { phone: 'Ese nÃºmero telefÃ³nico ya estÃ¡ registrado.' },
+    });
+    const retryRegistration = await app.inject({
+      method: 'POST',
+      payload: {
+        ...registrationProfilePayload(),
+        confirmPassword: 'Clave-segura-123',
+        email,
+        fullName: 'Registro durante retenciÃ³n',
+        password: 'Clave-segura-123',
+        phone: originalUser.phone,
+      },
+      url: '/v1/auth/register',
+    });
+    expect(retryRegistration.statusCode).toBe(409);
+    expect(retryRegistration.json<{ code: string }>().code).toBe(
+      'ACCOUNT_DELETION_RETENTION_ACTIVE',
+    );
     expect(
       await database.organization.findUnique({
         where: { id: organization.organizationId },

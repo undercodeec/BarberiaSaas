@@ -13,6 +13,9 @@ export default defineConfig({
   },
   webServer: {
     command: 'pnpm --filter @barber-saas/admin dev',
+    env: {
+      NEXT_PUBLIC_API_URL: 'http://127.0.0.1:4000',
+    },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     url: 'http://127.0.0.1:3001',

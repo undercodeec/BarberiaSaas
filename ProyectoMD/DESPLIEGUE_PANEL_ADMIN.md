@@ -1,6 +1,23 @@
 # Despliegue del panel Admin de Nava
 
-> Estado: procedimiento preparado, todavía no ejecutado ni validado en la VPS.
+> Estado: desplegado y validado el 21 de agosto de 2026 en
+> `https://admin.navacloud.app`.
+
+## Registro de ejecución
+
+- Commit desplegado: `0ead479`.
+- Base Neon: 58 migraciones aplicadas; la última fue
+  `20260821100000_subscription_billing_period_days`.
+- Servicio: `nava-admin.service` activo y atendiendo localmente en el puerto
+  `3001`.
+- Publicación: Nginx y Certbot entregan `https://admin.navacloud.app` con
+  respuesta `HTTP/2 200`.
+- Acceso: bootstrap protegido con contraseña derivada mediante scrypt y OTP por
+  correo. `PLATFORM_ADMIN_PASSWORD_HASH` debe comenzar por
+  `scrypt$16384$8$1$`; no admite hashes bcrypt ni se pega en el formulario.
+
+La plantilla systemd inicia el binario local de Next directamente. Así conserva
+`ProtectHome=true` sin depender de la caché de Corepack/pnpm en `/home/nava`.
 
 ## Requisitos
 
@@ -27,7 +44,8 @@ No usar `prisma migrate dev` ni modificar manualmente la base productiva.
 ## Servicio
 
 1. Copiar `deploy/systemd/nava-admin.service.example` a `/etc/systemd/system/nava-admin.service`.
-2. Verificar usuario, grupo, rutas y ubicación de `pnpm` con `command -v pnpm`.
+2. Verificar que `/usr/bin/node` y
+   `apps/admin/node_modules/next/dist/bin/next` existan.
 3. Ejecutar:
 
 ```bash
@@ -39,7 +57,7 @@ curl -fsS http://127.0.0.1:3001/ >/dev/null
 
 ## Nginx y TLS
 
-Usar `deploy/nginx/nava-admin.conf.example` como base, instalarlo en el directorio de sitios de Nginx, validar con `nginx -t` y recargar. Las rutas de certificado del ejemplo deben existir antes de activar el sitio.
+Usar `deploy/nginx/nava-admin.conf.example` como base, instalarlo en el directorio de sitios de Nginx, validar con `nginx -t` y recargar. Las rutas de certificado del ejemplo deben existir antes de activar el sitio. En la VPS se emitió el certificado de `admin.navacloud.app` con Certbot; su renovación quedó programada automáticamente.
 
 ## Aceptación obligatoria
 
@@ -51,4 +69,7 @@ Usar `deploy/nginx/nava-admin.conf.example` como base, instalarlo en el director
 - Revisión responsive y Axe en escritorio/móvil.
 - Revisión de logs de API/Admin sin contraseñas, OTP, tokens ni secretos.
 
-El despliegue solo se marca completado después de registrar URL, commit, migraciones aplicadas y evidencia del recorrido autenticado.
+El despliegue quedó completado con URL, commit, migraciones, servicio y HTTPS
+verificados. La aceptación funcional restante se limita a las comprobaciones de
+roles, PII y flujos operativos enumeradas arriba cuando se incorporen operadores
+adicionales.

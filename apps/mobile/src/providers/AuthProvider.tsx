@@ -44,7 +44,6 @@ interface AuthContextValue {
   readonly configurationError: string | null;
   readonly isLoading: boolean;
   readonly retrySessionRestore: () => Promise<void>;
-  readonly showNotificationsAfterSignIn: boolean;
   readonly session: { readonly expiresAt: string } | null;
   readonly signIn: (input: SignInInput) => Promise<void>;
   readonly signOut: () => Promise<void>;
@@ -64,8 +63,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<{ expiresAt: string } | null>(null);
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [status, setStatus] = useState<AuthStatus>('restoring');
-  const [showNotificationsAfterSignIn, setShowNotificationsAfterSignIn] =
-    useState(false);
   const restoreAttemptRef = useRef(0);
   const [sessionInvalidator] = useState(() =>
     createSessionInvalidator({
@@ -73,7 +70,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
       clearToken: clearSessionToken,
       onInvalidated: () => {
         setSession(null);
-        setShowNotificationsAfterSignIn(false);
         setStatus('unauthenticated');
         setUser(null);
       },
@@ -124,12 +120,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [retrySessionRestore]);
 
   const applyAuthResponse = useCallback(
-    async (response: AuthResponse, showNotifications = false) => {
+    async (response: AuthResponse) => {
       await storeSessionToken(response.session.token);
       restoreAttemptRef.current += 1;
       sessionInvalidator.reset();
       setSession({ expiresAt: response.session.expiresAt });
-      setShowNotificationsAfterSignIn(showNotifications);
       setStatus('authenticated');
       setUser(response.user);
     },
@@ -142,7 +137,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         '/v1/auth/login',
         { body: input, method: 'POST' },
       );
-      await applyAuthResponse(response, true);
+      await applyAuthResponse(response);
     },
     [applyAuthResponse],
   );
@@ -215,7 +210,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
       isLoading,
       retrySessionRestore,
       session,
-      showNotificationsAfterSignIn,
       resendVerification,
       signIn,
       signOut,
@@ -229,7 +223,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
       retrySessionRestore,
       resendVerification,
       session,
-      showNotificationsAfterSignIn,
       signIn,
       signOut,
       signUp,

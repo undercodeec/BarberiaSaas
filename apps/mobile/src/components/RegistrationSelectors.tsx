@@ -186,6 +186,7 @@ export function CountryCityFields({
   cityError,
   countryError,
   onCity,
+  onCityFocus,
   onCountry,
 }: {
   readonly city: string;
@@ -193,6 +194,7 @@ export function CountryCityFields({
   readonly cityError?: string | undefined;
   readonly countryError?: string | undefined;
   readonly onCity: (city: string) => void;
+  readonly onCityFocus?: TextInputProps['onFocus'];
   readonly onCountry: (country: CountryOption) => void;
 }) {
   const [countryOpen, setCountryOpen] = useState(false);
@@ -215,6 +217,7 @@ export function CountryCityFields({
             accessibilityLabel="Ciudad"
             autoCapitalize="words"
             onChangeText={onCity}
+            onFocus={onCityFocus}
             placeholder="Escribe tu ciudad"
             placeholderTextColor="#98a0ab"
             style={styles.cityInput}

@@ -11,7 +11,12 @@ export function NetworkStatusBanner() {
   const queryClient = useQueryClient();
   const queryCache = queryClient.getQueryCache();
   const subscribe = useCallback(
-    (onStoreChange: () => void) => queryCache.subscribe(onStoreChange),
+    (onStoreChange: () => void) =>
+      queryCache.subscribe(() => {
+        // Creating a query can synchronously notify this cache while another
+        // component is rendering. Notify React after that render has finished.
+        queueMicrotask(onStoreChange);
+      }),
     [queryCache],
   );
   const getSnapshot = useCallback(

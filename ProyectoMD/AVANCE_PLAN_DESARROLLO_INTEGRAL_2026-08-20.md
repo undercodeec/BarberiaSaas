@@ -35,7 +35,7 @@ misma.
 
 | Fase | Estado                  | Evidencia o pendiente principal                                                                                                                                                                                                                                                                                          |
 | ---- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 0    | Cerrada operativamente  | Release compilado, VPS y Neon reconciliados con 57 migraciones; API/Web y Nginx verificados. Un backup se restauró correctamente en una base temporal con 54 migraciones. El panel interno permanece deshabilitado hasta configurar su hash de acceso.                                                                   |
+| 0    | Cerrada operativamente  | Release compilado, VPS y Neon reconciliados con 58 migraciones; API/Web/Admin y Nginx verificados. Un backup se restauró correctamente en una base temporal con 54 migraciones. El panel interno está publicado en `https://admin.navacloud.app`, protegido por contraseña scrypt y OTP.                                 |
 | 1    | Parcial, bloqueante     | PayPhone aprobó Notificación Externa, pero se debe corregir la URL registrada; faltan credenciales sandbox por canal seguro y confirmar el mecanismo de autenticación, reintentos e IPs.                                                                                                                                 |
 | 2    | Implementada localmente | Migración `20260820220000_subscription_billing_domain`; aislamiento e idempotencia probados en PostgreSQL.                                                                                                                                                                                                               |
 | 3    | Sandbox web parcial     | Planes, sesión de compra, checkout owner, consulta de intento, expiración y aplicación verificada. La web `/checkout` tiene login con cookie HttpOnly, creación idempotente y espera por estado; sigue deshabilitada por configuración. No existe webhook que otorgue acceso porque su autenticación no está confirmada. |
@@ -44,17 +44,17 @@ misma.
 
 ## Cierre operativo de Fase 0 — 21 de agosto de 2026
 
-- La VPS se actualizó a `800736c`; el árbol de trabajo se dejó limpio.
+- La VPS se actualizó inicialmente a `800736c`; el despliegue posterior del Admin actualizó el código a `0ead479`.
 - `pnpm build` terminó correctamente para los 12 paquetes.
-- Neon quedó reconciliado: 57 migraciones detectadas y `pnpm db:status` sin pendientes.
+- Neon quedó reconciliado: 58 migraciones detectadas y `pnpm db:status` sin pendientes.
 - Se creó un dump PostgreSQL con cliente 18 y se restauró en una base temporal
   de Neon usando conexión directa y rol propietario; la restauración conservó
   las 54 migraciones presentes en el origen del backup.
 - `nava-api.service` y `nava-web.service` están activos; los healthchecks local
   y público de API devolvieron `{"status":"ok"}` y la web pública devolvió 200.
-- El release reveló una variable requerida del panel interno. Se dejó
-  `PLATFORM_ADMIN_EMAILS` vacía para mantener el panel deshabilitado hasta que
-  exista `PLATFORM_ADMIN_PASSWORD_HASH`; no se habilitaron pagos de plataforma.
+- Se configuraron `PLATFORM_ADMIN_EMAILS` y un
+  `PLATFORM_ADMIN_PASSWORD_HASH` scrypt; el panel quedó publicado con OTP. No
+  se habilitaron pagos de plataforma.
 
 ### Evidencia operativa pendiente de registrar
 

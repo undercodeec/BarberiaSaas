@@ -613,10 +613,12 @@ export function OpenButtonFlare() {
 }
 
 export function NotificationPermissionSheet({
+  canAskAgain,
   onAccept,
   onClose,
   visible,
 }: {
+  readonly canAskAgain: boolean;
   readonly onAccept: () => void;
   readonly onClose: () => void;
   readonly visible: boolean;
@@ -732,8 +734,9 @@ export function NotificationPermissionSheet({
             Activar notificaciones
           </Text>
           <Text style={styles.permissionDescription}>
-            Activa el permiso para recibir notificaciones importantes de tus
-            reservas y novedades sobre tu negocio.
+            {canAskAgain
+              ? 'Activa el permiso para recibir notificaciones importantes de tus reservas y novedades sobre tu negocio.'
+              : 'Las notificaciones están desactivadas para Nava. Ábrelas en Ajustes para recibir avisos importantes de tus reservas y novedades.'}
           </Text>
           <View style={styles.permissionActions}>
             <Pressable
@@ -751,7 +754,9 @@ export function NotificationPermissionSheet({
               onPress={onAccept}
               style={styles.permissionPrimaryButton}
             >
-              <Text style={styles.permissionPrimaryLabel}>Aceptar</Text>
+              <Text style={styles.permissionPrimaryLabel}>
+                {canAskAgain ? 'Aceptar' : 'Abrir ajustes'}
+              </Text>
             </Pressable>
           </View>
         </Animated.View>

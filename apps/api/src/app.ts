@@ -95,6 +95,7 @@ const SESSION_MAX_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const RESET_DURATION_MS = 30 * 60 * 1000;
 const VERIFICATION_DURATION_MS = 10 * 60 * 1000;
 const VERIFICATION_LOCK_DURATION_MS = 15 * 60 * 1000;
+const ACCOUNT_DELETION_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 const MAX_VERIFICATION_ATTEMPTS = 5;
 const MAX_AUTH_RATE_LIMIT_BUCKETS = 10_000;
 
@@ -644,6 +645,51 @@ function normalizePhone(phone: string): string {
   return phone.replace(/\D/gu, '');
 }
 
+function accountDeletionIdentifierHash(
+  type: 'email' | 'phone',
+  value: string,
+): string {
+  return hashOpaqueToken(`account-deletion-retention:${type}:${value}`);
+}
+
+async function activeAccountDeletionRetention(
+  database: DatabaseClient,
+  input: { readonly email?: string | null; readonly phoneKey?: string | null },
+) {
+  const emailHash = input.email
+    ? accountDeletionIdentifierHash('email', input.email)
+    : null;
+  const phoneHash = input.phoneKey
+    ? accountDeletionIdentifierHash('phone', input.phoneKey)
+    : null;
+  const identifierHashes = [emailHash, phoneHash].filter(
+    (identifierHash): identifierHash is string => identifierHash !== null,
+  );
+  if (identifierHashes.length === 0) {
+    return { email: false, phone: false };
+  }
+
+  const now = new Date();
+  await database.accountDeletionRetention.deleteMany({
+    where: { expiresAt: { lte: now } },
+  });
+  const records = await database.accountDeletionRetention.findMany({
+    select: { identifierHash: true },
+    where: {
+      expiresAt: { gt: now },
+      identifierHash: { in: identifierHashes },
+    },
+  });
+  return {
+    email:
+      emailHash !== null &&
+      records.some((record) => record.identifierHash === emailHash),
+    phone:
+      phoneHash !== null &&
+      records.some((record) => record.identifierHash === phoneHash),
+  };
+}
+
 function duplicateRegistrationError(
   duplicate: {
     readonly phoneKey: string | null;
@@ -893,7 +939,7 @@ export async function buildApi({
     const now = new Date();
     const email = input.email ? normalizeEmail(input.email) : null;
     const phoneKey = input.phone ? normalizePhone(input.phone) : null;
-    const [existingUser, pendingEmail, profilePhone, pendingPhone] =
+    const [existingUser, pendingEmail, profilePhone, pendingPhone, retention] =
       await Promise.all([
         email
           ? database.user.findUnique({
@@ -919,15 +965,17 @@ export async function buildApi({
               where: { expiresAt: { gt: now }, phoneKey },
             })
           : null,
+        activeAccountDeletionRetention(database, { email, phoneKey }),
       ]);
     return {
       conflicts: {
         ...(email &&
         ((existingUser?.passwordHash && existingUser.emailVerifiedAt) ||
-          pendingEmail)
+          pendingEmail ||
+          retention?.email)
           ? { email: 'Ese correo ya está registrado.' }
           : {}),
-        ...(phoneKey && (profilePhone || pendingPhone)
+        ...(phoneKey && (profilePhone || pendingPhone || retention?.phone)
           ? { phone: 'Ese número telefónico ya está registrado.' }
           : {}),
       },
@@ -947,6 +995,17 @@ export async function buildApi({
     const email = normalizeEmail(input.email);
     const phoneKey = normalizePhone(input.phone);
     try {
+      const retention = await activeAccountDeletionRetention(database, {
+        email,
+        phoneKey,
+      });
+      if (retention.email || retention.phone) {
+        throw new ApiError(
+          409,
+          'ACCOUNT_DELETION_RETENTION_ACTIVE',
+          'Estos datos estarán disponibles nuevamente 90 días después de eliminar la cuenta.',
+        );
+      }
       const passwordHash = await hashPassword(input.password);
       const existingUser = await database.user.findUnique({ where: { email } });
       if (existingUser?.passwordHash && existingUser.emailVerifiedAt) {
@@ -1322,7 +1381,24 @@ export async function buildApi({
 
     const anonymizedEmail = `deleted-${user.id}@deleted.invalid`;
     const membershipIds = memberships.map(({ id }) => id);
+    const retentionExpiresAt = new Date(
+      now.getTime() + ACCOUNT_DELETION_RETENTION_MS,
+    );
+    const retainedIdentifierHashes = [
+      accountDeletionIdentifierHash('email', user.email),
+      ...(user.phone
+        ? [accountDeletionIdentifierHash('phone', normalizePhone(user.phone))]
+        : []),
+    ];
     await database.$transaction(async (transaction) => {
+      await transaction.accountDeletionRetention.createMany({
+        data: retainedIdentifierHashes.map((identifierHash) => ({
+          expiresAt: retentionExpiresAt,
+          identifierHash,
+          userId: user.id,
+        })),
+        skipDuplicates: true,
+      });
       for (const membership of memberships) {
         await transaction.auditLog.create({
           data: {

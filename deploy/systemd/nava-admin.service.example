@@ -7,9 +7,11 @@ Wants=network-online.target
 Type=simple
 User=nava
 Group=nava
-WorkingDirectory=/opt/nava/app
+WorkingDirectory=/opt/nava/app/apps/admin
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/pnpm --filter @barber-saas/admin start
+Environment=PORT=3001
+# Evita Corepack/pnpm al arrancar: ProtectHome bloquea su caché bajo /home/nava.
+ExecStart=/usr/bin/node /opt/nava/app/apps/admin/node_modules/next/dist/bin/next start
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true

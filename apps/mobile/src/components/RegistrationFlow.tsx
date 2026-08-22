@@ -25,13 +25,20 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { type ReactNode, useEffect, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 
 import { appTheme } from './BottomNavigation';
+import { KeyboardAwareScrollView } from './KeyboardAwareScrollView';
 import { NavaButton } from './NavaButton';
 import {
   COUNTRIES,
@@ -97,8 +104,13 @@ type Values = Omit<SignUpInput, 'accountType' | 'countryCode'> & {
 export function RegistrationFlow() {
   const router = useRouter();
   const { height } = useWindowDimensions();
+  const scrollRef = useRef<ScrollView>(null);
+  const delayedFocusScrollRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const insets = useSafeAreaInsets();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardLiftY] = useState(() => new Animated.Value(0));
   const sheetMaxHeight = Math.min(
     Math.max(320, height - insets.top - 12),
     Math.round(height * 0.86),
@@ -124,6 +136,21 @@ export function RegistrationFlow() {
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const revealFocusedField = useCallback(() => {
+    const focusedInput = TextInput.State.currentlyFocusedInput();
+    if (!focusedInput) return;
+    scrollRef.current?.scrollResponderScrollNativeHandleToKeyboard?.(
+      focusedInput,
+      44,
+      true,
+    );
+  }, []);
+  const keepFieldVisible = useCallback(() => {
+    revealFocusedField();
+    if (delayedFocusScrollRef.current)
+      clearTimeout(delayedFocusScrollRef.current);
+    delayedFocusScrollRef.current = setTimeout(revealFocusedField, 180);
+  }, [revealFocusedField]);
   useEffect(() => {
     if (step !== 'verification' || !verificationExpiresAt) return;
     const updateCountdown = () => {
@@ -134,17 +161,37 @@ export function RegistrationFlow() {
     return () => clearInterval(interval);
   }, [step, verificationExpiresAt]);
   useEffect(() => {
-    const showSubscription = Keyboard.addListener('keyboardDidShow', () =>
-      setKeyboardVisible(true),
+    const showSubscription = Keyboard.addListener(
+      'keyboardDidShow',
+      (event) => {
+        setKeyboardVisible(true);
+        keepFieldVisible();
+        if (Platform.OS === 'android') {
+          Animated.timing(keyboardLiftY, {
+            duration: 180,
+            toValue: -Math.min(event.endCoordinates.height, 220),
+            useNativeDriver: true,
+          }).start();
+        }
+      },
     );
-    const hideSubscription = Keyboard.addListener('keyboardDidHide', () =>
-      setKeyboardVisible(false),
-    );
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false);
+      if (Platform.OS === 'android') {
+        Animated.timing(keyboardLiftY, {
+          duration: 160,
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      }
+    });
     return () => {
       showSubscription.remove();
       hideSubscription.remove();
+      if (delayedFocusScrollRef.current)
+        clearTimeout(delayedFocusScrollRef.current);
     };
-  }, []);
+  }, [keepFieldVisible, keyboardLiftY]);
   const verificationExpired = remainingSeconds === 0;
   const defaultCountry =
     COUNTRIES.find((country) => country.code === countryCode) ?? COUNTRIES[0]!;
@@ -454,19 +501,25 @@ export function RegistrationFlow() {
                     insets.bottom,
                     Platform.OS === 'android' ? 12 : 8,
                   ),
-                  transform: [{ translateY: sheetTranslateY }],
+                  transform: [
+                    {
+                      translateY: Animated.add(sheetTranslateY, keyboardLiftY),
+                    },
+                  ],
                 },
               ]}
             >
               <View {...panResponder.panHandlers} style={s.handle} />
-              <ScrollView
+              <KeyboardAwareScrollView
                 automaticallyAdjustKeyboardInsets
                 contentContainerStyle={
                   keyboardVisible ? s.scrollContentWithKeyboard : undefined
                 }
                 keyboardDismissMode="on-drag"
+                keyboardExtraOffset={40}
                 keyboardShouldPersistTaps="handled"
                 overScrollMode="never"
+                ref={scrollRef}
                 showsVerticalScrollIndicator={false}
                 style={s.scroll}
               >
@@ -533,6 +586,7 @@ export function RegistrationFlow() {
                                 label="Nombre"
                                 onBlur={field.onBlur}
                                 onChangeText={field.onChange}
+                                onFocus={keepFieldVisible}
                                 value={field.value}
                               />
                             )}
@@ -553,6 +607,7 @@ export function RegistrationFlow() {
                                   clearErrors('businessName');
                                   field.onChange(value);
                                 }}
+                                onFocus={keepFieldVisible}
                                 value={field.value}
                               />
                             )}
@@ -573,6 +628,7 @@ export function RegistrationFlow() {
                                   clearErrors('phone');
                                   field.onChange(value);
                                 }}
+                                onFocus={keepFieldVisible}
                                 value={field.value}
                               />
                             )}
@@ -605,6 +661,7 @@ export function RegistrationFlow() {
                                     countryCode={countryCode}
                                     countryError={countryState.error?.message}
                                     onCity={cityField.onChange}
+                                    onCityFocus={keepFieldVisible}
                                     onCountry={(country) => {
                                       setCountryCode(country.code);
                                       setValue('country', country.name);
@@ -686,6 +743,7 @@ export function RegistrationFlow() {
                                   clearErrors('email');
                                   field.onChange(value);
                                 }}
+                                onFocus={keepFieldVisible}
                                 value={field.value}
                               />
                             )}
@@ -700,6 +758,7 @@ export function RegistrationFlow() {
                                 label="Contraseña"
                                 onBlur={field.onBlur}
                                 onChangeText={field.onChange}
+                                onFocus={keepFieldVisible}
                                 secureTextEntry
                                 value={field.value}
                               />
@@ -715,6 +774,7 @@ export function RegistrationFlow() {
                                 label="Confirmar contraseña"
                                 onBlur={field.onBlur}
                                 onChangeText={field.onChange}
+                                onFocus={keepFieldVisible}
                                 secureTextEntry
                                 value={field.value}
                               />
@@ -823,6 +883,7 @@ export function RegistrationFlow() {
                               onChangeText={(code) =>
                                 setVerificationCode(code.replace(/\D/g, ''))
                               }
+                              onFocus={keepFieldVisible}
                               placeholder="000000"
                               placeholderTextColor={appTheme.colors.textMuted}
                               style={verificationStyles.codeInput}
@@ -858,7 +919,7 @@ export function RegistrationFlow() {
                     </View>
                   )}
                 </View>
-              </ScrollView>
+              </KeyboardAwareScrollView>
             </Animated.View>
           </KeyboardAvoidingView>
         </View>

@@ -60,6 +60,7 @@ export function BusinessLocationSheet({
   onComplete,
   onDismiss,
   onSubmit,
+  requestPermissionOnOpen = false,
   visible,
 }: {
   readonly countryCode: string;
@@ -67,6 +68,7 @@ export function BusinessLocationSheet({
   readonly onComplete: () => void;
   readonly onDismiss: () => void;
   readonly onSubmit: (location: GoogleMapsLocationCandidate) => Promise<void>;
+  readonly requestPermissionOnOpen?: boolean;
   readonly visible: boolean;
 }) {
   const insets = useSafeAreaInsets();
@@ -92,6 +94,36 @@ export function BusinessLocationSheet({
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchToken = useRef(sessionToken());
   const [sheetTranslateY] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    if (!visible || !requestPermissionOnOpen) return;
+    let isActive = true;
+
+    const requestLocationPermission = async () => {
+      try {
+        const permission = await ensurePermissionAccess(
+          Location.getForegroundPermissionsAsync,
+          Location.requestForegroundPermissionsAsync,
+        );
+        if (!isActive || permission === 'granted') return;
+        setError(
+          permission === 'blocked'
+            ? 'El permiso de ubicación está desactivado. Actívalo desde Ajustes para usar tu posición actual.'
+            : 'No se concedió el permiso. Puedes buscar el negocio o las calles manualmente.',
+        );
+      } catch {
+        if (isActive)
+          setError(
+            'No pudimos solicitar el permiso de ubicación. Puedes buscar la dirección manualmente.',
+          );
+      }
+    };
+
+    void requestLocationPermission();
+    return () => {
+      isActive = false;
+    };
+  }, [requestPermissionOnOpen, visible]);
 
   useEffect(() => {
     if (!visible || isSubmitted) return;

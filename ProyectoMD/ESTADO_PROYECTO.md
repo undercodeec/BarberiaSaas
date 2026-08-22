@@ -107,7 +107,10 @@ Mobile / Web pública / Admin
 - [x] Sesión con duración máxima e inactividad de siete días en backend.
 - [x] Onboarding transaccional de cuenta, organización, sede, colaboradores y
       servicios; continuidad después de reiniciar la app.
-- [x] Cierre/eliminación de cuenta con validaciones, baja lógica y auditoría.
+- [x] Cierre/eliminación de cuenta con validaciones, anonimización, baja
+      lógica y auditoría. Correo y teléfono se conservan únicamente como hashes
+      irreversibles durante 90 días para impedir el re-registro inmediato; los
+      hashes vencidos se purgan al validar un nuevo registro.
 - [x] Sesión móvil persistida con Secure Store.
 - [ ] Reejecutar la integración PostgreSQL aislada de autenticación,
       onboarding y multi-tenant en el corte de liberación.

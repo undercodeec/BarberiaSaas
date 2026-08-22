@@ -12,10 +12,10 @@ import type {
 } from '@barber-saas/api-client';
 import { useQuery } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Image, Platform, Pressable, Text, View } from 'react-native';
+import { Image, Linking, Platform, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 
@@ -64,11 +64,8 @@ import {
 export default function DashboardScreen() {
   const router = useRouter();
   const layout = useNativeLayoutMetrics();
-  const { session, showNotificationsAfterSignIn, user } = useAuth();
+  const { session, user } = useAuth();
   const tenant = useTenantScope();
-  const canPromptForNotifications = Boolean(
-    session && user && showNotificationsAfterSignIn,
-  );
   const accountQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -128,6 +125,11 @@ export default function DashboardScreen() {
   const [progressClock, setProgressClock] = useState(() => Date.now());
   const [isBookingSheetOpen, setIsBookingSheetOpen] = useState(false);
   const [isNotificationSheetOpen, setIsNotificationSheetOpen] = useState(false);
+  const [
+    notificationPermissionCanAskAgain,
+    setNotificationPermissionCanAskAgain,
+  ] = useState(true);
+  const notificationPromptHandledForUserRef = useRef<string | null>(null);
   const [notificationFlowState, setNotificationFlowState] = useState<
     'checking' | 'visible' | 'completed'
   >('checking');
@@ -236,15 +238,6 @@ export default function DashboardScreen() {
       };
     }
 
-    // A pending business location is required for the booking experience, so
-    // show that prompt before optional notification permissions.
-    if (needsLocationBanner === null || needsLocationBanner) {
-      if (needsLocationBanner) setNotificationFlowState('completed');
-      return () => {
-        isMounted = false;
-      };
-    }
-
     // Expo Web can report the browser permission as undetermined after a
     // refresh or sign-out. Push registration is native-only, so do not start
     // the permission flow in the web build.
@@ -262,15 +255,23 @@ export default function DashboardScreen() {
       };
     }
 
+    if (notificationPromptHandledForUserRef.current === user.id) {
+      setNotificationFlowState('completed');
+      return () => {
+        isMounted = false;
+      };
+    }
+
     const checkNotificationPermission = async () => {
       try {
-        const { status } = await Notifications.getPermissionsAsync();
+        const { canAskAgain, status } =
+          await Notifications.getPermissionsAsync();
         if (isMounted) {
           const shouldRequestPermission =
-            status !== Notifications.PermissionStatus.GRANTED &&
-            canPromptForNotifications;
+            status !== Notifications.PermissionStatus.GRANTED;
 
           if (shouldRequestPermission) {
+            setNotificationPermissionCanAskAgain(canAskAgain);
             notificationPromptTimer = setTimeout(() => {
               if (!isMounted) return;
               setIsNotificationSheetOpen(true);
@@ -296,13 +297,7 @@ export default function DashboardScreen() {
       isMounted = false;
       if (notificationPromptTimer) clearTimeout(notificationPromptTimer);
     };
-  }, [
-    canPromptForNotifications,
-    isDashboardFocused,
-    needsLocationBanner,
-    session,
-    user,
-  ]);
+  }, [isDashboardFocused, session, user]);
 
   useEffect(() => {
     let isMounted = true;
@@ -365,6 +360,7 @@ export default function DashboardScreen() {
 
     if (
       isDashboardFocused &&
+      notificationFlowState === 'completed' &&
       !isNotificationSheetOpen &&
       !isWelcomeSurveyOpen &&
       needsLocationBanner
@@ -380,18 +376,24 @@ export default function DashboardScreen() {
     };
   }, [
     isDashboardFocused,
+    notificationFlowState,
     isNotificationSheetOpen,
     isWelcomeSurveyOpen,
     needsLocationBanner,
   ]);
 
   const completeNotificationFlow = () => {
+    notificationPromptHandledForUserRef.current = user?.id ?? null;
     setIsNotificationSheetOpen(false);
     setNotificationFlowState('completed');
   };
 
   const requestNotificationPermission = async () => {
     try {
+      if (!notificationPermissionCanAskAgain) {
+        await Linking.openSettings();
+        return;
+      }
       const { status } = await Notifications.requestPermissionsAsync();
       if (status === Notifications.PermissionStatus.GRANTED)
         await syncPushToken();
@@ -700,6 +702,7 @@ export default function DashboardScreen() {
         visible={isQuickActionsPickerOpen}
       />
       <NotificationPermissionSheet
+        canAskAgain={notificationPermissionCanAskAgain}
         onAccept={() => void requestNotificationPermission()}
         onClose={completeNotificationFlow}
         visible={isNotificationSheetOpen}
@@ -718,6 +721,7 @@ export default function DashboardScreen() {
           onComplete={() => setIsLocationBannerOpen(false)}
           onDismiss={dismissLocationBanner}
           onSubmit={saveLocation}
+          requestPermissionOnOpen
           visible
         />
       ) : null}
