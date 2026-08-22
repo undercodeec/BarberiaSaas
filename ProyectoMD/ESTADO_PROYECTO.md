@@ -385,7 +385,7 @@ pnpm install --frozen-lockfile
 pnpm db:migrate:deploy
 pnpm db:status
 pnpm db:generate
-pnpm build:vps
+pnpm build
 systemctl restart nava-api.service
 systemctl restart nava-web.service
 systemctl restart nava-admin.service
