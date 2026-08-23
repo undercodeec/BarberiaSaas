@@ -312,6 +312,7 @@ model User {
   profilePhotoData                     String?                        @map("profile_photo_data") @db.Text
   profileBio                           String?                        @map("profile_bio") @db.VarChar(500)
   emailVerifiedAt                      DateTime?                      @map("email_verified_at") @db.Timestamptz(3)
+  suspendedAt                          DateTime?                      @map("suspended_at") @db.Timestamptz(3)
   locale                               String                         @default("es") @db.VarChar(10)
   deletedAt                            DateTime?                      @map("deleted_at") @db.Timestamptz(3)
   createdAt                            DateTime                       @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -362,6 +363,7 @@ model User {
   privacyConsents                      PrivacyConsent[]
 
   @@index([deletedAt])
+  @@index([suspendedAt])
   @@map("users")
 }
 

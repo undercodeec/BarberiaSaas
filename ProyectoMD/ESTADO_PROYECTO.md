@@ -327,6 +327,15 @@ Mobile / Web pública / Admin
 ### Fase 12 — Panel interno: funcional, con cambios locales
 
 - [x] Acceso limitado por `PLATFORM_ADMIN_EMAILS`, login y segundo factor OTP.
+- [~] Continuación Super Admin (23 de agosto de 2026): la primera entrega de
+      Usuarios Nava está implementada localmente con listado global paginado,
+      búsqueda/filtros en backend, PII enmascarada, ficha 360°, consulta de
+      Memberships, suspensión/reactivación, revocación total de sesiones y
+      solicitud segura de recuperación de contraseña. La migración
+      `20260823160000_platform_user_administration` agrega el estado de
+      suspensión y debe aplicarse junto con las demás migraciones pendientes.
+      Falta validación contra PostgreSQL real, navegación Usuario↔Organización,
+      administración de Memberships y las fases restantes de la propuesta.
 - [x] Métricas, organizaciones, plan, trial, uso, errores de notificación,
       auditoría y diagnóstico de soporte sin suplantación.
 - [x] Acciones de cambio de plan, suspensión y reactivación auditadas.

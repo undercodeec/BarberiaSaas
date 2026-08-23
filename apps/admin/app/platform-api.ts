@@ -48,6 +48,82 @@ export interface OrganizationList {
   };
 }
 
+export interface PlatformUser {
+  readonly createdAt: string;
+  readonly email: string;
+  readonly emailVerified: boolean;
+  readonly id: string;
+  readonly lastAccessAt: string | null;
+  readonly memberships: number;
+  readonly name: string;
+  readonly phone: string | null;
+  readonly roles: readonly string[];
+  readonly security: {
+    readonly activeSessions: number;
+    readonly suspended: boolean;
+  };
+  readonly status: 'active' | 'deleted' | 'suspended';
+}
+
+export interface PlatformUserList {
+  readonly pagination: OrganizationList['pagination'];
+  readonly users: readonly PlatformUser[];
+}
+
+export interface PlatformUserDetail {
+  readonly user: {
+    readonly account: {
+      readonly createdAt: string;
+      readonly deletedAt: string | null;
+      readonly email: string;
+      readonly emailVerified: boolean;
+      readonly id: string;
+      readonly name: string;
+      readonly phone: string | null;
+      readonly suspendedAt: string | null;
+      readonly updatedAt: string;
+    };
+    readonly audit: readonly {
+      readonly action: string;
+      readonly createdAt: string;
+      readonly metadata: unknown;
+    }[];
+    readonly devices: readonly {
+      readonly createdAt: string;
+      readonly updatedAt: string;
+    }[];
+    readonly memberships: readonly {
+      readonly createdAt: string;
+      readonly id: string;
+      readonly organization: {
+        readonly id: string;
+        readonly name: string;
+        readonly status: string;
+      };
+      readonly role: string;
+      readonly status: string;
+    }[];
+    readonly security: {
+      readonly activeSessions: number;
+      readonly lastAccessAt: string | null;
+      readonly sessions: readonly {
+        readonly createdAt: string;
+        readonly expiresAt: string;
+        readonly lastActiveAt: string;
+        readonly status: string;
+      }[];
+    };
+    readonly status: 'active' | 'deleted' | 'suspended';
+    readonly supportCases: readonly {
+      readonly id: string;
+      readonly organization: { readonly id: string; readonly name: string };
+      readonly status: string;
+      readonly title: string;
+      readonly updatedAt: string;
+    }[];
+  };
+}
+
 export interface NotificationFailure {
   readonly attempts: number;
   readonly channel: string;
@@ -458,6 +534,55 @@ export async function getOrganizations(
   return request<OrganizationList>(
     `/v1/platform/organizations?${query.toString()}`,
     {},
+    token,
+  );
+}
+
+export async function getPlatformUsers(
+  token: string,
+  input: {
+    readonly page: number;
+    readonly search: string;
+    readonly status: string;
+    readonly verification: string;
+  },
+) {
+  const query = new URLSearchParams({
+    page: String(input.page),
+    pageSize: '10',
+    status: input.status,
+    verification: input.verification,
+  });
+  if (input.search) query.set('search', input.search);
+  return request<PlatformUserList>(
+    `/v1/platform/users?${query.toString()}`,
+    {},
+    token,
+  );
+}
+
+export async function getPlatformUserDetail(token: string, userId: string) {
+  return request<PlatformUserDetail>(
+    `/v1/platform/users/${encodeURIComponent(userId)}`,
+    {},
+    token,
+  );
+}
+
+export type PlatformUserAction = {
+  readonly action:
+    'suspend' | 'reactivate' | 'revoke_sessions' | 'request_password_recovery';
+  readonly reason: string;
+};
+
+export async function updatePlatformUser(
+  token: string,
+  userId: string,
+  action: PlatformUserAction,
+) {
+  return request<{ id: string; status?: string }>(
+    `/v1/platform/users/${encodeURIComponent(userId)}`,
+    { body: JSON.stringify(action), method: 'PATCH' },
     token,
   );
 }

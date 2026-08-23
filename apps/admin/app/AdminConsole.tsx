@@ -35,6 +35,7 @@ import {
   OrganizationDetailModal,
   PlatformOperations,
 } from './PlatformOperations';
+import { PlatformUsers } from './PlatformUsers';
 
 const SESSION_KEY = 'nava.platform.session';
 const dateFormatter = new Intl.DateTimeFormat('es-EC', {
@@ -59,7 +60,8 @@ type View =
   | 'organizations'
   | 'overview'
   | 'privacy'
-  | 'security';
+  | 'security'
+  | 'users';
 type ModalState = {
   readonly organization: PlatformOrganization;
   readonly type: 'change_plan' | 'reactivate' | 'support' | 'suspend';
@@ -68,6 +70,7 @@ type AdminPermissions = {
   readonly billing: boolean;
   readonly operations: boolean;
   readonly support: boolean;
+  readonly users: boolean;
 };
 
 const statusLabels: Readonly<Record<string, string>> = {
@@ -1225,6 +1228,7 @@ export default function AdminConsole() {
       operator?.role === 'super_admin' ||
       operator?.role === 'operations' ||
       operator?.role === 'support',
+    users: operator?.role === 'super_admin' || operator?.role === 'operations',
   };
 
   const navigation = useMemo(
@@ -1235,6 +1239,7 @@ export default function AdminConsole() {
         id: 'organizations' as const,
         label: 'Organizaciones',
       },
+      { icon: 'users', id: 'users' as const, label: 'Usuarios' },
       {
         badge: notificationErrors.length,
         icon: 'bell',
@@ -1603,6 +1608,13 @@ export default function AdminConsole() {
               onSelect={setSelected}
               permissions={operatorPermissions}
               selected={selected}
+            />
+          ) : null}
+          {view === 'users' && token ? (
+            <PlatformUsers
+              canManage={operatorPermissions.users}
+              onToast={setToast}
+              token={token}
             />
           ) : null}
           {view === 'notifications' ? (

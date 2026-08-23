@@ -7,9 +7,11 @@ import {
   getOrganizationDetail,
   getOrganizations,
   getPlatformSession,
+  getPlatformUsers,
   requestPlatformAccessCode,
   startPlatformLogin,
   updatePlatformAlert,
+  updatePlatformUser,
   verifyPlatformAccessCode,
 } from './platform-api';
 
@@ -70,6 +72,60 @@ describe('cliente del panel de plataforma', () => {
     expect(url).toContain('trial=ending_soon');
     expect(new Headers(options.headers).get('authorization')).toBe(
       'Bearer session-token',
+    );
+  });
+
+  it('consulta usuarios con filtros en backend y sesiÃ³n autorizada', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          pagination: { page: 2, pageSize: 10, total: 0, totalPages: 1 },
+          users: [],
+        }),
+        { headers: { 'content-type': 'application/json' }, status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await getPlatformUsers('session-token', {
+      page: 2,
+      search: 'persona@nava.ec',
+      status: 'suspended',
+      verification: 'verified',
+    });
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/v1/platform/users?');
+    expect(url).toContain('search=persona%40nava.ec');
+    expect(url).toContain('status=suspended');
+    expect(url).toContain('verification=verified');
+    expect(new Headers(options.headers).get('authorization')).toBe(
+      'Bearer session-token',
+    );
+  });
+
+  it('envÃ­a acciones de usuario por PATCH sin exponer secretos', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: 'user-id', status: 'suspended' }), {
+        headers: { 'content-type': 'application/json' },
+        status: 200,
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await updatePlatformUser('session-token', 'user/id', {
+      action: 'suspend',
+      reason: 'Incumplimiento reportado y verificado por soporte.',
+    });
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_URL}/v1/platform/users/user%2Fid`);
+    expect(options.method).toBe('PATCH');
+    expect(options.body).toBe(
+      JSON.stringify({
+        action: 'suspend',
+        reason: 'Incumplimiento reportado y verificado por soporte.',
+      }),
     );
   });
 

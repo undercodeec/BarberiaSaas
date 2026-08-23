@@ -1,8 +1,11 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
-test('muestra la landing comercial en un viewport móvil', async ({ page }) => {
+test('abre el portal y muestra la propuesta comercial de Nava', async ({
+  page,
+}) => {
   await page.goto('/');
+  await page.evaluate(() => window.scrollTo(0, window.innerHeight));
   await expect(
     page.getByRole('heading', {
       name: 'Haz crecer tu barbería con más orden y menos complicaciones.',

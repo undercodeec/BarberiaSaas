@@ -1,8 +1,15 @@
 import type { Metadata, Viewport } from 'next';
+import { Manrope } from 'next/font/google';
 import type { ReactNode } from 'react';
 
 import { CookieConsent } from './components/CookieConsent';
 import './globals.css';
+
+const manrope = Manrope({
+  display: 'swap',
+  subsets: ['latin'],
+  variable: '--font-manrope',
+});
 
 export const metadata: Metadata = {
   title: 'Nava | La plataforma para tu barbería',
@@ -21,7 +28,7 @@ export default function RootLayout({
 }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="es">
-      <body>
+      <body className={manrope.variable}>
         {children}
         <CookieConsent />
       </body>

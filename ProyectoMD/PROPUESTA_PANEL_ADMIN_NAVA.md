@@ -179,6 +179,32 @@ plataforma que permita gestionar:
 
 La prioridad inmediata es **Usuarios Nava**.
 
+## Registro de avance — 23 de agosto de 2026
+
+La primera entrega de la prioridad P0 está implementada localmente y pendiente
+de aplicar en producción junto con su migración:
+
+- se añadió la navegación **Usuarios** y un listado global paginado;
+- la búsqueda por nombre, correo, teléfono o ID y los filtros de estado y
+  verificación se ejecutan en backend;
+- el listado y la ficha exponen únicamente correo, teléfono y nombre
+  enmascarados;
+- la ficha consulta Memberships, sesiones activas, dispositivos push y casos
+  de soporte relacionados sin exponer tokens ni secretos;
+- `suspend`, `reactivate`, `revoke_sessions` y
+  `request_password_recovery` están protegidas por RBAC de backend, requieren
+  motivo y generan auditoría;
+- la suspensión se persiste en `User.suspendedAt`, revoca las sesiones activas
+  e impide el login y la autenticación de la cuenta;
+- se creó la migración
+  `20260823160000_platform_user_administration`.
+
+La entrega no completa todavía SA-1 a SA-7: faltan la navegación explícita
+Usuario→Organización, la administración segura de Memberships, pruebas de
+integración PostgreSQL y revisión visual responsive autenticada. Por ello SRI
+continúa fuera de alcance hasta terminar el panel conforme a los criterios de
+aceptación de este documento.
+
 ---
 
 # Fase SA-1 — Gestión global de usuarios Nava

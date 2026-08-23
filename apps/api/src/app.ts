@@ -850,7 +850,7 @@ async function authenticate(database: DatabaseClient, request: FastifyRequest) {
       },
       revokedAt: null,
       tokenHash: hashOpaqueToken(token),
-      user: { deletedAt: null },
+      user: { deletedAt: null, suspendedAt: null },
     },
   });
   if (!session) {
@@ -1126,6 +1126,7 @@ export async function buildApi({
     if (
       !user?.passwordHash ||
       user.deletedAt ||
+      user.suspendedAt ||
       !(await verifyPassword(input.password, user.passwordHash))
     ) {
       throw new ApiError(
@@ -1787,7 +1788,7 @@ export async function buildApi({
       where: { email: normalizeEmail(email) },
     });
     let developmentResetToken: string | undefined;
-    if (user) {
+    if (user && !user.deletedAt && !user.suspendedAt) {
       const token = createOpaqueToken();
       await database.passwordResetToken.create({
         data: {
@@ -2699,6 +2700,37 @@ export async function buildApi({
         verificationMailer,
       });
       return { verificationExpiresAt: verification.verificationExpiresAt };
+    },
+    async (userId) => {
+      const user = await database.user.findFirst({
+        where: { deletedAt: null, id: userId, suspendedAt: null },
+      });
+      if (!user) {
+        throw new ApiError(
+          404,
+          'PLATFORM_USER_NOT_FOUND',
+          'La cuenta no está disponible.',
+        );
+      }
+      const token = createOpaqueToken();
+      await database.passwordResetToken.create({
+        data: {
+          expiresAt: new Date(Date.now() + RESET_DURATION_MS),
+          tokenHash: hashOpaqueToken(token),
+          userId: user.id,
+        },
+      });
+      const separator = config.MOBILE_RESET_URL.includes('?') ? '&' : '?';
+      const resetUrl = `${config.MOBILE_RESET_URL}${separator}token=${encodeURIComponent(token)}`;
+      if (recoveryMailer) {
+        await recoveryMailer.send({ email: user.email, resetUrl });
+      } else if (config.APP_ENV !== 'local') {
+        throw new ApiError(
+          503,
+          'PASSWORD_RECOVERY_DELIVERY_UNAVAILABLE',
+          'El correo de recuperación no está disponible.',
+        );
+      }
     },
   );
   registerAgendaRoutes(app, database, authenticate);

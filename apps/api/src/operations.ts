@@ -99,6 +99,38 @@ const updateLocationSchema = createLocationSchema
     'Debes modificar al menos un campo.',
   );
 const platformOrganizationParamsSchema = z.object({ id: z.uuid() });
+const platformUserParamsSchema = z.object({ id: z.uuid() });
+const platformUserListSchema = z.object({
+  from: z.coerce.date().optional(),
+  organizationId: z.uuid().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  role: z
+    .enum(['all', 'owner', 'manager', 'receptionist', 'barber'])
+    .default('all'),
+  search: z.string().trim().max(120).optional(),
+  status: z.enum(['all', 'active', 'suspended', 'deleted']).default('all'),
+  to: z.coerce.date().optional(),
+  verification: z.enum(['all', 'verified', 'unverified']).default('all'),
+});
+const platformUserActionSchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('suspend'),
+    reason: z.string().trim().min(10).max(500),
+  }),
+  z.object({
+    action: z.literal('reactivate'),
+    reason: z.string().trim().min(10).max(500),
+  }),
+  z.object({
+    action: z.literal('revoke_sessions'),
+    reason: z.string().trim().min(10).max(500),
+  }),
+  z.object({
+    action: z.literal('request_password_recovery'),
+    reason: z.string().trim().min(10).max(500),
+  }),
+]);
 const platformOrganizationListSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
@@ -441,6 +473,7 @@ type PlatformPermission =
   | 'manage_billing'
   | 'manage_operations'
   | 'manage_operators'
+  | 'manage_users'
   | 'support'
   | 'view';
 
@@ -455,6 +488,7 @@ const PLATFORM_ROLE_PERMISSIONS: Readonly<
     'export',
     'manage_operations',
     'manage_operators',
+    'manage_users',
     'support',
     'view',
   ],
@@ -476,6 +510,10 @@ function requirePlatformPermission(
 
 function platformRole(value: string): PlatformOperatorRole {
   return value.toUpperCase() as PlatformOperatorRole;
+}
+
+function membershipRole(value: string): MembershipRole {
+  return value.toUpperCase() as MembershipRole;
 }
 
 async function createPlatformAudit(
@@ -566,6 +604,12 @@ function maskedName(name: string) {
     .filter(Boolean)
     .map((part) => `${part.slice(0, 1)}.`)
     .join(' ');
+}
+
+function maskedPhone(phone: string | null) {
+  if (!phone) return null;
+  const visible = phone.slice(-3);
+  return `${'*'.repeat(Math.max(4, phone.length - visible.length))}${visible}`;
 }
 
 function csvCell(value: unknown) {
@@ -857,6 +901,7 @@ function registerPlatformRoutes(
   resendPendingVerification: (
     pendingRegistrationId: string,
   ) => Promise<{ readonly verificationExpiresAt: string }>,
+  requestPasswordRecovery: (userId: string) => Promise<void>,
 ) {
   app.post('/v1/platform/development-session', async () => {
     if (config.PLATFORM_DEVELOPMENT_BYPASS !== 'true') {
@@ -866,7 +911,7 @@ function registerPlatformRoutes(
     const user = email
       ? await database.user.findUnique({ where: { email } })
       : null;
-    if (!user || user.deletedAt || !user.emailVerifiedAt) {
+    if (!user || user.deletedAt || user.suspendedAt || !user.emailVerifiedAt) {
       throw new ApiError(
         503,
         'DEVELOPMENT_OPERATOR_UNAVAILABLE',
@@ -926,6 +971,7 @@ function registerPlatformRoutes(
       !passwordHash ||
       !user ||
       user.deletedAt ||
+      user.suspendedAt ||
       !user.emailVerifiedAt ||
       !(await verifyPassword(input.password, passwordHash))
     ) {
@@ -1402,6 +1448,345 @@ function registerPlatformRoutes(
       metadata: { targetUserId: session.userId },
     });
     return reply.code(204).send();
+  });
+
+  app.get('/v1/platform/users', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'view');
+    const query = platformUserListSchema.parse(request.query);
+    const where = {
+      ...(query.status === 'active'
+        ? { deletedAt: null, suspendedAt: null }
+        : query.status === 'suspended'
+          ? { deletedAt: null, suspendedAt: { not: null } }
+          : query.status === 'deleted'
+            ? { deletedAt: { not: null } }
+            : {}),
+      ...(query.verification === 'verified'
+        ? { emailVerifiedAt: { not: null } }
+        : query.verification === 'unverified'
+          ? { emailVerifiedAt: null }
+          : {}),
+      ...(query.role === 'all'
+        ? {}
+        : { memberships: { some: { role: membershipRole(query.role) } } }),
+      ...(query.organizationId
+        ? { memberships: { some: { organizationId: query.organizationId } } }
+        : {}),
+      ...(query.from || query.to
+        ? {
+            createdAt: {
+              ...(query.from ? { gte: query.from } : {}),
+              ...(query.to ? { lte: query.to } : {}),
+            },
+          }
+        : {}),
+      ...(query.search
+        ? {
+            OR: [
+              {
+                email: { contains: query.search, mode: 'insensitive' as const },
+              },
+              {
+                fullName: {
+                  contains: query.search,
+                  mode: 'insensitive' as const,
+                },
+              },
+              { id: { equals: query.search } },
+              { phone: { contains: query.search } },
+            ],
+          }
+        : {}),
+    };
+    const now = new Date();
+    const [total, users] = await Promise.all([
+      database.user.count({ where }),
+      database.user.findMany({
+        include: {
+          _count: {
+            select: {
+              memberships: true,
+              sessions: {
+                where: { expiresAt: { gt: now }, revokedAt: null },
+              },
+            },
+          },
+          memberships: { select: { role: true } },
+          sessions: {
+            orderBy: { lastActiveAt: 'desc' },
+            select: { expiresAt: true, lastActiveAt: true, revokedAt: true },
+            take: 1,
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+      }),
+    ]);
+    return {
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+      },
+      users: users.map((user) => {
+        return {
+          createdAt: user.createdAt.toISOString(),
+          email: maskedEmail(user.email),
+          emailVerified: Boolean(user.emailVerifiedAt),
+          id: user.id,
+          lastAccessAt: user.sessions[0]?.lastActiveAt.toISOString() ?? null,
+          memberships: user._count.memberships,
+          name: maskedName(user.fullName),
+          phone: maskedPhone(user.phone),
+          roles: [
+            ...new Set(
+              user.memberships.map((membership) =>
+                membership.role.toLowerCase(),
+              ),
+            ),
+          ],
+          security: {
+            activeSessions: user._count.sessions,
+            suspended: Boolean(user.suspendedAt),
+          },
+          status: user.deletedAt
+            ? 'deleted'
+            : user.suspendedAt
+              ? 'suspended'
+              : 'active',
+        };
+      }),
+    };
+  });
+
+  app.get('/v1/platform/users/:id', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'view');
+    const { id } = platformUserParamsSchema.parse(request.params);
+    const now = new Date();
+    const user = await database.user.findUnique({
+      include: {
+        memberships: {
+          include: {
+            organization: { select: { id: true, name: true, status: true } },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+        pushTokens: { select: { createdAt: true, updatedAt: true } },
+        sessions: {
+          orderBy: { lastActiveAt: 'desc' },
+          select: {
+            createdAt: true,
+            expiresAt: true,
+            lastActiveAt: true,
+            revokedAt: true,
+          },
+          take: 50,
+        },
+      },
+      where: { id },
+    });
+    if (!user)
+      throw new ApiError(
+        404,
+        'PLATFORM_USER_NOT_FOUND',
+        'La cuenta no existe.',
+      );
+    const activeSessions = user.sessions.filter(
+      (session) => !session.revokedAt && session.expiresAt > now,
+    );
+    const [audit, supportCases] = await Promise.all([
+      database.platformAuditLog.findMany({
+        orderBy: { createdAt: 'desc' },
+        select: { action: true, createdAt: true, metadata: true },
+        take: 20,
+        where: { entityId: user.id, entityType: 'user' },
+      }),
+      database.platformSupportCase.findMany({
+        include: { organization: { select: { id: true, name: true } } },
+        orderBy: { updatedAt: 'desc' },
+        take: 20,
+        where: {
+          organizationId: {
+            in: user.memberships.map((membership) => membership.organizationId),
+          },
+        },
+      }),
+    ]);
+    return {
+      user: {
+        account: {
+          createdAt: user.createdAt.toISOString(),
+          deletedAt: user.deletedAt?.toISOString() ?? null,
+          email: maskedEmail(user.email),
+          emailVerified: Boolean(user.emailVerifiedAt),
+          id: user.id,
+          name: maskedName(user.fullName),
+          phone: maskedPhone(user.phone),
+          suspendedAt: user.suspendedAt?.toISOString() ?? null,
+          updatedAt: user.updatedAt.toISOString(),
+        },
+        audit: audit.map((entry) => ({
+          action: entry.action,
+          createdAt: entry.createdAt.toISOString(),
+          metadata: entry.metadata,
+        })),
+        devices: user.pushTokens.map((device) => ({
+          createdAt: device.createdAt.toISOString(),
+          updatedAt: device.updatedAt.toISOString(),
+        })),
+        memberships: user.memberships.map((membership) => ({
+          createdAt: membership.createdAt.toISOString(),
+          id: membership.id,
+          organization: {
+            id: membership.organization.id,
+            name: membership.organization.name,
+            status: membership.organization.status.toLowerCase(),
+          },
+          role: membership.role.toLowerCase(),
+          status: membership.status.toLowerCase(),
+        })),
+        security: {
+          activeSessions: activeSessions.length,
+          lastAccessAt: user.sessions[0]?.lastActiveAt.toISOString() ?? null,
+          sessions: user.sessions.map((session) => ({
+            createdAt: session.createdAt.toISOString(),
+            expiresAt: session.expiresAt.toISOString(),
+            lastActiveAt: session.lastActiveAt.toISOString(),
+            status: session.revokedAt
+              ? 'revoked'
+              : session.expiresAt <= now
+                ? 'expired'
+                : 'active',
+          })),
+        },
+        status: user.deletedAt
+          ? 'deleted'
+          : user.suspendedAt
+            ? 'suspended'
+            : 'active',
+        supportCases: supportCases.map((supportCase) => ({
+          id: supportCase.id,
+          organization: supportCase.organization,
+          status: supportCase.status.toLowerCase(),
+          title: supportCase.title,
+          updatedAt: supportCase.updatedAt.toISOString(),
+        })),
+      },
+    };
+  });
+
+  app.patch('/v1/platform/users/:id', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'manage_users');
+    const { id } = platformUserParamsSchema.parse(request.params);
+    const input = platformUserActionSchema.parse(request.body);
+    const target = await database.user.findUnique({ where: { id } });
+    if (!target)
+      throw new ApiError(
+        404,
+        'PLATFORM_USER_NOT_FOUND',
+        'La cuenta no existe.',
+      );
+    if (target.id === operator.id && input.action === 'suspend') {
+      throw new ApiError(
+        409,
+        'PLATFORM_USER_SELF_SUSPENSION',
+        'No puedes suspender tu propia cuenta.',
+      );
+    }
+    if (target.deletedAt) {
+      throw new ApiError(
+        409,
+        'PLATFORM_USER_DELETED',
+        'Una cuenta eliminada no puede modificarse.',
+      );
+    }
+    const now = new Date();
+    if (input.action === 'suspend') {
+      await database.$transaction(async (transaction) => {
+        await transaction.user.update({
+          data: { suspendedAt: now },
+          where: { id },
+        });
+        await transaction.session.updateMany({
+          data: { revokedAt: now },
+          where: { revokedAt: null, userId: id },
+        });
+      });
+    } else if (input.action === 'reactivate') {
+      await database.user.update({
+        data: { suspendedAt: null },
+        where: { id },
+      });
+    } else if (input.action === 'revoke_sessions') {
+      await database.session.updateMany({
+        data: { revokedAt: now },
+        where: { revokedAt: null, userId: id },
+      });
+    } else {
+      if (target.suspendedAt) {
+        throw new ApiError(
+          409,
+          'PLATFORM_USER_SUSPENDED',
+          'Reactiva la cuenta antes de solicitar la recuperación.',
+        );
+      }
+      await requestPasswordRecovery(id);
+    }
+    const action =
+      input.action === 'suspend'
+        ? 'platform.user.suspended'
+        : input.action === 'reactivate'
+          ? 'platform.user.reactivated'
+          : input.action === 'revoke_sessions'
+            ? 'platform.user.sessions_revoked'
+            : 'platform.user.password_recovery_requested';
+    await createPlatformAudit(database, {
+      action,
+      actorUserId: operator.id,
+      afterData:
+        input.action === 'suspend'
+          ? { suspendedAt: now.toISOString() }
+          : input.action === 'reactivate'
+            ? { suspendedAt: null }
+            : undefined,
+      beforeData:
+        input.action === 'suspend' || input.action === 'reactivate'
+          ? { suspendedAt: target.suspendedAt?.toISOString() ?? null }
+          : undefined,
+      entityId: id,
+      entityType: 'user',
+      metadata: { reason: input.reason },
+    });
+    return {
+      id,
+      status:
+        input.action === 'suspend'
+          ? 'suspended'
+          : input.action === 'reactivate'
+            ? 'active'
+            : undefined,
+    };
   });
 
   app.get('/v1/platform/overview', async (request) => {
@@ -3862,6 +4247,7 @@ export function registerOperationsRoutes(
   resendPendingVerification: (
     pendingRegistrationId: string,
   ) => Promise<{ readonly verificationExpiresAt: string }>,
+  requestPasswordRecovery: (userId: string) => Promise<void>,
 ) {
   registerPlatformRoutes(
     app,
@@ -3870,6 +4256,7 @@ export function registerOperationsRoutes(
     config,
     platformAccessMailer,
     resendPendingVerification,
+    requestPasswordRecovery,
   );
   app.addHook('preHandler', async (request) => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(request.method)) return;
