@@ -75,6 +75,9 @@ export default function DashboardScreen() {
     queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
   });
   const organizationQuery = useCurrentOrganization();
+  const canAccessFinancialReports =
+    organizationQuery.data?.membership.role === 'owner' ||
+    organizationQuery.data?.membership.role === 'manager';
   const subscriptionQuery = useQuery({
     enabled: Boolean(session && user),
     queryFn: () =>
@@ -501,14 +504,16 @@ export default function DashboardScreen() {
                 </Text>
               ) : null}
             </View>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push('/business-summary')}
-              style={styles.summaryButton}
-            >
-              <Text style={styles.summaryLabel}>Resumen</Text>
-              <Ionicons color="#B47D17" name="bar-chart-outline" size={22} />
-            </Pressable>
+            {canAccessFinancialReports ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/business-summary')}
+                style={styles.summaryButton}
+              >
+                <Text style={styles.summaryLabel}>Resumen</Text>
+                <Ionicons color="#B47D17" name="bar-chart-outline" size={22} />
+              </Pressable>
+            ) : null}
           </View>
           <View style={styles.salesMeta}>
             <Text style={styles.salesMetaText}>{planProgress.expiryLabel}</Text>

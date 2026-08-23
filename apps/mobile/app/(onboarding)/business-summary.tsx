@@ -20,6 +20,7 @@ import {
   useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { InlineMessage } from '../../src/components/InlineMessage';
+import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../../src/lib/api';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -58,11 +59,15 @@ export default function BusinessSummaryScreen() {
   const router = useRouter();
   const layout = useNativeLayoutMetrics();
   const { session } = useAuth();
+  const organizationQuery = useCurrentOrganization();
+  const canAccessFinancialReports =
+    organizationQuery.data?.membership.role === 'owner' ||
+    organizationQuery.data?.membership.role === 'manager';
   const [preset, setPreset] = useState<Preset>('this_month');
   const [locationId, setLocationId] = useState<string | null>(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const summaryQuery = useQuery({
-    enabled: Boolean(session),
+    enabled: Boolean(session) && canAccessFinancialReports,
     queryFn: () => {
       const location = locationId
         ? `&locationId=${encodeURIComponent(locationId)}`
@@ -74,6 +79,8 @@ export default function BusinessSummaryScreen() {
     queryKey: tenant.key('business-summary', preset),
   });
   if (!session) return <Redirect href="/(auth)/login" />;
+  if (!organizationQuery.isLoading && !canAccessFinancialReports)
+    return <Redirect href="/reports" />;
 
   const report = summaryQuery.data;
   const currency = report?.currencyCode ?? 'USD';

@@ -19,6 +19,7 @@ import {
   goldButtonShadow,
 } from '../../src/components/BottomNavigation';
 import { InlineMessage } from '../../src/components/InlineMessage';
+import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../../src/lib/api';
 import { shareTemporaryExport } from '../../src/lib/temporary-export';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -42,6 +43,10 @@ export default function DailyReportScreen() {
   const { session } = useAuth();
   const tenant = useTenantScope();
   const router = useRouter();
+  const organizationQuery = useCurrentOrganization();
+  const canAccessFinancialReports =
+    organizationQuery.data?.membership.role === 'owner' ||
+    organizationQuery.data?.membership.role === 'manager';
   const [preset, setPreset] = useState<Preset>('today');
   const [locationId, setLocationId] = useState<string | null>(null);
   const queryString = useMemo(() => {
@@ -50,7 +55,7 @@ export default function DailyReportScreen() {
     return search.toString();
   }, [locationId, preset]);
   const reportQuery = useQuery({
-    enabled: Boolean(session),
+    enabled: Boolean(session) && canAccessFinancialReports,
     queryFn: () =>
       requireApiClient().request<DailyReportResponse>(
         `/v1/reports/daily?${queryString}`,
@@ -58,6 +63,8 @@ export default function DailyReportScreen() {
     queryKey: tenant.key('daily-report', queryString),
   });
   if (!session) return <Redirect href="/(auth)/login" />;
+  if (!organizationQuery.isLoading && !canAccessFinancialReports)
+    return <Redirect href="/reports" />;
   const report = reportQuery.data;
   const currency = report?.currencyCode ?? 'USD';
   const performCsvExport = async () => {

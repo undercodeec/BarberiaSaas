@@ -23,6 +23,7 @@ import {
   goldButtonShadow,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
+import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { accountQueryKey } from '../../src/lib/query-keys';
 import { shareTemporaryExport } from '../../src/lib/temporary-export';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -35,6 +36,7 @@ type ReportMenuItem = {
   readonly id: string;
   readonly movementKind?: 'deposits' | 'expenses' | 'sales';
   readonly planning?: string;
+  readonly requiresFinancialReportsAccess?: boolean;
   readonly route?: string;
   readonly status: 'available' | 'planned';
   readonly title: string;
@@ -55,6 +57,7 @@ const reportSections: readonly ReportSection[] = [
         description:
           'Citas, cobros, ventas por profesional, productos y cierres de Caja.',
         icon: 'today-outline',
+        requiresFinancialReportsAccess: true,
         route: '/daily-report',
         status: 'available',
       },
@@ -64,6 +67,7 @@ const reportSections: readonly ReportSection[] = [
         description:
           'Ventas, gastos, pagos, resultado neto y comisiones por período.',
         icon: 'bar-chart-outline',
+        requiresFinancialReportsAccess: true,
         route: '/business-summary',
         status: 'available',
       },
@@ -79,6 +83,7 @@ const reportSections: readonly ReportSection[] = [
         description:
           'Consulta cierres, efectivo esperado, contado y diferencias.',
         icon: 'wallet-outline',
+        requiresFinancialReportsAccess: true,
         route: '/wallet?tab=history',
         status: 'available',
       },
@@ -89,6 +94,7 @@ const reportSections: readonly ReportSection[] = [
           'Movimientos de gasto por fecha, sucursal, categoría y responsable.',
         icon: 'trending-down-outline',
         movementKind: 'expenses',
+        requiresFinancialReportsAccess: true,
         status: 'available',
       },
       {
@@ -97,6 +103,7 @@ const reportSections: readonly ReportSection[] = [
         description: 'Entradas de dinero que no corresponden a una venta.',
         icon: 'trending-up-outline',
         movementKind: 'deposits',
+        requiresFinancialReportsAccess: true,
         status: 'available',
       },
       {
@@ -104,6 +111,7 @@ const reportSections: readonly ReportSection[] = [
         title: 'Pagar a colaboradores',
         description: 'Pagar a tus colaboradores por rango de fechas.',
         icon: 'cash-outline',
+        requiresFinancialReportsAccess: true,
         route: '/wallet?tab=commissions',
         status: 'available',
       },
@@ -113,6 +121,7 @@ const reportSections: readonly ReportSection[] = [
         description:
           'Liquidaciones pagadas, anticipos, descuentos y reversos auditables.',
         icon: 'receipt-outline',
+        requiresFinancialReportsAccess: true,
         route: '/wallet?tab=commissions',
         status: 'available',
       },
@@ -169,6 +178,7 @@ const reportSections: readonly ReportSection[] = [
 export default function ReportsScreen() {
   const { session, user } = useAuth();
   const router = useRouter();
+  const organizationQuery = useCurrentOrganization();
   const accountQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -178,18 +188,24 @@ export default function ReportsScreen() {
     queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
   });
   const isSolo = accountQuery.data?.accountType === 'professional';
+  const role = organizationQuery.data?.membership.role;
+  const canAccessFinancialReports = role === 'owner' || role === 'manager';
   const visibleReportSections = useMemo(
     () =>
-      reportSections.map((section) => ({
-        ...section,
-        items: section.items.filter(
-          (item) =>
-            !isSolo ||
-            (item.id !== 'pay-collaborators' &&
-              item.id !== 'collaborator-payment-history'),
-        ),
-      })),
-    [isSolo],
+      reportSections
+        .map((section) => ({
+          ...section,
+          items: section.items.filter(
+            (item) =>
+              (!item.requiresFinancialReportsAccess ||
+                canAccessFinancialReports) &&
+              (!isSolo ||
+                (item.id !== 'pay-collaborators' &&
+                  item.id !== 'collaborator-payment-history')),
+          ),
+        }))
+        .filter((section) => section.items.length > 0),
+    [canAccessFinancialReports, isSolo],
   );
   const [movementReport, setMovementReport] = useState<
     'deposits' | 'expenses' | 'sales' | null
