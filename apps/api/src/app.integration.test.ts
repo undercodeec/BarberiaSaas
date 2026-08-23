@@ -163,6 +163,7 @@ function registrationProfilePayload() {
     countryCode: 'EC',
     openingTime: '09:00',
     phone: `+5939${String(registrationProfileSequence).padStart(8, '0')}`,
+    privacyPolicyAccepted: true,
   } as const;
 }
 

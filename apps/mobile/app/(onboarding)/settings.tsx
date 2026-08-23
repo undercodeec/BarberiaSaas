@@ -36,6 +36,7 @@ import { KeyboardAwareScrollView as ScrollView } from '../../src/components/Keyb
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../../src/lib/api';
 import { accountQueryKey } from '../../src/lib/query-keys';
+import { shareTemporaryExport } from '../../src/lib/temporary-export';
 import { runTenantTransition } from '../../src/lib/tenant-transition';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -47,6 +48,20 @@ interface MarketingPreference {
   readonly consentedAt: string | null;
   readonly policyVersion: string | null;
   readonly subscribed: boolean;
+}
+interface ClosedBusinessExport {
+  readonly expiresAt: string;
+  readonly id: string;
+  readonly name: string;
+}
+interface ClosedBusinessExportsResponse {
+  readonly exports: readonly ClosedBusinessExport[];
+}
+interface ClosedBusinessExportDownload {
+  readonly contentsBase64: string;
+  readonly expiresAt: string;
+  readonly filename: string;
+  readonly mimeType: string;
 }
 
 export default function SettingsScreen() {
@@ -98,6 +113,40 @@ export default function SettingsScreen() {
       });
     },
   });
+  const closedBusinessExportsQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<ClosedBusinessExportsResponse>(
+        '/v1/account/closed-business-exports',
+      ),
+    queryKey: accountQueryKey(user?.id, 'closed-business-exports'),
+  });
+  const downloadClosedBusinessExport = useMutation({
+    mutationFn: async ({
+      format,
+      organizationId,
+    }: {
+      readonly format: 'csv' | 'zip';
+      readonly organizationId: string;
+    }) => {
+      const download =
+        await requireApiClient().request<ClosedBusinessExportDownload>(
+          `/v1/account/closed-business-exports/${organizationId}?format=${format}`,
+        );
+      await shareTemporaryExport({
+        contents: download.contentsBase64,
+        encoding: 'base64',
+        filename: download.filename,
+        mimeType: download.mimeType,
+      });
+    },
+    onError: (error) => {
+      Alert.alert(
+        'No pudimos preparar la exportación',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      );
+    },
+  });
   const deleteAccountMutation = useMutation({
     mutationFn: async () => {
       await requireApiClient().request<void>('/v1/account', {
@@ -130,6 +179,9 @@ export default function SettingsScreen() {
       setIsCloseBusinessOpen(false);
       setCloseBusinessPassword('');
       setCloseBusinessConfirmation('');
+      await queryClient.invalidateQueries({
+        queryKey: accountQueryKey(user?.id, 'closed-business-exports'),
+      });
       Alert.alert(
         'Barbería cerrada',
         'Tu cuenta sigue activa. Abre nuevamente el enlace de invitación para unirte al otro negocio.',
@@ -322,6 +374,32 @@ export default function SettingsScreen() {
                 : 'Marketing de Nava: desactivado'
           }
         />
+        {closedBusinessExportsQuery.data?.exports.flatMap((business) => [
+          <SettingsCard
+            description={`Disponible hasta ${new Date(business.expiresAt).toLocaleDateString('es-EC')}. Incluye los datos estructurados del negocio.`}
+            icon="document-text-outline"
+            key={`${business.id}-csv`}
+            onPress={() =>
+              downloadClosedBusinessExport.mutate({
+                format: 'csv',
+                organizationId: business.id,
+              })
+            }
+            title={`Exportar ${business.name} (CSV)`}
+          />,
+          <SettingsCard
+            description="Paquete ZIP con datos estructurados e imágenes disponibles."
+            icon="archive-outline"
+            key={`${business.id}-zip`}
+            onPress={() =>
+              downloadClosedBusinessExport.mutate({
+                format: 'zip',
+                organizationId: business.id,
+              })
+            }
+            title={`Exportar ${business.name} (ZIP)`}
+          />,
+        ])}
         <Pressable
           accessibilityRole="button"
           disabled={isSigningOut}

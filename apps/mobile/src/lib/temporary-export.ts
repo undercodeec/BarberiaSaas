@@ -24,7 +24,13 @@ export async function runTemporaryShare(input: {
 
 function downloadOnWeb(input: TemporaryExportInput) {
   const link = document.createElement('a');
-  const blob = new Blob([input.contents], { type: input.mimeType });
+  const contents =
+    input.encoding === 'base64'
+      ? Uint8Array.from(atob(input.contents), (character) =>
+          character.charCodeAt(0),
+        )
+      : input.contents;
+  const blob = new Blob([contents], { type: input.mimeType });
   const objectUrl = URL.createObjectURL(blob);
   try {
     link.download = input.filename;

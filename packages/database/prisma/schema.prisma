@@ -359,6 +359,7 @@ model User {
   subscriptionPaymentAttemptsInitiated SubscriptionPaymentAttempt[]   @relation("SubscriptionPaymentInitiator")
   subscriptionChangesActed             SubscriptionChange[]           @relation("SubscriptionChangeActor")
   marketingConsents                    MarketingConsent[]
+  privacyConsents                      PrivacyConsent[]
 
   @@index([deletedAt])
   @@map("users")
@@ -420,6 +421,7 @@ model PendingRegistration {
   openingTime     String?                  @map("opening_time") @db.Char(5)
   closingTime     String?                  @map("closing_time") @db.Char(5)
   marketingOptIn  Boolean                  @default(false) @map("marketing_opt_in")
+  privacyPolicyAccepted Boolean             @default(false) @map("privacy_policy_accepted")
   createdAt       DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -438,6 +440,17 @@ model MarketingConsent {
 
   @@index([userId, withdrawnAt])
   @@map("marketing_consents")
+}
+
+model PrivacyConsent {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  policyVersion String   @map("policy_version") @db.VarChar(80)
+  acceptedAt    DateTime @default(now()) @map("accepted_at") @db.Timestamptz(3)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, acceptedAt])
+  @@map("privacy_consents")
 }
 
 model UserRegistrationProfile {

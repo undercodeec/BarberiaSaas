@@ -16,9 +16,28 @@
 
 > Corte de implementación de políticas (23 de agosto de 2026): trial de 10
 > días, gracia de 3 días exclusiva de planes pagados, recordatorio de renovación
-> a 5 días, código fundador y opt-in de marketing están implementados
+> a 5 días, código fundador, consentimiento de privacidad, opt-in de marketing,
+> exportación de cierre CSV/ZIP y control de cookies están implementados
 > localmente y requieren desplegar sus migraciones y configuración productiva
 > antes de declararlos operativos.
+
+### Validación del corte de políticas (23 de agosto de 2026)
+
+- [x] `pnpm typecheck`: 17 tareas correctas en 12 paquetes.
+- [x] `pnpm --filter @barber-saas/validation test`: 25 pruebas aprobadas.
+- [x] `pnpm --filter @barber-saas/web build`: incluye la ruta estática
+      `/tratamiento-de-datos`.
+- [x] `pnpm test:e2e`: 6/6 escenarios aprobados en Chromium móvil y escritorio,
+      incluidos banner de cookies y página pública de privacidad.
+- [ ] Antes del despliegue, aplicar
+      `20260823150000_privacy_consent` junto con las migraciones de
+      suscripciones pendientes, definir `PLATFORM_PRIVACY_POLICY_VERSION`,
+      `PLATFORM_MARKETING_POLICY_VERSION` y, si se usará analítica,
+      `NEXT_PUBLIC_GA_MEASUREMENT_ID`.
+- [ ] Sigue pendiente de operación externa el módulo propio de facturación SRI,
+      credenciales y homologación; SMTP Hostinger, PayPhone productivo, backups
+      30/90 y ensayo de restauración tampoco se pueden certificar desde el
+      repositorio.
 
 Este documento es la fuente de verdad del estado vigente. Sustituye la antigua
 bitácora cronológica: una función se considera terminada solo cuando existe en
@@ -110,9 +129,12 @@ Mobile / Web pública / Admin
 ### Fase 1 — Identidad, organización y onboarding: funcional
 
 - [x] Registro temporal y verificación OTP por correo antes de crear la cuenta.
-- [ ] La declaración de mayoría de edad o capacidad legal se incorporará a la
-      aceptación de la Política de Privacidad. El checkbox independiente de
-      edad fue retirado por decisión de producto.
+- [x] El registro exige aceptar la Política de Privacidad, guarda usuario,
+      fecha y versión de esa aceptación, e integra en ella la declaración de
+      mayoría de edad o capacidad legal. No existe checkbox separado de edad.
+- [x] Página pública local `/tratamiento-de-datos` con contactos para derechos,
+      eliminación, portabilidad, marketing y cookies; debe desplegarse en el
+      dominio público antes de comunicarla como operativa.
 - [x] Normalización y unicidad de correo y teléfono; disponibilidad previa al
       registro y límites de intentos/frecuencia.
 - [x] Contraseñas derivadas con `scrypt`; tokens opacos almacenados como hash.
@@ -185,11 +207,13 @@ Mobile / Web pública / Admin
 - [x] Directorio, búsqueda, alta, edición, importación de contactos, etiquetas
       y eliminación lógica.
 - [x] Historial de citas, notas y fotos privadas asociadas a notas.
+- [x] Las notas operativas rechazan expresiones claras de salud, historial
+      clínico y biometría. Es una salvaguarda de interfaz, no sustituye la
+      prohibición contractual ni una revisión humana de contenido sensible.
 - [x] Exportación y eliminación múltiple desde Mobile.
-- [ ] Al cerrar una cuenta o negocio, falta habilitar durante 30 días una
-      exportación de portabilidad que incluya CSV y un ZIP con los datos y las
-      imágenes disponibles. El cierre actual conserva historial, pero no
-      entrega todavía este paquete de forma autónoma.
+- [x] Tras cerrar un negocio, la persona propietaria puede descargar durante
+      30 días desde Ajustes un CSV de datos o un ZIP con datos e imágenes
+      disponibles; el acceso no reactiva el negocio cerrado.
 - [x] Reutilización de cliente por teléfono dentro del alcance implementado.
 - [ ] No existe deduplicación asistida ni barbero preferido persistente.
 - [ ] Las imágenes se guardan como `data:`/base64 en PostgreSQL; no existe
@@ -294,6 +318,9 @@ Mobile / Web pública / Admin
 - [x] Marketing Nava con opt-in explícito: desmarcado por defecto en el
       registro, consentimiento versionado y fechado, y baja posterior desde
       Ajustes. Los avisos operativos permanecen fuera de esta preferencia.
+- [x] Banner Web de cookies: Aceptar, Rechazar y Configurar ofrecen decisiones
+      equivalentes; GA4 solo se inserta después del consentimiento y si existe
+      `NEXT_PUBLIC_GA_MEASUREMENT_ID` en producción.
 - [ ] El endpoint de simulación sigue siendo parte de la operación del MVP y no
       sustituye un sistema de cobro.
 

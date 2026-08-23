@@ -93,6 +93,10 @@ import {
   reconcileSubscriptionLifecycle,
 } from './subscription-policy';
 import { processSubscriptionRenewalReminders } from './subscription-reminders';
+import {
+  buildClosedBusinessExport,
+  listClosedBusinessExports,
+} from './closed-business-export';
 
 const SESSION_IDLE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const SESSION_MAX_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -103,6 +107,10 @@ const ACCOUNT_DELETION_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 const MAX_VERIFICATION_ATTEMPTS = 5;
 const MAX_AUTH_RATE_LIMIT_BUCKETS = 10_000;
 const marketingPreferenceSchema = z.object({ marketingOptIn: z.boolean() });
+const closedBusinessExportParamsSchema = z.object({ organizationId: z.uuid() });
+const closedBusinessExportQuerySchema = z.object({
+  format: z.enum(['csv', 'zip']).default('csv'),
+});
 
 interface AuthRateLimitBucket {
   count: number;
@@ -758,6 +766,7 @@ async function issueVerificationCode({
   fullName,
   marketingOptIn = false,
   passwordHash,
+  privacyPolicyAccepted = false,
   registrationProfile,
   verificationMailer,
 }: {
@@ -767,6 +776,7 @@ async function issueVerificationCode({
   readonly fullName: string;
   readonly marketingOptIn?: boolean;
   readonly passwordHash: string;
+  readonly privacyPolicyAccepted?: boolean;
   readonly registrationProfile?: RegistrationProfileDraft;
   readonly verificationMailer: VerificationMailer | null;
 }) {
@@ -790,6 +800,7 @@ async function issueVerificationCode({
       fullName,
       marketingOptIn,
       passwordHash,
+      privacyPolicyAccepted,
       ...registrationData,
     },
     update: {
@@ -800,6 +811,7 @@ async function issueVerificationCode({
       lockedUntil: null,
       marketingOptIn,
       passwordHash,
+      privacyPolicyAccepted,
       ...registrationData,
     },
     where: { email },
@@ -1068,6 +1080,7 @@ export async function buildApi({
         fullName: input.fullName.trim(),
         marketingOptIn: input.marketingOptIn,
         passwordHash,
+        privacyPolicyAccepted: input.privacyPolicyAccepted,
         registrationProfile: {
           accountType:
             input.accountType === 'business'
@@ -1179,6 +1192,13 @@ export async function buildApi({
           remainingAttempts: MAX_VERIFICATION_ATTEMPTS - updated.failedAttempts,
         };
       }
+      if (!verification.privacyPolicyAccepted) {
+        throw new ApiError(
+          400,
+          'PRIVACY_POLICY_NOT_ACCEPTED',
+          'Debes aceptar la Política de Privacidad antes de verificar tu cuenta.',
+        );
+      }
       const consumed = await transaction.pendingRegistration.deleteMany({
         where: {
           codeHash: verification.codeHash,
@@ -1204,6 +1224,12 @@ export async function buildApi({
           ...(registrationProfile ? { phone: registrationProfile.phone } : {}),
         },
         where: { email: verification.email },
+      });
+      await transaction.privacyConsent.create({
+        data: {
+          policyVersion: config.PLATFORM_PRIVACY_POLICY_VERSION,
+          userId: user.id,
+        },
       });
       if (verification.marketingOptIn) {
         await transaction.marketingConsent.create({
@@ -1287,6 +1313,7 @@ export async function buildApi({
         fullName: pendingRegistration.fullName,
         marketingOptIn: pendingRegistration.marketingOptIn,
         passwordHash: pendingRegistration.passwordHash,
+        privacyPolicyAccepted: pendingRegistration.privacyPolicyAccepted,
         ...(registrationProfile ? { registrationProfile } : {}),
         verificationMailer,
       });
@@ -1350,6 +1377,30 @@ export async function buildApi({
     });
     return { consentedAt: null, policyVersion: null, subscribed: false };
   });
+
+  app.get('/v1/account/closed-business-exports', async (request) => {
+    const { user } = await authenticate(database, request);
+    return {
+      exports: await listClosedBusinessExports(database, user.id),
+    };
+  });
+
+  app.get(
+    '/v1/account/closed-business-exports/:organizationId',
+    async (request) => {
+      const { user } = await authenticate(database, request);
+      const { organizationId } = closedBusinessExportParamsSchema.parse(
+        request.params,
+      );
+      const { format } = closedBusinessExportQuerySchema.parse(request.query);
+      return buildClosedBusinessExport({
+        database,
+        format,
+        organizationId,
+        userId: user.id,
+      });
+    },
+  );
 
   app.post('/v1/auth/logout', async (request, reply) => {
     const { session } = await authenticate(database, request);

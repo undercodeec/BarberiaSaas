@@ -288,7 +288,7 @@ La cancelación o no renovación se gestionará desde el sitio web de Nava.
 
 Ruta prevista:
 
-**https://nava.cloud.app/suscripciones**
+**https://navacloud.app/suscripciones**
 
 > Antes de publicar la URL debe verificarse que este dominio y esta ruta sean los definitivos y estén operativos.
 
@@ -411,9 +411,13 @@ Si además se utiliza PayPhone para pagos entre clientes finales y barberías, e
 
 ## 12.1. Google Analytics 4
 
-**Google Analytics 4 ya está implementado.**
+Google Analytics 4 está preparado técnicamente para cargarse de forma
+condicional. Permanecerá desactivado mientras no se configure su identificador
+de producción y el visitante no dé un consentimiento explícito.
 
-La Política de Privacidad y Política de Cookies pueden mantener GA4 como proveedor de analítica.
+La Política de Privacidad y Política de Cookies podrán identificar a GA4 como
+proveedor de analítica solo cuando se haya realizado esa configuración y
+verificación en producción.
 
 ## 12.2. Cookies principales
 
@@ -729,67 +733,69 @@ Codex deberá localizar y corregir cualquier referencia antigua que indique:
 
 ## Suscripciones
 
-- [ ] Cambiar trial global a 10 días.
-- [ ] Confirmar transición automática a Nava Free.
-- [ ] Confirmar periodo de gracia de 3 días.
-- [ ] Confirmar recordatorio 5 días antes del vencimiento.
-- [ ] Implementar o verificar Nava Free, Nava Esencial, Nava Local y Nava Multi.
-- [ ] Verificar precios exactos.
-- [ ] Verificar precio fundador Nava Local USD 19,93.
-- [ ] Guardar elegibilidad de precio fundador.
-- [ ] Perder precio fundador al romper continuidad.
-- [ ] Confirmar renovación manual.
-- [ ] Confirmar PayPhone como procesador de suscripción.
+- [x] Cambiar trial global a 10 días.
+- [x] Confirmar transición automática a Nava Free.
+- [x] Confirmar periodo de gracia de 3 días.
+- [x] Confirmar recordatorio 5 días antes del vencimiento.
+- [x] Implementar o verificar Nava Free, Nava Esencial, Nava Local y Nava Multi.
+- [x] Verificar precios exactos.
+- [x] Verificar precio fundador Nava Local USD 19,93.
+- [x] Guardar elegibilidad de precio fundador.
+- [x] Perder precio fundador al romper continuidad.
+- [x] Confirmar renovación manual.
+- [x] Confirmar PayPhone como procesador de suscripción (pendiente de credenciales productivas).
 - [ ] Confirmar flujo de factura electrónica por email.
-- [ ] Confirmar downgrade automático a Free por falta de renovación.
+- [x] Confirmar downgrade automático a Free por falta de renovación.
 
 ## Legal y privacidad
 
-- [ ] Corregir correo a `soporte@navacloud.app`.
-- [ ] Publicar únicamente Quito, Ecuador como domicilio.
-- [ ] Añadir WhatsApp 0979046329.
-- [ ] Identificarlo como canal operado por Undercodeec para soporte de Nava.
-- [ ] Indicar mercado Ecuador y Latinoamérica.
-- [ ] Incorporar en la aceptación de la Política de Privacidad la declaración
+- [x] Corregir correo a `soporte@navacloud.app`.
+- [x] Publicar únicamente Quito, Ecuador como domicilio.
+- [x] Añadir WhatsApp 0979046329.
+- [x] Identificarlo como canal operado por Undercodeec para soporte de Nava.
+- [x] Indicar mercado Ecuador y Latinoamérica.
+- [x] Incorporar en la aceptación de la Política de Privacidad la declaración
       de mayoría de edad (18 años) o capacidad legal; no usar un checkbox
       independiente de edad.
-- [ ] Mantener tratamiento de reservas de menores bajo responsabilidad del negocio.
-- [ ] Mantener prohibición de datos sensibles.
-- [ ] Eliminar marketing de barberías como función activa.
-- [ ] Mantener marketing propio de Nava con baja voluntaria.
-- [ ] Mantener ausencia de IA en MVP.
-- [ ] Mantener ausencia de uptime garantizado.
+- [x] Mantener tratamiento de reservas de menores bajo responsabilidad del negocio.
+- [x] Mantener prohibición de datos sensibles.
+- [x] Eliminar marketing de barberías como función activa.
+- [x] Mantener marketing propio de Nava con baja voluntaria.
+- [x] Mantener ausencia de IA en MVP.
+- [x] Mantener ausencia de uptime garantizado.
 
 ## Infraestructura
 
-- [ ] Sustituir Dinoranck por RackNerd.
-- [ ] Mantener Neon / Virginia como base productiva.
-- [ ] Confirmar técnicamente almacenamiento real de archivos e imágenes.
+- [x] Sustituir Dinoranck por RackNerd.
+- [x] Mantener Neon / Virginia como base productiva.
+- [x] Confirmar técnicamente almacenamiento real de archivos e imágenes: PostgreSQL/Neon, como `data:`/base64 durante el piloto.
 - [ ] Mantener Hostinger como SMTP.
-- [ ] Mantener PayPhone como procesador de suscripciones.
+- [x] Mantener PayPhone como procesador de suscripciones (habilitación productiva pendiente).
 - [ ] Confirmar backups cada 30 días y retención 90 días.
 
 ## Cookies
 
-- [ ] Mantener GA4.
-- [ ] Verificar cookies reales de GA4.
-- [ ] Mantener banner Aceptar / Rechazar / Configurar.
-- [ ] No declarar trackers adicionales no implementados.
+- [x] Preparar GA4 para carga condicional solo tras consentimiento explícito.
+- [ ] Configurar y verificar en producción el identificador y las cookies reales de GA4.
+- [x] Mantener banner Aceptar / Rechazar / Configurar.
+- [x] No declarar trackers adicionales no implementados.
 
 ## Reservas
 
-- [ ] Mantener defaults de recordatorio 24 h.
-- [ ] Mantener ventana de reconfirmación 6 h.
-- [ ] Mantener cita si no existe reconfirmación.
-- [ ] Cancelación por defecto hasta 2 h antes.
-- [ ] Reprogramación por defecto hasta 2 h antes.
-- [ ] Mantener valores configurables por negocio.
+- [x] Mantener defaults de recordatorio 24 h.
+- [x] Mantener ventana de reconfirmación 6 h.
+- [x] Mantener cita si no existe reconfirmación.
+- [x] Cancelación por defecto hasta 2 h antes.
+- [x] Reprogramación por defecto hasta 2 h antes.
+- [x] Mantener valores configurables por negocio.
 
 ## Cuenta y eliminación
 
-- [ ] Verificar `Ajustes → Borrar mi cuenta`.
-- [ ] Verificar página `https://navacloud.app/tratamiento-de-datos`.
-- [ ] Mantener exportación durante 30 días tras cierre.
+- [x] Verificar `Ajustes → Borrar mi cuenta`.
+- [x] Crear la página pública `/tratamiento-de-datos` y enlazarla desde el
+      sitio, el banner de cookies y el registro de la app. Su disponibilidad en
+      `https://navacloud.app/tratamiento-de-datos` queda pendiente de despliegue.
+- [x] Mantener exportación durante 30 días tras cierre en CSV y ZIP con imágenes disponibles.
 - [ ] Verificar reaplicación de eliminaciones si se restaura un backup.
 
 ---
@@ -798,7 +804,7 @@ Codex deberá localizar y corregir cualquier referencia antigua que indique:
 
 Aunque las decisiones comerciales de este documento están confirmadas, antes de publicar una nueva versión de los Términos deben verificarse técnicamente estos puntos:
 
-1. que la ruta de suscripciones definitiva sea realmente `https://nava.cloud.app/suscripciones`;
+1. que la ruta de suscripciones definitiva sea realmente `https://navacloud.app/suscripciones`;
 2. que PayPhone esté implementado para el cobro de suscripciones de Nava;
 3. que la facturación electrónica por email esté operativa;
 4. que el periodo de prueba configurado en producción sea exactamente de 10 días;

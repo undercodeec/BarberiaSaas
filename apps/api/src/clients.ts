@@ -1,4 +1,5 @@
 import { MembershipStatus, type DatabaseClient } from '@barber-saas/database';
+import { hasSensitiveDataContent } from '@barber-saas/validation';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
@@ -22,7 +23,15 @@ const createClientSchema = z.object({
   email: z.string().email().max(254).optional(),
   fullName: z.string().trim().min(2).max(120),
   lastName: z.string().trim().max(120).optional(),
-  notes: z.string().trim().max(500).optional(),
+  notes: z
+    .string()
+    .trim()
+    .max(500)
+    .refine(
+      (value) => !hasSensitiveDataContent(value),
+      'Nava no permite registrar datos médicos, biométricos u otra información sensible.',
+    )
+    .optional(),
   phone: z.string().trim().min(5).max(24),
 });
 const updateClientSchema = createClientSchema
@@ -37,7 +46,15 @@ const createClientLabelSchema = z.object({
   name: z.string().trim().min(1).max(60),
 });
 const createClientNoteSchema = z.object({
-  description: z.string().trim().min(1).max(500),
+  description: z
+    .string()
+    .trim()
+    .min(1)
+    .max(500)
+    .refine(
+      (value) => !hasSensitiveDataContent(value),
+      'Nava no permite registrar datos médicos, biométricos u otra información sensible.',
+    ),
   photoData: z
     .string()
     .regex(/^data:image\/(jpeg|png|webp);base64,/u)

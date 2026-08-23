@@ -270,6 +270,19 @@ describe('motor de agenda', () => {
       }).success,
     ).toBe(false);
   });
+
+  it('rechaza notas con datos médicos o biométricos', () => {
+    expect(
+      createAppointmentSchema.safeParse({
+        clientName: 'Cliente Prueba',
+        locationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        notes: 'Tiene alergia a determinados productos.',
+        professionalMembershipId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        serviceIds: ['cccccccc-cccc-4ccc-8ccc-cccccccccccc'],
+        startsAt: '2030-01-14T15:00:00.000Z',
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe('autenticación y onboarding', () => {
@@ -286,8 +299,28 @@ describe('autenticación y onboarding', () => {
       openingTime: '09:00',
       password: 'clave-segura',
       phone: '+593999999999',
+      privacyPolicyAccepted: true,
     });
     expect(result.success).toBe(false);
+  });
+
+  it('requiere aceptar la Política de Privacidad al registrar una cuenta', () => {
+    expect(
+      signUpSchema.safeParse({
+        accountType: 'professional',
+        businessName: 'Estudio Ana',
+        city: 'Quito',
+        closingTime: '18:00',
+        confirmPassword: 'clave-segura',
+        countryCode: 'EC',
+        email: 'privacidad@example.com',
+        fullName: 'Ana Dueña',
+        openingTime: '09:00',
+        password: 'clave-segura',
+        phone: '+593999999999',
+        privacyPolicyAccepted: false,
+      }).success,
+    ).toBe(false);
   });
 
   it('valida todos los datos del perfil de registro', () => {
@@ -303,6 +336,7 @@ describe('autenticación y onboarding', () => {
       openingTime: '09:00',
       password: 'clave-segura',
       phone: '+593999999999',
+      privacyPolicyAccepted: true,
     });
     expect(result.success).toBe(true);
     if (result.success) {

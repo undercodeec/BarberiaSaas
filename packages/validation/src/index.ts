@@ -12,6 +12,24 @@ export const publicApiConfigSchema = z.object({
 });
 
 const emailSchema = z.email('Ingresa un correo electrónico válido.').max(254);
+const SENSITIVE_DATA_PATTERN =
+  /diagnostic|historial clinico|historia clinica|enfermedad|medicamento|alergia|biometric|huella dactilar|adn|sangre|salud mental|tratamiento medic/u;
+const SENSITIVE_DATA_MESSAGE =
+  'Nava no permite registrar datos médicos, biométricos u otra información sensible.';
+
+export function hasSensitiveDataContent(value: string) {
+  const normalized = value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/gu, '')
+    .toLowerCase();
+  return SENSITIVE_DATA_PATTERN.test(normalized);
+}
+
+const operationalNotesSchema = z
+  .string()
+  .trim()
+  .max(500)
+  .refine((value) => !hasSensitiveDataContent(value), SENSITIVE_DATA_MESSAGE);
 const passwordSchema = z
   .string()
   .min(8, 'La contraseña debe tener al menos 8 caracteres.')
@@ -86,6 +104,12 @@ export const signUpSchema = z
     email: emailSchema,
     fullName: z.string().trim().min(2, 'Ingresa tu nombre completo.').max(120),
     marketingOptIn: z.boolean().default(false),
+    privacyPolicyAccepted: z
+      .boolean()
+      .refine(
+        (value) => value,
+        'Debes aceptar la Política de Privacidad para crear tu cuenta.',
+      ),
     openingTime: timeSchema,
     password: passwordSchema,
     phone: phoneSchema,
@@ -518,7 +542,7 @@ export const createAppointmentSchema = z
     clientName: z.string().trim().max(120).nullish(),
     clientPhone: z.string().trim().min(7).max(24).nullish(),
     locationId: uuidSchema,
-    notes: z.string().trim().max(500).nullish(),
+    notes: operationalNotesSchema.nullish(),
     professionalMembershipId: uuidSchema,
     serviceIds: serviceIdsSchema,
     startsAt: z.iso.datetime(),

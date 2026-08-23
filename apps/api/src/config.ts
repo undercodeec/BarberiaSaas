@@ -69,6 +69,12 @@ const environmentSchema = z
       .min(1)
       .max(80)
       .default('2026-08-23'),
+    PLATFORM_PRIVACY_POLICY_VERSION: z
+      .string()
+      .trim()
+      .min(1)
+      .max(80)
+      .default('2026-08-23'),
     PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY: optionalText,
     PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS: optionalBasisPoints,
     PLATFORM_SUBSCRIPTION_TERMS_VERSION: optionalText,
