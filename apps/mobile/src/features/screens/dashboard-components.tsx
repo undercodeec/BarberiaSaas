@@ -565,49 +565,73 @@ export function ExtraQuickActionsSheet({
 }
 
 export function OpenButtonFlare() {
-  const translateX = useRef(new Animated.Value(-25)).current;
+  const flareProgress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    let isActive = true;
+    // Traslación, opacidad y escala se ejecutan en el driver nativo de Android.
+    const flareAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(flareProgress, {
+          duration: 2_200,
+          easing: Easing.inOut(Easing.sin),
+          isInteraction: false,
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+        Animated.timing(flareProgress, {
+          duration: 2_200,
+          easing: Easing.inOut(Easing.sin),
+          isInteraction: false,
+          toValue: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
 
-    const move = (toValue: number): void => {
-      Animated.timing(translateX, {
-        duration: 6_500,
-        easing: Easing.inOut(Easing.sin),
-        isInteraction: false,
-        toValue,
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished && isActive) move(toValue > 0 ? -25 : 25);
-      });
-    };
+    flareAnimation.start();
+    return () => flareAnimation.stop();
+  }, [flareProgress]);
 
-    move(25);
-    return () => {
-      isActive = false;
-      translateX.stopAnimation();
-    };
-  }, [translateX]);
-
-  const opacity = translateX.interpolate({
+  const translateX = flareProgress.interpolate({
     extrapolate: 'clamp',
-    inputRange: [-25, 0, 25],
-    outputRange: [0.7, 1, 0.7],
+    inputRange: [0, 1],
+    outputRange: [-32, 32],
   });
-  const scale = translateX.interpolate({
+  const opacity = flareProgress.interpolate({
     extrapolate: 'clamp',
-    inputRange: [-25, 0, 25],
-    outputRange: [0.86, 1.22, 0.86],
+    inputRange: [0, 0.32, 0.5, 0.68, 1],
+    outputRange: [0.5, 0.68, 1, 0.68, 0.5],
+  });
+  const auraOpacity = flareProgress.interpolate({
+    extrapolate: 'clamp',
+    inputRange: [0, 0.32, 0.5, 0.68, 1],
+    outputRange: [0.04, 0.12, 0.48, 0.12, 0.04],
   });
 
   return (
-    <View pointerEvents="none" style={styles.openButtonBottomGlow}>
+    <View pointerEvents="none" style={styles.openButtonFlareTrack}>
       <Animated.View
-        style={[
-          styles.openButtonFlare,
-          { opacity, transform: [{ translateX }, { scale }] },
-        ]}
-      />
+        style={[styles.openButtonFlare, { transform: [{ translateX }] }]}
+      >
+        <Animated.View
+          style={[styles.openButtonFlareAura, { opacity: auraOpacity }]}
+        >
+          <Svg height={31} viewBox="0 0 31 31" width={31}>
+            <Path
+              d="M15.5 0L18.1 12.9L31 15.5L18.1 18.1L15.5 31L12.9 18.1L0 15.5L12.9 12.9L15.5 0Z"
+              fill="#FFF0B5"
+            />
+          </Svg>
+        </Animated.View>
+        <Animated.View style={{ opacity }}>
+          <Svg height={17} viewBox="0 0 17 17" width={17}>
+            <Path
+              d="M8.5 0L10.6 6.4L17 8.5L10.6 10.6L8.5 17L6.4 10.6L0 8.5L6.4 6.4L8.5 0Z"
+              fill="#FFFDF2"
+            />
+          </Svg>
+        </Animated.View>
+      </Animated.View>
     </View>
   );
 }

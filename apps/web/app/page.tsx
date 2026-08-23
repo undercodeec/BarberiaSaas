@@ -1,81 +1,75 @@
-import { designTokens } from '@barber-saas/design-tokens';
+import Image from 'next/image';
+import { PricingCards } from './components/PricingCards';
 
-const foundations = [
-  'Aplicación móvil operativa',
-  'Reservas web sin instalar nada',
-  'Backend multi-tenant preparado',
-];
+const features = [
+  ['01', 'Reservas 24/7', 'Tus clientes reservan desde tu página incluso cuando el negocio está cerrado.'],
+  ['02', 'Agenda inteligente', 'Organiza profesionales, horarios, bloqueos y reprogramaciones.'],
+  ['03', 'Clientes e historial', 'Encuentra visitas, notas y datos importantes en un solo lugar.'],
+  ['04', 'Caja y ventas', 'Registra ingresos, gastos, retiros y ventas del día.'],
+  ['05', 'Comisiones', 'Lleva el control de lo que corresponde a cada profesional.'],
+  ['06', 'Inventario', 'Controla existencias y recibe alertas de stock bajo.'],
+  ['07', 'Reportes', 'Entiende ventas, servicios, productos y el rendimiento del equipo.'],
+  ['08', 'Recordatorios', 'Mantén a tus clientes informados sobre sus citas por los canales disponibles.'],
+] as const;
+
+function Brand() {
+  return <a className="nava-brand" href="#inicio" aria-label="Nava, inicio"><span>N</span>NAVA</a>;
+}
+
+function DashboardMock() {
+  return <div className="dashboard-mock" aria-label="Vista previa del panel Nava">
+    <div className="mock-nav"><Brand /><i /><i /><i /><i /></div>
+    <div className="mock-main"><div className="mock-title"><small>RESUMEN DE HOY</small><strong>Buenos días, Carlos</strong></div><div className="mock-top-cards"><div><span>Citas hoy</span><b>08</b><em>+3 desde ayer</em></div><div><span>Ventas</span><b>$245</b><em>En curso</em></div></div><div className="mock-list-title">PRÓXIMAS CITAS <button type="button">+ Nueva cita</button></div><div className="mock-appointment gold"><time>10:30</time><p><b>Andrés Vega</b><span>Corte + barba · Diego</span></p><em>Confirmada</em></div><div className="mock-appointment"><time>11:15</time><p><b>Mateo Díaz</b><span>Fade clásico · Carlos</span></p><em>Confirmada</em></div><div className="mock-appointment"><time>12:00</time><p><b>Daniel Ruiz</b><span>Corte · Diego</span></p><em>En espera</em></div></div>
+  </div>;
+}
+
+function BookingMock() {
+  return <div className="booking-mock" aria-label="Vista previa de reservas Nava"><header><Brand /><span>Reservar una cita</span></header><div className="booking-progress"><i /><i /><i /><i /></div><h4>¿Qué servicio buscas?</h4><div className="service-choice"><b>Corte clásico</b><span>45 min · $12</span><em>✓</em></div><div className="service-choice"><b>Corte + barba</b><span>60 min · $18</span></div><h4>Elige un horario</h4><div className="time-options"><button type="button">10:30</button><button type="button">11:15</button><button type="button">12:00</button></div></div>;
+}
+
+function StatMock({ type }: { readonly type: 'agenda' | 'clients' | 'money' | 'commission' | 'stock' | 'reports' }) {
+  if (type === 'clients') return <div className="info-mock clients-mock"><aside><b>Clientes</b><span>Buscar cliente</span><p className="active">Camila Torres</p><p>Andrés Vega</p><p>Diego Ramos</p></aside><div className="client-profile"><small>PERFIL DE CLIENTE</small><h4>Camila Torres</h4><p>Última visita · 12 agosto</p><div><b>Próxima cita</b><span>Viernes, 16:30 · Corte + barba</span></div><h5>Historial reciente</h5><p>Corte clásico <em>Hace 3 semanas</em></p><p>Fade clásico <em>Hace 2 meses</em></p></div></div>;
+  if (type === 'money') return <div className="money-mock"><div><span>Ventas de hoy</span><b>$385.00</b><em>↗ 12 % esta semana</em></div><div className="money-chart"><i /><i /><i /><i /><i /><i /><i /></div><section><p><span>Gastos</span><b>$48.00</b></p><p><span>Comisiones</span><b>$96.25</b></p><p><span>Caja</span><b>$240.75</b></p></section></div>;
+  if (type === 'commission') return <div className="team-mock"><small>COMISIONES DEL PERÍODO</small>{([['Carlos', '$420', '$126'], ['Diego', '$365', '$109.50'], ['Luis', '$510', '$153']] as const).map(([name, sales, commission]) => <p key={name}><span className="avatar">{name[0]}</span><b>{name}</b><em>Ventas: {sales}</em><strong>{commission}</strong></p>)}</div>;
+  if (type === 'stock') return <div className="stock-mock"><small>INVENTARIO</small>{([['Pomada Premium', '8', false], ['Aceite para barba', '3', false], ['Shampoo profesional', '2', true]] as const).map(([name, stock, low]) => <p key={name}><span className="product-square" /><b>{name}</b><em className={low ? 'low' : ''}>Stock: {stock}{low ? ' · Bajo' : ''}</em></p>)}</div>;
+  if (type === 'reports') return <div className="reports-mock"><small>REPORTE DEL MES</small><div className="report-bars">{[42, 66, 51, 84, 72, 95, 78].map((height, index) => <i key={index} style={{ height: `${height}%` }} />)}</div><p><b>$2,845</b><span>Ventas totales</span></p><div className="report-row"><span>Servicios más realizados</span><b>Corte clásico</b></div><div className="report-row"><span>Producto más vendido</span><b>Pomada Premium</b></div></div>;
+  return <div className="agenda-mock"><small>HOY · MARTES 23</small><h4>12 citas <span>4 profesionales</span></h4>{['09:00', '10:30', '11:15', '13:00'].map((time, index) => <p key={time}><time>{time}</time><i className={`agenda-event event-${index}`} /></p>)}<em>3 horarios disponibles</em></div>;
+}
 
 export default function HomePage() {
-  return (
-    <main className="min-h-screen overflow-hidden bg-[var(--surface)] text-[var(--ink)]">
-      <div aria-hidden="true" className="ambient ambient-top" />
-      <div aria-hidden="true" className="ambient ambient-bottom" />
-      <section className="relative mx-auto flex min-h-screen max-w-6xl flex-col justify-between px-6 py-8 sm:px-10 lg:px-16 lg:py-12">
-        <header className="flex items-center justify-between">
-          <div
-            className="flex items-center gap-3"
-            aria-label="Plataforma para barberías"
-          >
-            <span className="brand-mark" aria-hidden="true">
-              B
-            </span>
-            <span className="text-sm font-bold tracking-[0.22em] uppercase">
-              Barber OS
-            </span>
-          </div>
-          <span className="status-pill">Fase 0 completada</span>
-        </header>
+  return <main id="inicio">
+    <header className="nava-header"><Brand /><nav aria-label="Navegación principal"><a href="#inicio">Inicio</a><a href="#funciones">Funciones</a><a href="#reservas">Reservas</a><a href="#planes">Planes</a><a href="#recursos">Recursos</a><a href="#nava">Nava</a></nav><div className="header-actions"><a className="login-link" href="/checkout">Iniciar sesión</a><a className="gold-button small" href="mailto:soporte@navacloud.app?subject=Quiero%20probar%20Nava">Probar Nava</a></div><details className="mobile-menu"><summary aria-label="Abrir menú">☰</summary><div><a href="#funciones">Funciones</a><a href="#reservas">Reservas</a><a href="#planes">Planes</a><a href="/checkout">Iniciar sesión</a></div></details></header>
 
-        <div className="grid items-center gap-14 py-16 lg:grid-cols-[1.2fr_0.8fr] lg:gap-20">
-          <div>
-            <p className="eyebrow">Hecho para el ritmo del local</p>
-            <h1 className="mt-5 max-w-3xl text-5xl leading-[0.94] font-black tracking-[-0.055em] sm:text-7xl lg:text-8xl">
-              Tu barbería,
-              <span className="block text-[var(--accent)]">bajo control.</span>
-            </h1>
-            <p className="mt-7 max-w-xl text-lg leading-8 text-[var(--muted)] sm:text-xl">
-              Una base móvil-first para administrar agenda, clientes y operación
-              diaria desde cualquier lugar.
-            </p>
-          </div>
+    <section className="nava-hero"><div className="hero-photo"><Image src="/images/nava-barbershop-hero.png" alt="Barbero atendiendo a un cliente en una barbería moderna" fill priority sizes="100vw" /></div><div className="hero-copy"><p className="eyebrow">Software para barberías</p><h1>Haz crecer tu barbería con <em>más orden</em> y menos complicaciones.</h1><p>Nava reúne tus reservas, agenda, clientes, caja, equipo e inventario en un solo lugar para que dediques más tiempo a tu negocio y menos a organizarlo.</p><div className="hero-buttons"><a className="gold-button" href="mailto:soporte@navacloud.app?subject=Quiero%20probar%20Nava">Probar Nava gratis <span>→</span></a><a className="text-button" href="#funciones">Conocer funciones <span>↓</span></a></div><ul className="hero-benefits"><li>Configuración sencilla</li><li>Gestiona desde tu móvil</li><li>10 días para probar Nava</li></ul></div><div className="hero-dashboard"><DashboardMock /><span className="floating-card appointments">8 citas hoy</span><span className="floating-card stock">Stock bajo · 3 productos</span></div></section>
 
-          <aside className="foundation-card" aria-labelledby="foundation-title">
-            <div className="flex items-center justify-between border-b border-white/10 pb-5">
-              <div>
-                <p className="text-xs font-bold tracking-[0.18em] text-[var(--accent)] uppercase">
-                  Infraestructura
-                </p>
-                <h2 id="foundation-title" className="mt-1 text-2xl font-bold">
-                  Base preparada
-                </h2>
-              </div>
-              <span
-                aria-label="Sistema listo"
-                className="pulse-dot"
-                role="status"
-              />
-            </div>
-            <ul className="mt-2 divide-y divide-white/10">
-              {foundations.map((foundation, index) => (
-                <li className="flex items-center gap-4 py-5" key={foundation}>
-                  <span className="step-number">0{index + 1}</span>
-                  <span className="font-medium text-white/90">
-                    {foundation}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </aside>
-        </div>
+    <section className="quick-benefits"><article><i>◷</i><div><b>Reservas disponibles todo el día</b><span>Tus clientes eligen servicio, profesional, fecha y horario.</span></div></article><article><i>▦</i><div><b>Agenda organizada</b><span>Visualiza las citas del equipo y evita cruces de horario.</span></div></article><article><i>$</i><div><b>Control del negocio</b><span>Registra ventas, gastos y movimientos en un mismo lugar.</span></div></article><article><i>↗</i><div><b>Información para decidir mejor</b><span>Consulta reportes sobre ventas, servicios y productos.</span></div></article></section>
 
-        <footer className="flex flex-col gap-2 border-t border-white/10 pt-5 text-sm text-[var(--muted)] sm:flex-row sm:items-center sm:justify-between">
-          <span>Arquitectura modular · TypeScript estricto</span>
-          <span style={{ color: designTokens.colors.accent }}>
-            Ecuador · Latinoamérica
-          </span>
-        </footer>
-      </section>
-    </main>
-  );
+    <section className="section-intro" id="funciones"><p className="eyebrow dark">Todo lo que tu barbería necesita</p><h2>Una plataforma para organizar tu negocio <em>de principio a fin.</em></h2><p>Menos herramientas separadas. Más control desde un solo lugar.</p><div className="feature-grid">{features.map(([number, title, description]) => <article key={number}><span>{number}</span><i>◇</i><h3>{title}</h3><p>{description}</p><b>↗</b></article>)}</div></section>
+
+    <section className="split-section reservation-section" id="reservas"><div className="split-mock"><BookingMock /></div><div className="split-copy"><p className="eyebrow dark">Reservas más fáciles</p><h2>Tus clientes reservan. <em>Nava organiza el resto.</em></h2><p>Comparte tu página de reservas y permite que tus clientes encuentren horarios disponibles sin tener que escribirte para preguntar cada vez.</p><ul><li>Disponibilidad actualizada</li><li>Elección de servicio y profesional</li><li>Reprogramación y cancelación</li><li>Confirmaciones, recordatorios y reseñas</li></ul><a className="gold-button" href="#planes">Conocer las reservas de Nava <span>→</span></a></div></section>
+
+    <section className="split-section reverse"><div className="split-copy"><p className="eyebrow dark">Agenda Nava</p><h2>Una agenda pensada para el ritmo real de una barbería.</h2><p>Consulta el día, organiza a tu equipo y encuentra rápidamente los espacios disponibles.</p><ul><li>Agenda diaria</li><li>Horarios por profesional</li><li>Servicios con diferentes duraciones</li><li>Bloqueos y reprogramaciones</li><li>Diferentes sedes según el plan</li></ul></div><div className="split-mock pale"><StatMock type="agenda" /></div></section>
+
+    <section className="clients-section"><div><p className="eyebrow dark">Clientes</p><h2>Conoce mejor a quienes vuelven a tu barbería.</h2><p>Toda la información importante organizada para ofrecer una atención más personalizada.</p><ul><li>Historial de visitas</li><li>Información de contacto y notas</li><li>Servicios realizados y próximas citas</li><li>Etiquetas para organizar clientes</li></ul></div><StatMock type="clients" /></section>
+
+    <section className="finance-section"><div><p className="eyebrow">Finanzas y caja</p><h2>Ten claro cuánto entra, cuánto sale y cómo se mueve tu negocio.</h2><p>Nava convierte la operación diaria de tu barbería en información fácil de entender.</p><ul><li>Ventas del día</li><li>Gastos, retiros y depósitos</li><li>Cierres de caja y métodos de pago</li><li>Comisiones del equipo</li></ul></div><StatMock type="money" /></section>
+
+    <section className="split-section"><div className="split-mock"><StatMock type="commission" /></div><div className="split-copy"><p className="eyebrow dark">Comisiones</p><h2>Las cuentas de tu equipo, mucho más claras.</h2><p>Configura las comisiones de tus profesionales y consulta lo que corresponde pagar sin hacer cálculos al final del día.</p><ul><li>Comisiones por profesional</li><li>Reglas porcentuales o valores definidos</li><li>Registro de anticipos</li><li>Historial de pagos</li></ul></div></section>
+
+    <section className="split-section reverse inventory"><div className="split-copy"><p className="eyebrow dark">Inventario y productos</p><h2>Tus productos también forman parte del negocio.</h2><p>Lleva el control de lo que tienes disponible y evita darte cuenta demasiado tarde de que un producto se terminó.</p><ul><li>Control de existencias y alertas</li><li>Movimientos y productos por sede</li><li>Venta de productos</li><li>Pedidos desde el catálogo disponible</li></ul></div><div className="split-mock"><StatMock type="stock" /></div></section>
+
+    <section className="reports-section"><div><p className="eyebrow dark">Reportes</p><h2>Decisiones basadas en lo que realmente pasa en tu barbería.</h2><p>Consulta la información más importante sin perder tiempo armando hojas de cálculo.</p></div><StatMock type="reports" /></section>
+
+    <section className="why-section"><p className="eyebrow dark">Por qué Nava</p><h2>Más control para ti. Una mejor experiencia para tus clientes.</h2><div>{[['Ahorra tiempo', 'Organiza las tareas del día sin depender de varias herramientas.'], ['Reduce desorden', 'Agenda, clientes, caja y equipo comparten la misma información.'], ['Atiende mejor', 'Encuentra rápidamente lo que necesitas sobre cada cliente.'], ['Entiende tu negocio', 'Convierte ventas y operación en información fácil de consultar.']].map(([title, text]) => <article key={title}><i>✦</i><h3>{title}</h3><p>{text}</p></article>)}</div></section>
+
+    <section className="ecosystem" id="nava"><p className="eyebrow dark">Ecosistema Nava</p><h2>Una sola plataforma para cada momento de tu operación.</h2><div><article><span className="device phone">N</span><h3>App Nava</h3><p>Gestiona tu barbería desde donde estés: agenda, clientes, caja, equipo, inventario y reportes.</p></article><article><span className="device browser">⌁</span><h3>Reservas Nava</h3><p>Una página para que tus clientes reserven sin instalar ninguna aplicación.</p></article><article><span className="device dashboard">▦</span><h3>Más de una sede</h3><p>Centraliza la información de diferentes sedes y mantén una visión clara de tu operación.</p></article></div></section>
+
+    <section className="plans-section" id="planes"><p className="eyebrow dark">Planes Nava</p><h2>Un plan para cada etapa de tu barbería.</h2><p>Empieza, prueba Nava y cambia de plan cuando tu negocio lo necesite.</p><PricingCards /><small className="plan-note">10 días de prueba. Después, tu cuenta pasa a Nava Free si no eliges otro plan. *El precio fundador se mantiene mientras la suscripción mensual permanezca continua.</small></section>
+
+    <section className="faq-section" id="recursos"><p className="eyebrow dark">Preguntas frecuentes</p><h2>Todo claro desde el principio.</h2>{[['¿Necesito instalar algo en mi computadora?', 'Nava está diseñado para gestionar tu negocio desde las opciones disponibles en la plataforma sin depender de instalaciones complejas.'], ['¿Mis clientes necesitan descargar Nava?', 'No. Tus clientes pueden utilizar la página pública de reservas desde su navegador.'], ['¿Puedo gestionar varios profesionales?', 'Sí. Nava permite organizar profesionales, servicios y horarios según las condiciones de tu plan.'], ['¿Puedo controlar ventas y gastos?', 'Sí. Nava incluye herramientas para registrar la operación diaria de Caja y consultar reportes.'], ['¿Puedo cambiar de plan?', 'Sí. El negocio puede utilizar el plan que corresponda a sus necesidades según las condiciones comerciales vigentes.'], ['¿Existe un plan gratuito?', 'Sí. Nava dispone de Nava Free dentro de su estructura actual de planes.']].map(([question, answer]) => <details key={question}><summary>{question}<span>+</span></summary><p>{answer}</p></details>)}</section>
+
+    <section className="final-cta"><Image src="/images/nava-barbershop-hero.png" alt="" fill sizes="100vw" /><div><p className="eyebrow">Es tu momento</p><h2>Tu barbería merece trabajar con más orden.</h2><p>Empieza a organizar reservas, agenda, clientes, caja, equipo e inventario desde un solo lugar.</p><div><a className="gold-button" href="mailto:soporte@navacloud.app?subject=Quiero%20probar%20Nava">Probar Nava gratis <span>→</span></a><a className="text-button" href="#funciones">Ver funciones</a></div><small>Prueba Nava durante 10 días.</small></div></section>
+
+    <footer className="nava-footer"><Brand /><p>El software que ayuda a barberías a organizar mejor su día a día.</p><div><b>Producto</b><a href="#funciones">Funciones</a><a href="#reservas">Reservas</a><a href="#planes">Planes</a></div><div><b>Recursos</b><a href="#recursos">Preguntas frecuentes</a><a href="mailto:soporte@navacloud.app">Contacto</a></div><div><b>Nava</b><a href="mailto:soporte@navacloud.app">Soporte</a><a href="mailto:soporte@navacloud.app">Privacidad y términos</a></div><div><b>Contacto</b><a href="mailto:soporte@navacloud.app">soporte@navacloud.app</a><span>© {new Date().getFullYear()} Nava · Ecuador</span></div></footer>
+  </main>;
 }

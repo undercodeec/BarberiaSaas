@@ -372,46 +372,27 @@ export const styles = StyleSheet.create({
     shadowOpacity: 0.24,
     shadowRadius: 8,
   },
-  openButtonFlare: {
-    backgroundColor: '#FFFDF2',
-    borderRadius: 3,
-    bottom: -1,
-    ...Platform.select({
-      android: { elevation: 2 },
-      default: {
-        shadowColor: '#FFE7A3',
-        shadowOpacity: 0.64,
-        shadowRadius: 8,
-      },
-      web: {
-        boxShadow:
-          '0 0 3px 1px rgba(255, 255, 255, 0.96), 0 0 8px 4px rgba(255, 231, 163, 0.64), 0 2px 14px 7px rgba(225, 184, 91, 0.28)',
-      },
-    }),
-    height: 3,
-    position: 'absolute',
-    width: 6,
-    zIndex: 3,
-  },
-  openButtonBottomGlow: {
+  openButtonFlareTrack: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 2,
     bottom: 1,
-    ...Platform.select({
-      android: { elevation: 1 },
-      default: {
-        shadowColor: '#FFF6DA',
-        shadowOpacity: 0.2,
-        shadowRadius: 5,
-      },
-      web: { boxShadow: '0 -1px 5px 1px rgba(255, 246, 218, 0.2)' },
-    }),
     height: 1,
     left: 10,
     position: 'absolute',
     right: 10,
     zIndex: 2,
+  },
+  openButtonFlare: {
+    bottom: -8,
+    height: 17,
+    position: 'absolute',
+    width: 17,
+  },
+  openButtonFlareAura: {
+    height: 31,
+    left: -7,
+    position: 'absolute',
+    top: -7,
+    width: 31,
   },
   openButtonInnerBorder: {
     borderColor: 'rgba(255, 255, 255, 0.58)',

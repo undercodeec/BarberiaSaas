@@ -1,4 +1,5 @@
 import { s, verificationStyles } from './RegistrationFlow.styles';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import type { RegistrationAvailabilityResponse } from '@barber-saas/api-client';
 import {
   type RegistrationAvailabilityInput,
@@ -215,6 +216,7 @@ export function RegistrationFlow() {
       country: defaultCountry.name,
       email: '',
       fullName: '',
+      marketingOptIn: false,
       openingTime: '',
       password: '',
       phone: '',
@@ -313,6 +315,7 @@ export function RegistrationFlow() {
       confirmPassword,
       email,
       fullName,
+      marketingOptIn,
       openingTime,
       password,
       phone,
@@ -340,6 +343,7 @@ export function RegistrationFlow() {
           countryCode,
           email,
           fullName,
+          marketingOptIn,
           openingTime,
           password,
           phone: `${phoneCountry.dial} ${phone.trim()}`,
@@ -838,6 +842,44 @@ export function RegistrationFlow() {
                             label="Correo"
                             onEdit={() => setStep('credentials')}
                             value={values.email}
+                          />
+                          <Controller
+                            control={control}
+                            name="marketingOptIn"
+                            render={({ field }) => (
+                              <Pressable
+                                accessibilityRole="checkbox"
+                                accessibilityState={{ checked: field.value }}
+                                onPress={() => field.onChange(!field.value)}
+                                style={[
+                                  s.legalConsent,
+                                  field.value && s.legalConsentChecked,
+                                ]}
+                              >
+                                <Ionicons
+                                  color={
+                                    field.value
+                                      ? '#FFFFFF'
+                                      : appTheme.colors.accentDark
+                                  }
+                                  name={
+                                    field.value
+                                      ? 'checkmark-circle'
+                                      : 'ellipse-outline'
+                                  }
+                                  size={22}
+                                />
+                                <Text
+                                  style={[
+                                    s.legalConsentText,
+                                    field.value && s.legalConsentTextChecked,
+                                  ]}
+                                >
+                                  Quiero recibir novedades, promociones y
+                                  ofertas de Nava por correo electrónico.
+                                </Text>
+                              </Pressable>
+                            )}
                           />
                           <NavaButton
                             disabled={formState.isSubmitting}

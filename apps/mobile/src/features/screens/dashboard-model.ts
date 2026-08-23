@@ -13,7 +13,7 @@ import { requireApiClient } from '../../lib/api';
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 export const SUBSCRIPTION_NOTICE_TRIAL_DAYS = 3;
-export const SUBSCRIPTION_NOTICE_ACTIVE_DAYS = 7;
+export const SUBSCRIPTION_NOTICE_ACTIVE_DAYS = 5;
 export const DASHBOARD_BANNER_DELAY_MS = 1_500;
 export const LOCATION_BANNER_DELAY_MS = 500;
 export const WELCOME_SURVEY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;

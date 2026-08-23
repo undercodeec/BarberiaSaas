@@ -173,25 +173,22 @@ export function GlobalNotificationsBanner() {
   );
 
   useEffect(() => {
-    let isActive = true;
-
-    const animateBorderDot = () => {
-      borderDotProgress.setValue(0);
+    // Mantener la órbita en el driver nativo evita que el punto se quede
+    // detenido cuando el hilo de JavaScript se ocupa con una consulta o gesto.
+    const borderDotAnimation = Animated.loop(
       Animated.timing(borderDotProgress, {
         duration: 24_000,
         easing: Easing.linear,
         isInteraction: false,
         toValue: 1,
         useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished && isActive) animateBorderDot();
-      });
-    };
+      }),
+    );
 
-    animateBorderDot();
+    borderDotAnimation.start();
     return () => {
-      isActive = false;
-      borderDotProgress.stopAnimation();
+      borderDotAnimation.stop();
+      borderDotProgress.setValue(0);
     };
   }, [borderDotProgress]);
 

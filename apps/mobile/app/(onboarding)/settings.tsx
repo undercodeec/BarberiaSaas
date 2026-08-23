@@ -40,7 +40,14 @@ import { runTenantTransition } from '../../src/lib/tenant-transition';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const PRIMARY = appTheme.colors.accent;
+const PRIVACY_URL = 'https://navacloud.app/tratamiento-de-datos';
+const SUPPORT_WHATSAPP_URL = 'https://wa.me/593979046329';
 type IconName = ComponentProps<typeof Ionicons>['name'];
+interface MarketingPreference {
+  readonly consentedAt: string | null;
+  readonly policyVersion: string | null;
+  readonly subscribed: boolean;
+}
 
 export default function SettingsScreen() {
   const { session, signOut, user } = useAuth();
@@ -70,6 +77,26 @@ export default function SettingsScreen() {
     queryFn: () =>
       requireApiClient().request<UserProfileResponse>('/v1/profile'),
     queryKey: accountQueryKey(user?.id, 'user-profile'),
+  });
+  const marketingPreferenceQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<MarketingPreference>(
+        '/v1/account/marketing-preference',
+      ),
+    queryKey: accountQueryKey(user?.id, 'marketing-preference'),
+  });
+  const updateMarketingPreference = useMutation({
+    mutationFn: (marketingOptIn: boolean) =>
+      requireApiClient().request<MarketingPreference>(
+        '/v1/account/marketing-preference',
+        { body: { marketingOptIn }, method: 'PUT' },
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: accountQueryKey(user?.id, 'marketing-preference'),
+      });
+    },
   });
   const deleteAccountMutation = useMutation({
     mutationFn: async () => {
@@ -261,6 +288,40 @@ export default function SettingsScreen() {
             <Text style={styles.openLabel}>Abrir</Text>
           </Pressable>
         </View>
+        <SettingsCard
+          description="Canal de soporte de Nava operado por Undercodeec. Lunes a viernes, 10:00–19:00 (Ecuador)."
+          icon="logo-whatsapp"
+          onPress={() =>
+            void openExternal(SUPPORT_WHATSAPP_URL, 'Soporte por WhatsApp')
+          }
+          title="Soporte por WhatsApp"
+        />
+        <SettingsCard
+          description="Consulta el tratamiento de tus datos, privacidad y solicitudes de eliminación."
+          icon="shield-checkmark-outline"
+          onPress={() => void openExternal(PRIVACY_URL, 'Privacidad')}
+          title="Privacidad y tratamiento de datos"
+        />
+        <SettingsCard
+          description={
+            marketingPreferenceQuery.data?.subscribed
+              ? 'Recibirás novedades, promociones y ofertas de Nava por correo. Toca para dejar de recibirlas.'
+              : 'No recibirás correos promocionales. Toca si deseas recibir novedades y ofertas de Nava.'
+          }
+          icon="mail-outline"
+          onPress={() =>
+            updateMarketingPreference.mutate(
+              !marketingPreferenceQuery.data?.subscribed,
+            )
+          }
+          title={
+            updateMarketingPreference.isPending
+              ? 'Actualizando preferencias…'
+              : marketingPreferenceQuery.data?.subscribed
+                ? 'Marketing de Nava: activado'
+                : 'Marketing de Nava: desactivado'
+          }
+        />
         <Pressable
           accessibilityRole="button"
           disabled={isSigningOut}

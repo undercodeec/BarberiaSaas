@@ -85,6 +85,7 @@ export const signUpSchema = z
       .regex(/^[A-Z]{2}$/u, 'El código de país no es válido.'),
     email: emailSchema,
     fullName: z.string().trim().min(2, 'Ingresa tu nombre completo.').max(120),
+    marketingOptIn: z.boolean().default(false),
     openingTime: timeSchema,
     password: passwordSchema,
     phone: phoneSchema,

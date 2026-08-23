@@ -1,803 +1,893 @@
-# Políticas y términos de Nava
+# DEFINICIONES_LEGALES_COMERCIALES_NAVA.md
 
-> **Estado del documento:** plantilla previa a publicación.  
-> **Última actualización:** 10 de agosto de 2026.  
-> **Versión:** 1.0.0.  
-> **Importante:** solicita una revisión jurídica en Ecuador antes de publicar este documento y verifica que las rutas, proveedores y funcionalidades descritas estén efectivamente implementados.
-
-Este documento reúne las reglas aplicables al uso de **Nava**, su política de privacidad, sus términos y condiciones, su política de cookies y el procedimiento para solicitar la eliminación de cuentas y datos personales.
-
-## Índice
-
-1. [Información del titular de Nava](#1-información-del-titular-de-nava)
-2. [Política de privacidad](#2-política-de-privacidad)
-3. [Términos y condiciones](#3-términos-y-condiciones)
-4. [Política de cookies](#4-política-de-cookies)
-5. [Eliminación de cuentas y datos](#5-eliminación-de-cuentas-y-datos)
-6. [Aviso de privacidad para reservas](#6-aviso-de-privacidad-para-reservas)
-7. [Acuerdo de tratamiento de datos](#7-acuerdo-de-tratamiento-de-datos)
-8. [Contacto](#8-contacto)
+> **Estado:** decisiones confirmadas para desarrollo y actualización de documentos legales.
+> **Fecha de consolidación:** 23 de agosto de 2026.
+> **Proyecto:** Nava
+> **Propósito:** este documento consolida las decisiones definitivas comunicadas por el titular de Nava para que el equipo de desarrollo, Codex y futuras revisiones de `Politicas_y_terminos_Nava.md` utilicen una única fuente de verdad.
+>
+> **Importante:** cuando exista una contradicción entre este documento y una versión anterior de políticas, términos, precios, trial, suscripciones, soporte o infraestructura, **prevalecen las definiciones de este archivo**, salvo una decisión posterior documentada expresamente.
 
 ---
 
-## 1. Información del titular de Nava
+# 1. Titular, marca y contacto
 
-Nava es una plataforma tecnológica para la gestión de barberías y negocios relacionados con servicios de belleza y cuidado personal.
+## 1.1. Titular de Nava
 
-| Dato                            | Información                           |
-| ------------------------------- | ------------------------------------- |
-| Nombre comercial                | Nava                                  |
-| Titular o razón social          | Christopher Alexander Gallardo Campos |
-| RUC o identificación tributaria | 1727155671001                         |
-| Domicilio                       | Quito, Ecuador                        |
-| Correo de soporte               | soport@navacloud.app                  |
-| Correo de privacidad            | soport@navacloud.app                  |
-| Teléfono                        | No disponible                         |
-| Sitio web                       | https://navacloud.app                 |
+- **Nombre comercial del producto:** Nava.
+- **Titular:** Christopher Alexander Gallardo Campos.
+- **RUC:** 1727155671001.
+- **Domicilio público:** Quito, Ecuador.
+- No se publicará una dirección física más específica en los documentos generales.
 
-En este documento, **“Nava”**, **“la Plataforma”**, **“nosotros”** o **“nuestro”** se refieren al titular identificado anteriormente. **“Negocio”** o **“barbería”** se refiere a la persona o entidad que contrata y utiliza Nava. **“Usuario”** se refiere a propietarios, administradores, empleados o profesionales autorizados para acceder. **“Cliente final”** se refiere a la persona que reserva o recibe servicios de un negocio que utiliza Nava.
+## 1.2. Estado de la marca
+
+- La marca **Nava todavía no se encuentra registrada formalmente**.
+- Los documentos legales y comerciales no deben afirmar que Nava es una marca registrada.
+- Puede utilizarse “Nava” como nombre comercial o nombre del producto.
+
+## 1.3. Correo oficial
+
+Se utilizará un único correo para soporte, privacidad y comunicaciones relacionadas con la plataforma:
+
+- **soporte@navacloud.app**
+
+Este correo podrá recibir solicitudes de soporte, privacidad, acceso, rectificación, eliminación, suscripciones, reclamos y comunicaciones legales.
+
+## 1.4. WhatsApp de soporte
+
+Se utilizará el siguiente número como canal de soporte:
+
+- **0979046329**
+
+El número pertenece a **Undercodeec**, marca responsable del desarrollo tecnológico de Nava.
+
+Cuando se publique este número debe quedar claro que:
+
+- funciona como canal de soporte de Nava;
+- puede estar identificado comercialmente con Undercodeec;
+- no implica que Undercodeec sea una entidad jurídica distinta al titular, salvo que posteriormente se formalice de esa manera.
 
 ---
 
-# 2. Política de privacidad
+# 2. Mercado y usuarios objetivo
 
-## 2.1. Objeto y alcance
+## 2.1. Cobertura territorial
 
-Esta Política explica cómo Nava recopila, utiliza, almacena, comparte, protege y elimina datos personales cuando una persona:
+Nava prestará servicios inicialmente para:
 
-- visita el sitio web de Nava;
-- crea o administra una cuenta;
-- utiliza la aplicación web o móvil;
-- trabaja para un negocio registrado en Nava;
-- realiza una reserva en un negocio que utiliza Nava;
-- solicita soporte o se comunica con nosotros;
-- contrata una suscripción o realiza un pago; o
-- ejerce un derecho relacionado con sus datos personales.
+- Ecuador;
+- Latinoamérica.
 
-El tratamiento se realizará de acuerdo con la **Ley Orgánica de Protección de Datos Personales de Ecuador**, su Reglamento General y demás normativa aplicable.
+Los Términos y Condiciones podrán indicar que Nava se encuentra operado desde Ecuador y que la legislación ecuatoriana será la referencia contractual principal, sin impedir que usuarios de otros países latinoamericanos utilicen la plataforma.
 
-## 2.2. Roles y responsabilidades
+## 2.2. Tipos de clientes permitidos
 
-La responsabilidad sobre los datos depende del contexto en que fueron recopilados:
+Nava podrá ser contratado por:
 
-| Contexto                                    | Responsable                    | Función de Nava                                                              |
-| ------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------- |
-| Registro de la cuenta del negocio           | Nava                           | Responsable del tratamiento                                                  |
-| Suscripción, pagos, soporte y seguridad     | Nava                           | Responsable del tratamiento                                                  |
-| Analítica y comunicaciones propias de Nava  | Nava                           | Responsable del tratamiento                                                  |
-| Clientes registrados por una barbería       | La barbería                    | Responsable del tratamiento; Nava actúa como encargado                       |
-| Reservas, servicios e historial del cliente | La barbería                    | Responsable del tratamiento; Nava actúa como encargado                       |
-| Información de empleados y profesionales    | La barbería, salvo excepciones | Responsable del tratamiento; Nava actúa como encargado                       |
-| Marketing realizado por una barbería        | La barbería                    | Responsable del tratamiento; Nava actúa como proveedor tecnológico/encargado |
+- personas naturales;
+- barberos independientes;
+- propietarios de barberías;
+- negocios;
+- empresas;
+- profesionales que administren su propia operación.
 
-Cuando Nava actúa como encargado, tratará los datos únicamente siguiendo instrucciones documentadas del negocio, salvo que una obligación legal exija actuar de otra manera.
+No será obligatorio que el usuario sea una empresa formal constituida para abrir una cuenta.
 
-La barbería es responsable de informar a sus clientes y trabajadores, contar con una base legítima para el tratamiento y utilizar las funciones de Nava de manera legal.
+## 2.3. Edad mínima
 
-## 2.3. Datos que podemos tratar
+Para crear una cuenta empresarial o contratar Nava, el usuario deberá:
 
-Según las funciones utilizadas, Nava puede tratar las siguientes categorías:
+- tener al menos **18 años**; o
+- contar con capacidad legal suficiente para contratar según la normativa aplicable.
 
-### A. Datos de propietarios y usuarios del negocio
+Al aceptar la Política de Privacidad aplicable durante el registro o la
+contratación, el usuario declara que tiene al menos 18 años o capacidad legal
+suficiente para contratar Nava. Esta declaración forma parte de esa aceptación
+y no requiere un checkbox independiente de mayoría de edad.
 
-- nombres y apellidos;
+Los menores de edad no podrán crear ni contratar una cuenta empresarial de
+Nava en nombre propio.
+
+---
+
+# 3. Periodo de prueba y transición a plan gratuito
+
+## 3.1. Trial definitivo
+
+El periodo de prueba oficial de Nava será de:
+
+**10 días.**
+
+Cualquier referencia anterior a 12 o 14 días debe considerarse desactualizada.
+
+## 3.2. Finalización del trial
+
+Al finalizar los 10 días de prueba:
+
+- la cuenta pasará automáticamente al plan **Nava Free**;
+- los datos del usuario y del negocio se conservarán;
+- no se eliminará automáticamente información histórica;
+- no se bloqueará completamente el acceso;
+- se aplicarán los límites funcionales correspondientes al plan Free.
+
+---
+
+# 4. Planes y precios comerciales
+
+Los planes definidos para el lanzamiento son:
+
+| Plan          | Precio mensual |
+| ------------- | -------------: |
+| Nava Free     |       USD 0,00 |
+| Nava Esencial |       USD 9,83 |
+| Nava Local    |      USD 29,83 |
+| Nava Multi    |      USD 48,83 |
+
+## 4.1. Reglas generales de precios
+
+- Los precios publicados corresponden al **valor final que paga el usuario** al momento de contratar.
+- No deberán añadirse cargos inesperados al checkout.
+- Los precios podrán modificarse en el futuro.
+- Cualquier cambio de precio deberá comunicarse con una anticipación mínima de **15 días**.
+- El cambio no afectará retroactivamente periodos ya pagados.
+
+## 4.2. Régimen tributario e impuestos
+
+La situación tributaria del titular puede cambiar en el futuro. Si el régimen tributario cambia o aparece una obligación legal de aplicar impuestos adicionales, Nava podrá modificar sus precios.
+
+La redacción legal debe evitar afirmar que un precio nunca incluirá o nunca tendrá IVA.
+
+Redacción recomendada:
+
+> Los precios mostrados corresponden al valor final vigente al momento de la contratación. Nava podrá actualizarlos en caso de cambios comerciales, regulatorios o tributarios, previa notificación con la anticipación establecida en estos Términos.
+
+---
+
+# 5. Precio fundador
+
+## 5.1. Oferta fundador de Nava Local
+
+Nava podrá ofrecer:
+
+**Nava Local por USD 19,93/mes como precio fundador.**
+
+## 5.2. Duración
+
+La oferta puede mantenerse de manera indefinida mientras Nava decida conservarla comercialmente.
+
+## 5.3. Condición de permanencia
+
+El precio fundador se mantiene únicamente mientras:
+
+- el usuario conserve una suscripción mensual continua;
+- no deje vencer la suscripción;
+- no interrumpa los pagos mensuales.
+
+Si el usuario cancela, deja vencer la suscripción, omite una mensualidad o pierde la continuidad requerida, podrá perder el precio fundador y regresar al precio comercial vigente.
+
+## 5.4. Congelamiento del precio
+
+Mientras el usuario mantenga la continuidad exigida, el precio fundador de USD 19,93 permanecerá congelado para esa suscripción.
+
+## 5.5. Recomendación de implementación
+
+El backend debería registrar como mínimo:
+
+- `founder_price_eligible`;
+- `founder_price_started_at`;
+- `founder_price_lost_at`;
+- `founder_price_loss_reason`;
+- continuidad de mensualidades;
+- plan asociado;
+- historial de cambios de precio.
+
+---
+
+# 6. Suscripciones y cobros de Nava
+
+## 6.1. Procesador de pagos
+
+**PayPhone será utilizado como procesador de pagos de las suscripciones de Nava.**
+
+Los documentos legales deben indicar que:
+
+- PayPhone procesa el pago cuando se utilice este medio;
+- PayPhone puede estar sujeto a sus propios términos, políticas y controles;
+- Nava no debe almacenar el número completo de tarjeta ni el código CVV;
+- la información sensible de tarjeta deberá permanecer bajo el proveedor de pago correspondiente.
+
+## 6.2. Renovación
+
+Las renovaciones serán:
+
+**manuales.**
+
+Esto significa:
+
+- Nava no realizará cobros automáticos recurrentes de manera predeterminada;
+- el usuario deberá realizar el pago de renovación correspondiente;
+- no debe afirmarse que Nava guarda tarjetas para realizar renovaciones automáticas;
+- cualquier futura renovación automática requerirá actualización de términos y flujo de consentimiento.
+
+## 6.3. Aviso de vencimiento
+
+Nava enviará un aviso:
+
+**5 días antes del vencimiento de la suscripción.**
+
+## 6.4. Periodo de gracia
+
+Después del vencimiento existirán:
+
+**3 días de gracia.**
+
+Durante este periodo:
+
+- el usuario podrá regularizar la renovación;
+- se conservarán sus datos;
+- pueden mostrarse avisos de vencimiento y renovación.
+
+## 6.5. Consecuencia del impago
+
+Al terminar el periodo de gracia sin renovación:
+
+- la cuenta pasará automáticamente a **Nava Free**;
+- no se eliminarán los datos;
+- se conservará el historial;
+- se aplicarán los límites del plan gratuito;
+- las funciones premium dejarán de estar disponibles según los límites vigentes.
+
+---
+
+# 7. Facturación
+
+Nava emitirá:
+
+**facturación electrónica por correo electrónico.**
+
+Por cada suscripción pagada, se deberá generar el comprobante correspondiente según la normativa tributaria aplicable.
+
+El sistema debe contemplar:
+
+- datos de facturación;
+- identificación del cliente;
+- correo electrónico;
+- plan contratado;
+- valor pagado;
+- fecha;
+- número de comprobante;
+- estado del comprobante.
+
+---
+
+# 8. Reembolsos
+
+## 8.1. Regla general
+
+Los pagos realizados a Nava:
+
+**no son reembolsables una vez procesados.**
+
+## 8.2. Excepción
+
+Se podrá realizar devolución cuando exista un error atribuible a Nava, por ejemplo:
+
+- cobro duplicado generado por el sistema;
+- error técnico verificable que haya provocado un cargo incorrecto;
+- otra situación directamente imputable al sistema de Nava que justifique corregir el pago.
+
+## 8.3. Derechos legales
+
+La política de no reembolso no limitará derechos obligatorios o irrenunciables establecidos por la legislación aplicable.
+
+---
+
+# 9. Cancelación de suscripción
+
+La cancelación o no renovación se gestionará desde el sitio web de Nava.
+
+Ruta prevista:
+
+**https://nava.cloud.app/suscripciones**
+
+> Antes de publicar la URL debe verificarse que este dominio y esta ruta sean los definitivos y estén operativos.
+
+La cancelación:
+
+- detendrá futuras renovaciones;
+- no eliminará automáticamente la cuenta;
+- no eliminará los datos;
+- no generará automáticamente un reembolso;
+- permitirá conservar acceso conforme al periodo ya pagado y las reglas del plan.
+
+---
+
+# 10. Cierre de cuenta, exportación y eliminación
+
+## 10.1. Exportación de datos
+
+Cuando un negocio cierre su cuenta, tendrá un plazo de:
+
+**30 días calendario**
+
+para exportar los datos disponibles, salvo restricciones legales o de seguridad.
+
+## 10.2. Eliminación desde la app
+
+La funcionalidad:
+
+**Ajustes → Borrar mi cuenta**
+
+ya existe y debe mantenerse disponible para producción.
+
+## 10.3. Página pública de privacidad/eliminación
+
+La página:
+
+**https://navacloud.app/tratamiento-de-datos**
+
+ya existe y se utilizará para información relacionada con privacidad y solicitudes de datos.
+
+## 10.4. Backups después de una eliminación
+
+La política definida es:
+
+- backups cada **30 días**;
+- retención máxima de backups: **90 días**;
+- los datos residuales en backups no deberán utilizarse en la operación ordinaria;
+- desaparecerán conforme al ciclo de rotación;
+- si se restaura un backup, deberán reaplicarse las solicitudes de eliminación vigentes antes de volver a producción.
+
+---
+
+# 11. Infraestructura y proveedores
+
+## 11.1. VPS / infraestructura
+
+Proveedor:
+
+**RackNerd**
+Sitio del proveedor: `https://my.racknerd.com/`
+
+Ubicación declarada:
+
+- Estados Unidos;
+- región / apuntado operativo: Virginia.
+
+El documento legal debe reemplazar cualquier referencia anterior a “Dinoranck”.
+
+## 11.2. Base de datos
+
+Proveedor:
+
+**Neon**
+Sitio: `https://neon.com/`
+
+Región confirmada:
+
+- Virginia, Estados Unidos.
+
+Neon aloja la base de datos productiva de Nava.
+
+## 11.3. Archivos e imágenes
+
+El titular ha definido Neon como proveedor actual asociado al almacenamiento de los datos de Nava.
+
+Antes de afirmar que Neon almacena directamente archivos binarios o imágenes, el equipo de desarrollo debe comprobar la implementación real.
+
+**Regla para Codex:** verificar técnicamente dónde se almacenan avatares, imágenes de servicios, imágenes de productos y cualquier archivo antes de modificar la tabla legal de proveedores.
+
+## 11.4. Correo transaccional
+
+Proveedor:
+
+**Hostinger**
+
+Hostinger se utilizará para:
+
+- OTP;
+- verificación de cuenta;
+- recuperación de contraseña;
+- invitaciones;
+- recordatorios;
+- avisos operativos;
+- comunicaciones del sistema.
+
+## 11.5. PayPhone
+
+Proveedor:
+
+**PayPhone**
+
+Uso confirmado:
+
+- procesamiento de suscripciones pagadas de Nava.
+
+Si además se utiliza PayPhone para pagos entre clientes finales y barberías, esa relación deberá describirse separadamente según la implementación vigente.
+
+---
+
+# 12. Analítica y cookies
+
+## 12.1. Google Analytics 4
+
+**Google Analytics 4 ya está implementado.**
+
+La Política de Privacidad y Política de Cookies pueden mantener GA4 como proveedor de analítica.
+
+## 12.2. Cookies principales
+
+Se podrán declarar, previa verificación en producción:
+
+- `_ga`;
+- `_ga_<identificador>`.
+
+## 12.3. Otros trackers
+
+Para el MVP debe mantenerse una implementación sencilla.
+
+No declarar como activos, salvo implementación posterior confirmada:
+
+- Meta Pixel;
+- Google Ads;
+- Microsoft Clarity;
+- Hotjar;
+- PostHog;
+- herramientas similares.
+
+## 12.4. Banner de cookies
+
+El sitio debe disponer de un banner que permita:
+
+- aceptar cookies opcionales;
+- rechazar cookies opcionales;
+- configurar categorías;
+- consultar la política;
+- modificar posteriormente la decisión cuando corresponda.
+
+Las cookies de analítica que requieran consentimiento deberán permanecer desactivadas hasta obtenerlo.
+
+---
+
+# 13. Soporte
+
+## 13.1. Canal inicial
+
+El soporte se prestará inicialmente:
+
+**únicamente por WhatsApp Business.**
+
+Número:
+
+**0979046329**
+
+El canal pertenece a Undercodeec y se utilizará para atender a los usuarios de Nava.
+
+## 13.2. Evolución del soporte
+
+Nava podrá cambiar o ampliar el modelo de soporte en el futuro si aumenta la demanda.
+
+Posibles canales futuros:
+
+- sistema de tickets;
+- plataforma web de soporte;
+- correo;
+- otros canales.
+
+## 13.3. Horario
+
+Horario inicial:
+
+**lunes a viernes, días laborables de Ecuador, de 10:00 a 19:00, hora de Ecuador.**
+
+## 13.4. SLA
+
+No se establecerán tiempos máximos rígidos de respuesta por plan en el MVP.
+
+Redacción recomendada:
+
+> Nava procurará atender las solicitudes de soporte dentro de un tiempo razonable de acuerdo con su naturaleza, prioridad, complejidad y volumen de solicitudes.
+
+No prometer:
+
+- respuesta en X minutos;
+- resolución en X horas;
+- soporte 24/7;
+- SLA contractual específico;
+
+salvo que en el futuro se venda un plan que lo incluya expresamente.
+
+---
+
+# 14. Disponibilidad del servicio
+
+Nava no garantizará un porcentaje contractual de uptime en los planes iniciales.
+
+Los Términos deberán explicar que:
+
+- pueden existir interrupciones;
+- pueden ocurrir mantenimientos;
+- el servicio puede verse afectado por proveedores externos;
+- ciertas operaciones pueden demorar algunos minutos dependiendo del tráfico, infraestructura o condiciones técnicas;
+- Nava aplicará medidas razonables para restablecer el servicio.
+
+No debe utilizarse la expresión “disponibilidad garantizada 99,9%” mientras no exista un SLA formal.
+
+---
+
+# 15. Menores de edad
+
+## 15.1. Cuenta empresarial
+
+Los menores no pueden contratar una cuenta empresarial Nava por sí solos.
+
+## 15.2. Reservas de menores
+
+Las barberías sí podrán registrar o gestionar citas para menores de edad.
+
+La barbería será responsable de:
+
+- determinar si requiere autorización del padre, madre o representante;
+- recopilar únicamente los datos necesarios;
+- cumplir la legislación aplicable;
+- evitar campañas o perfiles ilícitos.
+
+---
+
+# 16. Datos sensibles
+
+Durante el MVP queda prohibido utilizar Nava para almacenar:
+
+- diagnósticos médicos;
+- historiales clínicos;
+- información de salud;
+- datos biométricos;
+- información especialmente sensible que no sea necesaria para el servicio;
+- categorías sensibles no expresamente habilitadas.
+
+Nava es un sistema para gestión de barberías y negocios relacionados con cuidado personal, no un sistema clínico.
+
+---
+
+# 17. Datos y fotografías de clientes
+
+## 17.1. Reservas públicas
+
+Los clientes finales no tienen perfil interno propio dentro de la aplicación Nava.
+
+La reserva pública solicita únicamente información básica como:
+
+- nombre;
 - correo electrónico;
 - teléfono;
-- contraseña almacenada mediante mecanismos criptográficos, nunca en texto legible;
-- cargo, rol y permisos;
-- nombre, dirección, logotipo y datos comerciales del negocio;
-- horarios, sucursales y configuración de servicios;
-- historial de acceso y actividad;
-- solicitudes de soporte y comunicaciones.
+- datos necesarios de la reserva.
 
-### B. Datos de clientes finales
+## 17.2. Fotografías
 
-- nombre y apellidos;
-- teléfono y correo electrónico;
-- fecha y hora de la reserva;
-- servicio, profesional y sucursal elegidos;
-- historial de citas, cancelaciones y ausencias;
-- preferencias o notas operativas ingresadas por la barbería;
-- consentimiento para recordatorios o comunicaciones comerciales, cuando corresponda;
-- evaluaciones o comentarios sobre el servicio.
+El flujo de reservas públicas:
 
-No deben ingresarse diagnósticos médicos, información de salud, datos biométricos ni otros datos sensibles, salvo que Nava habilite expresamente una función para ello y se hayan adoptado las garantías legales correspondientes.
+- no solicita fotografías de clientes.
 
-### C. Datos administrativos y comerciales
+La creación manual de reservas dentro de la aplicación:
 
-- catálogo de servicios y productos;
-- precios, descuentos y promociones;
-- ingresos, egresos, comisiones y cierres de caja;
-- inventario y movimientos de productos;
-- estado de la suscripción;
-- comprobantes y referencias de pago;
-- datos necesarios para facturación.
+- utiliza información equivalente;
+- no solicita fotografías del cliente como requisito.
 
-Nava no almacenará el número completo de una tarjeta ni su código de seguridad cuando los pagos sean procesados por una pasarela externa. El proveedor de pago tratará esos datos bajo sus propias condiciones.
+Por lo tanto, los documentos legales no deben afirmar que Nava solicita fotografías obligatorias a clientes finales durante la reserva.
 
-### D. Datos técnicos
+---
 
-- dirección IP;
-- fecha y hora de acceso;
-- navegador, sistema operativo y tipo de dispositivo;
-- identificadores de sesión;
-- registros de actividad, errores y seguridad;
-- cookies y tecnologías similares;
-- datos aproximados de ubicación derivados de la IP, cuando sea necesario para seguridad.
+# 18. Inteligencia artificial y decisiones automatizadas
 
-## 2.4. Origen de los datos
+Para la primera versión de Nava:
 
-Los datos pueden ser:
+- no se utilizará inteligencia artificial para tomar decisiones sobre usuarios;
+- no habrá decisiones automatizadas con efectos jurídicos o significativos;
+- no habrá perfilado automatizado avanzado;
+- no habrá recepcionista de IA en el MVP.
 
-- proporcionados directamente por el titular;
-- ingresados por una barbería o un usuario autorizado;
-- generados durante el uso de Nava;
-- recibidos de proveedores de autenticación, pagos, correo o mensajería;
-- obtenidos mediante cookies o herramientas de analítica previamente autorizadas.
+La Política de Privacidad puede mantener una cláusula indicando que cualquier futura incorporación de IA requerirá actualizar la política cuando corresponda.
 
-Si una barbería registra datos que no obtuvo directamente del cliente, será responsable de facilitarle la información exigida por la ley dentro del plazo aplicable o en su primera comunicación con el titular.
+---
 
-## 2.5. Finalidades y bases de legitimación
+# 19. Marketing de Nava
 
-| Finalidad                       | Datos utilizados                          | Base aplicable                                                         |
-| ------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------- |
-| Crear y administrar una cuenta  | Identificación, contacto y credenciales   | Ejecución del contrato y medidas precontractuales                      |
-| Prestar las funciones de Nava   | Usuarios, clientes, citas y configuración | Ejecución del contrato                                                 |
-| Gestionar reservas              | Contacto, servicio, horario y profesional | Ejecución del servicio solicitado; instrucciones de la barbería        |
-| Procesar suscripciones y pagos  | Facturación y referencias de pago         | Ejecución contractual y obligación legal                               |
-| Enviar avisos operativos        | Correo, teléfono y datos de la cita       | Ejecución contractual o interés legítimo, según el caso                |
-| Enviar publicidad de Nava       | Datos de contacto y preferencias          | Consentimiento cuando sea exigible                                     |
-| Enviar campañas de una barbería | Datos de contacto de sus clientes         | Base determinada por la barbería                                       |
-| Brindar soporte                 | Cuenta, mensajes y registros técnicos     | Ejecución contractual e interés legítimo                               |
-| Proteger la plataforma          | IP, sesiones, actividad y registros       | Interés legítimo y obligación de seguridad                             |
-| Prevenir fraude o abuso         | Cuenta, pagos y registros técnicos        | Interés legítimo y cumplimiento legal                                  |
-| Cumplir obligaciones legales    | Datos requeridos por la autoridad         | Obligación legal                                                       |
-| Analizar y mejorar Nava         | Datos de uso y métricas                   | Consentimiento o interés legítimo, según la herramienta y la normativa |
+Nava sí podrá enviar comunicaciones comerciales a los usuarios registrados, incluyendo:
 
-Cuando el tratamiento se base en consentimiento, el titular podrá retirarlo en cualquier momento. La retirada no afectará la licitud del tratamiento realizado previamente.
+- novedades;
+- nuevas funciones;
+- promociones;
+- descuentos;
+- ofertas;
+- información comercial;
+- contenido relacionado con Nava.
 
-## 2.6. Datos obligatorios y opcionales
+Estas comunicaciones deberán:
 
-Los campos marcados como obligatorios son necesarios para crear la cuenta, prestar el servicio, gestionar una reserva o atender una solicitud. Si no se proporcionan, es posible que Nava o la barbería no puedan completar la acción solicitada.
+- tener la base legal correspondiente;
+- permitir cancelar la recepción de comunicaciones promocionales cuando sea exigible;
+- mantenerse separadas de los mensajes operativos obligatorios.
 
-Los campos opcionales pueden dejarse vacíos sin impedir el acceso a las funciones esenciales, salvo que posteriormente resulten necesarios para una función solicitada por el usuario.
+Cancelar marketing no debe impedir recibir:
 
-## 2.7. Comunicaciones
-
-Nava podrá enviar mensajes necesarios para el funcionamiento del servicio, como:
-
-- confirmaciones de cuenta;
+- OTP;
 - recuperación de contraseña;
 - alertas de seguridad;
-- confirmaciones y recordatorios de citas;
-- avisos sobre pagos o suscripciones;
-- cambios relevantes en el servicio o en estos documentos;
-- respuestas de soporte.
-
-Estos mensajes operativos no se consideran publicidad y pueden ser indispensables para prestar el servicio.
-
-Las comunicaciones promocionales requerirán la base legal correspondiente y deberán incluir un mecanismo sencillo para dejar de recibirlas. Cancelar publicidad no cancela los mensajes operativos.
-
-## 2.8. Destinatarios y proveedores
-
-Nava podrá permitir el acceso estrictamente necesario a proveedores que apoyen la operación de la Plataforma. Antes de publicar esta Política debe completarse la lista real:
-
-| Proveedor                 | Servicio                                       | Datos posibles                                                                         | Ubicación                                                    |
-| ------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Neon                      | Base de datos PostgreSQL                       | Cuentas, citas y datos operativos                                                      | Virginia, Estados Unidos                                     |
-| Dinoranck                 | Infraestructura y alojamiento                  | Datos del sistema y registros                                                          | Virginia, Estados Unidos                                     |
-| Hostinger                 | Correos transaccionales                        | Nombre, correo y contenido                                                             | Estados Unidos                                               |
-| PayPhone                  | Cobro de suscripciones                         | Identificación y pago                                                                  | Ecuador                                                      |
-| No se utiliza actualmente | No se envían recordatorios por WhatsApp ni SMS | No aplica                                                                              | No aplica                                                    |
-| Google Analytics (GA4)    | Métricas de uso                                | IP, dispositivo y eventos                                                              | Estados Unidos y otros países donde Google procese los datos |
-| Neon                      | Base de datos                                  | Datos registrados en la aplicación, incluidos datos de usuarios y contenido multimedia | Virginia, Estados Unidos                                     |
-
-Los proveedores solo podrán tratar los datos para prestar el servicio contratado, deberán guardar confidencialidad y aplicar medidas de seguridad apropiadas.
-
-Nava también podrá comunicar datos cuando exista una obligación legal, una orden válida de autoridad competente o sea necesario para formular, ejercer o defender reclamaciones.
-
-Nava no vende bases de datos personales.
-
-## 2.9. Transferencias internacionales
-
-Algunos proveedores podrían procesar datos fuera de Ecuador. Antes de realizar una transferencia internacional, Nava verificará la existencia de un nivel adecuado de protección o utilizará las garantías permitidas por la normativa, como cláusulas contractuales, instrumentos jurídicamente vinculantes u otros mecanismos reconocidos.
-
-La lista actualizada de proveedores, países y garantías podrá solicitarse al correo de privacidad.
-
-## 2.10. Conservación de datos
-
-Los datos se conservarán únicamente durante el tiempo necesario para las finalidades informadas y para cumplir obligaciones legales o defender reclamaciones.
-
-| Categoría                         | Periodo o criterio inicial                                                        |
-| --------------------------------- | --------------------------------------------------------------------------------- |
-| Cuenta activa                     | Mientras exista la cuenta y la relación contractual                               |
-| Datos de clientes de una barbería | Mientras lo indique la barbería o permanezca vigente el servicio                  |
-| Copias de seguridad               | Se realizan cada 30 días y se conservan por un máximo de 90 días                  |
-| Registros de seguridad            | Entre 6 y 12 meses, según su utilidad técnica y de seguridad                      |
-| Solicitudes de soporte            | Entre 1 y 2 años, según sea necesario para seguimiento y defensa de reclamaciones |
-| Consentimientos y aceptaciones    | Mientras sean necesarios para demostrar cumplimiento                              |
-| Información contable o tributaria | Durante el plazo exigido por la legislación aplicable                             |
-| Solicitudes de derechos           | Durante el plazo necesario para demostrar su atención                             |
-
-Al finalizar el periodo aplicable, los datos serán eliminados, anonimizados o bloqueados cuando exista una obligación de conservación.
-
-## 2.11. Derechos de los titulares
-
-El titular puede solicitar, según corresponda:
-
-- **acceso:** conocer si se tratan sus datos y recibir una copia;
-- **actualización:** mantener los datos completos y actuales;
-- **rectificación:** corregir información inexacta;
-- **eliminación:** borrar datos cuando proceda legalmente;
-- **oposición:** solicitar que no se realicen determinados tratamientos;
-- **suspensión:** limitar temporalmente el tratamiento;
-- **portabilidad:** recibir o transferir los datos en un formato estructurado, cuando proceda;
-- **retiro del consentimiento:** revocar autorizaciones previamente otorgadas;
-- **no ser objeto de decisiones automatizadas:** pedir intervención humana cuando una decisión produzca efectos jurídicos o significativos.
-
-Para ejercer un derecho, el titular podrá escribir a **soport@navacloud.app** con el asunto `Solicitud de protección de datos` e indicar:
-
-1. nombre completo;
-2. correo o teléfono asociado;
-3. negocio o barbería relacionada, si aplica;
-4. derecho que desea ejercer;
-5. alcance de la solicitud;
-6. información razonable para verificar su identidad.
-
-No deben enviarse contraseñas ni datos completos de tarjetas. Nava podrá pedir información adicional únicamente cuando sea necesaria para verificar la identidad, evitar fraude o aclarar el alcance.
-
-Si la solicitud corresponde a datos controlados por una barbería, Nava podrá remitirla al negocio responsable y le prestará asistencia técnica para responder.
-
-La solicitud será gratuita y atendida dentro del plazo legal aplicable. Si no procede total o parcialmente, se informará la razón y los mecanismos disponibles para presentar un reclamo ante la autoridad competente.
-
-## 2.12. Menores de edad
-
-Nava está dirigido principalmente a negocios y personas con capacidad legal para contratar. Un menor no debe crear una cuenta empresarial ni aceptar estos términos en nombre de un negocio.
-
-Si una barbería permite reservas de menores, será responsable de determinar la base legal, obtener la autorización del representante cuando corresponda y recopilar únicamente los datos indispensables. Nava no debe utilizar datos de menores para publicidad propia ni elaborar perfiles comerciales sobre ellos.
-
-## 2.13. Seguridad
-
-Nava aplicará medidas técnicas y organizativas proporcionales al riesgo, que podrán incluir:
-
-- control de acceso por roles;
-- contraseñas protegidas mediante algoritmos seguros;
-- cifrado en tránsito mediante HTTPS/TLS;
-- separación lógica de los datos de cada negocio;
-- copias de seguridad y pruebas de restauración;
-- registro de accesos y eventos relevantes;
-- actualización de dependencias y corrección de vulnerabilidades;
-- restricciones de acceso administrativo;
-- procedimientos de respuesta a incidentes;
-- acuerdos de confidencialidad con personal y proveedores.
-
-Ningún sistema es completamente invulnerable. En caso de una vulneración, Nava investigará, contendrá el incidente y realizará las comunicaciones exigidas por la ley.
-
-## 2.14. Decisiones automatizadas e inteligencia artificial
-
-En la versión actual, Nava no utiliza inteligencia artificial, recomendaciones automatizadas ni decisiones automatizadas que produzcan efectos jurídicos o significativos sobre los titulares.
-
-Si en el futuro se incorporan recomendaciones, clasificación automática, asistentes o decisiones basadas en inteligencia artificial, esta Política deberá explicar su lógica general, los datos utilizados, las consecuencias previstas y la forma de solicitar intervención humana cuando corresponda.
-
-## 2.15. Cambios en esta Política
-
-Nava puede actualizar esta Política por cambios legales, técnicos o funcionales. La versión vigente indicará su fecha de actualización.
-
-Cuando un cambio sea sustancial, se notificará mediante la Plataforma, correo electrónico u otro canal adecuado antes de su entrada en vigor, cuando sea legalmente necesario. Si el cambio requiere un nuevo consentimiento, se solicitará de forma expresa.
+- facturas;
+- avisos de vencimiento;
+- comunicaciones esenciales de la cuenta.
 
 ---
 
-# 3. Términos y condiciones
+# 20. Marketing de las barberías
 
-## 3.1. Aceptación
+El MVP **no incluye** una función para que las barberías envíen campañas promocionales masivas a sus clientes desde Nava.
 
-Al crear una cuenta, marcar la casilla de aceptación o utilizar Nava, el usuario declara que:
+Por lo tanto:
 
-- ha leído estos Términos y la Política de Privacidad;
-- tiene capacidad legal para contratar;
-- actúa en nombre propio o cuenta con autorización para representar al negocio;
-- proporciona información verdadera y actualizada;
-- acepta quedar vinculado por la versión vigente de los documentos.
-
-Si no acepta estas condiciones, no debe crear una cuenta ni utilizar Nava.
-
-Nava conservará evidencia de la aceptación, incluyendo la versión del documento, fecha, cuenta, método de aceptación e información técnica razonablemente necesaria.
-
-## 3.2. Descripción del servicio
-
-Nava es una solución de software como servicio que puede incluir, según el plan contratado:
-
-- gestión de citas y calendario;
-- página o enlace público de reservas;
-- gestión de clientes;
-- usuarios, roles y profesionales;
-- catálogo de servicios y productos;
-- horarios, sucursales y disponibilidad;
-- recordatorios y notificaciones;
-- caja, ingresos, egresos y comisiones;
-- inventario;
-- reportes operativos;
-- configuraciones y soporte.
-
-Las funciones exactas, límites y precios serán los mostrados en la oferta o plan vigente al momento de contratar.
-
-Nava no presta los servicios de barbería ni interviene en la ejecución física de una cita. Cada negocio es responsable de sus precios, horarios, personal, calidad, atención, permisos y relación con sus clientes.
-
-## 3.3. Registro y cuenta
-
-Para registrarse, el usuario deberá proporcionar información exacta y mantenerla actualizada. Cada cuenta empresarial debe pertenecer a un negocio real o a una persona autorizada para administrarlo.
-
-El titular de la cuenta es responsable de:
-
-- proteger sus credenciales;
-- configurar correctamente los permisos;
-- desactivar usuarios que ya no trabajan en el negocio;
-- revisar la actividad de la cuenta;
-- avisar inmediatamente sobre accesos no autorizados;
-- asegurarse de que cada usuario cumpla estos Términos.
-
-Las cuentas son personales. No se deben compartir credenciales entre varias personas cuando Nava permita crear usuarios individuales.
-
-## 3.4. Roles y usuarios autorizados
-
-El propietario podrá invitar administradores, empleados o profesionales y asignarles permisos. Las acciones realizadas por usuarios autorizados se considerarán efectuadas dentro de la cuenta del negocio.
-
-El propietario es responsable de definir quién puede consultar, modificar, exportar o eliminar información. Nava no será responsable por permisos asignados incorrectamente por el negocio, sin perjuicio de sus propias obligaciones de seguridad.
-
-## 3.5. Planes, prueba y suscripción
-
-Nava podrá ofrecer planes gratuitos, periodos de prueba o suscripciones de pago. Antes de contratar se informará:
-
-- precio final e impuestos aplicables;
-- periodicidad de cobro;
-- funciones y límites;
-- duración de la prueba, si existe;
-- condiciones de renovación;
-- medios de pago;
-- forma de cancelar.
-
-Configuración comercial pendiente:
-
-| Condición                    | Regla de Nava                                                                                                                                          |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Duración de prueba           | 12 días                                                                                                                                                |
-| Precio y periodicidad        | Nava Free: USD 0/mes; Nava Esencial: USD 9,83/mes; Nava Local: USD 29,99/mes. Los límites y funciones de cada plan se informarán en la oferta vigente. |
-| Renovación automática        | No se aplica. Cada renovación o pago debe realizarse manualmente por el usuario.                                                                       |
-| Aviso previo al cobro        | 5 días antes del vencimiento o cobro aplicable                                                                                                         |
-| Periodo de gracia por impago | 3 días                                                                                                                                                 |
-| Reembolsos                   | Los pagos son finales y no reembolsables, sin perjuicio de los derechos irrenunciables que reconozca la ley.                                           |
-
-Si existe renovación automática, se informará de manera visible antes del pago y el usuario podrá cancelarla mediante un mecanismo razonablemente sencillo.
-
-## 3.6. Pagos, impuestos y facturación
-
-El usuario autoriza los cobros correspondientes al plan seleccionado. Los pagos podrán ser procesados por un proveedor externo sujeto a sus propias condiciones.
-
-El negocio es responsable de proporcionar datos de facturación correctos. Los precios se mostrarán con los impuestos incluidos o se indicará claramente cualquier importe adicional antes de confirmar el pago.
-
-Si un pago es rechazado, Nava podrá notificar al usuario y limitar temporalmente funciones después del periodo de gracia informado. La suspensión por impago no elimina automáticamente la cuenta ni sus datos.
-
-## 3.7. Cambios de precio
-
-Nava podrá modificar precios para periodos futuros. El cambio será comunicado con una anticipación razonable de **15 días** y no afectará importes ya pagados por el periodo vigente.
-
-Si el usuario no acepta el nuevo precio, podrá cancelar la renovación antes de que entre en vigor.
-
-## 3.8. Cancelación y reembolsos
-
-El titular puede cancelar la suscripción desde **Ajustes → Mi negocio → Suscripción**. También podrá solicitar asistencia a través del correo de soporte.
-
-La cancelación de la suscripción:
-
-- detiene cobros futuros;
-- no implica necesariamente un reembolso del periodo iniciado;
-- permite utilizar el servicio hasta el final del periodo ya pagado;
-- no elimina automáticamente la cuenta ni los datos.
-
-Los pagos realizados son finales y no se realizan reembolsos por periodos iniciados, salvo cuando la legislación aplicable exija lo contrario. Ninguna disposición limitará derechos irrenunciables reconocidos por la legislación de protección al consumidor.
-
-## 3.9. Uso aceptable
-
-El usuario se compromete a no:
-
-- utilizar Nava para actividades ilegales, fraudulentas o engañosas;
-- ingresar datos obtenidos sin una base legal válida;
-- enviar spam o publicidad no autorizada;
-- acosar, discriminar o perjudicar a terceros;
-- cargar malware o intentar vulnerar la seguridad;
-- acceder a cuentas o datos sin autorización;
-- eludir límites técnicos o comerciales;
-- realizar ingeniería inversa cuando esté prohibida por la ley;
-- copiar, revender o explotar Nava sin autorización escrita;
-- usar mecanismos automatizados que degraden el servicio;
-- suplantar identidades;
-- publicar contenido que infrinja propiedad intelectual o privacidad.
-
-## 3.10. Responsabilidades del negocio
-
-El negocio es responsable de:
-
-- la legalidad y exactitud de los datos que registra;
-- informar a clientes y empleados sobre el tratamiento;
-- gestionar consentimientos cuando sean necesarios;
-- responder solicitudes de sus clientes;
-- mantener precios, horarios y disponibilidad actualizados;
-- cumplir sus citas, devoluciones y obligaciones comerciales;
-- configurar recordatorios y campañas de forma legal;
-- cumplir normas tributarias, laborales, sanitarias y de consumo;
-- conservar copias o exportaciones cuando sean necesarias para sus obligaciones.
-
-El negocio no podrá utilizar Nava para crear perfiles discriminatorios ni tomar decisiones ilícitas sobre clientes o trabajadores.
-
-## 3.11. Propiedad de los datos
-
-Cada negocio conserva los derechos que le correspondan sobre la información que incorpora a Nava. El uso de la Plataforma no transfiere a Nava la propiedad de la base de clientes.
-
-El negocio concede a Nava una autorización limitada para alojar, procesar, respaldar y transmitir esos datos únicamente con el fin de prestar, proteger y mantener el servicio.
-
-Nava no utilizará los datos de clientes de una barbería para promocionar servicios propios, salvo que exista una relación directa con el titular y una base legal independiente claramente informada.
-
-## 3.12. Propiedad intelectual de Nava
-
-Nava, su software, diseño, código, marca, documentación y contenidos propios están protegidos por la legislación aplicable. El contrato concede al usuario una licencia limitada, revocable, no exclusiva, no transferible y condicionada al cumplimiento de estos Términos.
-
-La licencia no permite vender, sublicenciar, copiar sustancialmente, descompilar o crear productos derivados, excepto cuando una norma imperativa lo autorice.
-
-## 3.13. Integraciones de terceros
-
-Nava puede integrarse con proveedores de pagos, correo, mensajería, analítica u otros servicios. La disponibilidad de una integración puede depender de ese tercero y de sus propias condiciones.
-
-Nava informará cuando una función requiera compartir datos con un proveedor. No será responsable por interrupciones atribuibles exclusivamente a terceros fuera de su control, pero adoptará medidas razonables para seleccionar proveedores y gestionar incidentes.
-
-## 3.14. Disponibilidad, mantenimiento y cambios
-
-Nava procurará mantener el servicio disponible, pero no garantiza funcionamiento ininterrumpido. Podrán existir interrupciones por mantenimiento, actualizaciones, fallos externos, fuerza mayor o incidentes de seguridad.
-
-Cuando sea posible, los mantenimientos programados que afecten significativamente el servicio serán comunicados con antelación.
-
-Nava podrá mejorar, sustituir o retirar funciones. Si un cambio reduce sustancialmente una función esencial de un plan pagado, se informará de forma razonable y se ofrecerán las medidas que correspondan según el contrato y la ley.
-
-## 3.15. Copias de seguridad
-
-Nava mantendrá copias de seguridad cada 30 días, con una retención máxima de 90 días. Estas copias abarcan los datos necesarios para recuperar la operación de la Plataforma.
-
-Las copias de seguridad son una medida de continuidad y no deben considerarse un archivo permanente del negocio. El usuario deberá realizar exportaciones cuando necesite conservar información por razones legales o comerciales.
-
-## 3.16. Soporte
-
-El soporte se brindará por correo electrónico y WhatsApp, en días laborables de Ecuador, de 10:00 a 19:00 (hora de Ecuador), con los tiempos de respuesta establecidos en el plan contratado.
-
-El usuario deberá colaborar con información suficiente para diagnosticar un problema, sin enviar contraseñas ni datos innecesarios de clientes.
-
-## 3.17. Suspensión
-
-Nava podrá suspender total o parcialmente una cuenta cuando:
-
-- exista impago después del periodo informado;
-- se detecte una amenaza de seguridad;
-- haya indicios razonables de fraude o acceso no autorizado;
-- se incumplan gravemente estos Términos;
-- lo ordene una autoridad competente;
-- sea necesario evitar daños a usuarios o terceros.
-
-Salvo urgencia, obligación legal o riesgo de seguridad, Nava notificará la causa y ofrecerá una oportunidad razonable para corregirla.
-
-## 3.18. Terminación de la cuenta
-
-El usuario puede solicitar el cierre de su cuenta. Nava podrá terminar la relación por incumplimiento grave, uso ilícito o imposibilidad legal de continuar prestando el servicio.
-
-Antes del cierre, el negocio podrá exportar sus datos durante **30 días calendario**, excepto cuando exista una prohibición legal o un riesgo de seguridad.
-
-El cierre de acceso, la cancelación de suscripción y la eliminación de datos son procesos distintos. La eliminación se regirá por la sección correspondiente de este documento.
-
-## 3.19. Limitación de responsabilidad
-
-Dentro de los límites permitidos por la ley, Nava no será responsable por:
-
-- decisiones comerciales del negocio;
-- calidad o incumplimiento de servicios de barbería;
-- información incorrecta ingresada por usuarios;
-- pérdida causada por credenciales compartidas o permisos mal configurados por el negocio;
-- fallos de terceros fuera del control razonable de Nava;
-- daños indirectos no previsibles al contratar.
-
-Esta cláusula no excluye responsabilidad por dolo, culpa grave, incumplimiento de obligaciones legales de protección de datos ni derechos irrenunciables del consumidor.
-
-## 3.20. Indemnidad
-
-Cuando la ley lo permita, el negocio responderá por reclamaciones derivadas de datos, contenidos, campañas o instrucciones ilícitas introducidas por él, siempre que la causa no sea imputable a una acción u omisión de Nava.
-
-Esta disposición no impide determinar la responsabilidad proporcional de cada parte.
-
-## 3.21. Modificación de los Términos
-
-Nava podrá actualizar estos Términos por cambios legales, técnicos o comerciales. Los cambios sustanciales serán comunicados antes de su entrada en vigor.
-
-No se aplicarán retroactivamente condiciones que perjudiquen derechos ya adquiridos. Si el cambio requiere aceptación expresa, Nava solicitará una nueva confirmación.
-
-## 3.22. Ley aplicable y solución de controversias
-
-Estos Términos se rigen por las leyes de la República del Ecuador.
-
-Antes de iniciar una controversia, el usuario podrá contactar a **soport@navacloud.app** para buscar una solución directa. Esto no limita el derecho a acudir ante autoridades administrativas, de protección de datos, de consumo o judiciales competentes.
-
-La jurisdicción será la que determine la legislación aplicable, respetando los derechos irrenunciables de consumidores y titulares de datos.
+- no debe promocionarse esta función como disponible;
+- la Política no debe describirla como una función activa del MVP;
+- cualquier referencia genérica a campañas de barberías debe eliminarse o marcarse como futura.
 
 ---
 
-# 4. Política de cookies
+# 21. Política predeterminada de reservas
 
-## 4.1. Qué son las cookies
+Los siguientes valores son los **valores predeterminados** del sistema:
 
-Las cookies son pequeños archivos o identificadores que un sitio guarda o consulta en el dispositivo para permitir funciones, recordar preferencias, medir uso o mostrar contenido personalizado.
+- recordatorio: **24 horas antes** de la cita;
+- plazo para responder a reconfirmación: **6 horas**;
+- si el cliente no reconfirma: **la cita se mantiene**;
+- cancelación permitida hasta: **2 horas antes**;
+- reprogramación permitida hasta: **2 horas antes**.
 
-## 4.2. Categorías utilizadas
+## 21.1. Configuración por negocio
 
-Nava podrá utilizar las siguientes categorías únicamente si las herramientas correspondientes están realmente instaladas:
+Estos valores son configurables por cada negocio.
 
-| Categoría    | Finalidad                                                | Consentimiento                            |
-| ------------ | -------------------------------------------------------- | ----------------------------------------- |
-| Necesarias   | Sesión, seguridad, autenticación y funciones solicitadas | No se desactivan si son imprescindibles   |
-| Preferencias | Idioma, zona horaria y configuración visual              | Según su naturaleza y normativa aplicable |
-| Analítica    | Medir uso, rendimiento y errores                         | Requiere aceptación cuando corresponda    |
-| Publicidad   | Medir campañas y personalizar anuncios                   | Requiere aceptación previa                |
-| Terceros     | Habilitar servicios externos                             | Depende de su finalidad                   |
+Los documentos deben distinguir entre:
 
-## 4.3. Cookies concretas
-
-El siguiente inventario corresponde a la implementación prevista de Google Analytics 4. Debe verificarse nuevamente en producción si se añaden integraciones o etiquetas adicionales:
-
-| Nombre                               | Proveedor          | Finalidad                                           | Duración                                         | Categoría |
-| ------------------------------------ | ------------------ | --------------------------------------------------- | ------------------------------------------------ | --------- |
-| `_ga`                                | Google Analytics 4 | Distinguir usuarios únicos y medir el uso del sitio | Hasta 2 años, sujeto a los límites del navegador | Analítica |
-| `_ga_<identificador-del-contenedor>` | Google Analytics 4 | Mantener el estado de la sesión                     | Hasta 2 años, sujeto a los límites del navegador | Analítica |
-
-## 4.4. Gestión del consentimiento
-
-En la primera visita, Nava mostrará una herramienta que permita:
-
-- aceptar todas las cookies opcionales;
-- rechazarlas con una facilidad equivalente;
-- configurarlas por categoría;
-- consultar esta Política;
-- retirar o modificar la elección posteriormente.
-
-Las cookies de analítica o publicidad permanecerán desactivadas hasta obtener autorización cuando esta sea exigible. La aceptación de cookies opcionales no será requisito para utilizar funciones esenciales.
-
-El usuario también puede eliminar o bloquear cookies desde su navegador, aunque algunas funciones necesarias podrían dejar de operar correctamente.
+- valores predeterminados de Nava;
+- política particular del negocio.
 
 ---
 
-# 5. Eliminación de cuentas y datos
+# 22. Cancelaciones, anticipos y no-show
 
-## 5.1. Diferencias importantes
+Cada barbería es responsable de establecer y comunicar a sus clientes:
 
-- **Cancelar suscripción:** evita renovaciones futuras.
-- **Desactivar cuenta:** suspende temporalmente el acceso.
-- **Cerrar cuenta:** finaliza el acceso a Nava.
-- **Eliminar datos:** borra de forma segura los datos que ya no deban conservarse.
-- **Exportar datos:** entrega una copia antes del cierre o cuando proceda la portabilidad.
+- política de cancelación;
+- política de reprogramación;
+- anticipos;
+- depósitos;
+- devoluciones;
+- no-show;
+- condiciones comerciales relacionadas con el servicio físico.
 
-## 5.2. Cómo solicitar la eliminación
+Nava:
 
-El propietario de una cuenta podrá iniciar la solicitud desde:
-
-`Ajustes → Borrar mi cuenta`
-
-También podrá solicitarla sin iniciar sesión escribiendo a **soport@navacloud.app** con el asunto `Eliminación de datos de Nava`.
-
-La solicitud debe incluir:
-
-1. nombre completo;
-2. correo asociado a la cuenta;
-3. nombre del negocio;
-4. datos o cuenta que desea eliminar;
-5. información razonable para verificar su identidad.
-
-## 5.3. Clientes de una barbería
-
-Si una persona desea eliminar datos registrados por una barbería, puede presentar la solicitud directamente al negocio, que actúa como responsable. También puede contactar a Nava e indicar el nombre de la barbería; Nava remitirá la solicitud y colaborará técnicamente con el negocio.
-
-## 5.4. Verificación y plazo
-
-Nava verificará la identidad y autoridad del solicitante para impedir eliminaciones fraudulentas. La verificación puede incluir un enlace enviado al correo, contraseña actual, código temporal o información relacionada con la cuenta.
-
-Las solicitudes procedentes serán atendidas gratuitamente dentro del plazo legal aplicable. En Ecuador, el derecho de eliminación debe atenderse, con carácter general, en un plazo de **quince días**, sin perjuicio de las reglas o excepciones aplicables al caso concreto.
-
-## 5.5. Datos que se eliminarán
-
-Según el alcance de la solicitud, podrán eliminarse:
-
-- perfil y credenciales;
-- clientes, citas e historial operativo;
-- empleados y permisos;
-- configuraciones del negocio;
-- archivos cargados;
-- tokens de dispositivos y notificaciones;
-- identificadores de analítica vinculables;
-- información enviada a proveedores cuando corresponda.
-
-## 5.6. Datos que pueden conservarse
-
-Algunos datos podrán conservarse bloqueados y sin uso ordinario cuando sean necesarios para:
-
-- cumplir una obligación legal, tributaria o contable;
-- ejecutar o demostrar una obligación contractual pendiente;
-- responder órdenes de autoridad;
-- formular, ejercer o defender reclamaciones;
-- investigar fraude o incidentes de seguridad;
-- proteger derechos de terceros.
-
-Cuando sea posible, se informará la categoría conservada, el motivo y el plazo o criterio aplicable.
-
-## 5.7. Copias de seguridad y proveedores
-
-Los datos se eliminarán de los sistemas activos y se comunicarán las instrucciones necesarias a proveedores o subencargados.
-
-Los datos residuales en copias de seguridad quedarán aislados de usos ordinarios y desaparecerán conforme al ciclo documentado de rotación, con un plazo máximo de **90 días**. Si una copia se restaura, Nava aplicará nuevamente las solicitudes de eliminación vigentes antes de reanudar el uso normal.
-
-## 5.8. Confirmación
-
-Una vez completado el proceso, Nava enviará una confirmación o documento que indique:
-
-- fecha de recepción;
-- identidad verificada;
-- alcance de la solicitud;
-- sistemas y categorías afectadas;
-- datos bloqueados o conservados y su justificación;
-- fecha de finalización;
-- medidas aplicadas a proveedores.
-
-La eliminación es irreversible. Se recomienda exportar la información necesaria antes de confirmarla.
+- proporciona la infraestructura tecnológica;
+- no presta el servicio físico de barbería;
+- no decide por cuenta del negocio si un cliente debe recibir devolución;
+- no asume la relación comercial directa entre la barbería y su cliente final.
 
 ---
 
-# 6. Aviso de privacidad para reservas
+# 23. Responsabilidad sobre los datos
 
-> Este texto breve debe mostrarse debajo del formulario público de cada barbería.
+## 23.1. Datos propios de usuarios Nava
 
-## Versión recomendada
+Cuando Nava recoge datos para crear cuentas, gestionar suscripciones, enviar facturación, prestar soporte o gestionar seguridad, Nava actúa como responsable del tratamiento dentro del marco definido en la Política de Privacidad.
 
-Al reservar, autorizas al establecimiento **[NOMBRE DE LA BARBERÍA]** a utilizar los datos ingresados para gestionar tu cita, contactarte sobre el servicio y enviarte recordatorios. **Nava** proporciona la tecnología y trata esta información por cuenta del establecimiento. Consulta la [Política de Privacidad](https://navacloud.app/tratamiento-de-datos) y contacta al establecimiento para ejercer tus derechos.
+## 23.2. Datos de clientes de barberías
 
-Si la barbería desea enviar promociones, debe incluir una casilla independiente, opcional y desmarcada:
-
-> [ ] Acepto recibir promociones de **[NOMBRE DE LA BARBERÍA]** por **[correo/WhatsApp/SMS]**. Puedo retirar mi autorización en cualquier momento.
-
-La aceptación de publicidad no debe ser obligatoria para reservar.
+Cuando una barbería registra clientes, reservas, historial, servicios o datos operativos, la barbería actúa como responsable del tratamiento y Nava actúa como encargado tecnológico, salvo los tratamientos que Nava realice para sus propias obligaciones legales o de seguridad.
 
 ---
 
-# 7. Acuerdo de tratamiento de datos
+# 24. Fuente de verdad para futuras modificaciones
 
-Esta sección forma parte de los Términos cuando el negocio registra datos de clientes, empleados u otras personas en Nava.
+Antes de modificar código o documentos relacionados con las materias de este archivo, Codex deberá revisar:
 
-## 7.1. Partes y roles
+1. `DEFINICIONES_LEGALES_COMERCIALES_NAVA.md`
+2. `Politicas_y_terminos_Nava.md`
+3. `ESTADO_PROYECTO.md` o su versión vigente
+4. implementación real del backend y frontend
 
-El negocio actúa como **responsable del tratamiento** y Nava como **encargado del tratamiento** respecto de los datos ingresados por el negocio.
+Si existe contradicción:
 
-## 7.2. Objeto y duración
-
-Nava tratará datos personales para prestar las funciones contratadas durante la vigencia de la cuenta y el periodo limitado necesario para exportar, devolver o eliminar la información al terminar.
-
-## 7.3. Titulares y categorías
-
-Los titulares pueden incluir clientes, prospectos, empleados, profesionales y contactos del negocio. Los datos pueden incluir identificación, contacto, citas, servicios, horarios, preferencias, actividad laboral y datos administrativos.
-
-No se autoriza el ingreso de categorías sensibles salvo acuerdo previo, función expresamente habilitada y cumplimiento de garantías adicionales.
-
-## 7.4. Instrucciones
-
-Nava tratará los datos únicamente para:
-
-- alojarlos y organizarlos;
-- mostrar información a usuarios autorizados;
-- gestionar reservas y comunicaciones configuradas;
-- generar reportes solicitados;
-- realizar copias de seguridad;
-- brindar soporte y seguridad;
-- devolver, exportar o eliminar la información.
-
-Si Nava considera que una instrucción infringe la normativa, informará al negocio y podrá suspender su ejecución hasta aclararla, salvo prohibición legal.
-
-## 7.5. Obligaciones de Nava
-
-Nava se compromete a:
-
-- mantener confidencialidad;
-- limitar el acceso a personal autorizado;
-- aplicar medidas de seguridad apropiadas;
-- asistir en solicitudes de derechos;
-- informar incidentes al negocio dentro del plazo legal aplicable;
-- mantener información sobre subencargados;
-- colaborar con evaluaciones razonables de cumplimiento;
-- eliminar o devolver los datos al terminar, salvo obligación legal;
-- no utilizar la base de clientes para fines propios incompatibles.
-
-## 7.6. Obligaciones del negocio
-
-El negocio se compromete a:
-
-- tratar los datos de manera lícita, leal y transparente;
-- informar a los titulares;
-- determinar y documentar las bases de legitimación;
-- recopilar solo datos necesarios;
-- gestionar consentimientos cuando correspondan;
-- configurar permisos y proteger credenciales;
-- comunicar solicitudes de derechos a Nava oportunamente;
-- no emitir instrucciones ilícitas;
-- notificar a Nava cambios que modifiquen sustancialmente el riesgo.
-
-## 7.7. Subencargados
-
-El negocio autoriza de forma general el uso de los proveedores descritos en esta Política de Privacidad o que sean informados a solicitud mediante el correo de privacidad. Nava informará sobre incorporaciones o sustituciones relevantes y ofrecerá un mecanismo razonable para formular objeciones justificadas.
-
-## 7.8. Incidentes
-
-Nava notificará al negocio una vulneración de seguridad que afecte sus datos tan pronto como sea posible y dentro del plazo legal aplicable. La comunicación incluirá, en la medida disponible:
-
-- naturaleza del incidente;
-- categorías y volumen aproximado de afectados;
-- posibles consecuencias;
-- medidas de contención y corrección;
-- punto de contacto.
-
-El negocio será responsable de determinar las notificaciones que deba realizar como responsable, con la asistencia razonable de Nava.
-
-## 7.9. Finalización
-
-Al terminar el servicio, el negocio podrá solicitar una exportación dentro de **30 días calendario**. Después, Nava eliminará o anonimizará los datos conforme a su política de conservación, excepto la información que deba permanecer bloqueada por obligación legal.
+- este documento prevalece para decisiones comerciales y legales aquí confirmadas;
+- la implementación real prevalece para describir capacidades técnicas existentes;
+- si una capacidad indicada aquí todavía no está implementada, no debe publicarse como activa hasta completarla.
 
 ---
 
-# 8. Contacto
+# 25. Cambios obligatorios respecto a versiones anteriores
 
-Para consultas sobre el servicio:
+Codex deberá localizar y corregir cualquier referencia antigua que indique:
 
-- **Correo de soporte:** soport@navacloud.app
-- **Teléfono:** No disponible
-
-Para privacidad, derechos o eliminación:
-
-- **Correo de privacidad:** soport@navacloud.app
-- **Formulario y página de eliminación:** https://navacloud.app/tratamiento-de-datos
-- **Dirección:** Quito, Ecuador
-
-El titular también puede presentar un reclamo ante la **Superintendencia de Protección de Datos Personales del Ecuador**, sin perjuicio de otros derechos o acciones disponibles.
+- trial de 12 días;
+- trial de 14 días;
+- Nava Solo;
+- Nava Local a USD 29,99;
+- Nava Esencial a precio distinto de USD 9,83;
+- Nava Local a precio distinto de USD 29,83;
+- Nava Multi a precio distinto de USD 48,83;
+- periodo de gracia de 7 días;
+- renovación automática;
+- PayPhone excluido de las suscripciones Nava;
+- soporte obligatorio por correo como canal principal;
+- “Dinoranck” como proveedor de infraestructura;
+- campañas de marketing de barberías como función activa del MVP;
+- fotografías obligatorias de clientes en reservas;
+- IA activa en el MVP;
+- SLA de disponibilidad garantizado.
 
 ---
 
-## Lista privada de verificación antes de publicar
+# 26. Checklist técnico para Codex
 
-> Elimina esta sección de la página pública después de completar la implementación.
+## Suscripciones
 
-- [ ] Completar titular, RUC, domicilio y contactos.
-- [ ] Confirmar que el dominio y todas las URL funcionan con HTTPS.
-- [ ] Identificar región de Neon y país de cada proveedor.
-- [ ] Completar VPS, correo, pagos, WhatsApp/SMS, analítica y almacenamiento.
-- [ ] Publicar una lista actualizada de subencargados.
-- [ ] Definir prueba, precios, renovación, impago y reembolsos.
-- [ ] Implementar aceptación versionada de Términos y Política.
-- [ ] Implementar rechazo y configuración de cookies opcionales.
-- [ ] Auditar y completar el inventario real de cookies.
-- [ ] Crear la ruta interna de exportación y eliminación.
-- [ ] Crear una página pública de eliminación accesible sin iniciar sesión.
-- [ ] Documentar retención, copias de seguridad y restauración.
-- [ ] Separar mensajes operativos de campañas publicitarias.
-- [ ] Añadir aviso breve y consentimiento opcional al formulario de reservas.
-- [ ] Crear registro de solicitudes de derechos y certificados de eliminación.
-- [ ] Confirmar si se tratarán datos de menores o datos sensibles.
-- [ ] Confirmar si se utilizará inteligencia artificial.
-- [ ] Revisar el formulario de seguridad de Google Play si existe aplicación Android.
-- [ ] Implementar eliminación dentro de la app si existe cuenta móvil.
-- [ ] Obtener revisión final de un abogado ecuatoriano especializado.
+- [ ] Cambiar trial global a 10 días.
+- [ ] Confirmar transición automática a Nava Free.
+- [ ] Confirmar periodo de gracia de 3 días.
+- [ ] Confirmar recordatorio 5 días antes del vencimiento.
+- [ ] Implementar o verificar Nava Free, Nava Esencial, Nava Local y Nava Multi.
+- [ ] Verificar precios exactos.
+- [ ] Verificar precio fundador Nava Local USD 19,93.
+- [ ] Guardar elegibilidad de precio fundador.
+- [ ] Perder precio fundador al romper continuidad.
+- [ ] Confirmar renovación manual.
+- [ ] Confirmar PayPhone como procesador de suscripción.
+- [ ] Confirmar flujo de factura electrónica por email.
+- [ ] Confirmar downgrade automático a Free por falta de renovación.
 
-## Referencias normativas
+## Legal y privacidad
 
-- Ley Orgánica de Protección de Datos Personales del Ecuador.
-- Reglamento General a la Ley Orgánica de Protección de Datos Personales.
-- Resoluciones y normativa emitidas por la Superintendencia de Protección de Datos Personales.
-- Ley Orgánica de Defensa del Consumidor.
-- Ley de Comercio Electrónico, Firmas Electrónicas y Mensajes de Datos.
+- [ ] Corregir correo a `soporte@navacloud.app`.
+- [ ] Publicar únicamente Quito, Ecuador como domicilio.
+- [ ] Añadir WhatsApp 0979046329.
+- [ ] Identificarlo como canal operado por Undercodeec para soporte de Nava.
+- [ ] Indicar mercado Ecuador y Latinoamérica.
+- [ ] Incorporar en la aceptación de la Política de Privacidad la declaración
+      de mayoría de edad (18 años) o capacidad legal; no usar un checkbox
+      independiente de edad.
+- [ ] Mantener tratamiento de reservas de menores bajo responsabilidad del negocio.
+- [ ] Mantener prohibición de datos sensibles.
+- [ ] Eliminar marketing de barberías como función activa.
+- [ ] Mantener marketing propio de Nava con baja voluntaria.
+- [ ] Mantener ausencia de IA en MVP.
+- [ ] Mantener ausencia de uptime garantizado.
 
-> Este documento es una plantilla informativa y no sustituye asesoría jurídica profesional.
+## Infraestructura
+
+- [ ] Sustituir Dinoranck por RackNerd.
+- [ ] Mantener Neon / Virginia como base productiva.
+- [ ] Confirmar técnicamente almacenamiento real de archivos e imágenes.
+- [ ] Mantener Hostinger como SMTP.
+- [ ] Mantener PayPhone como procesador de suscripciones.
+- [ ] Confirmar backups cada 30 días y retención 90 días.
+
+## Cookies
+
+- [ ] Mantener GA4.
+- [ ] Verificar cookies reales de GA4.
+- [ ] Mantener banner Aceptar / Rechazar / Configurar.
+- [ ] No declarar trackers adicionales no implementados.
+
+## Reservas
+
+- [ ] Mantener defaults de recordatorio 24 h.
+- [ ] Mantener ventana de reconfirmación 6 h.
+- [ ] Mantener cita si no existe reconfirmación.
+- [ ] Cancelación por defecto hasta 2 h antes.
+- [ ] Reprogramación por defecto hasta 2 h antes.
+- [ ] Mantener valores configurables por negocio.
+
+## Cuenta y eliminación
+
+- [ ] Verificar `Ajustes → Borrar mi cuenta`.
+- [ ] Verificar página `https://navacloud.app/tratamiento-de-datos`.
+- [ ] Mantener exportación durante 30 días tras cierre.
+- [ ] Verificar reaplicación de eliminaciones si se restaura un backup.
+
+---
+
+# 27. Condiciones que deben revisarse antes de publicación legal
+
+Aunque las decisiones comerciales de este documento están confirmadas, antes de publicar una nueva versión de los Términos deben verificarse técnicamente estos puntos:
+
+1. que la ruta de suscripciones definitiva sea realmente `https://nava.cloud.app/suscripciones`;
+2. que PayPhone esté implementado para el cobro de suscripciones de Nava;
+3. que la facturación electrónica por email esté operativa;
+4. que el periodo de prueba configurado en producción sea exactamente de 10 días;
+5. que el periodo de gracia real sea de 3 días;
+6. que el downgrade a Nava Free sea automático;
+7. que los precios publicados coincidan exactamente con este archivo;
+8. que la política de precio fundador esté implementada;
+9. que el sistema de backups cumpla 30 días / 90 días;
+10. que el almacenamiento de imágenes/archivos esté identificado correctamente;
+11. que GA4 respete el consentimiento configurado;
+12. que el banner de cookies permita rechazar con una facilidad equivalente a aceptar;
+13. que la eliminación de cuenta esté disponible desde la app;
+14. que la página pública de privacidad/eliminación esté operativa;
+15. que no se promocionen funciones fuera del MVP como si estuvieran disponibles.
+
+---
+
+# 28. Nota de revisión jurídica
+
+Este documento constituye una **especificación de decisiones de producto, negocio, privacidad y operación** para el desarrollo de Nava.
+
+No sustituye una revisión profesional de:
+
+- Términos y Condiciones;
+- Política de Privacidad;
+- Acuerdo de Tratamiento de Datos;
+- Política de Cookies;
+- normativa tributaria;
+- normativa de protección al consumidor;
+- Ley Orgánica de Protección de Datos Personales de Ecuador;
+- obligaciones derivadas de operar comercialmente en otros países de Latinoamérica.
+
+La versión pública de los documentos legales deberá ser revisada antes del lanzamiento definitivo.
+
+---
+
+# 29. Resumen de decisiones definitivas
+
+| Tema                  | Decisión                                                                  |
+| --------------------- | ------------------------------------------------------------------------- |
+| Domicilio             | Quito, Ecuador                                                            |
+| Correo                | soporte@navacloud.app                                                     |
+| WhatsApp soporte      | 0979046329                                                                |
+| Mercado               | Ecuador y Latinoamérica                                                   |
+| Clientes              | Personas naturales y negocios                                             |
+| Edad mínima           | Declarada al aceptar la Política de Privacidad: 18 años / capacidad legal |
+| Trial                 | 10 días                                                                   |
+| Fin del trial         | Pasa automáticamente a Nava Free                                          |
+| Nava Free             | USD 0                                                                     |
+| Nava Esencial         | USD 9,83/mes                                                              |
+| Nava Local            | USD 29,83/mes                                                             |
+| Nava Multi            | USD 48,83/mes                                                             |
+| Precio fundador Local | USD 19,93/mes                                                             |
+| Fundador              | Se mantiene mientras exista continuidad mensual                           |
+| Renovación            | Manual                                                                    |
+| Procesador            | PayPhone                                                                  |
+| Aviso de vencimiento  | 5 días antes                                                              |
+| Gracia                | 3 días                                                                    |
+| Impago                | Downgrade automático a Free                                               |
+| Reembolsos            | No, salvo error atribuible a Nava                                         |
+| Cambio de precio      | Aviso mínimo de 15 días                                                   |
+| Facturación           | Electrónica por email                                                     |
+| Exportación al cerrar | 30 días                                                                   |
+| Borrar cuenta         | Disponible en app                                                         |
+| Página privacidad     | navacloud.app/tratamiento-de-datos                                        |
+| VPS                   | RackNerd                                                                  |
+| BD                    | Neon, Virginia, EE. UU.                                                   |
+| SMTP                  | Hostinger                                                                 |
+| Backups               | Cada 30 días / retención 90 días                                          |
+| Analítica             | Google Analytics 4                                                        |
+| Otros trackers        | No incluir por ahora                                                      |
+| Cookies               | Banner con aceptar/rechazar/configurar                                    |
+| Soporte               | WhatsApp Business                                                         |
+| Horario               | L-V laborables, 10:00–19:00 Ecuador                                       |
+| SLA soporte           | Sin tiempo máximo rígido                                                  |
+| Menores               | Pueden existir reservas; no cuentas empresariales                         |
+| Datos sensibles       | Prohibidos en MVP                                                         |
+| Fotos en reserva      | No se solicitan                                                           |
+| IA                    | No utilizada en MVP                                                       |
+| Marketing Nava        | Sí                                                                        |
+| Marketing barberías   | No disponible en MVP                                                      |
+| Recordatorio          | 24 h antes                                                                |
+| Reconfirmación        | 6 h                                                                       |
+| Sin reconfirmación    | La cita se mantiene                                                       |
+| Cancelación           | Hasta 2 h antes por defecto                                               |
+| Reprogramación        | Hasta 2 h antes por defecto                                               |
+| Uptime                | No garantizado contractualmente                                           |
+| Marca Nava            | Aún no registrada                                                         |
+
+---
+
+**Fin del documento.**

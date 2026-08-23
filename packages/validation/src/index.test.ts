@@ -291,21 +291,23 @@ describe('autenticación y onboarding', () => {
   });
 
   it('valida todos los datos del perfil de registro', () => {
-    expect(
-      signUpSchema.safeParse({
-        accountType: 'professional',
-        businessName: 'Estudio Ana',
-        city: 'Quito',
-        closingTime: '18:00',
-        confirmPassword: 'clave-segura',
-        countryCode: 'EC',
-        email: 'ana@example.com',
-        fullName: 'Ana Dueña',
-        openingTime: '09:00',
-        password: 'clave-segura',
-        phone: '+593999999999',
-      }).success,
-    ).toBe(true);
+    const result = signUpSchema.safeParse({
+      accountType: 'professional',
+      businessName: 'Estudio Ana',
+      city: 'Quito',
+      closingTime: '18:00',
+      confirmPassword: 'clave-segura',
+      countryCode: 'EC',
+      email: 'ana@example.com',
+      fullName: 'Ana Dueña',
+      openingTime: '09:00',
+      password: 'clave-segura',
+      phone: '+593999999999',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.marketingOptIn).toBe(false);
+    }
   });
 
   it('rechaza un horario de registro que cierre antes de abrir', () => {

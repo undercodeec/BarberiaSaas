@@ -69,6 +69,7 @@ export default function CheckoutExperience() {
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [discountCode, setDiscountCode] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,7 +135,10 @@ export default function CheckoutExperience() {
     setError(null);
     try {
       const result = await requestJson<PaymentAttempt>('payment', {
-        body: JSON.stringify({ planCode }),
+        body: JSON.stringify({
+          discountCode: discountCode.trim() || undefined,
+          planCode,
+        }),
         headers: { 'idempotency-key': crypto.randomUUID() },
         method: 'POST',
       });
@@ -248,6 +252,27 @@ export default function CheckoutExperience() {
                 {sessionMessage(session)}
               </p>
             ) : null}
+            <div className="mt-6 max-w-md">
+              <label
+                className="block text-sm font-semibold"
+                htmlFor="discount-code"
+              >
+                Código de descuento
+              </label>
+              <input
+                autoCapitalize="characters"
+                className="mt-1 w-full rounded-lg border border-black/20 px-3 py-2"
+                id="discount-code"
+                maxLength={80}
+                onChange={(event) => setDiscountCode(event.target.value)}
+                placeholder="Opcional"
+                value={discountCode}
+              />
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                Si tienes un código fundador, ingrésalo antes de seleccionar
+                Nava Local.
+              </p>
+            </div>
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               {plans
                 .filter(

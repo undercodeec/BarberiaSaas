@@ -4,14 +4,15 @@ import type { ReactNode } from 'react';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Gestión para barberías',
-  description: 'Base web móvil-first para la operación de barberías.',
+  title: 'Nava | La plataforma para tu barbería',
+  description:
+    'Agenda, reservas, clientes y operación para barberías que se mueven.',
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#101816',
+  themeColor: '#1b1d19',
 };
 
 export default function RootLayout({

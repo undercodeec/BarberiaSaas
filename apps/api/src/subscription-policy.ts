@@ -11,7 +11,7 @@ import { ApiError } from './errors';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ROLLING_BOOKING_WINDOW_DAYS = 30;
-export const TRIAL_DAYS = 7;
+export const TRIAL_DAYS = 10;
 export const GRACE_DAYS = 3;
 export const FREE_BOOKING_GRACE = 5;
 
@@ -256,7 +256,7 @@ export async function ensureOrganizationSubscription(
   }
 
   const legacyTrialEnd = new Date(
-    subscription.currentPeriodStart.getTime() + 14 * DAY_MS,
+    subscription.currentPeriodStart.getTime() + 7 * DAY_MS,
   );
   const configuredTrialEnd = new Date(
     subscription.currentPeriodStart.getTime() + TRIAL_DAYS * DAY_MS,
@@ -284,13 +284,16 @@ export async function ensureOrganizationSubscription(
   ) {
     subscription = await transaction.subscription.update({
       data: {
-        currentPeriodEnd: subscription.trialEndsAt,
-        graceEndsAt: new Date(
-          subscription.trialEndsAt.getTime() + GRACE_DAYS * DAY_MS,
-        ),
-        status: SubscriptionStatus.PAST_DUE,
+        graceEndsAt: null,
+        planId: free.id,
+        status: SubscriptionStatus.FREE,
+        trialEndsAt: null,
       },
       where: { id: subscription.id },
+    });
+    await transaction.organization.update({
+      data: { status: OrganizationStatus.ACTIVE },
+      where: { id: organizationId },
     });
   }
 
@@ -351,13 +354,52 @@ export async function ensureOrganizationSubscription(
       });
     } else {
       subscription = await transaction.subscription.update({
-        data: { status: SubscriptionStatus.SUSPENDED },
+        data: {
+          graceEndsAt: null,
+          ...(subscription.founderPriceEligible
+            ? {
+                founderPriceEligible: false,
+                founderPriceLostAt: now,
+                founderPriceLossReason: 'payment_continuity_interrupted',
+              }
+            : {}),
+          planId: free.id,
+          status: SubscriptionStatus.FREE,
+          trialEndsAt: null,
+        },
         where: { id: subscription.id },
+      });
+      await transaction.organization.update({
+        data: { status: OrganizationStatus.ACTIVE },
+        where: { id: organizationId },
       });
     }
   }
 
   return { plans: storedPlans, subscription };
+}
+
+/** Applies expiry rules even when the organization has no active session. */
+export async function reconcileSubscriptionLifecycle(
+  database: DatabaseClient,
+  now = new Date(),
+) {
+  const candidates = await database.subscription.findMany({
+    select: { organizationId: true },
+    where: {
+      OR: [
+        { status: SubscriptionStatus.TRIAL, trialEndsAt: { lte: now } },
+        { status: SubscriptionStatus.ACTIVE, currentPeriodEnd: { lte: now } },
+        { status: SubscriptionStatus.PAST_DUE, graceEndsAt: { lte: now } },
+      ],
+    },
+  });
+  for (const { organizationId } of candidates) {
+    await database.$transaction((transaction) =>
+      ensureOrganizationSubscription(transaction, organizationId, now),
+    );
+  }
+  return candidates.length;
 }
 
 export function planDefinition(code: string) {

@@ -19,7 +19,9 @@ import {
   addBillingDays,
   applyVerifiedPlatformPayment,
   expireStaleSubscriptionPayments,
+  inclusiveTaxBreakdown,
   platformPaymentEventHash,
+  resolveFounderPromotion,
   sanitizePlatformProviderPayload,
 } from './subscription-payments';
 
@@ -28,6 +30,13 @@ describe('dominio de pagos de suscripción', () => {
     expect(addBillingDays(new Date('2026-01-31T12:00:00Z'), 30)).toEqual(
       new Date('2026-03-02T12:00:00Z'),
     );
+  });
+
+  it('desglosa impuestos sin alterar el precio final publicado', () => {
+    expect(inclusiveTaxBreakdown(1993, 1500)).toEqual({
+      subtotalCents: 1733,
+      taxCents: 260,
+    });
   });
 
   it('minimiza payloads y genera una huella estable por evento', () => {
@@ -49,6 +58,43 @@ describe('dominio de pagos de suscripción', () => {
       platformPaymentEventHash(event),
     );
     expect(platformPaymentEventHash(event)).toHaveLength(64);
+  });
+
+  it('aplica el código fundador solo a Nava Local y conserva el beneficio activo', () => {
+    expect(
+      resolveFounderPromotion({
+        configuredCode: 'NAVA-FOUNDER',
+        founderPriceEligible: false,
+        founderPriceLostAt: null,
+        planCode: 'local',
+        submittedCode: 'nava-founder',
+      }),
+    ).toMatchObject({
+      applied: true,
+      error: null,
+      promotionCode: 'NAVA-FOUNDER',
+    });
+    expect(
+      resolveFounderPromotion({
+        configuredCode: 'NAVA-FOUNDER',
+        founderPriceEligible: true,
+        founderPriceLostAt: null,
+        planCode: 'local',
+        submittedCode: undefined,
+      }),
+    ).toMatchObject({ applied: true, error: null });
+    expect(
+      resolveFounderPromotion({
+        configuredCode: 'NAVA-FOUNDER',
+        founderPriceEligible: false,
+        founderPriceLostAt: new Date(),
+        planCode: 'local',
+        submittedCode: 'NAVA-FOUNDER',
+      }),
+    ).toMatchObject({
+      applied: false,
+      error: 'FOUNDER_PRICE_CONTINUITY_LOST',
+    });
   });
 });
 

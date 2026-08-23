@@ -2,6 +2,13 @@
 
 > Documento de contexto de producto para orientar a Codex y al equipo de desarrollo sobre cómo debe funcionar el trial, el plan gratuito, los límites de uso y la conversión a planes de pago dentro del MVP de Nava.
 
+> Vigencia comercial: las cifras y reglas de este documento se ajustaron el 23
+> de agosto de 2026 a `Politicas_y_terminos_Nava.md`, que prevalece ante
+> cualquier contradicción. El trial es de 10 días y los precios aplicables son
+> Nava Esencial USD 9,83, Nava Local USD 29,83 y Nava Multi USD 48,83; la
+> promoción de fundador para Nava Local es USD 19,93 bajo sus condiciones de
+> continuidad.
+
 ---
 
 ## 1. Objetivo
@@ -58,7 +65,7 @@ Onboarding
 ↓
 Trial Nava Local
 ↓
-Uso completo durante 14 días
+Uso completo durante 10 días
 ↓
 Finaliza el trial
 ↓
@@ -82,7 +89,7 @@ Upgrade a Nava Esencial o Nava Local
 Duración recomendada:
 
 ```text
-14 días
+10 días
 ```
 
 Durante el trial el usuario debe poder experimentar prácticamente todo el valor funcional del MVP:
@@ -470,7 +477,7 @@ No está pensado para equipos.
 Precio comercial recomendado:
 
 ```text
-USD 29.99 / mes
+USD 29.83 / mes
 ```
 
 Incluye:
@@ -841,11 +848,12 @@ Mientras no exista cobro integrado, el administrador de plataforma podrá cambia
 
 ## 24. Política de precios
 
-Los precios vigentes del MVP son USD 9.83 para Nava Esencial y USD 29.99
-para Nava Local. Ambos planes están disponibles para cuentas de tipo
-profesional y negocio; el tipo de cuenta no cambia el precio.
+Los precios vigentes del MVP son USD 9,83 para Nava Esencial, USD 29,83 para
+Nava Local y USD 48,83 para Nava Multi. Los planes están disponibles para
+cuentas de tipo profesional y negocio; el tipo de cuenta no cambia el precio.
 
-No se aplica precio fundador en esta decisión comercial.
+Nava Local puede usar el precio fundador de USD 19,93 cuando se ingrese el
+código de promoción vigente y se mantenga la continuidad mensual.
 
 ---
 
@@ -1032,7 +1040,7 @@ Para el primer MVP comercial se adopta como hipótesis:
 
 ```text
 Trial Nava Local
-14 días
+10 días
 
 Nava Free
 USD 0
@@ -1049,7 +1057,7 @@ reservas ilimitadas
 clientes ilimitados
 
 Nava Local
-USD 29.99 / mes
+USD 29.83 / mes
 1 sucursal
 profesionales ilimitados sin cobro por usuario
 MVP completo

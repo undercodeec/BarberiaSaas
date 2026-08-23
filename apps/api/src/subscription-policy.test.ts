@@ -94,6 +94,10 @@ function storedSubscription(
 }
 
 describe('política de suscripciones', () => {
+  it('configura exactamente 10 días de prueba', () => {
+    expect(TRIAL_DAYS).toBe(10);
+  });
+
   it('mantiene las fechas originales al consultar repetidamente una prueba', async () => {
     const now = new Date('2026-08-10T12:00:00.000Z');
     const periodStart = new Date(now.getTime() - DAY_MS);
@@ -159,12 +163,13 @@ describe('política de suscripciones', () => {
       now,
     );
 
-    expect(result.subscription.status).toBe(SubscriptionStatus.SUSPENDED);
+    expect(result.subscription.status).toBe(SubscriptionStatus.FREE);
+    expect(result.subscription.planId).toBe('plan-free');
     expect(context.update).toHaveBeenCalledTimes(2);
-    expect(context.current().status).toBe(SubscriptionStatus.SUSPENDED);
+    expect(context.current().status).toBe(SubscriptionStatus.FREE);
   });
 
-  it('convierte una prueba vencida en un periodo de gracia de tres dias', async () => {
+  it('convierte una prueba vencida directamente en Nava Free', async () => {
     const now = new Date('2026-08-10T12:00:00.000Z');
     const trialEndsAt = new Date(now.getTime() - DAY_MS);
     const original = storedSubscription({
@@ -181,12 +186,10 @@ describe('política de suscripciones', () => {
       now,
     );
 
-    expect(result.subscription.status).toBe(SubscriptionStatus.PAST_DUE);
-    expect(result.subscription.planId).toBe('plan-local');
-    expect(result.subscription.trialEndsAt).toEqual(trialEndsAt);
-    expect(result.subscription.graceEndsAt).toEqual(
-      new Date(trialEndsAt.getTime() + GRACE_DAYS * DAY_MS),
-    );
+    expect(result.subscription.status).toBe(SubscriptionStatus.FREE);
+    expect(result.subscription.planId).toBe('plan-free');
+    expect(result.subscription.trialEndsAt).toBeNull();
+    expect(result.subscription.graceEndsAt).toBeNull();
   });
 
   it('convierte una prueba cuya gracia terminó en Nava Free', async () => {

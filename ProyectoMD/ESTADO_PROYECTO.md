@@ -10,6 +10,16 @@
 > Estado global: **MVP funcional para piloto controlado, todavía no listo para
 > declararse producción estable**.
 
+> Actualización de políticas y suscripciones: **23 de agosto de 2026**. Esta
+> actualización complementa el corte histórico: las reglas vigentes de negocio
+> se definen en `Politicas_y_terminos_Nava.md` cuando exista contradicción.
+
+> Corte de implementación de políticas (23 de agosto de 2026): trial de 10
+> días, gracia de 3 días exclusiva de planes pagados, recordatorio de renovación
+> a 5 días, código fundador y opt-in de marketing están implementados
+> localmente y requieren desplegar sus migraciones y configuración productiva
+> antes de declararlos operativos.
+
 Este documento es la fuente de verdad del estado vigente. Sustituye la antigua
 bitácora cronológica: una función se considera terminada solo cuando existe en
 el código actual y tiene evidencia proporcional a su riesgo.
@@ -100,6 +110,9 @@ Mobile / Web pública / Admin
 ### Fase 1 — Identidad, organización y onboarding: funcional
 
 - [x] Registro temporal y verificación OTP por correo antes de crear la cuenta.
+- [ ] La declaración de mayoría de edad o capacidad legal se incorporará a la
+      aceptación de la Política de Privacidad. El checkbox independiente de
+      edad fue retirado por decisión de producto.
 - [x] Normalización y unicidad de correo y teléfono; disponibilidad previa al
       registro y límites de intentos/frecuencia.
 - [x] Contraseñas derivadas con `scrypt`; tokens opacos almacenados como hash.
@@ -152,6 +165,9 @@ Mobile / Web pública / Admin
 - [x] Token privado para consultar, confirmar asistencia, cancelar,
       reprogramar y reseñar.
 - [x] Reconfirmación, plazo y acción por falta de respuesta configurables.
+- [x] Valores predeterminados alineados con la política: recordatorio 24 h,
+      reconfirmación con plazo de 6 h, conservación de la cita sin respuesta y
+      cancelación/reprogramación hasta 2 h antes; cada negocio puede cambiarlos.
 - [x] Proxy Web de mismo origen limitado a rutas públicas para evitar exponer
       la URL interna de la API.
 - [x] Límites en memoria por IP para catálogo, disponibilidad, creación,
@@ -170,6 +186,10 @@ Mobile / Web pública / Admin
       y eliminación lógica.
 - [x] Historial de citas, notas y fotos privadas asociadas a notas.
 - [x] Exportación y eliminación múltiple desde Mobile.
+- [ ] Al cerrar una cuenta o negocio, falta habilitar durante 30 días una
+      exportación de portabilidad que incluya CSV y un ZIP con los datos y las
+      imágenes disponibles. El cierre actual conserva historial, pero no
+      entrega todavía este paquete de forma autónoma.
 - [x] Reutilización de cliente por teléfono dentro del alcance implementado.
 - [ ] No existe deduplicación asistida ni barbero preferido persistente.
 - [ ] Las imágenes se guardan como `data:`/base64 en PostgreSQL; no existe
@@ -242,17 +262,38 @@ Mobile / Web pública / Admin
 - [ ] “Préstamos a clientes” no está implementado y queda fuera del MVP; la UI
       todavía lo muestra como pendiente de definición y debe ocultarse o aclararse.
 
-### Fase 11 — Planes y límites: parcial
+### Fase 11 — Planes y límites: funcional, pendiente de habilitación externa
 
 - [x] Planes `free`, `essential`, `local` y `multi` con límites y feature flags.
-- [x] Trial de siete días, tres días de gracia y transición a Free o solo
-      lectura según el caso.
+- [x] Trial de 10 días; al finalizar pasa directamente a Nava Free. Los planes
+      pagados tienen 3 días de gracia y, ante impago, bajan automáticamente a
+      Nava Free sin eliminar datos.
 - [x] Límites backend para profesionales, sedes, clientes y reservas móviles.
 - [x] Panel interno para cambiar plan, suspender, reactivar y conceder soporte.
 - [x] La app Android solo consume el estado y no enlaza un checkout externo.
-- [ ] No existe facturación real de Nava, renovación ni webhook verificable. El
-      checkout Web autenticado existe para sandbox y permanece deshabilitado
-      hasta completar la validación con PayPhone y las decisiones comerciales.
+- [x] Checkout Web autenticado para suscripciones Nava con PayPhone, enlace de
+      pago, idempotencia, validación verificable del pago y auditoría. Sigue
+      deshabilitado hasta que PayPhone autorice el entorno productivo.
+- [x] Promoción de fundador para Nava Local: el checkout en
+      `navacloud.app/suscripciones` acepta un código configurable sólo en el
+      servidor (`PLATFORM_FOUNDER_PROMOTION_CODE`), aplica USD 19,93 como valor
+      final, registra la factura y conserva el beneficio mientras haya
+      continuidad mensual. El vencimiento del período de gracia lo revoca de
+      forma irreversible.
+- [x] Migraciones `20260823110000_subscription_policy_10_day_trial` y
+      `20260823120000_founder_promotion_code` actualizan trials vigentes y
+      persisten el historial de la promoción.
+- [ ] Falta habilitar credenciales PayPhone, configurar el código fundador en
+      producción, aplicar las migraciones y realizar el flujo real completo.
+- [x] Aviso de vencimiento cinco días antes: proceso horario por correo SMTP,
+      con registro persistente para no duplicar envíos y texto que aclara la
+      renovación manual.
+- [ ] Facturación electrónica por correo: se construirá un módulo propio que
+      se comunique con el facturador SRI para emitir comprobantes automáticos.
+      Requiere diseño, credenciales y pruebas de homologación antes de operar.
+- [x] Marketing Nava con opt-in explícito: desmarcado por defecto en el
+      registro, consentimiento versionado y fechado, y baja posterior desde
+      Ajustes. Los avisos operativos permanecen fuera de esta preferencia.
 - [ ] El endpoint de simulación sigue siendo parte de la operación del MVP y no
       sustituye un sistema de cobro.
 

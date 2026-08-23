@@ -358,6 +358,7 @@ model User {
   subscriptionInvoicesRequested        SubscriptionInvoice[]          @relation("SubscriptionInvoiceRequester")
   subscriptionPaymentAttemptsInitiated SubscriptionPaymentAttempt[]   @relation("SubscriptionPaymentInitiator")
   subscriptionChangesActed             SubscriptionChange[]           @relation("SubscriptionChangeActor")
+  marketingConsents                    MarketingConsent[]
 
   @@index([deletedAt])
   @@map("users")
@@ -418,12 +419,25 @@ model PendingRegistration {
   city            String?                  @db.VarChar(120)
   openingTime     String?                  @map("opening_time") @db.Char(5)
   closingTime     String?                  @map("closing_time") @db.Char(5)
+  marketingOptIn  Boolean                  @default(false) @map("marketing_opt_in")
   createdAt       DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([expiresAt])
   @@index([lockedUntil])
   @@map("pending_registrations")
+}
+
+model MarketingConsent {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  policyVersion String    @map("policy_version") @db.VarChar(80)
+  grantedAt     DateTime  @default(now()) @map("granted_at") @db.Timestamptz(3)
+  withdrawnAt   DateTime? @map("withdrawn_at") @db.Timestamptz(3)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, withdrawnAt])
+  @@map("marketing_consents")
 }
 
 model UserRegistrationProfile {
@@ -846,6 +860,11 @@ model Subscription {
   currentPeriodStart   DateTime             @map("current_period_start") @db.Timestamptz(3)
   currentPeriodEnd     DateTime             @map("current_period_end") @db.Timestamptz(3)
   freeBookingGraceUsed Boolean              @default(false) @map("free_booking_grace_used")
+  founderPriceEligible Boolean              @default(false) @map("founder_price_eligible")
+  founderPriceStartedAt DateTime?           @map("founder_price_started_at") @db.Timestamptz(3)
+  founderPriceLostAt   DateTime?            @map("founder_price_lost_at") @db.Timestamptz(3)
+  founderPriceLossReason String?            @map("founder_price_loss_reason") @db.VarChar(80)
+  renewalReminderSentAt DateTime?           @map("renewal_reminder_sent_at") @db.Timestamptz(3)
   createdAt            DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt            DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
   organization         Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -888,6 +907,9 @@ model SubscriptionInvoice {
   taxCents               Int                          @default(0) @map("tax_cents")
   taxBasisPoints         Int                          @map("tax_basis_points")
   totalCents             Int                          @map("total_cents")
+  promotionCode          String?                      @map("promotion_code") @db.VarChar(80)
+  promotionDiscountCents Int                          @default(0) @map("promotion_discount_cents")
+  founderPriceApplied    Boolean                      @default(false) @map("founder_price_applied")
   currencyCode           String                       @default("USD") @map("currency_code") @db.Char(3)
   billingPeriodMonths    Int                          @default(1) @map("billing_period_months")
   billingPeriodDays      Int                          @default(30) @map("billing_period_days")

@@ -4,6 +4,10 @@
 > Actualización operativa: 21 de agosto de 2026
 > Plan base: `PLAN_DESARROLLO_INTEGRAL_NAVA_2026-08-20.md`
 > Estado de cobro real: **deshabilitado**
+> Nota de vigencia: las decisiones de trial, gracia y precios de este corte
+> histórico fueron sustituidas el 23 de agosto de 2026 por
+> `Politicas_y_terminos_Nava.md` y se registran actualizadas en
+> `ESTADO_PROYECTO.md`.
 
 ## Resumen ejecutivo
 
@@ -159,8 +163,9 @@ para otorgar acceso y se requiere su confirmación formal antes de implementarlo
 
 ### Decisiones comerciales confirmadas para el piloto
 
-- El trial se mantiene en **7 días** y, para usuarios primerizos, conserva los
-  **3 días** de gracia ya implementados.
+- El trial vigente es de **10 días** y al terminar pasa a Nava Free. Los
+  **3 días** de gracia se aplican exclusivamente a suscripciones pagadas
+  vencidas.
 - El impuesto de plataforma se configurará en cero; el emisor indicado es
   Christopher Alexander Gallardo Campos y el dominio objetivo es
   `https://navacloud.app/checkout`.

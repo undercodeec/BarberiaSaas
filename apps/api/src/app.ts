@@ -88,7 +88,11 @@ import {
   hashPassword,
   verifyPassword,
 } from './security';
-import { ensureOrganizationSubscription } from './subscription-policy';
+import {
+  ensureOrganizationSubscription,
+  reconcileSubscriptionLifecycle,
+} from './subscription-policy';
+import { processSubscriptionRenewalReminders } from './subscription-reminders';
 
 const SESSION_IDLE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const SESSION_MAX_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -98,6 +102,7 @@ const VERIFICATION_LOCK_DURATION_MS = 15 * 60 * 1000;
 const ACCOUNT_DELETION_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 const MAX_VERIFICATION_ATTEMPTS = 5;
 const MAX_AUTH_RATE_LIMIT_BUCKETS = 10_000;
+const marketingPreferenceSchema = z.object({ marketingOptIn: z.boolean() });
 
 interface AuthRateLimitBucket {
   count: number;
@@ -751,6 +756,7 @@ async function issueVerificationCode({
   database,
   email,
   fullName,
+  marketingOptIn = false,
   passwordHash,
   registrationProfile,
   verificationMailer,
@@ -759,6 +765,7 @@ async function issueVerificationCode({
   readonly database: DatabaseClient;
   readonly email: string;
   readonly fullName: string;
+  readonly marketingOptIn?: boolean;
   readonly passwordHash: string;
   readonly registrationProfile?: RegistrationProfileDraft;
   readonly verificationMailer: VerificationMailer | null;
@@ -781,6 +788,7 @@ async function issueVerificationCode({
       email,
       expiresAt,
       fullName,
+      marketingOptIn,
       passwordHash,
       ...registrationData,
     },
@@ -790,6 +798,7 @@ async function issueVerificationCode({
       failedAttempts: 0,
       fullName,
       lockedUntil: null,
+      marketingOptIn,
       passwordHash,
       ...registrationData,
     },
@@ -1057,6 +1066,7 @@ export async function buildApi({
         database,
         email,
         fullName: input.fullName.trim(),
+        marketingOptIn: input.marketingOptIn,
         passwordHash,
         registrationProfile: {
           accountType:
@@ -1195,6 +1205,14 @@ export async function buildApi({
         },
         where: { email: verification.email },
       });
+      if (verification.marketingOptIn) {
+        await transaction.marketingConsent.create({
+          data: {
+            policyVersion: config.PLATFORM_MARKETING_POLICY_VERSION,
+            userId: user.id,
+          },
+        });
+      }
       if (registrationProfile) {
         const {
           accountType,
@@ -1267,6 +1285,7 @@ export async function buildApi({
         database,
         email: pendingRegistration.email,
         fullName: pendingRegistration.fullName,
+        marketingOptIn: pendingRegistration.marketingOptIn,
         passwordHash: pendingRegistration.passwordHash,
         ...(registrationProfile ? { registrationProfile } : {}),
         verificationMailer,
@@ -1287,6 +1306,49 @@ export async function buildApi({
       session: { expiresAt: session.expiresAt.toISOString() },
       user: publicUser(user),
     };
+  });
+
+  app.get('/v1/account/marketing-preference', async (request) => {
+    const { user } = await authenticate(database, request);
+    const consent = await database.marketingConsent.findFirst({
+      orderBy: { grantedAt: 'desc' },
+      where: { userId: user.id, withdrawnAt: null },
+    });
+    return {
+      consentedAt: consent?.grantedAt.toISOString() ?? null,
+      policyVersion: consent?.policyVersion ?? null,
+      subscribed: Boolean(consent),
+    };
+  });
+
+  app.put('/v1/account/marketing-preference', async (request) => {
+    const { user } = await authenticate(database, request);
+    const { marketingOptIn } = marketingPreferenceSchema.parse(request.body);
+    const now = new Date();
+    if (marketingOptIn) {
+      const activeConsent = await database.marketingConsent.findFirst({
+        orderBy: { grantedAt: 'desc' },
+        where: { userId: user.id, withdrawnAt: null },
+      });
+      const consent =
+        activeConsent ??
+        (await database.marketingConsent.create({
+          data: {
+            policyVersion: config.PLATFORM_MARKETING_POLICY_VERSION,
+            userId: user.id,
+          },
+        }));
+      return {
+        consentedAt: consent.grantedAt.toISOString(),
+        policyVersion: consent.policyVersion,
+        subscribed: true,
+      };
+    }
+    await database.marketingConsent.updateMany({
+      data: { withdrawnAt: now },
+      where: { userId: user.id, withdrawnAt: null },
+    });
+    return { consentedAt: null, policyVersion: null, subscribed: false };
   });
 
   app.post('/v1/auth/logout', async (request, reply) => {
@@ -1471,6 +1533,10 @@ export async function buildApi({
       });
       await transaction.appNotification.deleteMany({
         where: { userId: user.id },
+      });
+      await transaction.marketingConsent.updateMany({
+        data: { withdrawnAt: now },
+        where: { userId: user.id, withdrawnAt: null },
       });
       await transaction.pushToken.deleteMany({ where: { userId: user.id } });
       await transaction.userPortfolioItem.deleteMany({
@@ -2641,11 +2707,30 @@ export async function buildApi({
     );
   }, 60_000);
   subscriptionPaymentLifecycleTimer.unref();
+  const subscriptionLifecycleTimer = setInterval(
+    () => {
+      void reconcileSubscriptionLifecycle(database).catch((error: unknown) =>
+        app.log.error(error),
+      );
+      void processSubscriptionRenewalReminders(database, config).catch(
+        (error: unknown) => app.log.error(error),
+      );
+    },
+    60 * 60 * 1000,
+  );
+  subscriptionLifecycleTimer.unref();
+  void reconcileSubscriptionLifecycle(database).catch((error: unknown) =>
+    app.log.error(error),
+  );
+  void processSubscriptionRenewalReminders(database, config).catch(
+    (error: unknown) => app.log.error(error),
+  );
   app.addHook('onClose', async () => {
     clearInterval(publicBookingLifecycleTimer);
     clearInterval(notificationDeliveryTimer);
     clearInterval(productOrderLifecycleTimer);
     clearInterval(subscriptionPaymentLifecycleTimer);
+    clearInterval(subscriptionLifecycleTimer);
   });
 
   app.setErrorHandler((error, _request, reply) => {

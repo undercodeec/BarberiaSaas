@@ -24,8 +24,10 @@ import { ensureOrganizationSubscription } from './subscription-policy';
 
 const CHECKOUT_EXPIRATION_MS = 24 * 60 * 60 * 1000;
 const BILLING_PERIOD_DAYS = 30;
+export const FOUNDER_LOCAL_PRICE_CENTS = 1993;
 
 const checkoutSchema = z.object({
+  discountCode: z.string().trim().min(1).max(80).optional(),
   planCode: z.string().trim().min(1).max(40),
 });
 const paymentParamsSchema = z.object({ id: z.uuid() });
@@ -59,6 +61,63 @@ export interface VerifiedPlatformPayment {
   readonly status: 'approved' | 'rejected';
   readonly storeId: string;
   readonly verifiedAt?: Date;
+}
+
+function normalizePromotionCode(value: string | undefined | null) {
+  return value?.trim().toUpperCase() || null;
+}
+
+type FounderPromotionError =
+  | 'DISCOUNT_CODE_INVALID'
+  | 'DISCOUNT_CODE_NOT_APPLICABLE'
+  | 'FOUNDER_PRICE_CONTINUITY_LOST';
+
+export function resolveFounderPromotion(input: {
+  readonly configuredCode: string | undefined;
+  readonly founderPriceEligible: boolean;
+  readonly founderPriceLostAt: Date | null;
+  readonly planCode: string;
+  readonly submittedCode: string | undefined;
+}): {
+  readonly applied: boolean;
+  readonly error: FounderPromotionError | null;
+  readonly promotionCode: string | null;
+} {
+  const submittedCode = normalizePromotionCode(input.submittedCode);
+  if (input.planCode !== 'local') {
+    return {
+      applied: false,
+      error: submittedCode ? 'DISCOUNT_CODE_NOT_APPLICABLE' : null,
+      promotionCode: null,
+    };
+  }
+  if (input.founderPriceEligible)
+    return { applied: true, error: null, promotionCode: null };
+  if (!submittedCode)
+    return { applied: false, error: null, promotionCode: null };
+  if (submittedCode !== normalizePromotionCode(input.configuredCode))
+    return {
+      applied: false,
+      error: 'DISCOUNT_CODE_INVALID',
+      promotionCode: null,
+    };
+  if (input.founderPriceLostAt)
+    return {
+      applied: false,
+      error: 'FOUNDER_PRICE_CONTINUITY_LOST',
+      promotionCode: null,
+    };
+  return { applied: true, error: null, promotionCode: submittedCode };
+}
+
+export function inclusiveTaxBreakdown(
+  finalPriceCents: number,
+  taxBasisPoints: number,
+) {
+  const taxCents = Math.round(
+    (finalPriceCents * taxBasisPoints) / (10_000 + taxBasisPoints),
+  );
+  return { subtotalCents: finalPriceCents - taxCents, taxCents };
 }
 
 const SAFE_PROVIDER_PAYLOAD_KEYS = new Map(
@@ -395,8 +454,17 @@ export async function applyVerifiedPlatformPayment(
         currentPeriodStart: periodStartsAt,
         graceEndsAt: null,
         planId: attempt.invoice.planId,
+        renewalReminderSentAt: null,
         status: SubscriptionStatus.ACTIVE,
         trialEndsAt: null,
+        ...(attempt.invoice.founderPriceApplied
+          ? {
+              founderPriceEligible: true,
+              founderPriceLostAt: null,
+              founderPriceLossReason: null,
+              founderPriceStartedAt: subscription.founderPriceStartedAt ?? now,
+            }
+          : {}),
       },
       where: { id: subscription.id },
     });
@@ -633,6 +701,27 @@ export function registerSubscriptionPaymentRoutes(
           'SUBSCRIPTION_PLAN_NOT_AVAILABLE',
           'El plan seleccionado no está disponible para compra.',
         );
+      const founderPromotion = resolveFounderPromotion({
+        configuredCode: config.PLATFORM_FOUNDER_PROMOTION_CODE,
+        founderPriceEligible: subscription.founderPriceEligible,
+        founderPriceLostAt: subscription.founderPriceLostAt,
+        planCode: plan.code,
+        submittedCode: input.discountCode,
+      });
+      if (founderPromotion.error) {
+        const messages = {
+          DISCOUNT_CODE_INVALID: 'El código de descuento no es válido.',
+          DISCOUNT_CODE_NOT_APPLICABLE:
+            'El código de descuento no aplica al plan seleccionado.',
+          FOUNDER_PRICE_CONTINUITY_LOST:
+            'El precio fundador se perdió al interrumpir la suscripción.',
+        } as const;
+        throw new ApiError(
+          409,
+          founderPromotion.error,
+          messages[founderPromotion.error],
+        );
+      }
       if (
         subscription.status === SubscriptionStatus.ACTIVE &&
         subscription.currentPeriodEnd > new Date() &&
@@ -643,10 +732,15 @@ export function registerSubscriptionPaymentRoutes(
           'PLAN_CHANGE_POLICY_PENDING',
           'Los cambios entre planes activos se habilitarán al aprobar la política comercial.',
         );
-      const subtotalCents = plan.monthlyPriceCents!;
+      const finalPriceCents = founderPromotion.applied
+        ? FOUNDER_LOCAL_PRICE_CENTS
+        : plan.monthlyPriceCents!;
       const taxBasisPoints = config.PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS!;
-      const taxCents = Math.round((subtotalCents * taxBasisPoints) / 10_000);
-      const totalCents = subtotalCents + taxCents;
+      const { subtotalCents, taxCents } = inclusiveTaxBreakdown(
+        finalPriceCents,
+        taxBasisPoints,
+      );
+      const totalCents = finalPriceCents;
       const expiresAt = new Date(Date.now() + CHECKOUT_EXPIRATION_MS);
       const invoice = await transaction.subscriptionInvoice.create({
         data: {
@@ -662,11 +756,16 @@ export function registerSubscriptionPaymentRoutes(
           planCode: plan.code,
           planId: plan.id,
           planName: plan.name,
+          promotionCode: founderPromotion.promotionCode,
+          promotionDiscountCents: founderPromotion.applied
+            ? plan.monthlyPriceCents! - FOUNDER_LOCAL_PRICE_CENTS
+            : 0,
           requestedByUserId: user.id,
           subtotalCents,
           taxBasisPoints,
           taxCents,
           totalCents,
+          founderPriceApplied: founderPromotion.applied,
         },
       });
       const attempt = await transaction.subscriptionPaymentAttempt.create({
