@@ -110,6 +110,15 @@ Al finalizar los 10 días de prueba:
 - no se bloqueará completamente el acceso;
 - se aplicarán los límites funcionales correspondientes al plan Free.
 
+Al aplicarse Nava Free, el límite vigente es de **25 reservas en una ventana
+móvil de 30 días**, 100 clientes activos, una sucursal y un profesional
+operativo. Los datos creados durante el trial o un plan pagado se conservan:
+los profesionales, servicios, citas e historial que excedan el límite no se
+eliminan, pero quedan en modo histórico y no pueden recibir nuevas reservas,
+reservas en línea, cambios operativos ni nuevas asignaciones hasta recuperar un
+plan que los incluya. La aplicación los muestra atenuados y señala que requieren
+Nava Local; no los presenta como recursos activos del plan Free.
+
 ---
 
 # 4. Planes y precios comerciales

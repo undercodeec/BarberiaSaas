@@ -246,25 +246,28 @@ export function registerClientRoutes(
   app.post('/v1/clients', async (request, reply) => {
     const { user } = await authenticate(database, request);
     const organizationId = await currentOrganizationId(database, user.id);
-    if (organizationId) {
-      await assertCanCreateClient(database, organizationId);
-    }
     const input = createClientSchema.parse(request.body);
-    const client = await database.client.create({
-      data: {
-        addressLine: input.addressLine || null,
-        birthDate: input.birthDate || null,
-        createdByUserId: user.id,
-        documentNumber: input.documentNumber || null,
-        email: input.email || null,
-        fullName: input.fullName,
-        lastName: input.lastName || null,
-        notes: input.notes || null,
-        organizationId,
-        phone: input.phone,
-        updatedByUserId: user.id,
-      },
-      include: { labels: { include: { label: true } } },
+    const client = await database.$transaction(async (transaction) => {
+      if (organizationId) {
+        await transaction.$queryRaw`WITH lock AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtext(${organizationId}))) SELECT 1 AS locked FROM lock`;
+        await assertCanCreateClient(transaction, organizationId);
+      }
+      return transaction.client.create({
+        data: {
+          addressLine: input.addressLine || null,
+          birthDate: input.birthDate || null,
+          createdByUserId: user.id,
+          documentNumber: input.documentNumber || null,
+          email: input.email || null,
+          fullName: input.fullName,
+          lastName: input.lastName || null,
+          notes: input.notes || null,
+          organizationId,
+          phone: input.phone,
+          updatedByUserId: user.id,
+        },
+        include: { labels: { include: { label: true } } },
+      });
     });
     return reply.code(201).send({ client: publicClient(client) });
   });

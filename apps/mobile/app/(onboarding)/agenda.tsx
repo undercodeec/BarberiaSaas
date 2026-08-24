@@ -567,6 +567,11 @@ export default function AgendaScreen() {
       return appointment.status === statusFilter;
     });
   }, [appointmentsQuery.data, selectedMemberId, showCancelled, statusFilter]);
+  const canRescheduleSelectedAppointment =
+    !selectedAppointment ||
+    teamQuery.data?.members.find(
+      (member) => member.id === selectedAppointment.professionalMembershipId,
+    )?.planAvailable !== false;
   const displayedTimeline = showAllHours
     ? Array.from({ length: 25 }, (_, index) => index * 60)
     : configuredTimeline;
@@ -1065,6 +1070,10 @@ export default function AgendaScreen() {
             ]}
           >
             <Pressable
+              accessibilityState={{
+                disabled: !canRescheduleSelectedAppointment,
+              }}
+              disabled={!canRescheduleSelectedAppointment}
               accessibilityLabel="Cerrar ajustes de agenda"
               accessibilityRole="button"
               onPress={dismissAgendaSettings}
@@ -1351,10 +1360,17 @@ export default function AgendaScreen() {
                   },
                 });
               }}
-              style={styles.modalPrimaryAction}
+              style={[
+                styles.modalPrimaryAction,
+                !canRescheduleSelectedAppointment && { opacity: 0.42 },
+              ]}
             >
               <Ionicons color="#ffffff" name="calendar-outline" size={20} />
-              <Text style={styles.modalPrimaryText}>Reprogramar cita</Text>
+              <Text style={styles.modalPrimaryText}>
+                {canRescheduleSelectedAppointment
+                  ? 'Reprogramar cita'
+                  : 'Profesional histórico (Nava Local)'}
+              </Text>
             </Pressable>
             {selectedAppointment?.paymentStatus === 'pending' &&
             manualPaymentQuery.data?.eligible ? (
@@ -1414,14 +1430,25 @@ export default function AgendaScreen() {
               </Text>
             </Pressable>
             <Pressable
+              accessibilityState={{
+                disabled: !canRescheduleSelectedAppointment,
+              }}
+              disabled={!canRescheduleSelectedAppointment}
               onPress={() =>
                 selectedAppointment &&
                 cancelAppointment.mutate(selectedAppointment.id)
               }
-              style={styles.modalDangerAction}
+              style={[
+                styles.modalDangerAction,
+                !canRescheduleSelectedAppointment && { opacity: 0.42 },
+              ]}
             >
               <Ionicons color="#B42318" name="close-circle-outline" size={20} />
-              <Text style={styles.modalDangerText}>Cancelar cita</Text>
+              <Text style={styles.modalDangerText}>
+                {canRescheduleSelectedAppointment
+                  ? 'Cancelar cita'
+                  : 'Profesional histórico'}
+              </Text>
             </Pressable>
             <Pressable
               onPress={() => setSelectedAppointment(null)}

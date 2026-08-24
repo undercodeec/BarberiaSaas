@@ -216,10 +216,20 @@ describe('política de suscripciones', () => {
   });
 
   it('define los planes Esencial, Local y Multi con sus limites y precios', () => {
+    const free = planDefinition('free');
     const essential = planDefinition('essential');
     const local = planDefinition('local');
     const multi = planDefinition('multi');
 
+    expect(free).toMatchObject({
+      limits: {
+        clients: 100,
+        locations: 1,
+        rolling30DayBookings: 25,
+        teamMembers: 1,
+      },
+      name: 'Nava Free',
+    });
     expect(essential).toMatchObject({
       limits: {
         clients: null,

@@ -374,10 +374,12 @@ export const dashboardProgressStyles = StyleSheet.create({
 export function QuickAction({
   icon,
   label,
+  locked = false,
   onPress,
 }: {
   readonly icon: React.ComponentProps<typeof Ionicons>['name'];
   readonly label: string;
+  readonly locked?: boolean;
   readonly onPress: () => void;
 }) {
   const shimmerTranslateX = useRef(new Animated.Value(-82)).current;
@@ -406,9 +408,11 @@ export function QuickAction({
 
   return (
     <Pressable
+      accessibilityHint={locked ? 'Disponible con Nava Local.' : undefined}
       accessibilityRole="button"
+      accessibilityState={{ disabled: locked }}
       onPress={onPress}
-      style={styles.quickAction}
+      style={[styles.quickAction, locked && { opacity: 0.46 }]}
     >
       <View style={styles.quickIcon}>
         <Ionicons color="#B47D17" name={icon} size={30} />

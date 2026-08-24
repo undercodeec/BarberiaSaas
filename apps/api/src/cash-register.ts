@@ -16,6 +16,10 @@ import {
   reconcileAppointmentCommissions,
 } from './commissions';
 import { ApiError } from './errors';
+import {
+  assertCanUseProfessional,
+  getEntitlements,
+} from './subscription-policy';
 
 type Authenticate = (
   database: DatabaseClient,
@@ -268,6 +272,11 @@ export function registerCashRegisterRoutes(
           'RESPONSIBLE_NOT_FOUND',
           'El responsable no existe.',
         );
+      await assertCanUseProfessional(
+        database,
+        currentScope.organizationId,
+        responsible.id,
+      );
       responsibleName = responsible.user.fullName;
     } else {
       const currentUser = await database.user.findUniqueOrThrow({
@@ -512,6 +521,21 @@ export function registerCashRegisterRoutes(
             'COMMISSION_CONTEXT_REQUIRED',
             'Configura una organización y sucursal para registrar comisiones.',
           );
+        const entitlements = await getEntitlements(
+          transaction,
+          currentScope.organizationId,
+        );
+        if (!entitlements.featureFlags.commissions)
+          throw new ApiError(
+            403,
+            'PLAN_FEATURE_NOT_INCLUDED',
+            'Las comisiones requieren Nava Local.',
+          );
+        await assertCanUseProfessional(
+          transaction,
+          currentScope.organizationId,
+          input.professionalMembershipId,
+        );
         const assignment = await transaction.professionalService.findFirst({
           include: { service: true },
           where: {
@@ -550,6 +574,16 @@ export function registerCashRegisterRoutes(
             400,
             'INVENTORY_CONTEXT_REQUIRED',
             'Configura una organización y sucursal para vender productos.',
+          );
+        const entitlements = await getEntitlements(
+          transaction,
+          currentScope.organizationId,
+        );
+        if (!entitlements.featureFlags.inventory)
+          throw new ApiError(
+            403,
+            'PLAN_FEATURE_NOT_INCLUDED',
+            'El inventario requiere Nava Local.',
           );
         await transaction.$queryRaw`
           WITH lock AS MATERIALIZED (

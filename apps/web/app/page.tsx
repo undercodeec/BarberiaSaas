@@ -1,29 +1,100 @@
-import { ModuleDeck } from './components/ModuleDeck';
-import { PlanMatrix } from './components/PlanMatrix';
-import { PortalHero } from './components/PortalHero';
+const modules = [
+  'Reservas 24/7',
+  'Agenda del equipo',
+  'Clientes e historial',
+  'Caja y ventas',
+  'Comisiones',
+  'Inventario',
+  'Reportes',
+];
 
-const roster = [
-  ['01', 'Reservas 24/7', 'Tus clientes reservan desde su navegador.'],
-  ['02', 'Agenda del equipo', 'Horarios, bloqueos y reprogramaciones.'],
-  ['03', 'Clientes e historial', 'Información para atender mejor.'],
-  ['04', 'Caja y ventas', 'El movimiento de tu negocio, claro.'],
-  ['05', 'Comisiones', 'Cuentas transparentes para tu equipo.'],
-  ['06', 'Inventario', 'Productos y alertas de stock.'],
-  ['07', 'Reportes', 'Información para decidir mejor.'],
-] as const;
-
-function Brand() {
-  return <a aria-label="Nava, inicio" className="label-brand" href="#inicio">NAVA<span>.</span></a>;
-}
+const plans = [
+  ['Nava Free', 'Para conocer Nava'],
+  ['Nava Esencial', 'Operación individual'],
+  ['Nava Local', 'Barbería completa'],
+  ['Nava Multi', 'Más de una sede'],
+];
 
 export default function HomePage() {
-  return <main id="inicio">
-    <header className="label-nav"><Brand /><nav aria-label="Navegación principal"><a href="#modulos">Funciones</a><a href="#operacion">Operación</a><a href="#planes">Planes</a><a href="#recursos">Recursos</a></nav><div><a href="/checkout">Iniciar sesión</a><a className="label-pill" href="mailto:soporte@navacloud.app?subject=Quiero%20probar%20Nava">Probar Nava</a></div></header>
-    <PortalHero />
-    <section className="statement-fold" id="operacion"><p>Todo lo que tu barbería necesita</p><h2>Menos herramientas separadas. <em>Más control</em> desde un solo lugar.</h2><span>01</span><div className="statement-disc">N</div></section>
-    <section className="modules-section" id="modulos"><div><p className="section-label">Módulos Nava</p><h2>La operación de tu barbería, organizada como una sola experiencia.</h2><p>Reservas, agenda, clientes, caja, equipo, productos y reportes comparten el mismo ritmo.</p><div className="module-actions"><a className="label-pill" href="mailto:soporte@navacloud.app?subject=Quiero%20probar%20Nava">Probar Nava gratis</a><a href="#planes">Ver planes →</a></div></div><ModuleDeck /></section>
-    <section className="nava-roster"><p className="section-label">El sistema</p><h2>Todo conecta.<br />Nada sobra.</h2><div>{roster.map(([code, title, description]) => <article key={code}><span>{code}</span><h3>{title}</h3><p>{description}</p><b>→</b></article>)}</div></section>
-    <section className="plans-table-section" id="planes"><div><p className="section-label">Planes Nava</p><h2>Un plan para el ritmo de tu negocio.</h2><p>Prueba Nava durante 10 días. Después, tu cuenta pasa a Nava Free si no eliges otro plan.</p></div><PlanMatrix /></section>
-    <section className="nava-close" id="recursos"><div><p className="section-label">Nava para tu barbería</p><h2>Tu negocio merece trabajar con más orden.</h2><p>Organiza reservas, agenda, clientes, caja, equipo e inventario desde un solo lugar.</p><div><a className="label-pill" href="mailto:soporte@navacloud.app?subject=Quiero%20probar%20Nava">Probar Nava gratis</a><a href="#modulos">Ver funciones →</a></div><small>10 días para conocer Nava.</small></div><footer><span>© {new Date().getFullYear()} Nava · Ecuador</span><a href="mailto:soporte@navacloud.app">soporte@navacloud.app</a></footer><strong aria-hidden="true">NAVA</strong></section>
-  </main>;
+  return (
+    <main>
+      <header>
+        <a href="#inicio">NAVA</a>
+        <nav aria-label="Navegación principal">
+          <a href="#funciones">Funciones</a>
+          <a href="#operacion">Operación</a>
+          <a href="#planes">Planes</a>
+        </nav>
+        <a href="mailto:soporte@navacloud.app?subject=Quiero%20probar%20Nava">
+          Probar Nava
+        </a>
+      </header>
+
+      <section id="inicio">
+        <p>Software para barberías</p>
+        <h1>Haz crecer tu barbería con más orden y menos complicaciones.</h1>
+        <p>
+          Nava reúne reservas, agenda, clientes, caja, equipo e inventario en un
+          solo lugar.
+        </p>
+        <p>
+          <a href="mailto:soporte@navacloud.app?subject=Quiero%20probar%20Nava">
+            Probar Nava gratis
+          </a>{' '}
+          · <a href="#funciones">Conocer funciones</a>
+        </p>
+      </section>
+
+      <section id="operacion">
+        <h2>Todo lo que tu barbería necesita.</h2>
+        <p>Menos herramientas separadas. Más control desde un solo lugar.</p>
+      </section>
+
+      <section id="funciones">
+        <h2>Módulos Nava</h2>
+        <p>
+          La operación de tu barbería, organizada como una sola experiencia.
+        </p>
+        <ul>
+          {modules.map((module) => (
+            <li key={module}>{module}</li>
+          ))}
+        </ul>
+      </section>
+
+      <section id="planes">
+        <h2>Planes Nava</h2>
+        <p>Prueba Nava durante 10 días. Después, tu cuenta pasa a Nava Free.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Plan</th>
+              <th>Para quién</th>
+            </tr>
+          </thead>
+          <tbody>
+            {plans.map(([name, description]) => (
+              <tr key={name}>
+                <td>{name}</td>
+                <td>{description}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Tu negocio merece trabajar con más orden.</h2>
+        <p>10 días para conocer Nava.</p>
+        <a href="mailto:soporte@navacloud.app?subject=Quiero%20probar%20Nava">
+          Probar Nava gratis
+        </a>
+      </section>
+
+      <footer>
+        <span>© {new Date().getFullYear()} Nava · Ecuador</span>
+        <a href="mailto:soporte@navacloud.app">soporte@navacloud.app</a>
+      </footer>
+    </main>
+  );
 }

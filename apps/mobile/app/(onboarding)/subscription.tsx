@@ -24,6 +24,7 @@ const STATUS_LABELS: Record<SubscriptionResponse['current']['status'], string> =
     suspended: 'Solo lectura',
     trial: 'Prueba gratuita',
   };
+const FREE_BOOKING_LIMIT = 25;
 
 function formatPrice(cents: number | null, currencyCode: string) {
   if (cents === null) return 'Consultar';
@@ -34,10 +35,20 @@ function formatPrice(cents: number | null, currencyCode: string) {
   }).format(cents / 100)} / mes`;
 }
 
+function displayedBookingLimit(subscription: SubscriptionResponse | undefined) {
+  if (!subscription || subscription.current.planCode !== 'free') {
+    return subscription?.usage.bookingLimit ?? null;
+  }
+  return (
+    FREE_BOOKING_LIMIT +
+    (subscription.usage.graceUsed ? subscription.usage.graceBookings : 0)
+  );
+}
+
 function bookingUsageNotice(subscription: SubscriptionResponse | undefined) {
   if (!subscription || subscription.current.planCode !== 'free') return null;
   const usage = subscription.usage;
-  const effectiveLimit = usage.bookingLimit;
+  const effectiveLimit = displayedBookingLimit(subscription);
   if (effectiveLimit === null) return null;
   const baseLimit =
     effectiveLimit - (usage.graceUsed ? usage.graceBookings : 0);
@@ -58,12 +69,12 @@ function bookingUsageNotice(subscription: SubscriptionResponse | undefined) {
       copy: `Te quedan ${effectiveLimit - used} reservas de cortesia en esta ventana de 30 dias.`,
       title: 'Cortesia activa',
     };
-  if (used >= 36)
+  if (used >= 21)
     return {
       copy: `Te quedan ${baseLimit - used} reservas antes de alcanzar el limite de Nava Free.`,
       title: 'Estas cerca del limite',
     };
-  if (used >= 30)
+  if (used >= 20)
     return {
       copy: `Ya utilizaste ${used} de ${baseLimit} reservas en los ultimos 30 dias.`,
       title: '75% del limite utilizado',
@@ -124,6 +135,17 @@ export default function SubscriptionScreen() {
     ? new Date(subscription.current.trialEndsAt).toLocaleDateString()
     : null;
   const usageNotice = bookingUsageNotice(subscription);
+  const bookingLimit = displayedBookingLimit(subscription);
+  const historicalTeamMembers =
+    subscription !== undefined &&
+    subscription.current.planCode === 'free' &&
+    subscription.usage.teamMemberLimit !== null &&
+    subscription.usage.teamMembers > subscription.usage.teamMemberLimit;
+  const teamUsageValue = subscription
+    ? historicalTeamMembers
+      ? `${subscription.usage.teamMembers} guardados · ${subscription.usage.teamMemberLimit} operativo`
+      : `${subscription.usage.teamMembers} / ${subscription.usage.teamMemberLimit ?? 'Ilimitados'}`
+    : '-';
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -198,7 +220,7 @@ export default function SubscriptionScreen() {
               label="Reservas (ultimos 30 dias)"
               value={
                 subscription
-                  ? `${subscription.usage.rolling30DayBookings} / ${subscription.usage.bookingLimit ?? 'Ilimitadas'}`
+                  ? `${subscription.usage.rolling30DayBookings} / ${bookingLimit ?? 'Ilimitadas'}`
                   : '-'
               }
             />
@@ -210,14 +232,7 @@ export default function SubscriptionScreen() {
                   : '-'
               }
             />
-            <UsageItem
-              label="Profesionales"
-              value={
-                subscription
-                  ? `${subscription.usage.teamMembers} / ${subscription.usage.teamMemberLimit ?? 'Ilimitados'}`
-                  : '-'
-              }
-            />
+            <UsageItem label="Profesionales" value={teamUsageValue} />
             <UsageItem
               label="Sucursales"
               value={
@@ -278,6 +293,28 @@ export default function SubscriptionScreen() {
           </View>
         ) : null}
 
+        {subscription?.current.planCode === 'free' ? (
+          <View style={styles.freePlanCard}>
+            <Ionicons
+              color={appTheme.colors.accentDark}
+              name="shield-outline"
+              size={23}
+            />
+            <View style={styles.headerCopy}>
+              <Text style={styles.infoTitle}>Cómo funciona Nava Free</Text>
+              <Text style={styles.infoCopy}>
+                Incluye 25 reservas por cada 30 días, una sucursal y un
+                profesional operativo.
+              </Text>
+              <Text style={styles.infoCopy}>
+                {historicalTeamMembers
+                  ? 'Tus profesionales adicionales siguen guardados en modo histórico. No pueden recibir nuevas citas, reservas online ni cambios operativos hasta actualizar a Nava Local.'
+                  : 'Si vuelves desde Demo o un plan pagado, Nava conserva tus datos. Los recursos que excedan tu plan quedarán visibles como históricos y sin funciones operativas.'}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         {subscription?.current.readOnly ? (
           <View style={styles.warningCard}>
             <Ionicons color="#A15C00" name="lock-closed-outline" size={23} />
@@ -296,7 +333,7 @@ export default function SubscriptionScreen() {
           <View style={styles.capabilityCard}>
             <Text style={styles.infoTitle}>Capacidades del plan</Text>
             <Capability
-              label="Equipo"
+              label="Equipo y colaboradores"
               value={subscription.current.featureFlags.team}
             />
             <Capability
@@ -304,11 +341,12 @@ export default function SubscriptionScreen() {
               value={subscription.current.featureFlags.publicBooking}
             />
             <Capability
-              label="Wallet y comisiones"
-              value={
-                subscription.current.featureFlags.wallet &&
-                subscription.current.featureFlags.commissions
-              }
+              label="Nava Wallet"
+              value={subscription.current.featureFlags.wallet}
+            />
+            <Capability
+              label="Comisiones"
+              value={subscription.current.featureFlags.commissions}
             />
             <Capability
               label="Inventario"
@@ -523,6 +561,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginTop: 11,
+  },
+  freePlanCard: {
+    alignItems: 'flex-start',
+    backgroundColor: appTheme.colors.accentWash,
+    borderRadius: 18,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 16,
   },
   header: {
     alignItems: 'center',

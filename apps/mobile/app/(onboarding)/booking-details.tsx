@@ -331,6 +331,14 @@ export default function BookingDetailsScreen() {
   if (!session) return <Redirect href="/(auth)/login" />;
 
   const chooseProfessional = (id: string) => {
+    const professional = professionals.find((item) => item.id === id);
+    if (professional && !professional.planAvailable) {
+      Alert.alert(
+        'Profesional conservado',
+        'Este profesional y sus datos siguen guardados, pero Nava Free permite operar con un solo profesional. Actualiza a Nava Local para volver a asignarle nuevas citas.',
+      );
+      return;
+    }
     setProfessionalId(id);
     setServiceIds([]);
     setStartsAt(null);
@@ -393,10 +401,13 @@ export default function BookingDetailsScreen() {
             </Text>
             {professionals.map((professional) => (
               <Pressable
+                accessibilityState={{ disabled: !professional.planAvailable }}
+                disabled={!professional.planAvailable}
                 key={professional.id}
                 onPress={() => chooseProfessional(professional.id)}
                 style={[
                   styles.card,
+                  !professional.planAvailable && styles.cardPlanLocked,
                   professionalId === professional.id && styles.cardSelected,
                 ]}
               >
@@ -413,6 +424,9 @@ export default function BookingDetailsScreen() {
                     {professional.role === 'owner'
                       ? 'Propietario'
                       : 'Profesional'}
+                    {!professional.planAvailable
+                      ? ' · Guardado: requiere Nava Local'
+                      : ''}
                   </Text>
                 </View>
                 <Selection selected={professionalId === professional.id} />
@@ -858,6 +872,7 @@ const styles = StyleSheet.create({
     backgroundColor: appTheme.colors.accentWash,
     borderColor: appTheme.colors.accent,
   },
+  cardPlanLocked: { opacity: 0.46 },
   cardTitle: { color: appTheme.colors.text, fontSize: 15, fontWeight: '900' },
   content: { padding: appTheme.spacing.page, paddingBottom: 130 },
   copy: {

@@ -49,8 +49,10 @@ import {
 } from './security';
 import {
   assertCanCreateTeamMember,
+  assertCanUseProfessional,
   ensureOrganizationSubscription,
   getEntitlements,
+  getAllowedProfessionalIds,
   getSubscriptionUsage,
   grantFirstBookingGrace,
   GRACE_DAYS,
@@ -4729,7 +4731,13 @@ export function registerOperationsRoutes(
       permissionRole(current.role),
       'membership.manage',
     );
-    const [members, pendingInvitations, commissionRules] = await Promise.all([
+    const [
+      members,
+      pendingInvitations,
+      commissionRules,
+      entitlements,
+      allowedProfessionalIds,
+    ] = await Promise.all([
       database.membership.findMany({
         include: {
           memberLocations: { include: { location: true } },
@@ -4761,6 +4769,8 @@ export function registerOperationsRoutes(
           type: 'SERVICE_PERCENTAGE',
         },
       }),
+      getEntitlements(database, current.organizationId),
+      getAllowedProfessionalIds(database, current.organizationId),
     ]);
     const commissionByMembership = new Map<string, number>();
     for (const rule of commissionRules) {
@@ -4769,9 +4779,16 @@ export function registerOperationsRoutes(
       }
     }
     return {
+      teamEnabled: entitlements.featureFlags.team,
       members: members.map((member) => ({
         commissionPercentage: commissionByMembership.get(member.id) ?? null,
         id: member.id,
+        planAvailable:
+          member.role === MembershipRole.OWNER ||
+          member.role === MembershipRole.BARBER
+            ? allowedProfessionalIds === null ||
+              allowedProfessionalIds.includes(member.id)
+            : entitlements.featureFlags.team,
         locations: member.memberLocations.map(
           ({ location, onlineBookingEnabled }) => ({
             id: location.id,
@@ -4829,6 +4846,7 @@ export function registerOperationsRoutes(
         'El profesional no existe o no está activo.',
       );
     }
+    await assertCanUseProfessional(database, current.organizationId, member.id);
     await requireLocation(database, current.organizationId, input.locationId);
     const memberLocation = await database.memberLocation.findUnique({
       where: {
@@ -4907,6 +4925,13 @@ export function registerOperationsRoutes(
         403,
         'TEAM_MEMBER_PROTECTED',
         'No puedes modificar al propietario ni tu propia membresía desde esta pantalla.',
+      );
+    }
+    if (member.role === MembershipRole.BARBER) {
+      await assertCanUseProfessional(
+        database,
+        current.organizationId,
+        member.id,
       );
     }
     const role = input.role.toUpperCase() as MembershipRole;
@@ -5710,6 +5735,11 @@ export function registerOperationsRoutes(
       current.organizationId,
       input.membershipId,
     );
+    await assertCanUseProfessional(
+      database,
+      current.organizationId,
+      input.membershipId,
+    );
     const service = await database.service.findFirst({
       where: {
         id: input.serviceId,
@@ -5806,6 +5836,11 @@ export function registerOperationsRoutes(
       current.organizationId,
       input.membershipId,
     );
+    await assertCanUseProfessional(
+      database,
+      current.organizationId,
+      input.membershipId,
+    );
     const memberLocation = await database.memberLocation.findUnique({
       where: {
         membershipId_locationId: {
@@ -5861,6 +5896,11 @@ export function registerOperationsRoutes(
     const input = createScheduleBlockSchema.parse(request.body);
     await requireLocation(database, current.organizationId, input.locationId);
     await requireProfessional(
+      database,
+      current.organizationId,
+      input.membershipId,
+    );
+    await assertCanUseProfessional(
       database,
       current.organizationId,
       input.membershipId,

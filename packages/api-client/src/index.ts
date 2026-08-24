@@ -581,6 +581,7 @@ export interface TeamMember {
     readonly name: string;
     readonly onlineBookingEnabled: boolean;
   }>;
+  readonly planAvailable: boolean;
   readonly role: 'barber' | 'manager' | 'owner' | 'receptionist';
   readonly status: 'active';
   readonly user: AuthenticatedUser;
@@ -588,6 +589,7 @@ export interface TeamMember {
 
 export interface TeamResponse {
   readonly members: readonly TeamMember[];
+  readonly teamEnabled: boolean;
   readonly pendingInvitations: ReadonlyArray<{
     readonly activationStatus: 'pending_acceptance';
     readonly commissionPercentage: number | null;

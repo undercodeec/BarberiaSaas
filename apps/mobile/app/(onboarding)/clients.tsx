@@ -9,6 +9,7 @@ import type {
   ClientLabelsResponse,
   ClientRecord,
   ClientsResponse,
+  SubscriptionResponse,
 } from '@barber-saas/api-client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
@@ -173,7 +174,26 @@ export default function ClientsScreen() {
     [],
   );
   const organizationQuery = useCurrentOrganization();
+  const subscriptionQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<SubscriptionResponse>('/v1/subscription'),
+    queryKey: tenant.key('subscription'),
+  });
+  const clientLimit = subscriptionQuery.data?.usage.clientLimit ?? null;
+  const remainingClientSlots =
+    clientLimit === null
+      ? null
+      : Math.max(0, clientLimit - (subscriptionQuery.data?.usage.clients ?? 0));
+  const isClientLimitReached = remainingClientSlots === 0;
   const importContacts = useCallback(async () => {
+    if (isClientLimitReached) {
+      openDialog(
+        'Límite de clientes alcanzado',
+        `Nava Free permite hasta ${clientLimit ?? 100} clientes activos. Tus clientes actuales se conservan; actualiza tu plan para importar nuevos contactos.`,
+      );
+      return;
+    }
     if (Platform.OS === 'web') {
       openDialog(
         'Importación disponible en el teléfono',
@@ -268,7 +288,11 @@ export default function ClientsScreen() {
         );
         return;
       }
-      setImportCandidates(importable);
+      setImportCandidates(
+        remainingClientSlots === null
+          ? importable
+          : importable.slice(0, remainingClientSlots),
+      );
       setSelectedImportContactIds([]);
       setIsContactImportOpen(true);
     } catch (error) {
@@ -279,7 +303,13 @@ export default function ClientsScreen() {
     } finally {
       setIsImporting(false);
     }
-  }, [openDialog, organizationQuery]);
+  }, [
+    clientLimit,
+    isClientLimitReached,
+    openDialog,
+    organizationQuery,
+    remainingClientSlots,
+  ]);
   const selectedImportContacts = useMemo(() => {
     const selectedIds = new Set(selectedImportContactIds);
     return importCandidates.filter((contact) => selectedIds.has(contact.id));
@@ -336,6 +366,9 @@ export default function ClientsScreen() {
       await queryClient.invalidateQueries({
         queryKey: tenantQueryPrefix('clients'),
       });
+      await queryClient.invalidateQueries({
+        queryKey: tenant.key('subscription'),
+      });
       setIsContactImportOpen(false);
       setImportCandidates([]);
       setSelectedImportContactIds([]);
@@ -352,7 +385,7 @@ export default function ClientsScreen() {
     } finally {
       setIsImporting(false);
     }
-  }, [openDialog, queryClient, selectedImportContacts]);
+  }, [openDialog, queryClient, selectedImportContacts, tenant]);
   const clientsQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<ClientsResponse>('/v1/clients'),
@@ -627,9 +660,12 @@ export default function ClientsScreen() {
           <Pressable
             accessibilityLabel="Sincronizar contactos del teléfono"
             accessibilityRole="button"
-            disabled={isImporting}
+            disabled={isImporting || isClientLimitReached}
             onPress={() => void importContacts()}
-            style={[styles.iconButton, isImporting && { opacity: 0.55 }]}
+            style={[
+              styles.iconButton,
+              (isImporting || isClientLimitReached) && { opacity: 0.42 },
+            ]}
           >
             <Ionicons color="#101c2d" name="sync-outline" size={23} />
           </Pressable>
@@ -858,13 +894,15 @@ export default function ClientsScreen() {
             {!search ? (
               <Pressable
                 accessibilityRole="button"
-                disabled={isImporting}
+                disabled={isImporting || isClientLimitReached}
                 onPress={() => void importContacts()}
               >
                 <Text style={styles.emptyAction}>
-                  {isImporting
-                    ? 'Importando contactos...'
-                    : 'Importar contactos'}
+                  {isClientLimitReached
+                    ? 'Límite de Nava Free alcanzado'
+                    : isImporting
+                      ? 'Importando contactos...'
+                      : 'Importar contactos'}
                 </Text>
               </Pressable>
             ) : null}
@@ -883,8 +921,13 @@ export default function ClientsScreen() {
         <Pressable
           accessibilityLabel="Agregar cliente"
           accessibilityRole="button"
+          accessibilityState={{ disabled: isClientLimitReached }}
+          disabled={isClientLimitReached}
           onPress={() => setIsCreateOpen(true)}
-          style={styles.floatingAddContent}
+          style={[
+            styles.floatingAddContent,
+            isClientLimitReached && { opacity: 0.42 },
+          ]}
         >
           <Ionicons color="#ffffff" name="add" size={29} />
         </Pressable>
@@ -893,6 +936,11 @@ export default function ClientsScreen() {
       <BottomNavigation active="clients" />
       <ClientFormSheet
         onClose={() => setIsCreateOpen(false)}
+        onCreated={async () => {
+          await queryClient.invalidateQueries({
+            queryKey: tenant.key('subscription'),
+          });
+        }}
         visible={isCreateOpen}
         onError={(title, message) => openDialog(title, message)}
       />

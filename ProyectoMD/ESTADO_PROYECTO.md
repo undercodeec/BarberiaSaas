@@ -293,6 +293,20 @@ Mobile / Web pública / Admin
       pagados tienen 3 días de gracia y, ante impago, bajan automáticamente a
       Nava Free sin eliminar datos.
 - [x] Límites backend para profesionales, sedes, clientes y reservas móviles.
+- [x] Nava Free limita a 25 reservas en los últimos 30 días. Al terminar Demo,
+      trial o un plan pagado, conserva datos sin borrar: deja un profesional
+      operativo y marca los demás como históricos; API y app móvil bloquean sus
+      nuevas reservas, disponibilidad en línea, edición operativa y asignación
+      de servicios, mientras la interfaz los mantiene visibles con opacidad.
+      La pantalla Suscripción muestra el uso real, el límite de 25 reservas,
+      las capacidades vigentes y la explicación de los datos históricos.
+- [x] Refuerzo de degradación Free: Caja sólo permite seleccionar profesionales
+      habilitados; inventario y ventas/comisiones premium quedan inactivos o
+      redirigen a Suscripción. La importación y alta manual de clientes respetan
+      el máximo de 100 también bajo solicitudes concurrentes, mediante un bloqueo
+      transaccional por organización.
+- [x] Migración `20260823170000_free_booking_limit_25` actualiza el límite del
+      plan existente sin modificar reservas, profesionales ni historial.
 - [x] Panel interno para cambiar plan, suspender, reactivar y conceder soporte.
 - [x] La app Android solo consume el estado y no enlaza un checkout externo.
 - [x] Checkout Web autenticado para suscripciones Nava con PayPhone, enlace de
@@ -328,14 +342,14 @@ Mobile / Web pública / Admin
 
 - [x] Acceso limitado por `PLATFORM_ADMIN_EMAILS`, login y segundo factor OTP.
 - [~] Continuación Super Admin (23 de agosto de 2026): la primera entrega de
-      Usuarios Nava está implementada localmente con listado global paginado,
-      búsqueda/filtros en backend, PII enmascarada, ficha 360°, consulta de
-      Memberships, suspensión/reactivación, revocación total de sesiones y
-      solicitud segura de recuperación de contraseña. La migración
-      `20260823160000_platform_user_administration` agrega el estado de
-      suspensión y debe aplicarse junto con las demás migraciones pendientes.
-      Falta validación contra PostgreSQL real, navegación Usuario↔Organización,
-      administración de Memberships y las fases restantes de la propuesta.
+  Usuarios Nava está implementada localmente con listado global paginado,
+  búsqueda/filtros en backend, PII enmascarada, ficha 360°, consulta de
+  Memberships, suspensión/reactivación, revocación total de sesiones y
+  solicitud segura de recuperación de contraseña. La migración
+  `20260823160000_platform_user_administration` agrega el estado de
+  suspensión y debe aplicarse junto con las demás migraciones pendientes.
+  Falta validación contra PostgreSQL real, navegación Usuario↔Organización,
+  administración de Memberships y las fases restantes de la propuesta.
 - [x] Métricas, organizaciones, plan, trial, uso, errores de notificación,
       auditoría y diagnóstico de soporte sin suplantación.
 - [x] Acciones de cambio de plan, suspensión y reactivación auditadas.

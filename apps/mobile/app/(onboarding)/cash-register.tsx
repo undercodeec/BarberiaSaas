@@ -7,6 +7,7 @@ import type {
   CurrentCashRegisterResponse,
   InventoryResponse,
   ServicesResponse,
+  SubscriptionResponse,
   TeamResponse,
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -196,6 +197,12 @@ export default function CashRegisterScreen() {
       requireApiClient().request<InventoryResponse>('/v1/inventory'),
     queryKey: tenant.key('inventory'),
   });
+  const subscriptionQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<SubscriptionResponse>('/v1/subscription'),
+    queryKey: tenant.key('subscription'),
+  });
   const summaryQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -369,7 +376,7 @@ export default function CashRegisterScreen() {
   const sessionData = cashQuery.data?.session;
   const totals = summaryQuery.data?.totals;
   const availableResponsibles = (teamQuery.data?.members ?? []).filter(
-    (member) => member.user.id !== user?.id,
+    (member) => member.planAvailable && member.user.id !== user?.id,
   );
   const selectedMovementService = servicesQuery.data?.services.find(
     (service) => service.id === movementServiceId,
@@ -378,10 +385,16 @@ export default function CashRegisterScreen() {
     (product) => product.id === movementProductId,
   );
   const teamMembers = teamQuery.data?.members ?? [];
+  const commissionsEnabled =
+    subscriptionQuery.data?.current.featureFlags.commissions ?? true;
+  const inventoryEnabled =
+    subscriptionQuery.data?.current.featureFlags.inventory ?? true;
+  const canRecordSale = commissionsEnabled || inventoryEnabled;
   const isSoloOwner =
     teamMembers.length === 1 && teamMembers[0]?.role === 'owner';
   const commissionableProfessionals = teamMembers.filter(
     (member) =>
+      member.planAvailable &&
       (member.role === 'barber' || member.role === 'owner') &&
       (member.commissionPercentage !== null ||
         (isSoloOwner && member.role === 'owner')) &&
@@ -722,6 +735,10 @@ export default function CashRegisterScreen() {
                       ] as const
                     ).map((type) => (
                       <Pressable
+                        accessibilityState={{
+                          disabled: type === 'sale' && !canRecordSale,
+                        }}
+                        disabled={type === 'sale' && !canRecordSale}
                         key={type}
                         onPress={() => {
                           setMovementType(type);
@@ -734,6 +751,8 @@ export default function CashRegisterScreen() {
                         }}
                         style={[
                           styles.member,
+                          type === 'sale' &&
+                            !canRecordSale && { opacity: 0.42 },
                           movementType === type && styles.selected,
                         ]}
                       >
@@ -743,7 +762,9 @@ export default function CashRegisterScreen() {
                             movementType === type && styles.selectedText,
                           ]}
                         >
-                          {movementLabel(type)}
+                          {type === 'sale' && !canRecordSale
+                            ? 'Venta (Nava Local)'
+                            : movementLabel(type)}
                         </Text>
                       </Pressable>
                     ))}
@@ -753,12 +774,15 @@ export default function CashRegisterScreen() {
                       <Text style={styles.label}>Clase de venta</Text>
                       <View style={styles.members}>
                         <Pressable
+                          accessibilityState={{ disabled: !commissionsEnabled }}
+                          disabled={!commissionsEnabled}
                           onPress={() => {
                             setSaleKind('service');
                             setMovementProductId(null);
                           }}
                           style={[
                             styles.member,
+                            !commissionsEnabled && { opacity: 0.42 },
                             saleKind === 'service' && styles.selected,
                           ]}
                         >
@@ -768,10 +792,14 @@ export default function CashRegisterScreen() {
                               saleKind === 'service' && styles.selectedText,
                             ]}
                           >
-                            Servicio
+                            {commissionsEnabled
+                              ? 'Servicio'
+                              : 'Servicio (Nava Local)'}
                           </Text>
                         </Pressable>
                         <Pressable
+                          accessibilityState={{ disabled: !inventoryEnabled }}
+                          disabled={!inventoryEnabled}
                           onPress={() => {
                             setSaleKind('product');
                             setMovementProfessionalId(null);
@@ -779,6 +807,7 @@ export default function CashRegisterScreen() {
                           }}
                           style={[
                             styles.member,
+                            !inventoryEnabled && { opacity: 0.42 },
                             saleKind === 'product' && styles.selected,
                           ]}
                         >
@@ -788,7 +817,9 @@ export default function CashRegisterScreen() {
                               saleKind === 'product' && styles.selectedText,
                             ]}
                           >
-                            Producto
+                            {inventoryEnabled
+                              ? 'Producto'
+                              : 'Producto (Nava Local)'}
                           </Text>
                         </Pressable>
                       </View>

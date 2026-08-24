@@ -821,6 +821,11 @@ export function registerAgendaRoutes(
     try {
       const updated = await database.$transaction(async (transaction) => {
         await transaction.$queryRaw`WITH lock AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtext(${existing.professionalMembershipId}))) SELECT 1 AS locked FROM lock`;
+        await assertCanUseProfessional(
+          transaction,
+          current.organizationId,
+          existing.professionalMembershipId,
+        );
         await assertBookable(transaction, {
           endsAt,
           ignoreAppointmentId: existing.id,
@@ -897,6 +902,11 @@ export function registerAgendaRoutes(
       throw new ApiError(404, 'APPOINTMENT_NOT_FOUND', 'La cita no existe.');
     assertProfessionalScope(current, existing.professionalMembershipId);
     const updated = await database.$transaction(async (transaction) => {
+      await assertCanUseProfessional(
+        transaction,
+        current.organizationId,
+        existing.professionalMembershipId,
+      );
       const appointment = await transaction.appointment.update({
         data: {
           cancellationReason: input.reason,
@@ -950,6 +960,11 @@ export function registerAgendaRoutes(
     if (!existing)
       throw new ApiError(404, 'APPOINTMENT_NOT_FOUND', 'La cita no existe.');
     assertProfessionalScope(current, existing.professionalMembershipId);
+    await assertCanUseProfessional(
+      database,
+      current.organizationId,
+      existing.professionalMembershipId,
+    );
     const status = input.status.toUpperCase() as AppointmentStatus;
     const releasesSlot =
       status === AppointmentStatus.COMPLETED ||

@@ -1,5 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { OnboardingAccountDetailsResponse } from '@barber-saas/api-client';
+import type {
+  OnboardingAccountDetailsResponse,
+  SubscriptionFeatureFlags,
+  SubscriptionResponse,
+} from '@barber-saas/api-client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
@@ -29,6 +33,7 @@ type SettingsMenuItem = {
   readonly description: string;
   readonly icon: IconName;
   readonly id: string;
+  readonly requiredFeature?: keyof SubscriptionFeatureFlags;
   readonly route?: string;
   readonly title: string;
 };
@@ -57,6 +62,7 @@ const settingsSections: readonly SettingsSection[] = [
           'Gestiona tus colaboradores: crea, edita y administra su informaci\u00f3n.',
         icon: 'people-outline',
         id: 'collaborators',
+        requiredFeature: 'team',
         route: '/team-management',
         title: 'Gesti\u00f3n de colaboradores',
       },
@@ -85,6 +91,7 @@ const settingsSections: readonly SettingsSection[] = [
         description: 'Crea y configura las sucursales incluidas en tu plan.',
         icon: 'business-outline',
         id: 'locations',
+        requiredFeature: 'multiLocation',
         route: '/location-management',
         title: 'Sucursales',
       },
@@ -114,6 +121,7 @@ const settingsSections: readonly SettingsSection[] = [
         description: 'Controla productos, existencias y alertas de stock.',
         icon: 'cube-outline',
         id: 'inventory',
+        requiredFeature: 'inventory',
         route: '/inventory',
         title: 'Inventario',
       },
@@ -142,6 +150,13 @@ export default function BusinessSettingsScreen() {
       ),
     queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
   });
+  const subscriptionQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<SubscriptionResponse>('/v1/subscription'),
+    queryKey: accountQueryKey(user?.id, 'subscription'),
+  });
+  const featureFlags = subscriptionQuery.data?.current.featureFlags;
   const isSolo = accountQuery.data?.accountType === 'professional';
   const isBusiness = accountQuery.data?.accountType === 'business';
   const visibleSections = settingsSections.map((section) => ({
@@ -170,13 +185,20 @@ export default function BusinessSettingsScreen() {
 
   const openItem = useCallback(
     (item: SettingsMenuItem) => {
+      if (
+        item.requiredFeature &&
+        featureFlags?.[item.requiredFeature] === false
+      ) {
+        router.push('/subscription' as never);
+        return;
+      }
       if (item.route) {
         router.push(item.route as never);
         return;
       }
       unavailable(item.title);
     },
-    [router, unavailable],
+    [featureFlags, router, unavailable],
   );
 
   const toggle = useCallback(
@@ -247,6 +269,10 @@ export default function BusinessSettingsScreen() {
                 <SettingsNavigationCard
                   item={item}
                   key={item.id}
+                  locked={Boolean(
+                    item.requiredFeature &&
+                    featureFlags?.[item.requiredFeature] === false,
+                  )}
                   onPress={() => openItem(item)}
                 />
               ))}
@@ -291,18 +317,31 @@ export default function BusinessSettingsScreen() {
 
 function SettingsNavigationCard({
   item,
+  locked,
   onPress,
 }: {
   readonly item: SettingsMenuItem;
+  readonly locked: boolean;
   readonly onPress: () => void;
 }) {
   return (
     <Pressable
-      accessibilityHint="Abre esta configuraci\u00f3n"
-      accessibilityLabel={[item.title, item.description].join('. ')}
+      accessibilityHint={
+        locked
+          ? 'Disponible con Nava Local. Abre la suscripci\u00f3n para actualizar.'
+          : 'Abre esta configuraci\u00f3n'
+      }
+      accessibilityLabel={[
+        item.title,
+        locked ? 'Requiere Nava Local' : item.description,
+      ].join('. ')}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.card,
+        locked && styles.cardPlanLocked,
+        pressed && styles.pressed,
+      ]}
     >
       <View style={styles.iconContainer}>
         <Ionicons
@@ -318,7 +357,7 @@ function SettingsNavigationCard({
           numberOfLines={1}
           style={styles.cardDescription}
         >
-          {item.description}
+          {locked ? 'Disponible con Nava Local' : item.description}
         </Text>
       </View>
       <View style={styles.chevron}>
@@ -423,6 +462,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   cardList: { gap: 16, marginTop: 14 },
+  cardPlanLocked: { opacity: 0.46 },
   cardTitle: {
     color: COLORS.text,
     fontSize: 18,

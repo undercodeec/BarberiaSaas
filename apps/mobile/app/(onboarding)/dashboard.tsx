@@ -87,6 +87,9 @@ export default function DashboardScreen() {
     refetchOnMount: 'always',
     staleTime: 0,
   });
+  const inventoryEnabled =
+    subscriptionQuery.data?.current.featureFlags.inventory ?? true;
+  const teamEnabled = subscriptionQuery.data?.current.featureFlags.team ?? true;
   const operationTimeZone =
     organizationQuery.data?.location?.timezone ??
     organizationQuery.data?.organization?.defaultTimezone ??
@@ -118,7 +121,7 @@ export default function DashboardScreen() {
     queryKey: tenant.key('cash-register-summary'),
   });
   const inventoryQuery = useQuery({
-    enabled: Boolean(session),
+    enabled: Boolean(session && inventoryEnabled),
     queryFn: () =>
       requireApiClient().request<InventoryResponse>('/v1/inventory'),
     queryKey: tenant.key('inventory'),
@@ -537,8 +540,11 @@ export default function DashboardScreen() {
           />
           <QuickAction
             icon="cube-outline"
-            label="Inventario"
-            onPress={() => router.push('/inventory')}
+            label={inventoryEnabled ? 'Inventario' : 'Inventario (Local)'}
+            locked={!inventoryEnabled}
+            onPress={() =>
+              router.push(inventoryEnabled ? '/inventory' : '/subscription')
+            }
           />
           <QuickAction
             icon="wallet-outline"
@@ -552,8 +558,19 @@ export default function DashboardScreen() {
               <View key={action.id} style={styles.extraQuickActionSlot}>
                 <QuickAction
                   icon={action.icon}
-                  label={action.label}
-                  onPress={() => router.push(action.route as never)}
+                  label={
+                    action.id === 'collaborators' && !teamEnabled
+                      ? 'Colaboradores (Local)'
+                      : action.label
+                  }
+                  locked={action.id === 'collaborators' && !teamEnabled}
+                  onPress={() =>
+                    router.push(
+                      action.id === 'collaborators' && !teamEnabled
+                        ? '/subscription'
+                        : (action.route as never),
+                    )
+                  }
                 />
                 <Pressable
                   accessibilityLabel={`Quitar acceso rápido ${action.label}`}

@@ -123,6 +123,7 @@ export default function TeamManagementScreen() {
   const canManageTeam =
     current?.membership.role === 'owner' ||
     current?.membership.role === 'manager';
+  const teamEnabled = teamQuery.data?.teamEnabled ?? true;
   const canToggleOnlineBooking = (member: TeamMember) =>
     (member.role === 'barber' || member.role === 'owner') &&
     (canManageTeam || member.user.id === user?.id);
@@ -338,7 +339,7 @@ export default function TeamManagementScreen() {
             aparecerá en el equipo ni tendrá acceso hasta verificar su correo y
             aceptar el enlace.
           </Text>
-          {canManageTeam ? (
+          {canManageTeam && teamEnabled ? (
             <Pressable
               accessibilityLabel="Añadir colaborador"
               accessibilityRole="button"
@@ -354,7 +355,9 @@ export default function TeamManagementScreen() {
             </Pressable>
           ) : (
             <Text style={styles.permissionHint}>
-              Solo propietarios y administradores pueden enviar invitaciones.
+              {canManageTeam
+                ? 'Tu plan actual conserva el equipo, pero permite un solo profesional activo. Actualiza a Nava Local para invitar o reactivar colaboradores.'
+                : 'Solo propietarios y administradores pueden enviar invitaciones.'}
             </Text>
           )}
         </View>
@@ -367,6 +370,7 @@ export default function TeamManagementScreen() {
           {teamQuery.data?.members.map((member) => {
             const editable =
               canManageTeam &&
+              member.planAvailable &&
               member.role !== 'owner' &&
               member.user.id !== user?.id;
             const currentLocation = current?.location
@@ -374,7 +378,10 @@ export default function TeamManagementScreen() {
                   (location) => location.id === current.location?.id,
                 )
               : null;
-            const canToggle = canToggleOnlineBooking(member) && currentLocation;
+            const canToggle =
+              member.planAvailable &&
+              canToggleOnlineBooking(member) &&
+              currentLocation;
             return (
               <View key={member.id}>
                 <Pressable
@@ -386,7 +393,10 @@ export default function TeamManagementScreen() {
                   accessibilityRole={editable ? 'button' : undefined}
                   disabled={!editable}
                   onPress={() => openMember(member)}
-                  style={styles.memberCard}
+                  style={[
+                    styles.memberCard,
+                    !member.planAvailable && styles.memberCardPlanLocked,
+                  ]}
                 >
                   <View style={styles.avatar}>
                     <Text style={styles.avatarLabel}>
@@ -398,7 +408,10 @@ export default function TeamManagementScreen() {
                       {member.user.fullName}
                     </Text>
                     <Text style={styles.memberMeta}>
-                      {ROLE_LABELS[member.role] ?? member.role} · Activo
+                      {ROLE_LABELS[member.role] ?? member.role} ·{' '}
+                      {member.planAvailable
+                        ? 'Activo'
+                        : 'Guardado: requiere Nava Local'}
                     </Text>
                     {member.commissionPercentage !== null ? (
                       <Text style={styles.memberCommission}>
@@ -420,9 +433,11 @@ export default function TeamManagementScreen() {
                         Reservas online
                       </Text>
                       <Text style={styles.memberMeta}>
-                        {currentLocation.onlineBookingEnabled
-                          ? 'Visible para nuevas citas'
-                          : 'No disponible para nuevas citas'}
+                        {!member.planAvailable
+                          ? 'Conservado sin disponibilidad en tu plan actual'
+                          : currentLocation.onlineBookingEnabled
+                            ? 'Visible para nuevas citas'
+                            : 'No disponible para nuevas citas'}
                       </Text>
                     </View>
                     {canToggle ? (
@@ -852,6 +867,7 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
+  memberCardPlanLocked: { opacity: 0.46 },
   memberCopy: { flex: 1 },
   memberMeta: { color: COLORS.muted, fontSize: 13, marginTop: 4 },
   memberCommission: {

@@ -8,6 +8,10 @@
 > Nava Esencial USD 9,83, Nava Local USD 29,83 y Nava Multi USD 48,83; la
 > promoción de fundador para Nava Local es USD 19,93 bajo sus condiciones de
 > continuidad.
+>
+> Rectificación operativa del 23 de agosto de 2026: Nava Free permite **25
+> reservas en una ventana móvil de 30 días**. Esta cifra reemplaza toda
+> referencia histórica a 40 reservas dentro de este documento.
 
 ---
 
@@ -175,7 +179,7 @@ Público objetivo:
 1 organización
 1 sucursal
 1 profesional activo
-40 reservas durante los últimos 30 días
+25 reservas durante los últimos 30 días
 100 clientes activos
 ```
 
@@ -202,7 +206,7 @@ Ese volumen ya corresponde a una operación comercial relevante y podría elimin
 Por ello, la hipótesis inicial será:
 
 ```text
-40 reservas / ventana móvil de 30 días
+25 reservas / ventana móvil de 30 días
 ```
 
 ---
@@ -295,7 +299,7 @@ La primera vez que una organización llegue al límite Free se recomienda ofrece
 
 Mensaje sugerido:
 
-> Has alcanzado las 40 reservas incluidas en Nava Free. Te regalamos 5 reservas adicionales para que puedas terminar tu semana sin interrupciones.
+> Has alcanzado las 25 reservas incluidas en Nava Free. Te regalamos 5 reservas adicionales para que puedas terminar tu semana sin interrupciones.
 
 La cortesía se aplica una sola vez por organización.
 
@@ -317,7 +321,7 @@ Nava debe comunicar el uso antes del bloqueo.
 
 Sin presión de compra fuerte.
 
-### 30 reservas
+### 20 reservas
 
 > Has utilizado el 75% de las reservas incluidas en Nava Free.
 
@@ -327,11 +331,11 @@ CTA:
 Ver planes
 ```
 
-### 36 reservas
+### 21 reservas
 
 > Te quedan 4 reservas gratuitas.
 
-### 40 reservas
+### 25 reservas
 
 > Alcanzaste el límite de Nava Free.
 
@@ -384,7 +388,7 @@ Nava no debe depender únicamente del límite de reservas.
 ### Trigger 1 — Reservas
 
 ```text
-40 reservas / últimos 30 días
+25 reservas / últimos 30 días
 ```
 
 ### Trigger 2 — Profesionales
@@ -437,7 +441,7 @@ Incluye:
 
 - 1 profesional;
 - 1 sucursal;
-- 40 reservas rolling / 30 días;
+- 25 reservas rolling / 30 días;
 - 100 clientes;
 - agenda;
 - reservas públicas;
@@ -631,8 +635,7 @@ primera reserva
 5 reservas
 10 reservas
 20 reservas
-30 reservas
-40 reservas
+25 reservas
 ```
 
 ### Conversión
@@ -696,7 +699,7 @@ Primera reserva
 ↓
 20 reservas
 ↓
-30 reservas
+25 reservas
 ↓
 Límite Free
 ↓
@@ -705,7 +708,7 @@ Inicio de upgrade
 Pago
 ```
 
-Esto permitirá determinar si 40 reservas es realmente el límite correcto.
+Esto permitirá determinar si 25 reservas es realmente el límite correcto.
 
 El valor debe tratarse como una hipótesis configurable, no como una regla permanente.
 
@@ -953,7 +956,7 @@ Implementar durante la fase de planes y límites:
 
 Implementar:
 
-- 40 reservas rolling;
+- 25 reservas rolling;
 - 100 clientes;
 - 1 profesional;
 - validación backend;
@@ -1015,8 +1018,7 @@ Revisar periódicamente:
 % que llega a 5 reservas
 % que llega a 10 reservas
 % que llega a 20 reservas
-% que llega a 30 reservas
-% que llega a 40 reservas
+% que llega a 25 reservas
 % que usa la cortesía
 % que inicia upgrade
 % que paga
@@ -1046,7 +1048,7 @@ Nava Free
 USD 0
 1 profesional
 1 sucursal
-40 reservas rolling / 30 días
+25 reservas rolling / 30 días
 100 clientes
 
 Nava Esencial

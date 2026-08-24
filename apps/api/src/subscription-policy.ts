@@ -1,4 +1,5 @@
 import {
+  MembershipRole,
   MembershipStatus,
   OrganizationStatus,
   PlatformOverrideKind,
@@ -48,7 +49,7 @@ export const SUBSCRIPTION_PLANS = [
     features: [
       '1 profesional',
       '1 sucursal',
-      '40 reservas en los ultimos 30 dias',
+      '25 reservas en los ultimos 30 dias',
       '100 clientes activos',
       'Agenda y reservas publicas',
       'Caja y reportes basicos',
@@ -56,7 +57,7 @@ export const SUBSCRIPTION_PLANS = [
     limits: {
       clients: 100,
       locations: 1,
-      rolling30DayBookings: 40,
+      rolling30DayBookings: 25,
       teamMembers: 1,
     },
     monthlyPriceCents: 0,
@@ -535,7 +536,11 @@ export async function getAllowedProfessionalIds(
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     select: { id: true },
     take: limit,
-    where: { organizationId, status: MembershipStatus.ACTIVE },
+    where: {
+      organizationId,
+      role: { in: [MembershipRole.OWNER, MembershipRole.BARBER] },
+      status: MembershipStatus.ACTIVE,
+    },
   });
   return memberships.map(({ id }) => id);
 }
@@ -573,7 +578,7 @@ export async function assertCanCreateBooking(
       audience === 'public'
         ? 'Las reservas online de este negocio estan temporalmente pausadas. Puedes contactar directamente con el negocio.'
         : result.grace.available
-          ? 'Alcanzaste las 40 reservas de Nava Free. Activa tus 5 reservas de cortesia para continuar.'
+          ? 'Alcanzaste las 25 reservas de Nava Free. Activa tus 5 reservas de cortesia para continuar.'
           : 'Alcanzaste el limite de reservas de Nava Free. Actualiza tu plan para crear nuevas reservas.',
     );
   }
@@ -623,7 +628,7 @@ export async function recordBookingMilestone(
   const bookings = await transaction.appointment.count({
     where: { organizationId },
   });
-  if (![5, 10, 20, 30, 40].includes(bookings)) return;
+  if (![5, 10, 20, 25].includes(bookings)) return;
   await transaction.auditLog.create({
     data: {
       action: `organization.reached_${bookings}_bookings`,

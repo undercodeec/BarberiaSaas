@@ -7,6 +7,7 @@ import type {
   ProductOrderRecord,
   ProductOrdersResponse,
   StockMovementHistoryResponse,
+  SubscriptionResponse,
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -93,6 +94,12 @@ export default function InventoryScreen() {
   const [adjustmentNotes, setAdjustmentNotes] = useState('');
   const [adjustmentType, setAdjustmentType] =
     useState<AdjustmentType>('purchase');
+  const subscriptionQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<SubscriptionResponse>('/v1/subscription'),
+    queryKey: tenant.key('subscription'),
+  });
 
   const inventorySearch = useMemo(() => {
     const search = new URLSearchParams();
@@ -101,7 +108,9 @@ export default function InventoryScreen() {
     return search.toString();
   }, [locationId, lowStockOnly]);
   const inventoryQuery = useQuery({
-    enabled: Boolean(session),
+    enabled: Boolean(
+      session && subscriptionQuery.data?.current.featureFlags.inventory,
+    ),
     queryFn: () =>
       requireApiClient().request<InventoryResponse>(
         `/v1/inventory${inventorySearch ? `?${inventorySearch}` : ''}`,
@@ -320,6 +329,8 @@ export default function InventoryScreen() {
   });
 
   if (!session) return <Redirect href="/(auth)/login" />;
+  if (subscriptionQuery.data?.current.featureFlags.inventory === false)
+    return <Redirect href="/subscription" />;
 
   const chooseProductPhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
