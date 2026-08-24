@@ -117,7 +117,8 @@ a {
 
 .portal-hero {
   background: var(--paper);
-  height: 250vh;
+  /* Keeps the completed hero visible before the statement fold starts rising. */
+  height: 315vh;
   position: relative;
   z-index: 0;
 }
@@ -392,13 +393,18 @@ a {
 }
 
 .statement-scroll {
-  /* Reserves the final hero beat and enough travel to cover it completely. */
-  height: 135vh;
-  margin-top: -35vh;
+  /* A sticky scene: Statement is replaced by Deck while the page keeps moving. */
+  height: 400vh;
+  margin-top: -100vh;
   position: relative;
   z-index: 10;
 }
 .statement-fold {
+  --statement-exit: clamp(
+    0,
+    calc((var(--story-progress, 0) - 0.28) * 3),
+    1
+  );
   background: var(--secondary);
   border: 0;
   border-radius: 0;
@@ -409,6 +415,13 @@ a {
   padding: 15vh 17vw 12vh;
   position: sticky;
   top: 0;
+}
+.statement-content {
+  opacity: calc(1 - var(--statement-exit));
+  position: relative;
+  transform: translateY(calc(var(--statement-exit) * -9vh));
+  will-change: opacity, transform;
+  z-index: 1;
 }
 .portal-label {
   color: var(--gold-pale);
@@ -443,7 +456,7 @@ a {
   color: var(--gold);
   font-style: normal;
 }
-.statement-fold > p:not(.portal-label),
+.statement-content > p:not(.portal-label),
 .deck-copy > p:not(.portal-label),
 .plans-heading > p:not(.portal-label),
 .portal-close > div > p:not(.portal-label) {
@@ -474,6 +487,7 @@ a {
   position: absolute;
   right: -2vw;
   top: 27%;
+  opacity: calc(1 - var(--statement-exit));
   -webkit-text-stroke: 1px rgba(255, 255, 255, 0.16);
 }
 .statement-orbit {
@@ -484,11 +498,11 @@ a {
   display: flex;
   height: 150px;
   justify-content: center;
-  opacity: 0.68;
+  opacity: calc(0.68 - var(--statement-exit) * 0.68);
   position: absolute;
   right: -42px;
   top: 67%;
-  transform: rotate(21deg);
+  transform: translateY(calc(var(--statement-exit) * -9vh)) rotate(21deg);
   width: 150px;
 }
 .statement-orbit .nava-mark {
@@ -496,27 +510,44 @@ a {
 }
 
 .deck-section {
-  background: var(--paper);
-  border-top: 1px solid var(--hair);
-  min-height: 230vh;
+  background: transparent;
+  border-top: 0;
+  inset: 0;
+  min-height: 0;
   padding: 0;
-  position: relative;
+  pointer-events: none;
+  position: absolute;
+}
+.deck-section.is-active {
+  pointer-events: auto;
 }
 .deck-stage {
   align-items: center;
   display: grid;
   gap: 9vw;
   grid-template-columns: 0.85fr 1.15fr;
-  height: 100vh;
+  height: 100%;
+  inset: 0;
   padding: 12vh 10vw 11vh 17vw;
-  position: sticky;
-  top: 0;
+  position: absolute;
+  --deck-entry: clamp(
+    0,
+    calc((var(--story-progress, 0) - 0.43) * 3.5),
+    1
+  );
+  --deck-copy-reveal: clamp(0, calc((var(--deck-entry) - 0.04) * 1.72), 1);
+  --deck-cards-reveal: clamp(0, calc((var(--deck-entry) - 0.16) * 1.54), 1);
+  --deck-hint-reveal: clamp(0, calc((var(--deck-entry) - 0.34) * 1.52), 1);
+  will-change: opacity, transform;
 }
 .deck-copy h2 {
   font-size: clamp(30px, 3.6vw, 54px);
 }
 .deck-copy {
   max-width: 465px;
+  opacity: var(--deck-copy-reveal);
+  transform: translateY(calc((1 - var(--deck-copy-reveal)) * 7vh));
+  will-change: opacity, transform;
 }
 .deck-actions {
   display: flex;
@@ -551,6 +582,11 @@ a {
   touch-action: pan-y;
   user-select: none;
   width: min(39vw, 485px);
+  opacity: var(--deck-cards-reveal);
+  transform: translateY(calc((1 - var(--deck-cards-reveal)) * 8vh))
+    scale(calc(0.9 + var(--deck-cards-reveal) * 0.1));
+  transform-origin: center bottom;
+  will-change: opacity, transform;
 }
 .deck-card {
   background: #15191e;
@@ -651,7 +687,10 @@ a {
   display: flex;
   gap: 18px;
   left: 17vw;
+  opacity: var(--deck-hint-reveal);
   position: absolute;
+  transform: translateY(calc((1 - var(--deck-hint-reveal)) * 3vh));
+  will-change: opacity, transform;
 }
 .deck-hint span {
   color: var(--muted);
@@ -855,7 +894,7 @@ a {
     padding: 8px 10px;
   }
   .portal-hero {
-    height: 190vh;
+    height: 315svh;
   }
   .portal-photo {
     background-position: 65% center;
@@ -937,8 +976,8 @@ a {
     right: 5%;
   }
   .statement-scroll {
-    height: 135svh;
-    margin-top: -35svh;
+    height: 400svh;
+    margin-top: -100svh;
   }
   .statement-fold {
     border: 0;
@@ -965,7 +1004,7 @@ a {
     width: 105px;
   }
   .deck-section {
-    min-height: 185vh;
+    min-height: 0;
     padding: 0;
   }
   .deck-stage {
@@ -1043,5 +1082,15 @@ a {
   .hero-notification {
     animation: none;
     opacity: 1;
+  }
+  .statement-fold,
+  .statement-content,
+  .statement-index,
+  .statement-orbit,
+  .deck-copy,
+  .module-deck,
+  .deck-hint {
+    opacity: 1 !important;
+    transform: none !important;
   }
 }

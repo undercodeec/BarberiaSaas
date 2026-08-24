@@ -64,9 +64,10 @@ function Logo() {
 
 export default function HomePage() {
   const portalRef = useRef<HTMLElement>(null);
-  const deckSectionRef = useRef<HTMLElement>(null);
+  const deckSectionRef = useRef<HTMLDivElement>(null);
   const dragStart = useRef<number | null>(null);
   const [portalProgress, setPortalProgress] = useState(0);
+  const [storyProgress, setStoryProgress] = useState(0);
   const [scrollDeckStep, setScrollDeckStep] = useState(0);
   const [deck, setDeck] = useState<readonly (typeof modules)[number][]>([
     ...modules,
@@ -94,8 +95,13 @@ export default function HomePage() {
         const rect = deckSection.getBoundingClientRect();
         const range = Math.max(1, rect.height - window.innerHeight);
         const progress = Math.min(1, Math.max(0, -rect.top / range));
+        const deckProgress = Math.min(1, Math.max(0, (progress - 0.65) / 0.35));
+        setStoryProgress(progress);
         setScrollDeckStep(
-          Math.min(modules.length - 1, Math.floor(progress * modules.length)),
+          Math.min(
+            modules.length - 1,
+            Math.floor(deckProgress * modules.length),
+          ),
         );
       }
     };
@@ -245,8 +251,13 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div className="statement-scroll">
+      <div
+        className="statement-scroll"
+        ref={deckSectionRef}
+        style={{ '--story-progress': storyProgress } as CSSProperties}
+      >
         <section className="statement-fold" id="operacion">
+          <div className="statement-content">
           <p className="portal-label">Nava / Operación</p>
           <h2>
             Haz crecer tu barbería con <em>más orden</em> y menos
@@ -259,16 +270,19 @@ export default function HomePage() {
           <a className="portal-text-link" href={trialLink}>
             Probar Nava gratis <Arrow />
           </a>
+          </div>
           <span aria-hidden="true" className="statement-index">
             01
           </span>
           <div aria-hidden="true" className="statement-orbit">
             <Mark />
           </div>
-        </section>
-      </div>
-
-      <section className="deck-section" id="modulos" ref={deckSectionRef}>
+          <section
+        className={
+          storyProgress >= 0.65 ? 'deck-section is-active' : 'deck-section'
+        }
+        id="modulos"
+      >
         <div className="deck-stage">
           <div className="deck-copy">
             <p className="portal-label">Módulos Nava</p>
@@ -351,7 +365,9 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-      </section>
+          </section>
+        </section>
+      </div>
 
       <section className="module-roster">
         <p className="portal-label">Una plataforma</p>
