@@ -2016,6 +2016,61 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(replacementResponse.statusCode).toBe(201);
   });
 
+  it('registra ventas del propietario sin exigir una regla de comision', async () => {
+    const agenda = await setupAgenda('venta-propietario-sin-comision');
+    const ownerMembership = await database.membership.findFirstOrThrow({
+      where: {
+        organizationId: agenda.organizationId,
+        role: 'OWNER',
+      },
+    });
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${agenda.ownerToken}` },
+          method: 'POST',
+          payload: {
+            locationId: agenda.locationId,
+            membershipId: ownerMembership.id,
+            serviceId: agenda.serviceId,
+          },
+          url: '/v1/services/assignments',
+        })
+      ).statusCode,
+    ).toBe(201);
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${agenda.ownerToken}` },
+          method: 'POST',
+          payload: { openingAmountCents: 0 },
+          url: '/v1/cash-register/open',
+        })
+      ).statusCode,
+    ).toBe(201);
+
+    const sale = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        amountCents: 1_200,
+        description: 'Servicio atendido por propietario',
+        paymentMethod: 'cash',
+        professionalMembershipId: ownerMembership.id,
+        serviceId: agenda.serviceId,
+        type: 'sale',
+      },
+      url: '/v1/cash-register/movements',
+    });
+    expect(sale.statusCode, sale.body).toBe(201);
+    const movementId = sale.json<{ movement: { id: string } }>().movement.id;
+    expect(
+      await database.commissionEntry.findUnique({
+        where: { cashMovementId: movementId },
+      }),
+    ).toBeNull();
+  });
+
   it('genera comisiones idempotentes al cobrar citas y ventas manuales', async () => {
     const agenda = await setupAgenda('comisiones-caja');
     await database.commissionRule.create({

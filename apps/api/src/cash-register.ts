@@ -3,6 +3,7 @@ import {
   CashMovementType,
   PaymentMethod,
   AppointmentPaymentStatus,
+  MembershipRole,
   MembershipStatus,
   StockDirection,
   StockMovementType,
@@ -513,7 +514,11 @@ export function registerCashRegisterRoutes(
         });
       }
 
-      let commissionableService: { id: string; name: string } | null = null;
+      let commissionableService: {
+        id: string;
+        name: string;
+        generatesCommission: boolean;
+      } | null = null;
       if (input.serviceId && input.professionalMembershipId) {
         if (!currentScope.organizationId || !session.locationId)
           throw new ApiError(
@@ -537,7 +542,10 @@ export function registerCashRegisterRoutes(
           input.professionalMembershipId,
         );
         const assignment = await transaction.professionalService.findFirst({
-          include: { service: true },
+          include: {
+            membership: { select: { role: true } },
+            service: true,
+          },
           where: {
             locationId: session.locationId,
             membershipId: input.professionalMembershipId,
@@ -558,7 +566,11 @@ export function registerCashRegisterRoutes(
             'COMMISSION_ASSIGNMENT_NOT_FOUND',
             'El servicio no está asignado al profesional seleccionado.',
           );
-        commissionableService = assignment.service;
+        commissionableService = {
+          ...assignment.service,
+          generatesCommission:
+            assignment.membership.role === MembershipRole.BARBER,
+        };
       }
 
       let productSale: {
@@ -710,6 +722,7 @@ export function registerCashRegisterRoutes(
         await reconcileAppointmentCommissions(transaction, input.appointmentId);
       } else if (
         commissionableService &&
+        commissionableService.generatesCommission &&
         input.professionalMembershipId &&
         currentScope.organizationId &&
         session.locationId

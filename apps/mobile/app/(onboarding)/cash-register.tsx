@@ -390,14 +390,10 @@ export default function CashRegisterScreen() {
   const inventoryEnabled =
     subscriptionQuery.data?.current.featureFlags.inventory ?? true;
   const canRecordSale = commissionsEnabled || inventoryEnabled;
-  const isSoloOwner =
-    teamMembers.length === 1 && teamMembers[0]?.role === 'owner';
-  const commissionableProfessionals = teamMembers.filter(
+  const serviceProfessionals = teamMembers.filter(
     (member) =>
       member.planAvailable &&
       (member.role === 'barber' || member.role === 'owner') &&
-      (member.commissionPercentage !== null ||
-        (isSoloOwner && member.role === 'owner')) &&
       selectedMovementService?.assignments.some(
         (assignment) => assignment.membershipId === member.id,
       ),
@@ -858,9 +854,9 @@ export default function CashRegisterScreen() {
                               ),
                             )}
                           </View>
-                          <Text style={styles.label}>Profesional</Text>
+                          <Text style={styles.label}>Atendido por</Text>
                           <View style={styles.members}>
-                            {commissionableProfessionals.map((member) => (
+                            {serviceProfessionals.map((member) => (
                               <Pressable
                                 key={member.id}
                                 onPress={() =>
@@ -884,9 +880,9 @@ export default function CashRegisterScreen() {
                               </Pressable>
                             ))}
                             {movementServiceId &&
-                            commissionableProfessionals.length === 0 ? (
+                            serviceProfessionals.length === 0 ? (
                               <Text style={styles.inlineEmpty}>
-                                Este servicio no tiene profesionales asignados.
+                                Este servicio no tiene personas asignadas.
                               </Text>
                             ) : null}
                           </View>
