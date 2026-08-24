@@ -102,6 +102,7 @@ const updateLocationSchema = createLocationSchema
   );
 const platformOrganizationParamsSchema = z.object({ id: z.uuid() });
 const platformUserParamsSchema = z.object({ id: z.uuid() });
+const platformMembershipParamsSchema = z.object({ id: z.uuid() });
 const platformUserListSchema = z.object({
   from: z.coerce.date().optional(),
   organizationId: z.uuid().optional(),
@@ -130,6 +131,21 @@ const platformUserActionSchema = z.discriminatedUnion('action', [
   }),
   z.object({
     action: z.literal('request_password_recovery'),
+    reason: z.string().trim().min(10).max(500),
+  }),
+]);
+const platformMembershipActionSchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('change_role'),
+    reason: z.string().trim().min(10).max(500),
+    role: z.enum(['manager', 'receptionist', 'barber']),
+  }),
+  z.object({
+    action: z.literal('suspend'),
+    reason: z.string().trim().min(10).max(500),
+  }),
+  z.object({
+    action: z.literal('reactivate'),
     reason: z.string().trim().min(10).max(500),
   }),
 ]);
@@ -1788,6 +1804,128 @@ function registerPlatformRoutes(
           : input.action === 'reactivate'
             ? 'active'
             : undefined,
+    };
+  });
+
+  app.patch('/v1/platform/memberships/:id', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'manage_users');
+    const { id } = platformMembershipParamsSchema.parse(request.params);
+    const input = platformMembershipActionSchema.parse(request.body);
+    const membership = await database.membership.findUnique({
+      select: {
+        organizationId: true,
+        role: true,
+        status: true,
+        userId: true,
+      },
+      where: { id },
+    });
+    if (!membership) {
+      throw new ApiError(
+        404,
+        'PLATFORM_MEMBERSHIP_NOT_FOUND',
+        'La membresÃ­a no existe.',
+      );
+    }
+    if (membership.role === MembershipRole.OWNER) {
+      throw new ApiError(
+        409,
+        'PLATFORM_OWNER_MEMBERSHIP_PROTECTED',
+        'La propiedad solo puede cambiarse mediante una transferencia explÃ­cita.',
+      );
+    }
+    if (
+      (input.action === 'suspend' &&
+        membership.status !== MembershipStatus.ACTIVE) ||
+      (input.action === 'reactivate' &&
+        membership.status !== MembershipStatus.SUSPENDED)
+    ) {
+      throw new ApiError(
+        409,
+        'PLATFORM_MEMBERSHIP_STATE_CONFLICT',
+        'La membresÃ­a no admite esta transiciÃ³n de estado.',
+      );
+    }
+    if (
+      input.action === 'change_role' &&
+      membership.status !== MembershipStatus.ACTIVE
+    ) {
+      throw new ApiError(
+        409,
+        'PLATFORM_MEMBERSHIP_STATE_CONFLICT',
+        'Solo puedes cambiar el rol de una membresÃ­a activa.',
+      );
+    }
+    if (
+      input.action === 'change_role' &&
+      membership.role === membershipRole(input.role)
+    ) {
+      throw new ApiError(
+        409,
+        'PLATFORM_MEMBERSHIP_NO_CHANGE',
+        'La membresÃ­a ya tiene ese rol.',
+      );
+    }
+    const nextRole =
+      input.action === 'change_role'
+        ? membershipRole(input.role)
+        : membership.role;
+    const nextStatus =
+      input.action === 'suspend'
+        ? MembershipStatus.SUSPENDED
+        : input.action === 'reactivate'
+          ? MembershipStatus.ACTIVE
+          : membership.status;
+    const updated = await database.$transaction(async (transaction) => {
+      if (
+        nextStatus === MembershipStatus.ACTIVE &&
+        nextRole === MembershipRole.BARBER &&
+        (membership.status !== MembershipStatus.ACTIVE ||
+          membership.role !== MembershipRole.BARBER)
+      ) {
+        await assertCanCreateTeamMember(
+          transaction as Parameters<typeof assertCanCreateTeamMember>[0],
+          membership.organizationId,
+        );
+      }
+      const result = await transaction.membership.update({
+        data: { role: nextRole, status: nextStatus },
+        where: { id },
+      });
+      await transaction.platformAuditLog.create({
+        data: {
+          action: 'platform.user.membership_changed',
+          actorUserId: operator.id,
+          afterData: {
+            role: result.role.toLowerCase(),
+            status: result.status.toLowerCase(),
+          } as never,
+          beforeData: {
+            role: membership.role.toLowerCase(),
+            status: membership.status.toLowerCase(),
+          } as never,
+          entityId: id,
+          entityType: 'membership',
+          metadata: {
+            action: input.action,
+            organizationId: membership.organizationId,
+            reason: input.reason,
+            userId: membership.userId,
+          } as never,
+        },
+      });
+      return result;
+    });
+    return {
+      id: updated.id,
+      role: updated.role.toLowerCase(),
+      status: updated.status.toLowerCase(),
     };
   });
 

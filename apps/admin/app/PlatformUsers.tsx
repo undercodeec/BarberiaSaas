@@ -5,12 +5,19 @@ import { useEffect, useState, type FormEvent } from 'react';
 import {
   getPlatformUserDetail,
   getPlatformUsers,
+  updatePlatformMembership,
   updatePlatformUser,
   type PlatformUser,
   type PlatformUserAction,
   type PlatformUserDetail,
   type PlatformUserList,
 } from './platform-api';
+
+type MembershipAction = {
+  readonly id: string;
+  readonly organizationName: string;
+  readonly type: 'change_role' | 'reactivate' | 'suspend';
+};
 
 const dateFormatter = new Intl.DateTimeFormat('es-EC', {
   dateStyle: 'medium',
@@ -49,6 +56,11 @@ function UserDetail({
     null,
   );
   const [reason, setReason] = useState('');
+  const [membershipAction, setMembershipAction] =
+    useState<MembershipAction | null>(null);
+  const [membershipRole, setMembershipRole] = useState<
+    'barber' | 'manager' | 'receptionist'
+  >('barber');
   const [busy, setBusy] = useState(false);
   const user = detail.user;
 
@@ -59,6 +71,26 @@ function UserDetail({
     try {
       await updatePlatformUser(token, user.account.id, { action, reason });
       setAction(null);
+      setReason('');
+      onMutated();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitMembership(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!membershipAction) return;
+    setBusy(true);
+    try {
+      await updatePlatformMembership(
+        token,
+        membershipAction.id,
+        membershipAction.type === 'change_role'
+          ? { action: 'change_role', reason, role: membershipRole }
+          : { action: membershipAction.type, reason },
+      );
+      setMembershipAction(null);
       setReason('');
       onMutated();
     } finally {
@@ -136,11 +168,106 @@ function UserDetail({
                 >
                   Ver organización
                 </button>
+                {canManage && membership.role !== 'owner' ? (
+                  <>
+                    <button
+                      className="button button--ghost"
+                      onClick={() => {
+                        setMembershipRole(
+                          membership.role as
+                            'barber' | 'manager' | 'receptionist',
+                        );
+                        setMembershipAction({
+                          id: membership.id,
+                          organizationName: membership.organization.name,
+                          type: 'change_role',
+                        });
+                      }}
+                      type="button"
+                    >
+                      Cambiar rol
+                    </button>
+                    <button
+                      className="button button--ghost"
+                      onClick={() =>
+                        setMembershipAction({
+                          id: membership.id,
+                          organizationName: membership.organization.name,
+                          type:
+                            membership.status === 'suspended'
+                              ? 'reactivate'
+                              : 'suspend',
+                        })
+                      }
+                      type="button"
+                    >
+                      {membership.status === 'suspended'
+                        ? 'Reactivar membership'
+                        : 'Suspender membership'}
+                    </button>
+                  </>
+                ) : null}
               </div>
             </article>
           ))}
         </div>
       )}
+      {membershipAction ? (
+        <form
+          className="compact-form"
+          onSubmit={(event) => void submitMembership(event)}
+        >
+          <h4>
+            {titleCase(membershipAction.type)}:{' '}
+            {membershipAction.organizationName}
+          </h4>
+          {membershipAction.type === 'change_role' ? (
+            <label>
+              Rol nuevo
+              <select
+                onChange={(event) =>
+                  setMembershipRole(
+                    event.target.value as 'barber' | 'manager' | 'receptionist',
+                  )
+                }
+                value={membershipRole}
+              >
+                <option value="manager">Manager</option>
+                <option value="receptionist">Recepcionista</option>
+                <option value="barber">Barbero</option>
+              </select>
+            </label>
+          ) : null}
+          <label>
+            Motivo de {titleCase(membershipAction.type)}
+            <textarea
+              maxLength={500}
+              minLength={10}
+              onChange={(event) => setReason(event.target.value)}
+              required
+              rows={3}
+              value={reason}
+            />
+          </label>
+          <div className="inline-actions">
+            <button
+              className="button button--primary"
+              disabled={busy}
+              type="submit"
+            >
+              {busy ? 'Procesando…' : 'Confirmar y auditar'}
+            </button>
+            <button
+              className="button button--ghost"
+              disabled={busy}
+              onClick={() => setMembershipAction(null)}
+              type="button"
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+      ) : null}
 
       <h3>Seguridad</h3>
       <p className="muted-copy">

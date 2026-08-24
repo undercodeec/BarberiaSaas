@@ -11,6 +11,7 @@ import {
   requestPlatformAccessCode,
   startPlatformLogin,
   updatePlatformAlert,
+  updatePlatformMembership,
   updatePlatformUser,
   verifyPlatformAccessCode,
 } from './platform-api';
@@ -126,6 +127,40 @@ describe('cliente del panel de plataforma', () => {
         action: 'suspend',
         reason: 'Incumplimiento reportado y verificado por soporte.',
       }),
+    );
+  });
+
+  it('actualiza memberships por una ruta administrativa autenticada', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'membership-id',
+          role: 'manager',
+          status: 'active',
+        }),
+        { headers: { 'content-type': 'application/json' }, status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await updatePlatformMembership('session-token', 'membership/id', {
+      action: 'change_role',
+      reason: 'El colaborador asumirá funciones de coordinación.',
+      role: 'manager',
+    });
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_URL}/v1/platform/memberships/membership%2Fid`);
+    expect(options.method).toBe('PATCH');
+    expect(options.body).toBe(
+      JSON.stringify({
+        action: 'change_role',
+        reason: 'El colaborador asumirá funciones de coordinación.',
+        role: 'manager',
+      }),
+    );
+    expect(new Headers(options.headers).get('authorization')).toBe(
+      'Bearer session-token',
     );
   });
 

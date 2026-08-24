@@ -576,6 +576,17 @@ export type PlatformUserAction = {
   readonly reason: string;
 };
 
+export type PlatformMembershipAction =
+  | {
+      readonly action: 'change_role';
+      readonly reason: string;
+      readonly role: 'barber' | 'manager' | 'receptionist';
+    }
+  | {
+      readonly action: 'reactivate' | 'suspend';
+      readonly reason: string;
+    };
+
 export async function updatePlatformUser(
   token: string,
   userId: string,
@@ -583,6 +594,18 @@ export async function updatePlatformUser(
 ) {
   return request<{ id: string; status?: string }>(
     `/v1/platform/users/${encodeURIComponent(userId)}`,
+    { body: JSON.stringify(action), method: 'PATCH' },
+    token,
+  );
+}
+
+export async function updatePlatformMembership(
+  token: string,
+  membershipId: string,
+  action: PlatformMembershipAction,
+) {
+  return request<{ id: string; role: string; status: string }>(
+    `/v1/platform/memberships/${encodeURIComponent(membershipId)}`,
     { body: JSON.stringify(action), method: 'PATCH' },
     token,
   );
