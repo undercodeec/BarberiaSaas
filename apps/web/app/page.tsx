@@ -117,8 +117,10 @@ export default function HomePage() {
     if (direction < 0) {
       const lastCard = deck[deck.length - 1]!;
       setReturningCard(lastCard);
-      setDeck((current) => [lastCard, ...current.slice(0, -1)]);
-      window.setTimeout(() => setReturningCard(null), 110);
+      window.setTimeout(() => {
+        setDeck((current) => [lastCard, ...current.slice(0, -1)]);
+        window.setTimeout(() => setReturningCard(null), 30);
+      }, 820);
       return;
     }
     const currentCard = deck[0]!;
@@ -293,15 +295,7 @@ export default function HomePage() {
               Menos herramientas separadas. Más control desde un solo lugar.
             </p>
             <div className="deck-actions">
-              <a
-                className="portal-button portal-button-primary"
-                href={trialLink}
-              >
-                Probar Nava <Arrow />
-              </a>
-              <a className="portal-button portal-button-outline" href="#planes">
-                Ver planes
-              </a>
+             
             </div>
           </div>
           <div
@@ -348,7 +342,6 @@ export default function HomePage() {
             })}
           </div>
           <div className="deck-hint">
-            <span>Arrastra o usa las flechas</span>
             <div className="deck-pagination">
               {modules.map((module, index) => (
                 <button

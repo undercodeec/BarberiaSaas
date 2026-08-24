@@ -6,6 +6,7 @@ allowBuilds:
   '@prisma/engines': true
   '@swc/core': true
   esbuild: true
+  libxmljs2: true
   prisma: true
   sharp: true
   unrs-resolver: true

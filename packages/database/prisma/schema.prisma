@@ -1052,6 +1052,12 @@ model SriInvoice {
   subscriptionInvoiceId        String                   @map("subscription_invoice_id") @db.Uuid
   subscriptionPaymentAttemptId String                   @unique @map("subscription_payment_attempt_id") @db.Uuid
   environment                  SriEnvironment
+  issuerRuc                    String                   @map("issuer_ruc") @db.Char(13)
+  issuerLegalName              String                   @map("issuer_legal_name") @db.VarChar(300)
+  issuerTradeName              String?                  @map("issuer_trade_name") @db.VarChar(300)
+  issuerMainAddress            String                   @map("issuer_main_address") @db.VarChar(300)
+  issuerAccountingRequired     String                   @map("issuer_accounting_required") @db.Char(2)
+  issuerTaxRegime              SriTaxRegime             @map("issuer_tax_regime")
   documentType                 String                   @default("01") @map("document_type") @db.Char(2)
   establishmentCode            String                   @map("establishment_code") @db.Char(3)
   emissionPointCode            String                   @map("emission_point_code") @db.Char(3)
@@ -1084,6 +1090,8 @@ model SriInvoice {
   emailedAt                    DateTime?                @map("emailed_at") @db.Timestamptz(3)
   nextAttemptAt                DateTime?                @map("next_attempt_at") @db.Timestamptz(3)
   attemptCount                 Int                      @default(0) @map("attempt_count")
+  processingLockToken          String?                  @map("processing_lock_token") @db.Uuid
+  processingLockUntil          DateTime?                @map("processing_lock_until") @db.Timestamptz(3)
   unsignedXml                  String?                  @map("unsigned_xml") @db.Text
   signedXml                    String?                  @map("signed_xml") @db.Text
   authorizedXml                String?                  @map("authorized_xml") @db.Text
@@ -1098,6 +1106,7 @@ model SriInvoice {
 
   @@unique([documentType, establishmentCode, emissionPointCode, sequential])
   @@index([organizationId, issuedAt])
+  @@index([processingLockUntil])
   @@index([status, nextAttemptAt])
   @@map("sri_invoices")
 }

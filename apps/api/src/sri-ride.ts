@@ -45,7 +45,7 @@ export function buildSriRidePdf(input: RideInput) {
       }).format(input.authorizationDate)
     : 'Pendiente';
   const lines = [
-    line('NAVA - FACTURA ELECTRONICA', 48, 790, true),
+    line(`${input.issuer.legalName} - FACTURA ELECTRONICA`, 48, 790, true),
     line(`RUC: ${input.issuer.ruc}`, 48, 772),
     line(`Factura No.: ${number}`, 48, 754, true),
     line(`Fecha de emision: ${date}`, 48, 736),

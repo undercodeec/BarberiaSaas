@@ -20,7 +20,7 @@ describe('núcleo SRI', () => {
       establishmentCode: '001',
       emissionPointCode: '001',
       numericCode: '12345678',
-      ruc: '1727155671001',
+      ruc: '0000000000001',
       sequential: 1,
     });
     expect(key).toMatch(/^\d{49}$/u);
@@ -34,7 +34,7 @@ describe('núcleo SRI', () => {
 
   it('genera XML de factura 2.1.0 escapando datos del comprador', () => {
     const xml = buildSriInvoiceXml({
-      accessKey: '2308202601172715567100110010010000000011234567810',
+      accessKey: '2308202601000000000000110010010000000011234567810',
       buyer: {
         identification: '1712345678',
         identificationType: '05',
@@ -47,9 +47,9 @@ describe('núcleo SRI', () => {
         accountingRequired: 'NO',
         emissionPointCode: '001',
         establishmentCode: '001',
-        legalName: 'Christopher Gallardo',
+        legalName: 'RAZÓN SOCIAL DE PRUEBA',
         mainAddress: 'Quito, Ecuador',
-        ruc: '1727155671001',
+        ruc: '0000000000001',
         taxRegime: 'GENERAL',
       },
       paymentMethodCode: '19',

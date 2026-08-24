@@ -5,10 +5,12 @@ import * as xades from 'xadesjs';
 import xpath from 'xpath';
 
 interface CertificateMaterial {
+  readonly canSign: boolean;
   readonly certificateBase64: string;
   readonly expiresAt: Date;
   readonly privateKeyPkcs8: ArrayBuffer;
   readonly publicKeySpki: ArrayBuffer;
+  readonly subject: string;
 }
 
 let xmlDependenciesReady = false;
@@ -42,6 +44,15 @@ function exactArrayBuffer(value: Uint8Array) {
   ) as ArrayBuffer;
 }
 
+function safeSubject(certificate: forge.pki.Certificate) {
+  return certificate.subject.attributes
+    .map(
+      (attribute) =>
+        `${attribute.shortName ?? attribute.name}=${attribute.value}`,
+    )
+    .join(', ');
+}
+
 async function loadCertificate(
   certificatePath: string,
   certificatePassword: string,
@@ -66,6 +77,16 @@ async function loadCertificate(
     const certificate = certificateBag.cert;
     if (certificate.validity.notAfter <= new Date())
       throw new Error('El certificado SRI está vencido.');
+    const certificatePublicKey =
+      certificate.publicKey as forge.pki.rsa.PublicKey;
+    if (
+      keyBag.key.n.compareTo(certificatePublicKey.n) !== 0 ||
+      keyBag.key.e.compareTo(certificatePublicKey.e) !== 0
+    )
+      throw certificateError();
+    const keyUsage = certificate.getExtension('keyUsage') as
+      { digitalSignature?: boolean } | undefined;
+    if (keyUsage && !keyUsage.digitalSignature) throw certificateError();
     const privateKeyInfo = forge.pki.wrapRsaPrivateKey(
       forge.pki.privateKeyToAsn1(keyBag.key),
     );
@@ -73,6 +94,7 @@ async function loadCertificate(
       .toDer(forge.pki.certificateToAsn1(certificate))
       .getBytes();
     return {
+      canSign: true,
       certificateBase64: Buffer.from(certificateDer, 'binary').toString(
         'base64',
       ),
@@ -88,6 +110,7 @@ async function loadCertificate(
           'binary',
         ),
       ),
+      subject: safeSubject(certificate),
     };
   } catch (error) {
     if (
@@ -107,7 +130,11 @@ export async function inspectSriCertificate(input: {
     input.certificatePath,
     input.certificatePassword,
   );
-  return { expiresAt: certificate.expiresAt };
+  return {
+    canSign: certificate.canSign,
+    expiresAt: certificate.expiresAt,
+    subject: certificate.subject,
+  };
 }
 
 /** Firma enveloped XAdES_BES 1.3.2 con RSA-SHA1, tal como pide la ficha SRI 2.34. */

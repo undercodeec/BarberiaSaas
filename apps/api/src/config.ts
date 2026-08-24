@@ -84,6 +84,7 @@ const environmentSchema = z
       .min(1)
       .max(86_400)
       .default(15),
+    SRI_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(100).default(6),
     SRI_CERTIFICATE_PASSWORD: optionalText,
     SRI_CERTIFICATE_PATH: optionalText,
     SRI_EMISSION_ENABLED: z.enum(['true', 'false']).default('false'),

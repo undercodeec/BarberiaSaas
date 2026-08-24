@@ -81,6 +81,7 @@ describe('configuración SRI', () => {
     const config = readConfig(baseEnvironment);
     expect(config.SRI_ENV).toBe('test');
     expect(config.SRI_EMISSION_ENABLED).toBe('false');
+    expect(config.SRI_PRODUCTION_ENABLED).toBe('false');
   });
 
   it('impide habilitar emisión sin los secretos y datos fiscales requeridos', () => {
@@ -89,6 +90,6 @@ describe('configuración SRI', () => {
     ).toThrow();
     expect(() =>
       readConfig({ ...baseEnvironment, SRI_ENV: 'production' }),
-    ).toThrow();
+    ).toThrow('SRI_PRODUCTION_ENABLED=true');
   });
 });

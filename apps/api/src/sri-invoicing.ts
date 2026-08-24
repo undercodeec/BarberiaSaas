@@ -12,6 +12,7 @@ import { buildSriInvoiceXml } from './sri-core';
 import { SriClient } from './sri-client';
 import { buildSriRidePdf } from './sri-ride';
 import { signSriInvoiceXml } from './sri-signer';
+import { validateSriInvoiceXml } from './sri-xsd';
 
 type Transaction = Parameters<DatabaseClient['$transaction']>[0] extends (
   transaction: infer Value,
@@ -150,6 +151,43 @@ export async function enqueueSriInvoiceForPayment(
       ruc: configuration.issuerRuc,
       sequential,
     });
+    const unsignedXml = buildSriInvoiceXml({
+      accessKey,
+      buyer: {
+        address: buyer.address,
+        identification: buyer.identification,
+        identificationType: buyer.identificationType,
+        name: buyer.legalName,
+      },
+      description: `Suscripción Nava ${payment.invoice.planName}`,
+      environment:
+        configuration.environment === SriEnvironment.PRODUCTION
+          ? 'production'
+          : 'test',
+      invoiceDate: issuedAt,
+      issuer: {
+        accountingRequired: configuration.accountingRequired,
+        emissionPointCode: configuration.emissionPointCode,
+        establishmentCode: configuration.establishmentCode,
+        legalName: configuration.issuerLegalName,
+        mainAddress: configuration.issuerMainAddress,
+        ruc: configuration.issuerRuc,
+        taxRegime: configuration.taxRegime,
+        tradeName: configuration.issuerTradeName,
+      },
+      paymentMethodCode: configuration.paymentMethodCode,
+      sequential,
+      subtotalCents: payment.invoice.subtotalCents,
+      tax: {
+        cents: payment.invoice.taxCents,
+        code: configuration.taxCode,
+        percentageCode: configuration.taxPercentageCode,
+        rateBasisPoints: payment.invoice.taxBasisPoints,
+      },
+      totalCents: payment.invoice.totalCents,
+    });
+    // La transacción revierte también el incremento de la secuencia si el XSD falla.
+    validateSriInvoiceXml(unsignedXml);
     const created = await transaction.sriInvoice.create({
       data: {
         accessKey,
@@ -164,13 +202,19 @@ export async function enqueueSriInvoiceForPayment(
         emissionPointCode: configuration.emissionPointCode,
         environment: configuration.environment,
         establishmentCode: configuration.establishmentCode,
+        issuerAccountingRequired: configuration.accountingRequired,
+        issuerLegalName: configuration.issuerLegalName,
+        issuerMainAddress: configuration.issuerMainAddress,
+        issuerRuc: configuration.issuerRuc,
+        issuerTaxRegime: configuration.taxRegime,
+        issuerTradeName: configuration.issuerTradeName,
         issuedAt,
         organizationId: payment.organizationId,
         paymentMethodCode: configuration.paymentMethodCode,
         paymentReference: payment.providerTransactionId,
         planCode: payment.invoice.planCode,
         sequential,
-        status: SriInvoiceStatus.PENDING,
+        status: SriInvoiceStatus.GENERATED,
         subscriptionInvoiceId: payment.invoiceId,
         subscriptionPaymentAttemptId: payment.id,
         subtotalCents: payment.invoice.subtotalCents,
@@ -179,6 +223,7 @@ export async function enqueueSriInvoiceForPayment(
         taxCode: configuration.taxCode,
         taxPercentageCode: configuration.taxPercentageCode,
         totalCents: payment.invoice.totalCents,
+        unsignedXml,
       },
     });
     await transaction.auditLog.create({
@@ -239,6 +284,89 @@ function nextSriAttempt(config: ApiConfig, attemptCount: number) {
   );
 }
 
+function assertSriRuntimeEnvironment(
+  config: ApiConfig,
+  invoiceEnvironment: SriEnvironment,
+) {
+  const configuredEnvironment =
+    config.SRI_ENV === 'production'
+      ? SriEnvironment.PRODUCTION
+      : SriEnvironment.TEST;
+  if (invoiceEnvironment !== configuredEnvironment)
+    throw new Error(
+      'El ambiente persistido de la factura no coincide con la configuración SRI actual.',
+    );
+  if (
+    invoiceEnvironment === SriEnvironment.PRODUCTION &&
+    config.SRI_PRODUCTION_ENABLED !== 'true'
+  )
+    throw new Error(
+      'SRI de producción está bloqueado: SRI_PRODUCTION_ENABLED=true es obligatorio.',
+    );
+}
+
+async function recordSriTechnicalError(
+  database: DatabaseClient,
+  config: ApiConfig,
+  invoice: { attemptCount: number; id: string },
+  message: string,
+) {
+  const permanent =
+    /^(XML de factura|XSD factura|El ambiente persistido|SRI de producción|No fue posible abrir el certificado|El certificado SRI está vencido)/u.test(
+      message,
+    );
+  const attemptCount = permanent
+    ? config.SRI_MAX_ATTEMPTS
+    : invoice.attemptCount + 1;
+  await database.sriInvoice.update({
+    data: {
+      attemptCount,
+      nextAttemptAt:
+        permanent || attemptCount >= config.SRI_MAX_ATTEMPTS
+          ? null
+          : nextSriAttempt(config, invoice.attemptCount),
+      sriErrorCode: permanent ? 'SRI_PRECONDITION_ERROR' : 'TECHNICAL_ERROR',
+      sriErrorMessage: message,
+      status: SriInvoiceStatus.ERROR,
+    },
+    where: { id: invoice.id },
+  });
+}
+
+async function acquireSriInvoiceLock(
+  database: DatabaseClient,
+  config: ApiConfig,
+  invoiceId: string,
+) {
+  const token = randomUUID();
+  const now = new Date();
+  const result = await database.sriInvoice.updateMany({
+    data: {
+      processingLockToken: token,
+      processingLockUntil: new Date(now.getTime() + 120_000),
+    },
+    where: {
+      attemptCount: { lt: config.SRI_MAX_ATTEMPTS },
+      id: invoiceId,
+      OR: [
+        { processingLockUntil: null },
+        { processingLockUntil: { lte: now } },
+      ],
+      status: {
+        in: [
+          SriInvoiceStatus.PENDING,
+          SriInvoiceStatus.GENERATED,
+          SriInvoiceStatus.SIGNED,
+          SriInvoiceStatus.RECEIVED,
+          SriInvoiceStatus.PROCESSING,
+          SriInvoiceStatus.ERROR,
+        ],
+      },
+    },
+  });
+  return result.count === 1 ? token : null;
+}
+
 async function processSriInvoice(
   database: DatabaseClient,
   config: ApiConfig,
@@ -252,16 +380,16 @@ async function processSriInvoice(
     !config.SRI_CERTIFICATE_PASSWORD
   )
     return;
-  const invoice = await database.sriInvoice.findUnique({
-    where: { id: invoiceId },
-  });
-  if (
-    !invoice ||
-    invoice.status === SriInvoiceStatus.AUTHORIZED ||
-    invoice.status === SriInvoiceStatus.NOT_AUTHORIZED
-  )
-    return;
+  const lockToken = await acquireSriInvoiceLock(database, config, invoiceId);
+  if (!lockToken) return;
+  let invoice: Awaited<ReturnType<typeof database.sriInvoice.findUnique>> =
+    null;
   try {
+    invoice = await database.sriInvoice.findUnique({
+      where: { id: invoiceId },
+    });
+    if (!invoice) return;
+    assertSriRuntimeEnvironment(config, invoice.environment);
     if (invoice.status === SriInvoiceStatus.PENDING) {
       const xml = buildSriInvoiceXml({
         accessKey: invoice.accessKey,
@@ -278,14 +406,14 @@ async function processSriInvoice(
             : 'test',
         invoiceDate: invoice.issuedAt,
         issuer: {
-          accountingRequired: configuration.accountingRequired,
+          accountingRequired: invoice.issuerAccountingRequired as 'SI' | 'NO',
           emissionPointCode: invoice.emissionPointCode,
           establishmentCode: invoice.establishmentCode,
-          legalName: configuration.issuerLegalName,
-          mainAddress: configuration.issuerMainAddress,
-          ruc: configuration.issuerRuc,
-          taxRegime: configuration.taxRegime,
-          tradeName: configuration.issuerTradeName,
+          legalName: invoice.issuerLegalName,
+          mainAddress: invoice.issuerMainAddress,
+          ruc: invoice.issuerRuc,
+          taxRegime: invoice.issuerTaxRegime,
+          tradeName: invoice.issuerTradeName,
         },
         paymentMethodCode: invoice.paymentMethodCode,
         sequential: invoice.sequential,
@@ -298,6 +426,7 @@ async function processSriInvoice(
         },
         totalCents: invoice.totalCents,
       });
+      validateSriInvoiceXml(xml);
       await database.sriInvoice.update({
         data: { status: SriInvoiceStatus.GENERATED, unsignedXml: xml },
         where: { id: invoice.id },
@@ -325,6 +454,8 @@ async function processSriInvoice(
         const errors = sriErrors(reception.messages);
         await database.sriInvoice.update({
           data: {
+            attemptCount: config.SRI_MAX_ATTEMPTS,
+            nextAttemptAt: null,
             sriErrorCode: errors.code,
             sriErrorMessage: errors.message,
             status: SriInvoiceStatus.ERROR,
@@ -349,10 +480,14 @@ async function processSriInvoice(
       return;
     const authorization = await client.authorize(invoice.accessKey);
     if (authorization.status === 'PPR') {
+      const attemptCount = invoice.attemptCount + 1;
       await database.sriInvoice.update({
         data: {
-          attemptCount: { increment: 1 },
-          nextAttemptAt: nextSriAttempt(config, invoice.attemptCount),
+          attemptCount,
+          nextAttemptAt:
+            attemptCount >= config.SRI_MAX_ATTEMPTS
+              ? null
+              : nextSriAttempt(config, invoice.attemptCount),
           status: SriInvoiceStatus.PROCESSING,
         },
         where: { id: invoice.id },
@@ -386,9 +521,9 @@ async function processSriInvoice(
       },
       description: invoice.description,
       issuer: {
-        legalName: configuration.issuerLegalName,
-        ruc: configuration.issuerRuc,
-        taxRegime: configuration.taxRegime,
+        legalName: invoice.issuerLegalName,
+        ruc: invoice.issuerRuc,
+        taxRegime: invoice.issuerTaxRegime,
       },
       issuedAt: invoice.issuedAt,
       sequential: invoice.sequential,
@@ -415,15 +550,12 @@ async function processSriInvoice(
       error instanceof Error
         ? error.message.slice(0, 4000)
         : 'Error técnico SRI.';
-    await database.sriInvoice.update({
-      data: {
-        attemptCount: { increment: 1 },
-        nextAttemptAt: nextSriAttempt(config, invoice.attemptCount),
-        sriErrorCode: 'TECHNICAL_ERROR',
-        sriErrorMessage: message,
-        status: SriInvoiceStatus.ERROR,
-      },
-      where: { id: invoice.id },
+    if (invoice)
+      await recordSriTechnicalError(database, config, invoice, message);
+  } finally {
+    await database.sriInvoice.updateMany({
+      data: { processingLockToken: null, processingLockUntil: null },
+      where: { id: invoiceId, processingLockToken: lockToken },
     });
   }
 }
@@ -438,6 +570,7 @@ export async function processSriInvoiceQueue(
     select: { id: true },
     take: limit,
     where: {
+      attemptCount: { lt: config.SRI_MAX_ATTEMPTS },
       OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: new Date() } }],
       status: {
         in: [
