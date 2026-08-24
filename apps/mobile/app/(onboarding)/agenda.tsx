@@ -1388,7 +1388,7 @@ export default function AgendaScreen() {
                   Registrar cobro PayPhone
                 </Text>
               </Pressable>
-            ) : null}{' '}
+            ) : null}
             <Pressable
               onPress={() => {
                 if (!selectedAppointment?.clientPhone) {

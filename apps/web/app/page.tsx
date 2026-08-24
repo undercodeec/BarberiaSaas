@@ -1,11 +1,11 @@
 'use client';
 
+import { animate } from 'animejs';
 import {
   useEffect,
   useRef,
   useState,
   type CSSProperties,
-  type PointerEvent,
 } from 'react';
 
 const trialLink = 'mailto:soporte@navacloud.app?subject=Quiero%20probar%20Nava';
@@ -19,11 +19,72 @@ const modules = [
   'Reportes',
 ] as const;
 const plans = [
-  ['Nava Free', 'Para conocer Nava'],
-  ['Nava Esencial', 'Operación individual'],
-  ['Nava Local', 'Barbería completa'],
-  ['Nava Multi', 'Más de una sede'],
+  {
+    benefits: [
+      ['Profesionales', '1 profesional operativo'],
+      ['Sucursales', '1 sucursal'],
+      ['Reservas', '25 en los últimos 30 días'],
+      ['Clientes', '100 clientes activos'],
+      ['Reservas online', 'Agenda y reservas públicas'],
+      ['Operación', 'Caja y reportes básicos'],
+    ],
+    description: 'Lo esencial para ordenar tus primeros días con Nava.',
+    name: 'Nava Free',
+    price: 'Gratis',
+    summary: 'Para conocer Nava',
+  },
+  {
+    benefits: [
+      ['Profesionales', '1 profesional activo'],
+      ['Sucursales', '1 sucursal'],
+      ['Reservas', 'Ilimitadas'],
+      ['Clientes', 'Ilimitados'],
+      ['Reservas online', 'Agenda y reservas públicas'],
+      ['Operación', 'Caja e informes esenciales'],
+    ],
+    description: 'Para quien atiende solo y quiere operar sin límites.',
+    name: 'Nava Esencial',
+    price: '$9.83',
+    summary: 'Operación individual',
+  },
+  {
+    benefits: [
+      ['Profesionales', 'Ilimitados, sin cobro por usuario'],
+      ['Sucursales', 'Hasta 3 sucursales'],
+      ['Reservas y clientes', 'Ilimitados'],
+      ['Cobros', 'Caja, POS y comisiones'],
+      ['Gestión', 'Inventario, roles y permisos'],
+      ['Reservas directas', '0% de comisión'],
+    ],
+    description:
+      'La operación completa para un local que ya trabaja en equipo.',
+    name: 'Nava Local',
+    price: '$29.83',
+    summary: 'Barbería completa',
+  },
+  {
+    benefits: [
+      ['Profesionales', 'Ilimitados, sin cobro por usuario'],
+      ['Sucursales', 'Hasta 6 sucursales'],
+      ['Reservas y clientes', 'Ilimitados'],
+      ['Cobros', 'Caja, POS, comisiones e inventario por sede'],
+      ['Gestión', 'Reportes completos, roles y permisos'],
+      ['Reservas directas', '0% de comisión'],
+    ],
+    description:
+      'Visibilidad y control unificado para hacer crecer varias sedes.',
+    name: 'Nava Multi',
+    price: '$48.83',
+    summary: 'Más de una sede',
+  },
 ] as const;
+
+type FixedSectionMetrics = {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+};
 
 function Arrow() {
   return (
@@ -43,6 +104,24 @@ function Arrow() {
   );
 }
 
+function Chevron() {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      height="18"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+      width="18"
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
 function Mark() {
   return (
     <span aria-hidden="true" className="nava-mark">
@@ -56,8 +135,7 @@ function Mark() {
 function Logo() {
   return (
     <a aria-label="Nava, inicio" className="portal-logo" href="#inicio">
-      <Mark />
-      <span>NAVA</span>
+      <img alt="Nava" src="/images/nava-logo.png" />
     </a>
   );
 }
@@ -65,22 +143,29 @@ function Logo() {
 export default function HomePage() {
   const portalRef = useRef<HTMLElement>(null);
   const deckSectionRef = useRef<HTMLDivElement>(null);
-  const dragStart = useRef<number | null>(null);
+  const plansTableRef = useRef<HTMLElement>(null);
+  const portalCloseRef = useRef<HTMLElement>(null);
+  const closeModelRef = useRef<HTMLDivElement>(null);
+  const plansHoldRef = useRef(false);
+  const closeModelHasEnteredRef = useRef(false);
+  const storyProgressRef = useRef(0);
+  const deckTransitionRef = useRef(false);
+  const deckWheelDistanceRef = useRef(0);
   const [portalProgress, setPortalProgress] = useState(0);
   const [storyProgress, setStoryProgress] = useState(0);
-  const [scrollDeckStep, setScrollDeckStep] = useState(0);
   const [deck, setDeck] = useState<readonly (typeof modules)[number][]>([
     ...modules,
   ]);
   const [deckDirection, setDeckDirection] = useState(1);
-  const [dragOffset, setDragOffset] = useState(0);
   const [passingCard, setPassingCard] = useState<
     (typeof modules)[number] | null
   >(null);
   const [returningCard, setReturningCard] = useState<
     (typeof modules)[number] | null
   >(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const [expandedPlan, setExpandedPlan] = useState<string | null>(null);
+  const [plansHold, setPlansHold] = useState<FixedSectionMetrics | null>(null);
+  const [closeProgress, setCloseProgress] = useState(0);
 
   useEffect(() => {
     const updateMotion = () => {
@@ -95,14 +180,33 @@ export default function HomePage() {
         const rect = deckSection.getBoundingClientRect();
         const range = Math.max(1, rect.height - window.innerHeight);
         const progress = Math.min(1, Math.max(0, -rect.top / range));
-        const deckProgress = Math.min(1, Math.max(0, (progress - 0.65) / 0.35));
+        storyProgressRef.current = progress;
         setStoryProgress(progress);
-        setScrollDeckStep(
-          Math.min(
-            modules.length - 1,
-            Math.floor(deckProgress * modules.length),
-          ),
+      }
+
+      const plansTable = plansTableRef.current;
+      const portalClose = portalCloseRef.current;
+      if (plansTable && portalClose) {
+        const closeTop = portalClose.getBoundingClientRect().top;
+        setCloseProgress(
+          Math.min(1, Math.max(0, (window.innerHeight - closeTop) / window.innerHeight)),
         );
+        const shouldHoldPlans =
+          closeTop > 0 && closeTop < window.innerHeight;
+
+        if (shouldHoldPlans && !plansHoldRef.current) {
+          const rect = plansTable.getBoundingClientRect();
+          plansHoldRef.current = true;
+          setPlansHold({
+            height: rect.height,
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+          });
+        } else if (!shouldHoldPlans && plansHoldRef.current) {
+          plansHoldRef.current = false;
+          setPlansHold(null);
+        }
       }
     };
     updateMotion();
@@ -110,16 +214,52 @@ export default function HomePage() {
     return () => window.removeEventListener('scroll', updateMotion);
   }, []);
 
+  useEffect(() => {
+    const model = closeModelRef.current;
+    if (!model) return;
+
+    if (closeProgress < 0.06) {
+      closeModelHasEnteredRef.current = false;
+      model.style.removeProperty('opacity');
+      model.style.removeProperty('transform');
+      return;
+    }
+
+    if (
+      closeModelHasEnteredRef.current ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return;
+    }
+
+    closeModelHasEnteredRef.current = true;
+    const entranceOffset = Math.round(
+      Math.min(320, Math.max(150, window.innerWidth * 0.24)),
+    );
+
+    animate(model, {
+      duration: 1350,
+      ease: 'inOutSine',
+      opacity: [0, 1, 1],
+      scale: [0.82, 1.035, 1],
+      x: [entranceOffset, -18, 0],
+    });
+  }, [closeProgress]);
+
   const deckIndex = modules.indexOf(deck[0]!);
   const shiftDeck = (direction: number) => {
-    if (passingCard || returningCard) return;
+    if (deckTransitionRef.current) return;
+    deckTransitionRef.current = true;
     setDeckDirection(direction);
     if (direction < 0) {
       const lastCard = deck[deck.length - 1]!;
       setReturningCard(lastCard);
       window.setTimeout(() => {
         setDeck((current) => [lastCard, ...current.slice(0, -1)]);
-        window.setTimeout(() => setReturningCard(null), 30);
+        window.setTimeout(() => {
+          setReturningCard(null);
+          deckTransitionRef.current = false;
+        }, 30);
       }, 820);
       return;
     }
@@ -127,50 +267,38 @@ export default function HomePage() {
     setPassingCard(currentCard);
     window.setTimeout(() => {
       setDeck((current) => [...current.slice(1), current[0]!]);
-      window.setTimeout(() => setPassingCard(null), 110);
+      window.setTimeout(() => {
+        setPassingCard(null);
+        deckTransitionRef.current = false;
+      }, 110);
     }, 420);
   };
-  const showDeckCard = (module: (typeof modules)[number]) => {
-    if (deck[0] === module) return;
-    const targetIndex = deck.indexOf(module);
-    setDeckDirection(targetIndex > 0 ? 1 : -1);
-    setDeck((current) => [
-      ...current.slice(targetIndex),
-      ...current.slice(0, targetIndex),
-    ]);
-  };
   useEffect(() => {
-    if (
-      isDragging ||
-      passingCard ||
-      returningCard ||
-      scrollDeckStep === deckIndex
-    )
-      return;
-    const timer = window.setTimeout(
-      () => shiftDeck(scrollDeckStep > deckIndex ? 1 : -1),
-      0,
-    );
-    return () => window.clearTimeout(timer);
-  }, [deckIndex, isDragging, passingCard, returningCard, scrollDeckStep]);
-  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    dragStart.current = event.clientX;
-    setIsDragging(true);
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-  const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (dragStart.current !== null)
-      setDragOffset(event.clientX - dragStart.current);
-  };
-  const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
-    const start = dragStart.current;
-    dragStart.current = null;
-    setIsDragging(false);
-    setDragOffset(0);
-    if (start === null) return;
-    const distance = event.clientX - start;
-    if (Math.abs(distance) > 48) shiftDeck(distance < 0 ? 1 : -1);
-  };
+    const onWheel = (event: WheelEvent) => {
+      const isDeckSceneActive =
+        storyProgressRef.current >= 0.65 && storyProgressRef.current < 1;
+      const direction = Math.sign(event.deltaY);
+      const canAdvance = direction > 0 && deckIndex < modules.length - 1;
+      const canReturn = direction < 0 && deckIndex > 0;
+
+      if (!isDeckSceneActive || event.ctrlKey || (!canAdvance && !canReturn)) {
+        return;
+      }
+
+      event.preventDefault();
+      if (deckTransitionRef.current) return;
+
+      deckWheelDistanceRef.current += event.deltaY;
+      if (Math.abs(deckWheelDistanceRef.current) < 70) return;
+
+      const wheelDirection = Math.sign(deckWheelDistanceRef.current);
+      deckWheelDistanceRef.current = 0;
+      shiftDeck(wheelDirection);
+    };
+
+    window.addEventListener('wheel', onWheel, { passive: false });
+    return () => window.removeEventListener('wheel', onWheel);
+  }, [deck, deckIndex]);
   const portalStyle = { '--portal-progress': portalProgress } as CSSProperties;
 
   return (
@@ -260,18 +388,18 @@ export default function HomePage() {
       >
         <section className="statement-fold" id="operacion">
           <div className="statement-content">
-          <p className="portal-label">Nava / Operación</p>
-          <h2>
-            Haz crecer tu barbería con <em>más orden</em> y menos
-            complicaciones.
-          </h2>
-          <p>
-            Nava reúne reservas, agenda, clientes, caja, equipo e inventario en
-            un solo lugar.
-          </p>
-          <a className="portal-text-link" href={trialLink}>
-            Probar Nava gratis <Arrow />
-          </a>
+            <p className="portal-label">Nava / Operación</p>
+            <h2>
+              Haz crecer tu barbería con <em>más orden</em> y menos
+              complicaciones.
+            </h2>
+            <p>
+              Nava reúne reservas, agenda, clientes, caja, equipo e inventario
+              en un solo lugar.
+            </p>
+            <a className="portal-text-link" href={trialLink}>
+              Probar Nava gratis <Arrow />
+            </a>
           </div>
           <span aria-hidden="true" className="statement-index">
             01
@@ -279,101 +407,99 @@ export default function HomePage() {
           <div aria-hidden="true" className="statement-orbit">
             <Mark />
           </div>
+          <div aria-hidden="true" className="statement-devices">
+            <img
+              alt=""
+              className="statement-device statement-device-cash"
+              src="/images/model.png"
+            />
+            <img
+              alt=""
+              className="statement-device statement-device-reservations"
+              src="/images/model2.png"
+            />
+          </div>
           <section
-        className={
-          storyProgress >= 0.65 ? 'deck-section is-active' : 'deck-section'
-        }
-        id="modulos"
-      >
-        <div className="deck-stage">
-          <div className="deck-copy">
-            <p className="portal-label">Módulos Nava</p>
-            <h2>
-              La operación de tu barbería, organizada como una sola experiencia.
-            </h2>
-            <p>
-              Menos herramientas separadas. Más control desde un solo lugar.
-            </p>
-            <div className="deck-actions">
-             
-            </div>
-          </div>
-          <div
-            aria-label="Módulos Nava"
-            className={isDragging ? 'module-deck is-dragging' : 'module-deck'}
-            onKeyDown={(event) => {
-              if (event.key === 'ArrowLeft') shiftDeck(-1);
-              if (event.key === 'ArrowRight') shiftDeck(1);
-            }}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            style={
-              {
-                '--deck-direction': deckDirection,
-                '--deck-drag': `${dragOffset}px`,
-              } as CSSProperties
+            className={
+              storyProgress >= 0.65 ? 'deck-section is-active' : 'deck-section'
             }
-            tabIndex={0}
+            id="modulos"
           >
-            {deck.map((module, position) => {
-              const originalIndex = modules.indexOf(module);
-              return (
-                <article
-                  className={
-                    passingCard === module
-                      ? 'deck-card is-passing'
-                      : returningCard === module
-                        ? 'deck-card is-returning'
-                        : 'deck-card'
-                  }
-                  data-position={position}
-                  key={module}
-                  style={{ '--deck-position': position } as CSSProperties}
-                >
-                  <span>0{originalIndex + 1}</span>
-                  <h3>{module}</h3>
-                  <div>
-                    <Mark />
-                    <small>Nava</small>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-          <div className="deck-hint">
-            <div className="deck-pagination">
-              {modules.map((module, index) => (
-                <button
-                  aria-label={`Mostrar ${module}`}
-                  aria-pressed={index === deckIndex}
-                  className={index === deckIndex ? 'active' : ''}
-                  key={module}
-                  onClick={() => {
-                    showDeckCard(module);
-                  }}
-                  type="button"
-                />
-              ))}
+            <div className="deck-stage">
+              <div className="deck-copy">
+                <p className="portal-label">Módulos Nava</p>
+                <h2>
+                  La operación de tu barbería, organizada como una sola
+                  experiencia.
+                </h2>
+                <p>
+                  Menos herramientas separadas. Más control desde un solo lugar.
+                </p>
+                <div className="deck-actions"></div>
+              </div>
+              <div
+                aria-label="Módulos Nava"
+                className="module-deck"
+                style={
+                  {
+                    '--deck-direction': deckDirection,
+                  } as CSSProperties
+                }
+              >
+                {deck.map((module, position) => {
+                  const originalIndex = modules.indexOf(module);
+                  return (
+                    <article
+                      className={
+                        passingCard === module
+                          ? 'deck-card is-passing'
+                          : returningCard === module
+                            ? 'deck-card is-returning'
+                            : 'deck-card'
+                      }
+                      data-position={position}
+                      key={module}
+                      style={{ '--deck-position': position } as CSSProperties}
+                    >
+                      <span>0{originalIndex + 1}</span>
+                      <h3>{module}</h3>
+                      <div>
+                        <Mark />
+                        <small>Nava</small>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              <div aria-hidden="true" className="deck-hint">
+                <div className="deck-pagination">
+                  {modules.map((module, index) => (
+                    <span
+                      className={index === deckIndex ? 'active' : ''}
+                      key={module}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
           </section>
         </section>
       </div>
 
-      <section className="module-roster">
-        <p className="portal-label">Una plataforma</p>
-        {modules.map((module, index) => (
-          <article key={module}>
-            <span>0{index + 1}</span>
-            <h2>{module}</h2>
-            <small>Nava</small>
-          </article>
-        ))}
-      </section>
-
-      <section className="plans-table-section" id="planes">
+      <div
+        className="plans-table-stage"
+        style={plansHold ? { height: plansHold.height } : undefined}
+      >
+      <section
+        className={
+          plansHold
+            ? 'plans-table-section is-held-for-close'
+            : 'plans-table-section'
+        }
+        id="planes"
+        ref={plansTableRef}
+        style={plansHold ?? undefined}
+      >
         <div className="plans-heading">
           <p className="portal-label">Planes Nava</p>
           <h2>Un plan para cada momento de tu negocio.</h2>
@@ -381,51 +507,135 @@ export default function HomePage() {
             Prueba Nava durante 10 días. Después, tu cuenta pasa a Nava Free.
           </p>
         </div>
-        <div className="plan-table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Plan</th>
-                <th>Para quién</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {plans.map(([name, description]) => (
-                <tr key={name}>
-                  <td>{name}</td>
-                  <td>{description}</td>
-                  <td>
-                    <a href={trialLink} aria-label={`Probar ${name}`}>
-                      <Arrow />
-                    </a>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="plan-table-wrap" role="list">
+          <div aria-hidden="true" className="plan-table-head">
+            <span>Plan</span>
+            <span>Ideal para</span>
+            <span>Explorar</span>
+          </div>
+          {plans.map((plan) => {
+            const isExpanded = expandedPlan === plan.name;
+            const panelId = `plan-${plan.name.toLowerCase().replaceAll(' ', '-')}`;
+            return (
+              <article
+                className={
+                  isExpanded ? 'plan-disclosure is-expanded' : 'plan-disclosure'
+                }
+                key={plan.name}
+                role="listitem"
+              >
+                <button
+                  aria-controls={panelId}
+                  aria-expanded={isExpanded}
+                  className="plan-row-button"
+                  onClick={() =>
+                    setExpandedPlan((current) =>
+                      current === plan.name ? null : plan.name,
+                    )
+                  }
+                  type="button"
+                >
+                  <span className="plan-row-name">
+                    <small>Plan Nava</small>
+                    <strong>{plan.name}</strong>
+                  </span>
+                  <span className="plan-row-summary">{plan.summary}</span>
+                  <span className="plan-row-action">
+                    <span>{isExpanded ? 'Cerrar' : 'Ver plan'}</span>
+                    <i>
+                      <Chevron />
+                    </i>
+                  </span>
+                </button>
+                <div className="plan-expander" id={panelId}>
+                  <div className="plan-expander-inner">
+                    <div className="plan-price-card">
+                      <span>Inversión mensual</span>
+                      <strong>{plan.price}</strong>
+                      <small>
+                        {plan.price === 'Gratis' ? 'sin costo' : 'USD / mes'}
+                      </small>
+                      <div aria-hidden="true" className="plan-phone-scene">
+                        <img alt="" src="/images/model2.png" />
+                        <div className="plan-preview-note plan-preview-note-reservation">
+                          <span>✓</span>
+                          <div>
+                            <b>Reserva confirmada</b>
+                            <small>Hoy · 10:30</small>
+                          </div>
+                        </div>
+                        <div className="plan-preview-note plan-preview-note-cash">
+                          <span>$</span>
+                          <div>
+                            <b>Caja al día</b>
+                            <small>Venta registrada</small>
+                          </div>
+                        </div>
+                        <div className="plan-preview-note plan-preview-note-client">
+                          <span>+</span>
+                          <div>
+                            <b>Cliente nuevo</b>
+                            <small>Historial creado</small>
+                          </div>
+                        </div>
+                      </div>
+                      <a href={trialLink}>
+                        Empezar 10 días gratis <Arrow />
+                      </a>
+                    </div>
+                    <div className="plan-detail-card">
+                      <p>{plan.description}</p>
+                      <table className="plan-feature-table">
+                        <caption>Qué incluye {plan.name}</caption>
+                        <tbody>
+                          {plan.benefits.map(([feature, detail]) => (
+                            <tr key={feature}>
+                              <th scope="row">{feature}</th>
+                              <td>{detail}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </section>
+      </div>
 
-      <section className="portal-close">
-        <div>
-          <p className="portal-label">Nava</p>
-          <h2>Tu negocio merece trabajar con más orden.</h2>
-          <p>10 días para conocer Nava.</p>
-        </div>
-        <div className="close-actions">
-          <a className="portal-button portal-button-primary" href={trialLink}>
-            Probar Nava gratis <Arrow />
-          </a>
-        </div>
-        <div className="close-rule">
-          <span>© {new Date().getFullYear()} Nava · Ecuador</span>
-          <a href="mailto:soporte@navacloud.app">soporte@navacloud.app</a>
-        </div>
-        <div aria-hidden="true" className="close-wordmark">
-          NAVA
-        </div>
-      </section>
+      <div className="portal-close-scroll">
+        <section
+          className="portal-close"
+          ref={portalCloseRef}
+          style={{ '--close-progress': closeProgress } as CSSProperties}
+        >
+          <div>
+            <p className="portal-label">Nava</p>
+            <h2>Tu negocio merece trabajar con más orden.</h2>
+            <p>10 días para conocer Nava.</p>
+          </div>
+          <div className="close-actions">
+            <a className="portal-button portal-button-primary" href={trialLink}>
+              Probar Nava gratis <Arrow />
+            </a>
+          </div>
+          <div className="close-rule">
+            <span>© {new Date().getFullYear()} Nava · Ecuador</span>
+            <a href="mailto:soporte@navacloud.app">soporte@navacloud.app</a>
+          </div>
+          <div aria-hidden="true" className="close-model">
+            <div className="close-model-motion" ref={closeModelRef}>
+              <img alt="" src="/images/model3.png" />
+            </div>
+          </div>
+          <div aria-hidden="true" className="close-wordmark">
+            NAVA
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
