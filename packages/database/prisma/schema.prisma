@@ -143,6 +143,34 @@ enum SubscriptionPaymentStatus {
   REVERSED
 }
 
+enum SriEnvironment {
+  TEST
+  PRODUCTION
+}
+
+enum SriTaxRegime {
+  GENERAL
+  RIMPE
+  RIMPE_NEGOCIO_POPULAR
+}
+
+enum SriInvoiceStatus {
+  PENDING
+  GENERATED
+  SIGNED
+  RECEIVED
+  PROCESSING
+  AUTHORIZED
+  NOT_AUTHORIZED
+  ERROR
+}
+
+enum SriInvoiceDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
 enum PaymentProviderEventSource {
   WEBHOOK
   POLL
@@ -822,6 +850,8 @@ model Organization {
   subscriptionPaymentAttempts        SubscriptionPaymentAttempt[]
   paymentProviderEvents              PaymentProviderEvent[]
   subscriptionChanges                SubscriptionChange[]
+  billingProfile                     OrganizationBillingProfile?
+  sriInvoices                        SriInvoice[]
 
   @@map("organizations")
 }
@@ -941,6 +971,7 @@ model SubscriptionInvoice {
   plan                   Plan                         @relation(fields: [planId], references: [id], onDelete: Restrict)
   paymentAttempts        SubscriptionPaymentAttempt[]
   changes                SubscriptionChange[]
+  sriInvoices            SriInvoice[]
 
   @@index([organizationId, status, dueAt])
   @@index([planId, createdAt])
@@ -973,11 +1004,102 @@ model SubscriptionPaymentAttempt {
   initiatedBy           User?                     @relation("SubscriptionPaymentInitiator", fields: [initiatedByUserId], references: [id], onDelete: SetNull)
   providerEvents        PaymentProviderEvent[]
   changes               SubscriptionChange[]
+  sriInvoice            SriInvoice?
 
   @@unique([organizationId, idempotencyKeyHash])
   @@index([organizationId, status, expiresAt])
   @@index([invoiceId, createdAt])
   @@map("subscription_payment_attempts")
+}
+
+// Perfil de facturación del comprador. Pertenece al negocio que contrata Nava,
+// no a los clientes finales de ese negocio.
+model OrganizationBillingProfile {
+  id                 String   @id @default(uuid()) @db.Uuid
+  organizationId     String   @unique @map("organization_id") @db.Uuid
+  identificationType String   @map("identification_type") @db.Char(2)
+  identification     String   @map("identification") @db.VarChar(20)
+  legalName          String   @map("legal_name") @db.VarChar(300)
+  email              String   @db.VarChar(100)
+  address            String?  @db.VarChar(300)
+  phone              String?  @db.VarChar(24)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@map("organization_billing_profiles")
+}
+
+// Contador protegido por transacción para cada serie fiscal del emisor Nava.
+model SriDocumentSequence {
+  id                String   @id @default(uuid()) @db.Uuid
+  documentType      String   @map("document_type") @db.Char(2)
+  establishmentCode String   @map("establishment_code") @db.Char(3)
+  emissionPointCode String   @map("emission_point_code") @db.Char(3)
+  lastSequential    Int      @default(0) @map("last_sequential")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([documentType, establishmentCode, emissionPointCode])
+  @@map("sri_document_sequences")
+}
+
+// Comprobante fiscal Nava -> organización suscriptora. Conserva snapshots
+// tributarios incluso si el perfil o el plan cambian después de la emisión.
+model SriInvoice {
+  id                           String                   @id @default(uuid()) @db.Uuid
+  organizationId               String                   @map("organization_id") @db.Uuid
+  subscriptionInvoiceId        String                   @map("subscription_invoice_id") @db.Uuid
+  subscriptionPaymentAttemptId String                   @unique @map("subscription_payment_attempt_id") @db.Uuid
+  environment                  SriEnvironment
+  documentType                 String                   @default("01") @map("document_type") @db.Char(2)
+  establishmentCode            String                   @map("establishment_code") @db.Char(3)
+  emissionPointCode            String                   @map("emission_point_code") @db.Char(3)
+  sequential                   Int
+  accessKey                    String                   @unique @map("access_key") @db.Char(49)
+  authorizationNumber          String?                  @map("authorization_number") @db.VarChar(80)
+  authorizationDate            DateTime?                @map("authorization_date") @db.Timestamptz(3)
+  status                       SriInvoiceStatus         @default(PENDING)
+  deliveryStatus               SriInvoiceDeliveryStatus @default(PENDING) @map("delivery_status")
+  buyerIdentificationType      String                   @map("buyer_identification_type") @db.Char(2)
+  buyerIdentification          String                   @map("buyer_identification") @db.VarChar(20)
+  buyerName                    String                   @map("buyer_name") @db.VarChar(300)
+  buyerEmail                   String                   @map("buyer_email") @db.VarChar(100)
+  buyerAddress                 String?                  @map("buyer_address") @db.VarChar(300)
+  buyerPhone                   String?                  @map("buyer_phone") @db.VarChar(24)
+  planCode                     String                   @map("plan_code") @db.VarChar(40)
+  description                  String                   @db.VarChar(300)
+  subtotalCents                Int                      @map("subtotal_cents")
+  discountCents                Int                      @default(0) @map("discount_cents")
+  taxCents                     Int                      @map("tax_cents")
+  taxBasisPoints               Int                      @map("tax_basis_points")
+  taxCode                      String                   @map("tax_code") @db.Char(1)
+  taxPercentageCode            String                   @map("tax_percentage_code") @db.VarChar(4)
+  totalCents                   Int                      @map("total_cents")
+  currencyCode                 String                   @default("USD") @map("currency_code") @db.Char(3)
+  paymentMethodCode            String                   @map("payment_method_code") @db.Char(2)
+  paymentReference             String?                  @map("payment_reference") @db.VarChar(80)
+  issuedAt                     DateTime                 @map("issued_at") @db.Timestamptz(3)
+  authorizedAt                 DateTime?                @map("authorized_at") @db.Timestamptz(3)
+  emailedAt                    DateTime?                @map("emailed_at") @db.Timestamptz(3)
+  nextAttemptAt                DateTime?                @map("next_attempt_at") @db.Timestamptz(3)
+  attemptCount                 Int                      @default(0) @map("attempt_count")
+  unsignedXml                  String?                  @map("unsigned_xml") @db.Text
+  signedXml                    String?                  @map("signed_xml") @db.Text
+  authorizedXml                String?                  @map("authorized_xml") @db.Text
+  ridePdf                      Bytes?                   @map("ride_pdf")
+  sriErrorCode                 String?                  @map("sri_error_code") @db.VarChar(80)
+  sriErrorMessage              String?                  @map("sri_error_message") @db.Text
+  createdAt                    DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                    DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization                 Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  subscriptionInvoice          SubscriptionInvoice      @relation(fields: [subscriptionInvoiceId], references: [id], onDelete: Restrict)
+  subscriptionPaymentAttempt   SubscriptionPaymentAttempt @relation(fields: [subscriptionPaymentAttemptId], references: [id], onDelete: Restrict)
+
+  @@unique([documentType, establishmentCode, emissionPointCode, sequential])
+  @@index([organizationId, issuedAt])
+  @@index([status, nextAttemptAt])
+  @@map("sri_invoices")
 }
 
 model PaymentProviderEvent {

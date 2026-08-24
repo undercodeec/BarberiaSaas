@@ -34,10 +34,11 @@
       suscripciones pendientes, definir `PLATFORM_PRIVACY_POLICY_VERSION`,
       `PLATFORM_MARKETING_POLICY_VERSION` y, si se usará analítica,
       `NEXT_PUBLIC_GA_MEASUREMENT_ID`.
-- [ ] Sigue pendiente de operación externa el módulo propio de facturación SRI,
-      credenciales y homologación; SMTP Hostinger, PayPhone productivo, backups
-      30/90 y ensayo de restauración tampoco se pueden certificar desde el
-      repositorio.
+- [ ] La base local del módulo propio de facturación SRI está implementada, pero
+      siguen pendientes el certificado `.p12`, datos fiscales confirmados,
+      validación XSD oficial en ejecución, credenciales/homologación SRI y la
+      prueba SMTP real. PayPhone productivo, backups 30/90 y ensayo de
+      restauración tampoco se pueden certificar desde el repositorio.
 
 Este documento es la fuente de verdad del estado vigente. Sustituye la antigua
 bitácora cronológica: una función se considera terminada solo cuando existe en
@@ -326,9 +327,14 @@ Mobile / Web pública / Admin
 - [x] Aviso de vencimiento cinco días antes: proceso horario por correo SMTP,
       con registro persistente para no duplicar envíos y texto que aclara la
       renovación manual.
-- [ ] Facturación electrónica por correo: se construirá un módulo propio que
-      se comunique con el facturador SRI para emitir comprobantes automáticos.
-      Requiere diseño, credenciales y pruebas de homologación antes de operar.
+- [ ] Facturación electrónica por correo: existe una base propia para facturar
+      exclusivamente Nava → negocio suscriptor: perfil y snapshot de comprador,
+      secuencial transaccional, clave de acceso, XML de factura 2.1.0,
+      firma XAdES_BES, recepción/autorización SOAP, RIDE, cola persistente e
+      intento de envío SMTP. No se considera operativa ni completa hasta validar
+      XML contra los XSD oficiales en ejecución, instalar un `.p12`, confirmar
+      régimen/impuestos/forma de pago con contador y lograr homologación SRI +
+      correo real. No factura Caja, productos ni servicios de las barberías.
 - [x] Marketing Nava con opt-in explícito: desmarcado por defecto en el
       registro, consentimiento versionado y fechado, y baja posterior desde
       Ajustes. Los avisos operativos permanecen fuera de esta preferencia.
@@ -337,6 +343,55 @@ Mobile / Web pública / Admin
       `NEXT_PUBLIC_GA_MEASUREMENT_ID` en producción.
 - [ ] El endpoint de simulación sigue siendo parte de la operación del MVP y no
       sustituye un sistema de cobro.
+
+#### Facturación SRI propia — parcial, pendiente de validación externa (23 de agosto de 2026)
+
+- [x] Se reutiliza `SubscriptionInvoice` como snapshot comercial y
+      `SubscriptionPaymentAttempt` como pago verificable. `SriInvoice` es el
+      comprobante fiscal distinto, restringido de forma única a un pago de
+      suscripción; evita facturas duplicadas cuando PayPhone o el worker se
+      reintentan.
+- [x] La migración `20260823180000_sri_electronic_invoicing` agrega perfil de
+      facturación por organización, secuencias fiscales concurrentes y el
+      comprobante con snapshots de comprador, plan, importes, impuestos, XML,
+      RIDE, autorización, errores y entrega. Tiene `rollback.sql`.
+- [x] La emisión queda desacoplada de activar el plan: un pago aplicado conserva
+      la suscripción activa aunque SRI, red o SMTP fallen. El worker PostgreSQL
+      retoma facturas pendientes sin Redis ni otro proveedor adicional.
+- [x] La clave de acceso tiene 49 dígitos, usa el módulo 11 y el secuencial se
+      reserva con una operación atómica por tipo/establecimiento/punto de
+      emisión; no usa `MAX(secuencial) + 1`.
+- [x] Se construye factura XML `2.1.0`, se firma en backend como XAdES_BES
+      enveloped con certificado PKCS#12 y RSA-SHA1, y se usan los WS directos
+      offline de recepción y autorización del SRI por ambiente `test` o
+      `production`. No se integra un proveedor externo ni se fija el TLS del
+      SRI en código.
+- [x] Tras autorización se conserva XML autorizado, se genera un RIDE PDF
+      mínimo y se entrega XML + RIDE por SMTP. El estado fiscal y la entrega de
+      correo se persisten por separado; un reenvío no emite otro comprobante.
+- [x] API de propietario: configurar datos de facturación, listar comprobantes,
+      descargar XML/RIDE autorizado y solicitar reenvío. El perfil pertenece a
+      la organización suscriptora y nunca a los clientes finales de barberías.
+- [x] Configuración nueva: `SRI_ENV` (por defecto `test`),
+      `SRI_EMISSION_ENABLED`, `SRI_PRODUCTION_ENABLED`, datos del emisor Nava,
+      régimen, impuestos, forma de pago, ruta/contraseña del certificado y
+      espera de autorización. Producción requiere la doble activación explícita.
+- [x] Evidencia local: pruebas unitarias de módulo 11, clave de acceso,
+      secuencial, montos y XML; pruebas API 37 aprobadas (30 omitidas por no
+      disponer de `TEST_DATABASE_URL`); typecheck, build API, lint modificado y
+      `prisma validate` correctos.
+- [ ] No existe aún evidencia contra un certificado de pruebas ni contra el SRI
+      de certificación. Tampoco se ha validado el XML mediante el XSD oficial
+      durante la ejecución; no declarar que el comprobante es aceptado hasta
+      añadir esa evidencia.
+- [ ] Falta la pantalla Mobile/Web de "Mis facturas" y la vista global de
+      diagnóstico/reintento para `platform_admin` en Nava Control Center. La
+      API de propietario ya existe, pero no sustituye esas interfaces.
+- [ ] Antes de habilitar: aplicar migración, confirmar con contador el régimen,
+      IVA/códigos SRI y forma de pago; obtener/instalar el `.p12` fuera del
+      repositorio; solicitar/habilitar emisión en SRI en Línea; probar recepción
+      → autorización → RIDE → SMTP en `SRI_ENV=test`; solo después activar
+      producción con `SRI_PRODUCTION_ENABLED=true`.
 
 ### Fase 12 — Panel interno: funcional, con cambios locales
 

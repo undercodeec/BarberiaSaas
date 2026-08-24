@@ -94,6 +94,12 @@ import {
 } from './subscription-policy';
 import { processSubscriptionRenewalReminders } from './subscription-reminders';
 import {
+  enqueuePendingSriInvoices,
+  processSriInvoiceQueue,
+} from './sri-invoicing';
+import { registerSriBillingRoutes } from './sri-billing';
+import { deliverSriInvoices } from './sri-mailer';
+import {
   buildClosedBusinessExport,
   listClosedBusinessExports,
 } from './closed-business-export';
@@ -2760,6 +2766,7 @@ export async function buildApi({
     config,
     platformPaymentProvider,
   );
+  registerSriBillingRoutes(app, database, authenticate, config);
   registerProductOrderRoutes(app, database, authenticate, config);
   registerReportRoutes(app, database, authenticate);
 
@@ -2802,11 +2809,32 @@ export async function buildApi({
     60 * 60 * 1000,
   );
   subscriptionLifecycleTimer.unref();
+  const sriInvoiceLifecycleTimer = setInterval(() => {
+    void enqueuePendingSriInvoices(database, config).catch((error: unknown) =>
+      app.log.error(error),
+    );
+    void processSriInvoiceQueue(database, config).catch((error: unknown) =>
+      app.log.error(error),
+    );
+    void deliverSriInvoices(database, config).catch((error: unknown) =>
+      app.log.error(error),
+    );
+  }, 60_000);
+  sriInvoiceLifecycleTimer.unref();
   void reconcileSubscriptionLifecycle(database).catch((error: unknown) =>
     app.log.error(error),
   );
   void processSubscriptionRenewalReminders(database, config).catch(
     (error: unknown) => app.log.error(error),
+  );
+  void enqueuePendingSriInvoices(database, config).catch((error: unknown) =>
+    app.log.error(error),
+  );
+  void processSriInvoiceQueue(database, config).catch((error: unknown) =>
+    app.log.error(error),
+  );
+  void deliverSriInvoices(database, config).catch((error: unknown) =>
+    app.log.error(error),
   );
   app.addHook('onClose', async () => {
     clearInterval(publicBookingLifecycleTimer);
@@ -2814,6 +2842,7 @@ export async function buildApi({
     clearInterval(productOrderLifecycleTimer);
     clearInterval(subscriptionPaymentLifecycleTimer);
     clearInterval(subscriptionLifecycleTimer);
+    clearInterval(sriInvoiceLifecycleTimer);
   });
 
   app.setErrorHandler((error, _request, reply) => {

@@ -78,6 +78,31 @@ const environmentSchema = z
     PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY: optionalText,
     PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS: optionalBasisPoints,
     PLATFORM_SUBSCRIPTION_TERMS_VERSION: optionalText,
+    SRI_AUTHORIZATION_DELAY_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(86_400)
+      .default(15),
+    SRI_CERTIFICATE_PASSWORD: optionalText,
+    SRI_CERTIFICATE_PATH: optionalText,
+    SRI_EMISSION_ENABLED: z.enum(['true', 'false']).default('false'),
+    SRI_ENV: z.enum(['test', 'production']).default('test'),
+    SRI_ESTABLISHMENT_CODE: optionalText,
+    SRI_ISSUER_LEGAL_NAME: optionalText,
+    SRI_ISSUER_RUC: optionalText,
+    SRI_ISSUER_TRADE_NAME: optionalText,
+    SRI_MAIN_ADDRESS: optionalText,
+    SRI_EMISSION_POINT_CODE: optionalText,
+    SRI_ACCOUNTING_REQUIRED: z.enum(['SI', 'NO']).optional(),
+    SRI_PAYMENT_METHOD_CODE: optionalText,
+    SRI_PRODUCTION_ENABLED: z.enum(['true', 'false']).default('false'),
+    SRI_TAX_BASIS_POINTS: optionalBasisPoints,
+    SRI_TAX_CODE: optionalText,
+    SRI_TAX_PERCENTAGE_CODE: optionalText,
+    SRI_TAX_REGIME: z
+      .enum(['GENERAL', 'RIMPE', 'RIMPE_NEGOCIO_POPULAR'])
+      .default('GENERAL'),
     PAYPHONE_CREDENTIALS_ENCRYPTION_KEY: optionalText,
     PUBLIC_WEB_URL: z.url().default('https://book.nava.app'),
     SMTP_FROM: optionalText,
@@ -154,6 +179,42 @@ const environmentSchema = z
           'La clave PayPhone de plataforma debe ser distinta de la clave usada para tenants.',
         path: ['PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY'],
       });
+    }
+    if (
+      value.SRI_ENV === 'production' &&
+      value.SRI_PRODUCTION_ENABLED !== 'true'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'SRI_PRODUCTION_ENABLED=true es obligatorio para seleccionar SRI_ENV=production.',
+        path: ['SRI_PRODUCTION_ENABLED'],
+      });
+    }
+    if (value.SRI_EMISSION_ENABLED === 'true') {
+      const required = [
+        'SRI_CERTIFICATE_PASSWORD',
+        'SRI_CERTIFICATE_PATH',
+        'SRI_ESTABLISHMENT_CODE',
+        'SRI_ISSUER_LEGAL_NAME',
+        'SRI_ISSUER_RUC',
+        'SRI_MAIN_ADDRESS',
+        'SRI_EMISSION_POINT_CODE',
+        'SRI_ACCOUNTING_REQUIRED',
+        'SRI_PAYMENT_METHOD_CODE',
+        'SRI_TAX_BASIS_POINTS',
+        'SRI_TAX_CODE',
+        'SRI_TAX_PERCENTAGE_CODE',
+      ] as const;
+      for (const field of required) {
+        if (value[field] === undefined) {
+          context.addIssue({
+            code: 'custom',
+            message: `${field} es obligatoria al habilitar emisión SRI.`,
+            path: [field],
+          });
+        }
+      }
     }
   });
 

@@ -75,3 +75,20 @@ describe('configuración de cobros de plataforma', () => {
     expect(config.PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS).toBe(1500);
   });
 });
+
+describe('configuración SRI', () => {
+  it('mantiene SRI en pruebas y emisión deshabilitada por defecto', () => {
+    const config = readConfig(baseEnvironment);
+    expect(config.SRI_ENV).toBe('test');
+    expect(config.SRI_EMISSION_ENABLED).toBe('false');
+  });
+
+  it('impide habilitar emisión sin los secretos y datos fiscales requeridos', () => {
+    expect(() =>
+      readConfig({ ...baseEnvironment, SRI_EMISSION_ENABLED: 'true' }),
+    ).toThrow();
+    expect(() =>
+      readConfig({ ...baseEnvironment, SRI_ENV: 'production' }),
+    ).toThrow();
+  });
+});

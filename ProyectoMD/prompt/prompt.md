@@ -6,8 +6,6 @@ A record-label landing page whose hero is a portal: two panels part outward to u
 
 Near-black ground with a warm bone ink, one amber accent and one teal, both taken from the photography so the page and the image are the same palette. A wide geometric display face carries every heading; a neutral sans carries all small type at wide tracking.
 
-
-
 ## Spec
 
 Apply a dark label style. Palette: ground #0A0C0E, secondary ground #101317, ink #EDE7DC, secondary ink #9EA5A8, muted #6C7378, amber #E8913C, teal #2E6B72, hairlines rgba(237,231,220,.13). Typography: 'Syne' 600-800 for the wordmark and headings at letter-spacing -.02em to -.03em; 'Sora' 400-600 at 10.5-16px, with labels uppercase at letter-spacing .12em-.15em. Pull the two accents OUT of the hero photograph so the interface and the image agree. MUST keep both accents to type, a dot or a rule, never a filled area. DO NOT use a gradient banner, a bento grid, a glow, or a drop shadow on anything except the deck cards.

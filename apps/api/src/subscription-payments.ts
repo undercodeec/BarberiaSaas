@@ -654,6 +654,18 @@ export function registerSubscriptionPaymentRoutes(
         'SUBSCRIPTION_CHECKOUT_DISABLED',
         'El checkout se habilitará después de completar la validación con PayPhone.',
       );
+    if (config.SRI_EMISSION_ENABLED === 'true') {
+      const billingProfile =
+        await database.organizationBillingProfile.findUnique({
+          where: { organizationId: membership.organizationId },
+        });
+      if (!billingProfile)
+        throw new ApiError(
+          409,
+          'SRI_BILLING_PROFILE_REQUIRED',
+          'Completa los datos de facturación antes de pagar la suscripción.',
+        );
+    }
     const configuration =
       await database.platformPaymentConfiguration.findUnique({
         where: { provider: 'payphone' },
