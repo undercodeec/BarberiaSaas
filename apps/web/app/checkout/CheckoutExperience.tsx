@@ -86,14 +86,16 @@ export default function CheckoutExperience() {
   }, []);
 
   useEffect(() => {
-    void Promise.all([
-      requestJson<{ plans: Plan[] }>('plans').then(({ plans: result }) =>
-        setPlans(result),
-      ),
-      loadSession(),
-    ]).catch(() =>
-      setError('No pudimos cargar los planes. Inténtalo nuevamente.'),
-    );
+    queueMicrotask(() => {
+      void Promise.all([
+        requestJson<{ plans: Plan[] }>('plans').then(({ plans: result }) =>
+          setPlans(result),
+        ),
+        loadSession(),
+      ]).catch(() =>
+        setError('No pudimos cargar los planes. Inténtalo nuevamente.'),
+      );
+    });
   }, [loadSession]);
 
   useEffect(() => {

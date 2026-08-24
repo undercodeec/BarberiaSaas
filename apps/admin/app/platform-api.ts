@@ -244,6 +244,7 @@ export interface PlatformOrganizationDetail {
     readonly owner: {
       readonly email: string;
       readonly fullName: string;
+      readonly id: string;
     } | null;
     readonly slug: string;
     readonly status: string;

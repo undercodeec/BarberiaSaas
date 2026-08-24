@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
 const API_URL =
   process.env.API_URL ??
@@ -107,10 +107,13 @@ async function checkoutProxy(
         { status: 502 },
       );
     if (body && typeof body === 'object' && 'session' in body) {
-      const { token: _token, ...safeSession } = body.session as {
-        token?: unknown;
-        [key: string]: unknown;
+      const safeSession = {
+        ...(body.session as {
+          token?: unknown;
+          [key: string]: unknown;
+        }),
       };
+      delete safeSession.token;
       body.session = safeSession;
     }
     const response = NextResponse.json(body, { status: upstream.status });

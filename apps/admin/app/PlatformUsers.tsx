@@ -32,12 +32,17 @@ function UserDetail({
   canManage,
   onClose,
   onMutated,
+  onOpenOrganization,
   token,
 }: {
   readonly detail: PlatformUserDetail;
   readonly canManage: boolean;
   readonly onClose: () => void;
   readonly onMutated: () => void;
+  readonly onOpenOrganization: (organization: {
+    readonly id: string;
+    readonly name: string;
+  }) => void;
   readonly token: string;
 }) {
   const [action, setAction] = useState<PlatformUserAction['action'] | null>(
@@ -124,6 +129,13 @@ function UserDetail({
                 <span className="channel-badge">
                   {titleCase(membership.status)}
                 </span>
+                <button
+                  className="button button--ghost"
+                  onClick={() => onOpenOrganization(membership.organization)}
+                  type="button"
+                >
+                  Ver organización
+                </button>
               </div>
             </article>
           ))}
@@ -213,11 +225,21 @@ function UserDetail({
 
 export function PlatformUsers({
   canManage,
+  onOpenOrganization,
   onToast,
+  selectedUser,
   token,
 }: {
   readonly canManage: boolean;
+  readonly onOpenOrganization: (organization: {
+    readonly id: string;
+    readonly name: string;
+  }) => void;
   readonly onToast: (message: string) => void;
+  readonly selectedUser: {
+    readonly id: string;
+    readonly requestId: number;
+  } | null;
   readonly token: string;
 }) {
   const [data, setData] = useState<PlatformUserList | null>(null);
@@ -230,8 +252,30 @@ export function PlatformUsers({
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
+    if (!selectedUser) return;
     let active = true;
-    setLoading(true);
+    void getPlatformUserDetail(token, selectedUser.id)
+      .then((next) => {
+        if (active) setDetail(next);
+      })
+      .catch((error: unknown) => {
+        if (active)
+          onToast(
+            error instanceof Error
+              ? error.message
+              : 'No fue posible abrir la ficha del usuario.',
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, [onToast, selectedUser, token]);
+
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setLoading(true);
+    });
     void getPlatformUsers(token, { page, search, status, verification })
       .then((next) => {
         if (active) setData(next);
@@ -333,6 +377,7 @@ export function PlatformUsers({
               setDetail,
             );
           }}
+          onOpenOrganization={onOpenOrganization}
           token={token}
         />
       ) : null}

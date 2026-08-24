@@ -1788,13 +1788,15 @@ export function OrganizationDetailModal({
   allowExtendTrial,
   onClose,
   onMutated,
+  onOpenUser,
   organization,
   token,
 }: {
   readonly allowExtendTrial: boolean;
   readonly onClose: () => void;
   readonly onMutated: () => void;
-  readonly organization: PlatformOrganization;
+  readonly onOpenUser: (userId: string) => void;
+  readonly organization: Pick<PlatformOrganization, 'id' | 'name'>;
   readonly token: string;
 }) {
   const [detail, setDetail] = useState<PlatformOrganizationDetail | null>(null);
@@ -1989,9 +1991,17 @@ export function OrganizationDetailModal({
               </section>
               <section className="content-card">
                 <span className="card-kicker">Negocio</span>
-                <h3>
-                  {detail.organization.owner?.fullName ?? 'Sin propietario'}
-                </h3>
+                {detail.organization.owner ? (
+                  <button
+                    className="button button--ghost"
+                    onClick={() => onOpenUser(detail.organization.owner!.id)}
+                    type="button"
+                  >
+                    {detail.organization.owner.fullName}
+                  </button>
+                ) : (
+                  <h3>Sin propietario</h3>
+                )}
                 <p>{detail.organization.owner?.email ?? '—'}</p>
                 <p>
                   {detail.organization.defaultTimezone} ·{' '}

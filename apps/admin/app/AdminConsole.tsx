@@ -1118,7 +1118,11 @@ export default function AdminConsole() {
   const [selected, setSelected] = useState<PlatformOrganization | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
   const [detailOrganization, setDetailOrganization] =
-    useState<PlatformOrganization | null>(null);
+    useState<Pick<PlatformOrganization, 'id' | 'name'> | null>(null);
+  const [selectedUser, setSelectedUser] = useState<{
+    readonly id: string;
+    readonly requestId: number;
+  } | null>(null);
   const [modalBusy, setModalBusy] = useState(false);
   const [diagnostics, setDiagnostics] = useState<SupportDiagnostics | null>(
     null,
@@ -1613,7 +1617,9 @@ export default function AdminConsole() {
           {view === 'users' && token ? (
             <PlatformUsers
               canManage={operatorPermissions.users}
+              onOpenOrganization={setDetailOrganization}
               onToast={setToast}
+              selectedUser={selectedUser}
               token={token}
             />
           ) : null}
@@ -1669,6 +1675,14 @@ export default function AdminConsole() {
         <OrganizationDetailModal
           onClose={() => setDetailOrganization(null)}
           onMutated={() => setRefreshKey((value) => value + 1)}
+          onOpenUser={(id) => {
+            setDetailOrganization(null);
+            setSelectedUser((current) => ({
+              id,
+              requestId: (current?.requestId ?? 0) + 1,
+            }));
+            setView('users');
+          }}
           organization={detailOrganization}
           allowExtendTrial={operatorPermissions.billing}
           token={token}

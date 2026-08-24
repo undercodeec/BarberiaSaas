@@ -1964,7 +1964,9 @@ function registerPlatformRoutes(
           select: { id: true, isActive: true, name: true, timezone: true },
         },
         memberships: {
-          include: { user: { select: { email: true, fullName: true } } },
+          include: {
+            user: { select: { email: true, fullName: true, id: true } },
+          },
           orderBy: { createdAt: 'asc' },
           where: { role: MembershipRole.OWNER },
         },
@@ -2124,7 +2126,11 @@ function registerPlatformRoutes(
         locations: organization.locations,
         name: organization.name,
         owner: owner
-          ? { email: maskedEmail(owner.email), fullName: owner.fullName }
+          ? {
+              email: maskedEmail(owner.email),
+              fullName: owner.fullName,
+              id: owner.id,
+            }
           : null,
         slug: organization.slug,
         status: organization.status.toLowerCase(),

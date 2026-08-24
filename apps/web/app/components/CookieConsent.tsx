@@ -41,12 +41,14 @@ export function CookieConsent() {
   const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === 'accepted' || stored === 'rejected') {
-      setChoice(stored);
-      setAnalyticsEnabled(stored === 'accepted');
-      configureAnalytics(stored);
-    }
+    queueMicrotask(() => {
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+      if (stored === 'accepted' || stored === 'rejected') {
+        setChoice(stored);
+        setAnalyticsEnabled(stored === 'accepted');
+        configureAnalytics(stored);
+      }
+    });
   }, []);
 
   const save = (next: ConsentChoice) => {
