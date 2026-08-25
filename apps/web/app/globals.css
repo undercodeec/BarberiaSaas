@@ -3473,11 +3473,11 @@ a {
     padding: 12vh 30px 0;
   }
   .close-model {
-    bottom: -4svh;
-    height: min(72svh, 610px);
-    opacity: calc(0.58 + (var(--close-progress, 0) * 0.24));
-    right: -42vw;
-    width: 128vw;
+    bottom: -1svh;
+    height: min(60svh, 510px);
+    opacity: 1;
+    right: -25vw;
+    width: 105vw;
   }
   .close-model-left {
     bottom: -4svh;
