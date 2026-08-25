@@ -60,8 +60,19 @@ export interface VerifiedPlatformPayment {
   readonly providerTransactionId: string;
   readonly status: 'approved' | 'rejected';
   readonly storeId: string;
+  readonly source?: PaymentProviderEventSource;
   readonly verifiedAt?: Date;
 }
+
+const payphonePlatformWebhookSchema = z.object({
+  Amount: z.coerce.number().int().positive(),
+  ClientTransactionId: z.string().trim().min(1).max(15),
+  Currency: z.string().trim().length(3).transform((value) => value.toUpperCase()),
+  StatusCode: z.coerce.number().int(),
+  StoreId: z.string().trim().min(1).max(160),
+  TransactionId: z.union([z.string(), z.number().int()]).transform(String),
+  TransactionStatus: z.string().trim().min(1).max(80),
+});
 
 function normalizePromotionCode(value: string | undefined | null) {
   return value?.trim().toUpperCase() || null;
@@ -343,7 +354,7 @@ export async function applyVerifiedPlatformPayment(
         payload,
         providerEventHash: eventHash,
         providerTransactionId: payment.providerTransactionId,
-        source: PaymentProviderEventSource.RECONCILIATION,
+        source: payment.source ?? PaymentProviderEventSource.RECONCILIATION,
         subscriptionPaymentAttemptId: attempt.id,
       },
     });
@@ -582,6 +593,48 @@ export function registerSubscriptionPaymentRoutes(
   config: ApiConfig,
   providerOverride?: PlatformPaymentProvider,
 ) {
+  const webhookAllowedIps = new Set(
+    config.PLATFORM_PAYPHONE_WEBHOOK_ALLOWED_IPS.split(',')
+      .map((value) => value.trim())
+      .filter(Boolean),
+  );
+
+  app.post('/v1/webhooks/payphone/platform', async (request, reply) => {
+    if (!webhookAllowedIps.has(request.ip))
+      return reply.code(403).send({ ErrorCode: '777', Response: false });
+
+    const parsed = payphonePlatformWebhookSchema.safeParse(request.body);
+    if (!parsed.success)
+      return reply.code(200).send({ ErrorCode: '444', Response: false });
+
+    const payment = parsed.data;
+    if (
+      config.PLATFORM_PAYMENTS_ENABLED !== 'true' ||
+      payment.StatusCode !== 3 ||
+      payment.TransactionStatus.toLowerCase() !== 'approved'
+    )
+      return reply.code(200).send({ ErrorCode: '222', Response: false });
+
+    try {
+      const result = await applyVerifiedPlatformPayment(database, {
+        amountCents: payment.Amount,
+        currencyCode: payment.Currency,
+        internalReference: payment.ClientTransactionId,
+        payload: request.body,
+        providerTransactionId: payment.TransactionId,
+        source: PaymentProviderEventSource.WEBHOOK,
+        status: 'approved',
+        storeId: payment.StoreId,
+      });
+      if (result.applied || result.duplicate)
+        return reply.code(200).send({ ErrorCode: '000', Response: true });
+      return reply.code(200).send({ ErrorCode: '444', Response: false });
+    } catch (error) {
+      request.log.error(error, 'platform_payphone_webhook_failed');
+      return reply.code(200).send({ ErrorCode: '222', Response: false });
+    }
+  });
+
   app.get('/v1/subscription/plans', async () => {
     const plans = await database.plan.findMany({
       orderBy: { sortOrder: 'asc' },

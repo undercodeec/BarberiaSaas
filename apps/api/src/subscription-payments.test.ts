@@ -223,6 +223,7 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
           32,
           13,
         ).toString('base64'),
+        PLATFORM_PAYPHONE_WEBHOOK_ALLOWED_IPS: '127.0.0.1',
         PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS: '0',
         PLATFORM_SUBSCRIPTION_TERMS_VERSION: 'sandbox-2026-08',
       }),
