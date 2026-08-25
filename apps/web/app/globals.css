@@ -3227,7 +3227,7 @@ a {
   }
   .portal-hero {
     /* Deja aire tras completar el hero antes de que entre la siguiente escena. */
-    height: 300svh;
+    height: 350svh;
   }
   .portal-photo {
     background-position: 65% center;
@@ -3253,17 +3253,17 @@ a {
       'copy'
       'image';
     grid-template-columns: 1fr;
-    grid-template-rows: 61svh 39svh;
+    grid-template-rows: 56svh 44svh;
   }
   .portal-detail-image {
     /* Ajusta aquí la posición vertical de la imagen principal del hero. */
     background-position: center bottom;
-    background-size: auto min(44svh, 420px);
-    min-height: 39svh;
+    background-size: auto min(43svh, 390px);
+    min-height: 44svh;
   }
   .portal-detail-copy {
     justify-content: flex-start;
-    min-height: 61svh;
+    min-height: 56svh;
     padding: max(96px, 12svh) 28px 24px;
     transform: translateY(calc((1 - var(--portal-progress)) * 50px));
   }
@@ -3313,8 +3313,8 @@ a {
   }
   .statement-scroll {
     height: 500svh;
-    /* El hero se conserva visible antes de que esta escena se superponga. */
-    margin-top: -40svh;
+    /* Cubre el hero completo después de que este termina de revelarse. */
+    margin-top: -100svh;
   }
   .portal-close-scroll {
     height: 200svh;
@@ -3373,7 +3373,8 @@ a {
     height: calc(100vw - 140px);
     margin: 58px auto 0;
     min-height: 0;
-    touch-action: pan-y;
+    /* El gesto vertical controla una tarjeta por vez mientras el mazo está activo. */
+    touch-action: none;
     width: calc(100vw - 140px);
   }
   .deck-card {
