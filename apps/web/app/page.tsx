@@ -1,12 +1,7 @@
 'use client';
 
 import { animate } from 'animejs';
-import {
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-} from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
 const trialLink = '/suscripciones';
 const portalMenuItems = [
@@ -166,6 +161,7 @@ export default function HomePage() {
   const storyProgressRef = useRef(0);
   const deckTransitionRef = useRef(false);
   const deckWheelDistanceRef = useRef(0);
+  const deckTouchStartRef = useRef<{ x: number; y: number } | null>(null);
   const [portalProgress, setPortalProgress] = useState(0);
   const [storyProgress, setStoryProgress] = useState(0);
   const [deck, setDeck] = useState<readonly (typeof modules)[number][]>([
@@ -205,10 +201,12 @@ export default function HomePage() {
       if (plansTable && portalClose) {
         const closeTop = portalClose.getBoundingClientRect().top;
         setCloseProgress(
-          Math.min(1, Math.max(0, (window.innerHeight - closeTop) / window.innerHeight)),
+          Math.min(
+            1,
+            Math.max(0, (window.innerHeight - closeTop) / window.innerHeight),
+          ),
         );
-        const shouldHoldPlans =
-          closeTop > 0 && closeTop < window.innerHeight;
+        const shouldHoldPlans = closeTop > 0 && closeTop < window.innerHeight;
 
         if (shouldHoldPlans && !plansHoldRef.current) {
           const rect = plansTable.getBoundingClientRect();
@@ -291,6 +289,7 @@ export default function HomePage() {
   };
   useEffect(() => {
     const onWheel = (event: WheelEvent) => {
+      if (window.matchMedia('(max-width: 800px)').matches) return;
       const isDeckSceneActive =
         storyProgressRef.current >= 0.65 && storyProgressRef.current < 1;
       const direction = Math.sign(event.deltaY);
@@ -529,6 +528,28 @@ export default function HomePage() {
               <div
                 aria-label="Módulos Nava"
                 className="module-deck"
+                onTouchEnd={(event) => {
+                  const start = deckTouchStartRef.current;
+                  const touch = event.changedTouches[0];
+                  deckTouchStartRef.current = null;
+                  if (!start || !touch) return;
+                  const deltaX = touch.clientX - start.x;
+                  const deltaY = touch.clientY - start.y;
+                  if (
+                    Math.abs(deltaX) < 42 ||
+                    Math.abs(deltaX) <= Math.abs(deltaY)
+                  )
+                    return;
+                  shiftDeck(deltaX < 0 ? 1 : -1);
+                }}
+                onTouchStart={(event) => {
+                  const touch = event.touches[0];
+                  if (!touch) return;
+                  deckTouchStartRef.current = {
+                    x: touch.clientX,
+                    y: touch.clientY,
+                  };
+                }}
                 style={
                   {
                     '--deck-direction': deckDirection,
@@ -542,6 +563,8 @@ export default function HomePage() {
                       ? cardPreviews[originalIndex]!
                       : null;
                   const hasPreview = preview !== null;
+                  const goldGradientId = `deck-gold-ribbon-${originalIndex}`;
+                  const lightGradientId = `deck-light-ribbon-${originalIndex}`;
                   const cardMotionClass =
                     passingCard === module
                       ? 'is-passing'
@@ -550,7 +573,14 @@ export default function HomePage() {
                         : '';
                   return (
                     <article
-                      className={`deck-card has-wave${hasPreview ? ' has-preview' : ''}${cardMotionClass ? ` ${cardMotionClass}` : ''}`}
+                      className={[
+                        'deck-card',
+                        'has-wave',
+                        hasPreview ? 'has-preview' : '',
+                        cardMotionClass,
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
                       data-position={position}
                       key={module}
                       style={{ '--deck-position': position } as CSSProperties}
@@ -558,69 +588,86 @@ export default function HomePage() {
                       <span>0{originalIndex + 1}</span>
                       <h3>{module}</h3>
                       <svg
-                            aria-hidden="true"
-                            className="deck-card-wavefield"
-                            preserveAspectRatio="none"
-                            viewBox="0 0 440 440"
+                        aria-hidden="true"
+                        className="deck-card-wavefield"
+                        preserveAspectRatio="none"
+                        viewBox="0 0 440 440"
+                      >
+                        <defs>
+                          <linearGradient id={goldGradientId} x1="0%" x2="100%">
+                            <stop offset="0" stopColor="#fff" stopOpacity="0" />
+                            <stop offset="0.42" stopColor="#c89449" />
+                            <stop offset="0.7" stopColor="#fffaf0" />
+                            <stop
+                              offset="1"
+                              stopColor="#c89449"
+                              stopOpacity="0"
+                            />
+                          </linearGradient>
+                          <linearGradient
+                            id={lightGradientId}
+                            x1="0%"
+                            x2="100%"
                           >
-                            <defs>
-                              <linearGradient id="deck-gold-ribbon" x1="0%" x2="100%">
-                                <stop offset="0" stopColor="#fff" stopOpacity="0" />
-                                <stop offset="0.42" stopColor="#c89449" />
-                                <stop offset="0.7" stopColor="#fffaf0" />
-                                <stop offset="1" stopColor="#c89449" stopOpacity="0" />
-                              </linearGradient>
-                              <linearGradient id="deck-light-ribbon" x1="0%" x2="100%">
-                                <stop offset="0" stopColor="#c89449" stopOpacity="0" />
-                                <stop offset="0.36" stopColor="#fff" />
-                                <stop offset="0.65" stopColor="#d8a65c" />
-                                <stop offset="1" stopColor="#fff" stopOpacity="0" />
-                              </linearGradient>
-                            </defs>
-                            <path
-                              className="deck-svg-wave deck-svg-ribbon-one"
-                              d="M-70 390C68 340 53 180 205 120S384 42 510 -22"
+                            <stop
+                              offset="0"
+                              stopColor="#c89449"
+                              stopOpacity="0"
                             />
-                            <path
-                              className="deck-svg-wave deck-svg-ribbon-two"
-                              d="M-70 335C80 286 90 120 240 88S387 18 510 -45"
-                            />
-                            <path
-                              className="deck-svg-wave deck-svg-ribbon-three"
-                              d="M-78 432C82 365 95 250 242 192S372 98 510 36"
-                            />
-                            <path
-                              className="deck-svg-wave deck-svg-ribbon-four"
-                              d="M-65 267C71 241 92 79 215 43S391 -10 502 -85"
-                            />
-                            <path
-                              className="deck-svg-wave deck-svg-ribbon-five"
-                              d="M-75 470C55 412 87 306 231 252S389 180 505 106"
-                            />
-                            <g className="deck-svg-particles">
-                              <circle cx="72" cy="306" r="3" />
-                              <circle cx="128" cy="250" r="2" />
-                              <circle cx="178" cy="188" r="3" />
-                              <circle cx="236" cy="137" r="2" />
-                              <circle cx="294" cy="102" r="3" />
-                              <circle cx="354" cy="58" r="2" />
-                            </g>
+                            <stop offset="0.36" stopColor="#fff" />
+                            <stop offset="0.65" stopColor="#d8a65c" />
+                            <stop offset="1" stopColor="#fff" stopOpacity="0" />
+                          </linearGradient>
+                        </defs>
+                        <path
+                          className="deck-svg-wave deck-svg-ribbon-one"
+                          d="M-70 390C68 340 53 180 205 120S384 42 510 -22"
+                          stroke={`url(#${goldGradientId})`}
+                        />
+                        <path
+                          className="deck-svg-wave deck-svg-ribbon-two"
+                          d="M-70 335C80 286 90 120 240 88S387 18 510 -45"
+                          stroke={`url(#${lightGradientId})`}
+                        />
+                        <path
+                          className="deck-svg-wave deck-svg-ribbon-three"
+                          d="M-78 432C82 365 95 250 242 192S372 98 510 36"
+                          stroke={`url(#${goldGradientId})`}
+                        />
+                        <path
+                          className="deck-svg-wave deck-svg-ribbon-four"
+                          d="M-65 267C71 241 92 79 215 43S391 -10 502 -85"
+                          stroke={`url(#${lightGradientId})`}
+                        />
+                        <path
+                          className="deck-svg-wave deck-svg-ribbon-five"
+                          d="M-75 470C55 412 87 306 231 252S389 180 505 106"
+                          stroke={`url(#${goldGradientId})`}
+                        />
+                        <g className="deck-svg-particles">
+                          <circle cx="72" cy="306" r="3" />
+                          <circle cx="128" cy="250" r="2" />
+                          <circle cx="178" cy="188" r="3" />
+                          <circle cx="236" cy="137" r="2" />
+                          <circle cx="294" cy="102" r="3" />
+                          <circle cx="354" cy="58" r="2" />
+                        </g>
                       </svg>
                       {hasPreview ? (
-                          <div
-                            className="deck-card-device"
-                            style={
-                              {
-                                '--preview-ratio': preview.ratio,
-                              } as CSSProperties
-                            }
-                          >
-                            <img
-                              alt={`Vista del módulo ${module} en Nava`}
-                              className="deck-card-preview"
-                              src={`/images/${preview.source}`}
-                            />
-                          </div>
+                        <div
+                          className="deck-card-device"
+                          style={
+                            {
+                              '--preview-ratio': preview.ratio,
+                            } as CSSProperties
+                          }
+                        >
+                          <img
+                            alt={`Vista del módulo ${module} en Nava`}
+                            className="deck-card-preview"
+                            src={`/images/${preview.source}`}
+                          />
+                        </div>
                       ) : null}
                       <div>
                         <Mark />
@@ -649,120 +696,122 @@ export default function HomePage() {
         className="plans-table-stage"
         style={plansHold ? { height: plansHold.height } : undefined}
       >
-      <section
-        className={
-          plansHold
-            ? 'plans-table-section is-held-for-close'
-            : 'plans-table-section'
-        }
-        id="planes"
-        ref={plansTableRef}
-        style={plansHold ?? undefined}
-      >
-        <div className="plans-heading">
-          <p className="portal-label">Planes Nava</p>
-          <h2>Un plan para cada momento de tu negocio.</h2>
-          <p>
-            Prueba Nava durante 10 días. Después, tu cuenta pasa a Nava Free.
-          </p>
-        </div>
-        <div className="plan-table-wrap" role="list">
-          <div aria-hidden="true" className="plan-table-head">
-            <span>Plan</span>
-            <span>Ideal para</span>
-            <span>Explorar</span>
+        <section
+          className={
+            plansHold
+              ? 'plans-table-section is-held-for-close'
+              : 'plans-table-section'
+          }
+          id="planes"
+          ref={plansTableRef}
+          style={plansHold ?? undefined}
+        >
+          <div className="plans-heading">
+            <p className="portal-label">Planes Nava</p>
+            <h2>Un plan para cada momento de tu negocio.</h2>
+            <p>
+              Prueba Nava durante 10 días. Después, tu cuenta pasa a Nava Free.
+            </p>
           </div>
-          {plans.map((plan) => {
-            const isExpanded = expandedPlan === plan.name;
-            const panelId = `plan-${plan.name.toLowerCase().replaceAll(' ', '-')}`;
-            return (
-              <article
-                className={
-                  isExpanded ? 'plan-disclosure is-expanded' : 'plan-disclosure'
-                }
-                key={plan.name}
-                role="listitem"
-              >
-                <button
-                  aria-controls={panelId}
-                  aria-expanded={isExpanded}
-                  className="plan-row-button"
-                  onClick={() =>
-                    setExpandedPlan((current) =>
-                      current === plan.name ? null : plan.name,
-                    )
+          <div className="plan-table-wrap" role="list">
+            <div aria-hidden="true" className="plan-table-head">
+              <span>Plan</span>
+              <span>Ideal para</span>
+              <span>Explorar</span>
+            </div>
+            {plans.map((plan) => {
+              const isExpanded = expandedPlan === plan.name;
+              const panelId = `plan-${plan.name.toLowerCase().replaceAll(' ', '-')}`;
+              return (
+                <article
+                  className={
+                    isExpanded
+                      ? 'plan-disclosure is-expanded'
+                      : 'plan-disclosure'
                   }
-                  type="button"
+                  key={plan.name}
+                  role="listitem"
                 >
-                  <span className="plan-row-name">
-                    <small>Plan Nava</small>
-                    <strong>{plan.name}</strong>
-                  </span>
-                  <span className="plan-row-summary">{plan.summary}</span>
-                  <span className="plan-row-action">
-                    <span>{isExpanded ? 'Cerrar' : 'Ver plan'}</span>
-                    <i>
-                      <Chevron />
-                    </i>
-                  </span>
-                </button>
-                <div className="plan-expander" id={panelId}>
-                  <div className="plan-expander-inner">
-                    <div className="plan-price-card">
-                      <span>Inversión mensual</span>
-                      <strong>{plan.price}</strong>
-                      <small>
-                        {plan.price === 'Gratis' ? 'sin costo' : 'USD / mes'}
-                      </small>
-                      <div aria-hidden="true" className="plan-phone-scene">
-                        <img alt="" src="/images/model2.png" />
-                        <div className="plan-preview-note plan-preview-note-reservation">
-                          <span>✓</span>
-                          <div>
-                            <b>Reserva confirmada</b>
-                            <small>Hoy · 10:30</small>
+                  <button
+                    aria-controls={panelId}
+                    aria-expanded={isExpanded}
+                    className="plan-row-button"
+                    onClick={() =>
+                      setExpandedPlan((current) =>
+                        current === plan.name ? null : plan.name,
+                      )
+                    }
+                    type="button"
+                  >
+                    <span className="plan-row-name">
+                      <small>Plan Nava</small>
+                      <strong>{plan.name}</strong>
+                    </span>
+                    <span className="plan-row-summary">{plan.summary}</span>
+                    <span className="plan-row-action">
+                      <span>{isExpanded ? 'Cerrar' : 'Ver plan'}</span>
+                      <i>
+                        <Chevron />
+                      </i>
+                    </span>
+                  </button>
+                  <div className="plan-expander" id={panelId}>
+                    <div className="plan-expander-inner">
+                      <div className="plan-price-card">
+                        <span>Inversión mensual</span>
+                        <strong>{plan.price}</strong>
+                        <small>
+                          {plan.price === 'Gratis' ? 'sin costo' : 'USD / mes'}
+                        </small>
+                        <div aria-hidden="true" className="plan-phone-scene">
+                          <img alt="" src="/images/model2.png" />
+                          <div className="plan-preview-note plan-preview-note-reservation">
+                            <span>✓</span>
+                            <div>
+                              <b>Reserva confirmada</b>
+                              <small>Hoy · 10:30</small>
+                            </div>
+                          </div>
+                          <div className="plan-preview-note plan-preview-note-cash">
+                            <span>$</span>
+                            <div>
+                              <b>Caja al día</b>
+                              <small>Venta registrada</small>
+                            </div>
+                          </div>
+                          <div className="plan-preview-note plan-preview-note-client">
+                            <span>+</span>
+                            <div>
+                              <b>Cliente nuevo</b>
+                              <small>Historial creado</small>
+                            </div>
                           </div>
                         </div>
-                        <div className="plan-preview-note plan-preview-note-cash">
-                          <span>$</span>
-                          <div>
-                            <b>Caja al día</b>
-                            <small>Venta registrada</small>
-                          </div>
-                        </div>
-                        <div className="plan-preview-note plan-preview-note-client">
-                          <span>+</span>
-                          <div>
-                            <b>Cliente nuevo</b>
-                            <small>Historial creado</small>
-                          </div>
-                        </div>
+                        <a href={trialLink}>
+                          Empezar 10 días gratis <Arrow />
+                        </a>
                       </div>
-                      <a href={trialLink}>
-                        Empezar 10 días gratis <Arrow />
-                      </a>
-                    </div>
-                    <div className="plan-detail-card">
-                      <p>{plan.description}</p>
-                      <table className="plan-feature-table">
-                        <caption>Qué incluye {plan.name}</caption>
-                        <tbody>
-                          {plan.benefits.map(([feature, detail]) => (
-                            <tr key={feature}>
-                              <th scope="row">{feature}</th>
-                              <td>{detail}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      <div className="plan-detail-card">
+                        <p>{plan.description}</p>
+                        <table className="plan-feature-table">
+                          <caption>Qué incluye {plan.name}</caption>
+                          <tbody>
+                            {plan.benefits.map(([feature, detail]) => (
+                              <tr key={feature}>
+                                <th scope="row">{feature}</th>
+                                <td>{detail}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
+                </article>
+              );
+            })}
+          </div>
+        </section>
       </div>
 
       <div className="portal-close-scroll">

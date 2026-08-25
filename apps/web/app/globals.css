@@ -137,7 +137,10 @@ a {
   gap: 11px;
   min-height: 36px;
   padding: 0 13px 0 15px;
-  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+  transition:
+    background 0.25s ease,
+    border-color 0.25s ease,
+    color 0.25s ease;
 }
 .portal-menu-toggle:hover {
   background: var(--gold);
@@ -265,7 +268,8 @@ a {
   animation: portal-menu-layer-deep 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .portal-menu.is-open .portal-menu-layers span:last-child {
-  animation: portal-menu-layer-light 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.06s both;
+  animation: portal-menu-layer-light 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.06s
+    both;
 }
 .portal-menu.is-open .portal-menu-panel {
   animation: portal-menu-panel-in 0.68s cubic-bezier(0.16, 1, 0.3, 1) 0.11s both;
@@ -295,8 +299,18 @@ a {
   }
 }
 .portal-menu-panel::before {
-  background: radial-gradient(circle at 86% 13%, rgba(200, 148, 73, 0.24), transparent 25%),
-    linear-gradient(145deg, transparent 0 56%, rgba(200, 148, 73, 0.08) 56% 59%, transparent 59% 100%);
+  background:
+    radial-gradient(
+      circle at 86% 13%,
+      rgba(200, 148, 73, 0.24),
+      transparent 25%
+    ),
+    linear-gradient(
+      145deg,
+      transparent 0 56%,
+      rgba(200, 148, 73, 0.08) 56% 59%,
+      transparent 59% 100%
+    );
   content: '';
   inset: 0;
   pointer-events: none;
@@ -342,7 +356,9 @@ a {
   opacity: 0;
   transform: translateY(34px) rotate(3deg);
   transform-origin: left bottom;
-  transition: opacity 0.32s ease, transform 0.44s cubic-bezier(0.22, 0.8, 0.28, 1);
+  transition:
+    opacity 0.32s ease,
+    transform 0.44s cubic-bezier(0.22, 0.8, 0.28, 1);
   will-change: transform, opacity;
 }
 .portal-menu.is-open .portal-menu-links a {
@@ -385,7 +401,9 @@ a {
   font-weight: 800;
   letter-spacing: -0.075em;
   line-height: 0.9;
-  transition: color 0.25s ease, transform 0.25s ease;
+  transition:
+    color 0.25s ease,
+    transform 0.25s ease;
 }
 .portal-menu-links a:hover > span {
   color: var(--gold-deep);
@@ -701,11 +719,7 @@ a {
   z-index: 10;
 }
 .statement-fold {
-  --statement-exit: clamp(
-    0,
-    calc((var(--story-progress, 0) - 0.28) * 3),
-    1
-  );
+  --statement-exit: clamp(0, calc((var(--story-progress, 0) - 0.28) * 3), 1);
   background: #fff;
   border: 0;
   border-radius: 0;
@@ -862,11 +876,7 @@ a {
   inset: 0;
   padding: 12vh 10vw 11vh 17vw;
   position: absolute;
-  --deck-entry: clamp(
-    0,
-    calc((var(--story-progress, 0) - 0.43) * 3.5),
-    1
-  );
+  --deck-entry: clamp(0, calc((var(--story-progress, 0) - 0.43) * 3.5), 1);
   --deck-copy-reveal: clamp(0, calc((var(--deck-entry) - 0.04) * 1.72), 1);
   --deck-cards-reveal: clamp(0, calc((var(--deck-entry) - 0.16) * 1.54), 1);
   --deck-hint-reveal: clamp(0, calc((var(--deck-entry) - 0.34) * 1.52), 1);
@@ -1025,28 +1035,23 @@ a {
 }
 .deck-svg-ribbon-one {
   animation: deck-ribbon-forward 13s ease-in-out infinite alternate;
-  stroke: url(#deck-gold-ribbon);
   stroke-width: 18;
 }
 .deck-svg-ribbon-two {
   animation: deck-ribbon-reverse 17s ease-in-out infinite alternate;
-  stroke: url(#deck-light-ribbon);
   stroke-width: 7;
 }
 .deck-svg-ribbon-three {
   animation: deck-ribbon-forward 19s ease-in-out infinite alternate-reverse;
-  stroke: url(#deck-gold-ribbon);
   stroke-width: 12;
 }
 .deck-svg-ribbon-four {
   animation: deck-ribbon-reverse 12s linear infinite alternate-reverse;
-  stroke: url(#deck-light-ribbon);
   stroke-dasharray: 8 8;
   stroke-width: 3;
 }
 .deck-svg-ribbon-five {
   animation: deck-ribbon-forward 16s ease-in-out infinite alternate;
-  stroke: url(#deck-gold-ribbon);
   stroke-dasharray: 24 7;
   stroke-width: 6;
 }
@@ -1709,8 +1714,17 @@ a {
 }
 .subscription-page::before {
   background:
-    radial-gradient(circle at 82% 12%, rgba(200, 148, 73, 0.2), transparent 23%),
-    linear-gradient(125deg, transparent 48%, rgba(255, 255, 255, 0.045) 48.2% 48.5%, transparent 48.7%);
+    radial-gradient(
+      circle at 82% 12%,
+      rgba(200, 148, 73, 0.2),
+      transparent 23%
+    ),
+    linear-gradient(
+      125deg,
+      transparent 48%,
+      rgba(255, 255, 255, 0.045) 48.2% 48.5%,
+      transparent 48.7%
+    );
   content: '';
   inset: 0;
   pointer-events: none;
@@ -1859,10 +1873,25 @@ a {
 }
 .subscription-page::before {
   background:
-    radial-gradient(circle at 13% 9%, rgba(200, 148, 73, 0.22), transparent 24%),
-    radial-gradient(circle at 85% 16%, rgba(227, 195, 142, 0.36), transparent 25%),
-    radial-gradient(circle at 1px 1px, rgba(16, 19, 23, 0.055) 1px, transparent 0);
-  background-size: auto, auto, 22px 22px;
+    radial-gradient(
+      circle at 13% 9%,
+      rgba(200, 148, 73, 0.22),
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at 85% 16%,
+      rgba(227, 195, 142, 0.36),
+      transparent 25%
+    ),
+    radial-gradient(
+      circle at 1px 1px,
+      rgba(16, 19, 23, 0.055) 1px,
+      transparent 0
+    );
+  background-size:
+    auto,
+    auto,
+    22px 22px;
   opacity: 0.9;
 }
 .subscription-page .commercial-logo img {
@@ -1892,7 +1921,10 @@ a {
   font-weight: 800;
   letter-spacing: 0.02em;
   padding: 10px 13px;
-  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
 }
 .subscription-access-actions button:hover {
   border-color: var(--gold-deep);
@@ -2095,7 +2127,9 @@ a {
   margin-top: auto;
   padding: 10px 7px;
   text-align: center;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
 }
 .subscription-matrix-plan > a:hover,
 .subscription-matrix-actions a:hover,
@@ -2251,7 +2285,11 @@ a {
 }
 .subscription-access-intro {
   background:
-    radial-gradient(circle at 15% 16%, rgba(227, 195, 142, 0.25), transparent 24%),
+    radial-gradient(
+      circle at 15% 16%,
+      rgba(227, 195, 142, 0.25),
+      transparent 24%
+    ),
     linear-gradient(145deg, #171b1e, #090b0d);
   color: #f7f4ec;
   display: flex;
@@ -2883,7 +2921,9 @@ a {
   font-size: 10px;
   font-weight: 800;
   padding: 9px 12px;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
 }
 .policies-jump-links a:hover {
   background: var(--on-light);
@@ -3186,8 +3226,8 @@ a {
     padding-top: 15px;
   }
   .portal-hero {
-    /* Holds the final hero frame until the statement can cover it. */
-    height: 250svh;
+    /* Deja aire tras completar el hero antes de que entre la siguiente escena. */
+    height: 300svh;
   }
   .portal-photo {
     background-position: 65% center;
@@ -3213,22 +3253,23 @@ a {
       'copy'
       'image';
     grid-template-columns: 1fr;
-    grid-template-rows: 53svh 47svh;
+    grid-template-rows: 61svh 39svh;
   }
   .portal-detail-image {
+    /* Ajusta aquí la posición vertical de la imagen principal del hero. */
     background-position: center bottom;
-    background-size: auto min(42svh, 390px);
-    min-height: 43vh;
+    background-size: auto min(44svh, 420px);
+    min-height: 39svh;
   }
   .portal-detail-copy {
     justify-content: flex-start;
-    min-height: 53svh;
-    padding: 34px 28px 28px;
+    min-height: 61svh;
+    padding: max(96px, 12svh) 28px 24px;
     transform: translateY(calc((1 - var(--portal-progress)) * 50px));
   }
   .portal-detail-copy h2 {
-    font-size: clamp(29px, 8.3vw, 43px);
-    max-width: 14ch;
+    font-size: clamp(28px, 7.6vw, 38px);
+    max-width: 15ch;
   }
   .portal-detail-copy > span {
     font-size: 13px;
@@ -3309,10 +3350,12 @@ a {
   .statement-device-cash {
     height: 49svh;
     right: 33vw;
-    top: 40svh;
+    /* Ajusta este top para subir o bajar la imagen izquierda de Operación. */
+    top: 47svh;
   }
   .statement-device-reservations {
-    bottom: -5svh;
+    /* Ajusta este bottom para ubicar la imagen derecha de Operación. */
+    bottom: -9svh;
     height: 53svh;
     right: -8vw;
   }
@@ -3329,7 +3372,12 @@ a {
     height: calc(100vw - 140px);
     margin: 58px auto 0;
     min-height: 0;
+    touch-action: pan-y;
     width: calc(100vw - 140px);
+  }
+  .deck-card {
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
   .deck-card h3 {
     font-size: 10vw;
