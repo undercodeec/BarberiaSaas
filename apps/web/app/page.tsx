@@ -11,12 +11,21 @@ import {
 const trialLink = 'mailto:soporte@navacloud.app?subject=Quiero%20probar%20Nava';
 const modules = [
   'Reservas 24/7',
-  'Agenda del equipo',
-  'Clientes e historial',
+  'Colaboradores',
+  'Clientes',
   'Caja y ventas',
   'Comisiones',
   'Inventario',
   'Reportes',
+] as const;
+const cardPreviews = [
+  { ratio: '810 / 1402', source: 'card1.jpeg' },
+  { ratio: '1122 / 1402', source: 'card2.png' },
+  { ratio: '810 / 1402', source: 'card3.png' },
+  { ratio: '844 / 1402', source: 'card4.png' },
+  { ratio: '1007 / 1402', source: 'card5.png' },
+  { ratio: '1007 / 1402', source: 'card6.png' },
+  { ratio: '958 / 1402', source: 'card7.png' },
 ] as const;
 const plans = [
   {
@@ -448,21 +457,91 @@ export default function HomePage() {
               >
                 {deck.map((module, position) => {
                   const originalIndex = modules.indexOf(module);
+                  const preview =
+                    originalIndex < cardPreviews.length
+                      ? cardPreviews[originalIndex]!
+                      : null;
+                  const hasPreview = preview !== null;
+                  const cardMotionClass =
+                    passingCard === module
+                      ? 'is-passing'
+                      : returningCard === module
+                        ? 'is-returning'
+                        : '';
                   return (
                     <article
-                      className={
-                        passingCard === module
-                          ? 'deck-card is-passing'
-                          : returningCard === module
-                            ? 'deck-card is-returning'
-                            : 'deck-card'
-                      }
+                      className={`deck-card has-wave${hasPreview ? ' has-preview' : ''}${cardMotionClass ? ` ${cardMotionClass}` : ''}`}
                       data-position={position}
                       key={module}
                       style={{ '--deck-position': position } as CSSProperties}
                     >
                       <span>0{originalIndex + 1}</span>
                       <h3>{module}</h3>
+                      <svg
+                            aria-hidden="true"
+                            className="deck-card-wavefield"
+                            preserveAspectRatio="none"
+                            viewBox="0 0 440 440"
+                          >
+                            <defs>
+                              <linearGradient id="deck-gold-ribbon" x1="0%" x2="100%">
+                                <stop offset="0" stopColor="#fff" stopOpacity="0" />
+                                <stop offset="0.42" stopColor="#c89449" />
+                                <stop offset="0.7" stopColor="#fffaf0" />
+                                <stop offset="1" stopColor="#c89449" stopOpacity="0" />
+                              </linearGradient>
+                              <linearGradient id="deck-light-ribbon" x1="0%" x2="100%">
+                                <stop offset="0" stopColor="#c89449" stopOpacity="0" />
+                                <stop offset="0.36" stopColor="#fff" />
+                                <stop offset="0.65" stopColor="#d8a65c" />
+                                <stop offset="1" stopColor="#fff" stopOpacity="0" />
+                              </linearGradient>
+                            </defs>
+                            <path
+                              className="deck-svg-wave deck-svg-ribbon-one"
+                              d="M-70 390C68 340 53 180 205 120S384 42 510 -22"
+                            />
+                            <path
+                              className="deck-svg-wave deck-svg-ribbon-two"
+                              d="M-70 335C80 286 90 120 240 88S387 18 510 -45"
+                            />
+                            <path
+                              className="deck-svg-wave deck-svg-ribbon-three"
+                              d="M-78 432C82 365 95 250 242 192S372 98 510 36"
+                            />
+                            <path
+                              className="deck-svg-wave deck-svg-ribbon-four"
+                              d="M-65 267C71 241 92 79 215 43S391 -10 502 -85"
+                            />
+                            <path
+                              className="deck-svg-wave deck-svg-ribbon-five"
+                              d="M-75 470C55 412 87 306 231 252S389 180 505 106"
+                            />
+                            <g className="deck-svg-particles">
+                              <circle cx="72" cy="306" r="3" />
+                              <circle cx="128" cy="250" r="2" />
+                              <circle cx="178" cy="188" r="3" />
+                              <circle cx="236" cy="137" r="2" />
+                              <circle cx="294" cy="102" r="3" />
+                              <circle cx="354" cy="58" r="2" />
+                            </g>
+                      </svg>
+                      {hasPreview ? (
+                          <div
+                            className="deck-card-device"
+                            style={
+                              {
+                                '--preview-ratio': preview.ratio,
+                              } as CSSProperties
+                            }
+                          >
+                            <img
+                              alt={`Vista del módulo ${module} en Nava`}
+                              className="deck-card-preview"
+                              src={`/images/${preview.source}`}
+                            />
+                          </div>
+                      ) : null}
                       <div>
                         <Mark />
                         <small>Nava</small>
@@ -625,6 +704,9 @@ export default function HomePage() {
           <div className="close-rule">
             <span>© {new Date().getFullYear()} Nava · Ecuador</span>
             <a href="mailto:soporte@navacloud.app">soporte@navacloud.app</a>
+          </div>
+          <div aria-hidden="true" className="close-model close-model-left">
+            <img alt="" src="/images/model4.png" />
           </div>
           <div aria-hidden="true" className="close-model">
             <div className="close-model-motion" ref={closeModelRef}>

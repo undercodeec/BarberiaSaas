@@ -29,16 +29,39 @@
       `/tratamiento-de-datos`.
 - [x] `pnpm test:e2e`: 6/6 escenarios aprobados en Chromium móvil y escritorio,
       incluidos banner de cookies y página pública de privacidad.
-- [ ] Antes del despliegue, aplicar
-      `20260823150000_privacy_consent` junto con las migraciones de
-      suscripciones pendientes, definir `PLATFORM_PRIVACY_POLICY_VERSION`,
-      `PLATFORM_MARKETING_POLICY_VERSION` y, si se usará analítica,
-      `NEXT_PUBLIC_GA_MEASUREMENT_ID`.
-- [ ] La base local del módulo propio de facturación SRI está implementada, pero
-      siguen pendientes el certificado `.p12`, datos fiscales confirmados,
-      validación XSD oficial en ejecución, credenciales/homologación SRI y la
-      prueba SMTP real. PayPhone productivo, backups 30/90 y ensayo de
-      restauración tampoco se pueden certificar desde el repositorio.
+- [x] En la VPS (24 de agosto) se aplicaron `20260823150000_privacy_consent` y
+      las migraciones de suscripciones pendientes. Los valores
+      `PLATFORM_PRIVACY_POLICY_VERSION`, `PLATFORM_MARKETING_POLICY_VERSION` y,
+      si se usa analítica, `NEXT_PUBLIC_GA_MEASUREMENT_ID`, requieren revisión
+      operativa antes de declararlos públicos.
+- [~] El módulo propio de facturación SRI está desplegado en TEST con migraciones
+      y validación XSD local. Siguen pendientes la comprobación del certificado
+      `.p12` como usuario de servicio, los datos fiscales definitivos, la
+      homologación SRI y la prueba SMTP real. PayPhone productivo, backups 30/90
+      y ensayo de restauración tampoco se pueden certificar desde el repositorio.
+
+### Actualización de despliegue SRI TEST (24 de agosto de 2026)
+
+- [x] Se desplegó `main` en la VPS (`/opt/nava/app`) y se aplicaron las nueve
+      migraciones pendientes, incluidas `20260823180000_sri_electronic_invoicing`
+      y `20260824100000_sri_issuer_snapshots_and_xsd_validation`. `pnpm db:status`
+      confirmó el esquema actualizado.
+- [x] `pnpm build` completó para API, Web y Admin. El primer fallo ocurrió porque
+      `prisma generate` se ejecutó antes de actualizar el repositorio; al
+      regenerar el cliente después del pull, el build fue correcto.
+- [x] `nava-api.service` quedó activo y
+      `curl http://127.0.0.1:4000/health` respondió `{"status":"ok"}`.
+- [x] El certificado `.p12` se instaló fuera del repositorio en
+      `/etc/nava/secrets/sri/`, con directorio `0750 root:nava` y archivo
+      `0640 root:nava`.
+- [x] El error de arranque posterior se diagnosticó como un valor no numérico en
+      `SRI_TAX_BASIS_POINTS`. Se retiró el placeholder y la API volvió a iniciar.
+      Hasta confirmar los datos tributarios, la emisión debe seguir en
+      `SRI_EMISSION_ENABLED=false`, `SRI_ENV=test` y
+      `SRI_PRODUCTION_ENABLED=false`.
+- [ ] Falta comprobar el `.p12` con el proceso `nava`, confirmar la configuración
+      fiscal, probar SMTP y emitir una única factura controlada contra SRI TEST.
+      No hay autorización para producción.
 
 Este documento es la fuente de verdad del estado vigente. Sustituye la antigua
 bitácora cronológica: una función se considera terminada solo cuando existe en
@@ -344,7 +367,7 @@ Mobile / Web pública / Admin
 - [ ] El endpoint de simulación sigue siendo parte de la operación del MVP y no
       sustituye un sistema de cobro.
 
-#### Facturación SRI propia — parcial, pendiente de validación externa (23 de agosto de 2026)
+#### Facturación SRI propia — parcial, desplegada en TEST y pendiente de validación externa (24 de agosto de 2026)
 
 - [x] Se reutiliza `SubscriptionInvoice` como snapshot comercial y
       `SubscriptionPaymentAttempt` como pago verificable. `SriInvoice` es el
@@ -373,25 +396,29 @@ Mobile / Web pública / Admin
       descargar XML/RIDE autorizado y solicitar reenvío. El perfil pertenece a
       la organización suscriptora y nunca a los clientes finales de barberías.
 - [x] Configuración nueva: `SRI_ENV` (por defecto `test`),
-      `SRI_EMISSION_ENABLED`, `SRI_PRODUCTION_ENABLED`, datos del emisor Nava,
-      régimen, impuestos, forma de pago, ruta/contraseña del certificado y
-      espera de autorización. Producción requiere la doble activación explícita.
+      `SRI_EMISSION_ENABLED`, `SRI_PRODUCTION_ENABLED`, datos fiscales reales
+      del emisor (Nava es la marca comercial), régimen, impuestos, forma de
+      pago, ruta/contraseña del certificado y espera de autorización. Producción
+      requiere la doble activación explícita.
 - [x] Evidencia local: pruebas unitarias de módulo 11, clave de acceso,
       secuencial, montos y XML; pruebas API 37 aprobadas (30 omitidas por no
       disponer de `TEST_DATABASE_URL`); typecheck, build API, lint modificado y
       `prisma validate` correctos.
-- [ ] No existe aún evidencia contra un certificado de pruebas ni contra el SRI
-      de certificación. Tampoco se ha validado el XML mediante el XSD oficial
-      durante la ejecución; no declarar que el comprobante es aceptado hasta
-      añadir esa evidencia.
+- [x] El XML se valida antes de firmar mediante el XSD oficial local de factura
+      2.1.0; el esquema no se descarga durante la ejecución. La emisión conserva
+      snapshots fiscales del emisor, limita reintentos y bloquea el procesamiento
+      concurrente de una misma factura.
+- [ ] No existe aún evidencia contra el certificado instalado ni contra el SRI
+      de certificación; no declarar que el comprobante es aceptado hasta completar
+      una factura controlada en TEST y la entrega por SMTP.
 - [ ] Falta la pantalla Mobile/Web de "Mis facturas" y la vista global de
       diagnóstico/reintento para `platform_admin` en Nava Control Center. La
       API de propietario ya existe, pero no sustituye esas interfaces.
-- [ ] Antes de habilitar: aplicar migración, confirmar con contador el régimen,
-      IVA/códigos SRI y forma de pago; obtener/instalar el `.p12` fuera del
-      repositorio; solicitar/habilitar emisión en SRI en Línea; probar recepción
-      → autorización → RIDE → SMTP en `SRI_ENV=test`; solo después activar
-      producción con `SRI_PRODUCTION_ENABLED=true`.
+- [ ] Antes de habilitar emisión: confirmar con contador el régimen, IVA/códigos
+      SRI y forma de pago; comprobar el `.p12` como usuario `nava`; probar
+      recepción → autorización → RIDE → SMTP con una sola factura en
+      `SRI_ENV=test`; solo después, en una tarea independiente, evaluar producción
+      con `SRI_PRODUCTION_ENABLED=true`.
 
 ### Fase 12 — Panel interno: funcional, con cambios locales
 
