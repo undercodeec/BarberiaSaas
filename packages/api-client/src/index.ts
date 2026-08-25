@@ -421,7 +421,7 @@ export interface DailyReportResponse {
     readonly id: string;
     readonly name: string;
     readonly quantity: number;
-    readonly scheduledValueCents: number;
+    readonly revenueCents: number;
   }>;
   readonly sales: {
     readonly averageTicketCents: number;
@@ -462,7 +462,7 @@ export interface BusinessSummaryResponse {
       readonly id: string;
       readonly name: string;
       readonly quantity: number;
-      readonly scheduledValueCents: number;
+      readonly revenueCents: number;
     }>;
   };
   readonly expenses: {

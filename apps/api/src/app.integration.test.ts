@@ -2813,7 +2813,7 @@ describeWithDatabase('API con PostgreSQL', () => {
       services: Array<{
         name: string;
         quantity: number;
-        scheduledValueCents: number;
+        revenueCents: number;
       }>;
       professionals: Array<{
         commissionCents: number;
@@ -2865,7 +2865,7 @@ describeWithDatabase('API con PostgreSQL', () => {
       expect.objectContaining({
         name: 'Corte agenda',
         quantity: 1,
-        scheduledValueCents: 1_200,
+        revenueCents: 2_000,
       }),
     ]);
     expect(report.expenses).toEqual([

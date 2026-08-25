@@ -218,7 +218,7 @@ export default function DailyReportScreen() {
                 <Detail
                   key={service.id}
                   name={service.name}
-                  note={`${service.quantity} realizados · valor programado ${money(service.scheduledValueCents, currency)}`}
+                  note={`${service.quantity} cobrados · ventas ${money(service.revenueCents, currency)}`}
                   value={`${service.quantity} ${service.quantity === 1 ? 'servicio' : 'servicios'}`}
                 />
               ))}

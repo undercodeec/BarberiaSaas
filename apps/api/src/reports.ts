@@ -183,36 +183,37 @@ function namedAmountRows(
     );
 }
 
-function appointmentServiceRows(
-  appointments: ReadonlyArray<{
-    readonly services: ReadonlyArray<{
-      readonly priceCents: number;
-      readonly serviceId: string;
-      readonly serviceName: string;
-    }>;
+function serviceSaleRows(
+  sales: ReadonlyArray<{
+    readonly amountCents: number;
+    readonly serviceId: string | null;
   }>,
+  services: ReadonlyArray<{ readonly id: string; readonly name: string }>,
 ) {
+  const serviceNames = new Map(
+    services.map(({ id, name }) => [id, name] as const),
+  );
   const grouped = new Map<
     string,
-    { name: string; quantity: number; scheduledValueCents: number }
+    { name: string; quantity: number; revenueCents: number }
   >();
-  for (const appointment of appointments) {
-    for (const service of appointment.services) {
-      const current = grouped.get(service.serviceId) ?? {
-        name: service.serviceName,
-        quantity: 0,
-        scheduledValueCents: 0,
-      };
-      current.quantity += 1;
-      current.scheduledValueCents += service.priceCents;
-      grouped.set(service.serviceId, current);
-    }
+  for (const sale of sales) {
+    if (!sale.serviceId) continue;
+    const current = grouped.get(sale.serviceId) ?? {
+      name: serviceNames.get(sale.serviceId) ?? 'Servicio eliminado',
+      quantity: 0,
+      revenueCents: 0,
+    };
+    current.quantity += 1;
+    current.revenueCents += sale.amountCents;
+    grouped.set(sale.serviceId, current);
   }
   return [...grouped.entries()]
     .map(([id, values]) => ({ id, ...values }))
     .sort(
       (left, right) =>
-        right.quantity - left.quantity || left.name.localeCompare(right.name),
+        right.revenueCents - left.revenueCents ||
+        left.name.localeCompare(right.name),
     );
 }
 
@@ -323,7 +324,6 @@ export function registerReportRoutes(
       commissionEntries,
       professionalAdvances,
       paidSettlements,
-      completedAppointments,
     ] = await Promise.all([
       database.cashMovement.findMany({
         select: {
@@ -389,25 +389,6 @@ export function registerReportRoutes(
           status: CommissionSettlementStatus.PAID,
         },
       }),
-      database.appointment.findMany({
-        select: {
-          services: {
-            select: {
-              priceCents: true,
-              serviceId: true,
-              serviceName: true,
-            },
-          },
-        },
-        where: {
-          OR: windows.map(({ end, location, start }) => ({
-            locationId: location.id,
-            startsAt: { gte: start, lt: end },
-          })),
-          organizationId: membership.organizationId,
-          status: AppointmentStatus.COMPLETED,
-        },
-      }),
     ]);
 
     const sales = movements.filter(
@@ -441,6 +422,18 @@ export function registerReportRoutes(
         .filter(({ type }) => type === CashMovementType.EXPENSE)
         .map(({ amountCents }) => amountCents),
     );
+    const serviceIds = [
+      ...new Set(
+        sales.flatMap(({ serviceId }) => (serviceId ? [serviceId] : [])),
+      ),
+    ];
+    const services = await database.service.findMany({
+      select: { id: true, name: true },
+      where: {
+        id: { in: serviceIds },
+        organizationId: membership.organizationId,
+      },
+    });
     const productRows = movements
       .filter(
         (
@@ -518,7 +511,7 @@ export function registerReportRoutes(
             right.revenueCents - left.revenueCents ||
             left.name.localeCompare(right.name),
         ),
-        services: appointmentServiceRows(completedAppointments),
+        services: serviceSaleRows(sales, services),
       },
       expenses: {
         collaboratorPaymentsCents,
@@ -676,6 +669,7 @@ export function registerReportRoutes(
             productId: true,
             productQuantity: true,
             professionalMembershipId: true,
+            serviceId: true,
             type: true,
           },
           where: {
@@ -759,7 +753,12 @@ export function registerReportRoutes(
         sales.flatMap(({ productId }) => (productId ? [productId] : [])),
       ),
     ];
-    const [professionals, products] = await Promise.all([
+    const serviceIds = [
+      ...new Set(
+        sales.flatMap(({ serviceId }) => (serviceId ? [serviceId] : [])),
+      ),
+    ];
+    const [professionals, products, services] = await Promise.all([
       database.membership.findMany({
         include: { user: { select: { fullName: true } } },
         where: {
@@ -771,6 +770,13 @@ export function registerReportRoutes(
         select: { id: true, name: true },
         where: {
           id: { in: productIds },
+          organizationId: membership.organizationId,
+        },
+      }),
+      database.service.findMany({
+        select: { id: true, name: true },
+        where: {
+          id: { in: serviceIds },
           organizationId: membership.organizationId,
         },
       }),
@@ -848,11 +854,7 @@ export function registerReportRoutes(
     const expenseRows = namedAmountRows(
       movements.filter(({ type }) => type === CashMovementType.EXPENSE),
     );
-    const serviceRows = appointmentServiceRows(
-      appointments.filter(
-        ({ status }) => status === AppointmentStatus.COMPLETED,
-      ),
-    );
+    const serviceRows = serviceSaleRows(sales, services);
     const period = windows[0]?.period;
     if (!period) throw new Error('El reporte no tiene un período válido.');
     const response = {
@@ -951,11 +953,11 @@ export function registerReportRoutes(
         ],
         ['Cobros', 'Otro', null, null, response.collections.otherCents],
         ...response.services.map((service) => [
-          'Servicios realizados',
-          'Valor programado',
+          'Servicios cobrados',
+          'Ventas',
           service.name,
           service.quantity,
-          service.scheduledValueCents,
+          service.revenueCents,
         ]),
         ...response.expenses.map((expense) => [
           'Egresos',
