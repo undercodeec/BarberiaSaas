@@ -3186,7 +3186,8 @@ a {
     padding-top: 15px;
   }
   .portal-hero {
-    height: 315svh;
+    /* Holds the final hero frame until the statement can cover it. */
+    height: 250svh;
   }
   .portal-photo {
     background-position: 65% center;
@@ -3212,15 +3213,16 @@ a {
       'copy'
       'image';
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: 53svh 47svh;
   }
   .portal-detail-image {
-    background-position: 65% center;
+    background-position: center bottom;
+    background-size: auto min(42svh, 390px);
     min-height: 43vh;
   }
   .portal-detail-copy {
     justify-content: flex-start;
-    min-height: 57vh;
+    min-height: 53svh;
     padding: 34px 28px 28px;
     transform: translateY(calc((1 - var(--portal-progress)) * 50px));
   }
@@ -3269,6 +3271,7 @@ a {
   }
   .statement-scroll {
     height: 500svh;
+    /* Starts as the sticky hero reaches its final frame, fully covering it. */
     margin-top: -100svh;
   }
   .portal-close-scroll {
@@ -3299,7 +3302,7 @@ a {
     width: 105px;
   }
   .statement-devices {
-    opacity: calc((1 - var(--statement-exit)) * 0.28);
+    opacity: calc(1 - var(--statement-exit));
     right: -14vw;
     width: 80vw;
   }
@@ -3420,19 +3423,20 @@ a {
     padding: 12vh 30px 0;
   }
   .close-model {
-    bottom: -5vh;
-    height: 68svh;
-    opacity: calc(0.16 + (var(--close-progress, 0) * 0.24));
-    right: -36vw;
-    width: 93vw;
+    bottom: -4svh;
+    height: min(72svh, 610px);
+    opacity: calc(0.58 + (var(--close-progress, 0) * 0.24));
+    right: -42vw;
+    width: 128vw;
   }
   .close-model-left {
-    bottom: -5svh;
-    height: 68svh;
-    left: auto;
-    opacity: calc(0.3 + (var(--close-progress, 0) * 0.4));
-    right: -36vw;
-    width: 93vw;
+    bottom: -4svh;
+    height: min(72svh, 610px);
+    left: -24vw;
+    opacity: calc(0.64 + (var(--close-progress, 0) * 0.24));
+    right: auto;
+    transform: translateX(calc((1 - var(--close-progress, 0)) * -8vw));
+    width: 88vw;
   }
   .close-actions {
     flex-wrap: wrap;
