@@ -162,6 +162,7 @@ export default function HomePage() {
   const deckTransitionRef = useRef(false);
   const deckWheelDistanceRef = useRef(0);
   const deckTouchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const [deckTransitionVersion, setDeckTransitionVersion] = useState(0);
   const [portalProgress, setPortalProgress] = useState(0);
   const [storyProgress, setStoryProgress] = useState(0);
   const [deck, setDeck] = useState<readonly (typeof modules)[number][]>([
@@ -273,6 +274,7 @@ export default function HomePage() {
         window.setTimeout(() => {
           setReturningCard(null);
           deckTransitionRef.current = false;
+          setDeckTransitionVersion((current) => current + 1);
         }, 30);
       }, 820);
       return;
@@ -284,9 +286,25 @@ export default function HomePage() {
       window.setTimeout(() => {
         setPassingCard(null);
         deckTransitionRef.current = false;
+        setDeckTransitionVersion((current) => current + 1);
       }, 110);
     }, 420);
   };
+  useEffect(() => {
+    if (!window.matchMedia('(max-width: 800px)').matches) return;
+    const start = 0.66;
+    const end = 0.96;
+    const normalized = Math.min(
+      1,
+      Math.max(0, (storyProgress - start) / (end - start)),
+    );
+    const targetIndex = Math.min(
+      modules.length - 1,
+      Math.floor(normalized * modules.length),
+    );
+    if (deckTransitionRef.current || targetIndex === deckIndex) return;
+    shiftDeck(targetIndex > deckIndex ? 1 : -1);
+  }, [deckIndex, deckTransitionVersion, storyProgress]);
   useEffect(() => {
     const onWheel = (event: WheelEvent) => {
       if (window.matchMedia('(max-width: 800px)').matches) return;

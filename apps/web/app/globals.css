@@ -3272,6 +3272,7 @@ a {
     max-width: 15ch;
   }
   .portal-detail-copy > span {
+    color: #fff;
     font-size: 13px;
     margin-top: 16px;
   }
@@ -3312,8 +3313,8 @@ a {
   }
   .statement-scroll {
     height: 500svh;
-    /* Starts as the sticky hero reaches its final frame, fully covering it. */
-    margin-top: -100svh;
+    /* El hero se conserva visible antes de que esta escena se superponga. */
+    margin-top: -40svh;
   }
   .portal-close-scroll {
     height: 200svh;
