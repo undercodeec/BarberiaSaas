@@ -21,6 +21,25 @@
 > localmente y requieren desplegar sus migraciones y configuración productiva
 > antes de declararlos operativos.
 
+### Actualización de suscripciones PayPhone TEST (25 de agosto de 2026)
+
+- [x] La web comercial está publicada en `https://navacloud.app`, con TLS
+      válido. El flujo de planes conserva la selección tras registro/login,
+      crea el negocio inicial y dirige al checkout autenticado.
+- [x] La API recibe `POST /v1/webhooks/payphone/platform`. Valida el origen por
+      allowlist, el estado aprobado, StoreId, monto, moneda e idempotencia antes
+      de aplicar una suscripción; los eventos duplicados no amplían el acceso.
+- [x] PayPhone tiene registrada para sandbox la URL
+      `https://api.navacloud.app/v1/webhooks/payphone/platform`. En la VPS se
+      generó la clave de cifrado de plataforma y se aprovisionó el StoreId y
+      token TEST mediante el comando interactivo
+      `payphone:platform:configure`; el token queda cifrado AES-256-GCM en la
+      base de datos y no se guarda en Git, frontend ni logs.
+- [ ] Los cobros siguen deshabilitados hasta obtener de PayPhone las IPs de
+      origen (o un mecanismo criptográfico verificable), configurar
+      `PLATFORM_PAYPHONE_WEBHOOK_ALLOWED_IPS`, endurecer el encabezado Nginx
+      `X-Forwarded-For` y ejecutar una compra sandbox completa.
+
 ### Validación del corte de políticas (23 de agosto de 2026)
 
 - [x] `pnpm typecheck`: 17 tareas correctas en 12 paquetes.
@@ -87,7 +106,7 @@ el código actual y tiene evidencia proporcional a su riesgo.
 | Operación de barbería        | Funcional        | Equipo, servicios, horarios, agenda, clientes, Caja, comisiones, inventario, reportes y notificaciones tienen API y UI móvil.                                               |
 | Reserva pública              | Funcional        | Catálogo, disponibilidad, OTP, política, idempotencia, gestión por token, reseñas y recordatorios implementados.                                                            |
 | Comercio de productos        | Parcial          | Catálogo, carrito, pedidos, reserva de stock, PayPhone y gestión operativa existen; faltan endurecimiento público y pruebas específicas.                                    |
-| Planes y suscripciones       | Parcial          | Trial, plan Free, límites y feature flags se aplican en backend; no existe checkout real de la suscripción Nava.                                                            |
+| Planes y suscripciones       | Sandbox preparado | Trial, plan Free, límites, feature flags, checkout web y receptor PayPhone están implementados; configuración TEST cifrada aprovisionada. Falta allowlist verificable y ensayo completo antes de habilitar cobros. |
 | Panel interno                | Funcional, local | Operación segura y OTP existen. La modernización visual y nuevos filtros están sin commit y sin validación visual autenticada final.                                        |
 | Calidad                      | Bloqueada        | Esquema, tipos, pruebas, E2E básico y builds pasan; lint y formato global fallan. Se omitieron 28 pruebas PostgreSQL.                                                       |
 | Producción                   | Piloto           | Hay evidencia histórica de API/Web en VPS, Neon, TLS, FCM y Maps. No se revalidaron hoy servicios, migraciones productivas ni recorrido completo.                           |

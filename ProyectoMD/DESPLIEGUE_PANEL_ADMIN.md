@@ -73,3 +73,13 @@ El despliegue quedó completado con URL, commit, migraciones, servicio y HTTPS
 verificados. La aceptación funcional restante se limita a las comprobaciones de
 roles, PII y flujos operativos enumeradas arriba cuando se incorporen operadores
 adicionales.
+
+## Relación con suscripciones PayPhone
+
+El panel Admin y la API comercial comparten la misma base PostgreSQL: el panel
+puede consultar el estado de organizaciones, planes, facturas e incidencias,
+pero no administra ni expone tokens PayPhone. La configuración de plataforma
+(`PlatformPaymentConfiguration`) se aprovisiona exclusivamente desde la VPS con
+el comando interactivo de la API y conserva el token cifrado. A 25 de agosto de
+2026 existe configuración TEST aprovisionada; los cobros siguen deshabilitados
+hasta configurar el origen verificable del webhook y superar una compra sandbox.
