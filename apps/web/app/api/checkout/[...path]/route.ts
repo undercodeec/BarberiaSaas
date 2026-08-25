@@ -11,6 +11,8 @@ const SESSION_COOKIE = 'nava_checkout_session';
 const routes = {
   'auth/login': { method: 'POST', upstream: 'v1/auth/login' },
   'auth/logout': { method: 'POST', upstream: 'v1/auth/logout' },
+  'auth/register': { method: 'POST', upstream: 'v1/auth/register' },
+  'auth/verify-email': { method: 'POST', upstream: 'v1/auth/verify-email' },
   payment: { method: 'POST', upstream: 'v1/subscription/checkout' },
   plans: { method: 'GET', upstream: 'v1/subscription/plans' },
   session: { method: 'GET', upstream: 'v1/subscription/session' },
@@ -58,7 +60,12 @@ async function checkoutProxy(
     );
 
   const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
-  if (route !== routes['auth/login'] && !sessionToken)
+  const isPublicAuthRoute =
+    route === routes['auth/login'] ||
+    route === routes['auth/register'] ||
+    route === routes['auth/verify-email'] ||
+    route === routes.plans;
+  if (!isPublicAuthRoute && !sessionToken)
     return NextResponse.json(
       { code: 'UNAUTHENTICATED', message: 'Inicia sesión para continuar.' },
       { status: 401 },
@@ -93,7 +100,11 @@ async function checkoutProxy(
   }
 
   const body = await readJson(upstream);
-  if (path.join('/') === 'auth/login' && upstream.ok) {
+  if (
+    (path.join('/') === 'auth/login' ||
+      path.join('/') === 'auth/verify-email') &&
+    upstream.ok
+  ) {
     const token =
       body && typeof body === 'object' && 'session' in body
         ? (body.session as { token?: unknown }).token

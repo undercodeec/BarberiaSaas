@@ -8,7 +8,13 @@ import {
   type CSSProperties,
 } from 'react';
 
-const trialLink = 'mailto:soporte@navacloud.app?subject=Quiero%20probar%20Nava';
+const trialLink = '/suscripciones';
+const portalMenuItems = [
+  { href: '/', label: 'Inicio', number: '01' },
+  { href: '/suscripciones', label: 'Suscripciones', number: '02' },
+  { href: '/politicas', label: 'Políticas', number: '03' },
+  { href: 'https://wa.me/593979046329', label: 'Soporte', number: '04' },
+] as const;
 const modules = [
   'Reservas 24/7',
   'Colaboradores',
@@ -175,6 +181,7 @@ export default function HomePage() {
   const [expandedPlan, setExpandedPlan] = useState<string | null>(null);
   const [plansHold, setPlansHold] = useState<FixedSectionMetrics | null>(null);
   const [closeProgress, setCloseProgress] = useState(0);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     const updateMotion = () => {
@@ -308,21 +315,94 @@ export default function HomePage() {
     window.addEventListener('wheel', onWheel, { passive: false });
     return () => window.removeEventListener('wheel', onWheel);
   }, [deck, deckIndex]);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const closeFromKeyboard = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsMenuOpen(false);
+    };
+
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', closeFromKeyboard);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', closeFromKeyboard);
+    };
+  }, [isMenuOpen]);
+
   const portalStyle = { '--portal-progress': portalProgress } as CSSProperties;
 
   return (
     <main id="inicio">
-      <header className="portal-nav">
+      <header className={isMenuOpen ? 'portal-nav is-menu-open' : 'portal-nav'}>
         <Logo />
         <nav aria-label="Navegación principal">
           <a href="#operacion">Operación</a>
           <a href="#modulos">Módulos</a>
           <a href="#planes">Planes</a>
         </nav>
-        <a className="portal-nav-cta" href={trialLink}>
-          Probar Nava <Arrow />
-        </a>
+        <button
+          aria-controls="portal-menu-panel"
+          aria-expanded={isMenuOpen}
+          className="portal-menu-toggle"
+          onClick={() => setIsMenuOpen((current) => !current)}
+          type="button"
+        >
+          <span className="portal-menu-toggle-label" aria-hidden="true">
+            Menu
+          </span>
+          <span className="portal-menu-toggle-icon" aria-hidden="true">
+            <i />
+            <i />
+          </span>
+        </button>
       </header>
+
+      <div className={isMenuOpen ? 'portal-menu is-open' : 'portal-menu'}>
+        <button
+          aria-label="Cerrar men\u00fa"
+          className="portal-menu-backdrop"
+          onClick={() => setIsMenuOpen(false)}
+          tabIndex={isMenuOpen ? 0 : -1}
+          type="button"
+        />
+        <div aria-hidden="true" className="portal-menu-layers">
+          <span data-menu-layer />
+          <span data-menu-layer />
+        </div>
+        <aside
+          aria-hidden={!isMenuOpen}
+          aria-label="Men\u00fa principal"
+          className="portal-menu-panel"
+          id="portal-menu-panel"
+        >
+          <div className="portal-menu-kicker">
+            <Mark />
+            <span>Nava / Navegaci\u00f3n</span>
+          </div>
+          <nav aria-label="Secciones del portal" className="portal-menu-links">
+            {portalMenuItems.map((item) => (
+              <a
+                data-menu-item
+                href={item.href}
+                key={item.href}
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <small>{item.number}</small>
+                <span>{item.label}</span>
+              </a>
+            ))}
+          </nav>
+          <div className="portal-menu-footer">
+            <p>Tu negocio, siempre en movimiento.</p>
+            <a href={trialLink} onClick={() => setIsMenuOpen(false)}>
+              Solicitar una demo <Arrow />
+            </a>
+          </div>
+        </aside>
+      </div>
 
       <section className="portal-hero" ref={portalRef} style={portalStyle}>
         <div className="portal-stage">
