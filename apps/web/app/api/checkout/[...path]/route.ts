@@ -13,6 +13,11 @@ const routes = {
   'auth/logout': { method: 'POST', upstream: 'v1/auth/logout' },
   'auth/register': { method: 'POST', upstream: 'v1/auth/register' },
   'auth/verify-email': { method: 'POST', upstream: 'v1/auth/verify-email' },
+  'onboarding/complete-account-setup': {
+    method: 'POST',
+    upstream: 'v1/onboarding/complete-account-setup',
+  },
+  'onboarding/services': { method: 'POST', upstream: 'v1/onboarding/services' },
   payment: { method: 'POST', upstream: 'v1/subscription/checkout' },
   plans: { method: 'GET', upstream: 'v1/subscription/plans' },
   session: { method: 'GET', upstream: 'v1/subscription/session' },
@@ -52,7 +57,21 @@ async function checkoutProxy(
   context: { params: Promise<{ path: string[] }> },
 ) {
   const { path } = await context.params;
-  const route = routes[path.join('/') as keyof typeof routes];
+  const requestedPath = path.join('/');
+  const paymentAttemptId =
+    path.length === 2 &&
+    path[0] === 'payments' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+      path[1] ?? '',
+    )
+      ? path[1]
+      : null;
+  const route = paymentAttemptId
+    ? {
+        method: 'GET' as const,
+        upstream: `v1/subscription/payments/${paymentAttemptId}`,
+      }
+    : routes[requestedPath as keyof typeof routes];
   if (!route || route.method !== request.method)
     return NextResponse.json(
       { message: 'Ruta no permitida.' },
@@ -101,8 +120,7 @@ async function checkoutProxy(
 
   const body = await readJson(upstream);
   if (
-    (path.join('/') === 'auth/login' ||
-      path.join('/') === 'auth/verify-email') &&
+    (requestedPath === 'auth/login' || requestedPath === 'auth/verify-email') &&
     upstream.ok
   ) {
     const token =
@@ -138,6 +156,6 @@ async function checkoutProxy(
     return response;
   }
   const response = NextResponse.json(body, { status: upstream.status });
-  if (path.join('/') === 'auth/logout') response.cookies.delete(SESSION_COOKIE);
+  if (requestedPath === 'auth/logout') response.cookies.delete(SESSION_COOKIE);
   return response;
 }

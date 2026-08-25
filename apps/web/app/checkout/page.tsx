@@ -1,5 +1,11 @@
-import CheckoutExperience from './CheckoutExperience';
+import { Suspense } from 'react';
+
+import SubscriptionCheckout from './SubscriptionCheckout';
 
 export default function CheckoutPage() {
-  return <CheckoutExperience />;
+  return (
+    <Suspense fallback={<main className="subscription-checkout-page" />}>
+      <SubscriptionCheckout />
+    </Suspense>
+  );
 }

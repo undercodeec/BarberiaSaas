@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Plan {
   readonly code: string;
@@ -31,7 +32,7 @@ interface ApiError {
   readonly message?: string;
 }
 
-type AccessView = 'login' | 'register' | 'verify';
+type AccessView = 'login' | 'register' | 'setup' | 'verify';
 
 type RegistrationForm = {
   accountType: 'business' | 'professional';
@@ -49,26 +50,36 @@ type RegistrationForm = {
   privacyPolicyAccepted: boolean;
 };
 
+type FirstServiceForm = {
+  durationMinutes: number;
+  name: string;
+  price: number;
+};
+
 const commercialPlans = [
   {
+    code: 'free',
     description: 'Para conocer Nava',
     featured: false,
     name: 'Nava Free',
     price: 'USD 0',
   },
   {
+    code: 'essential',
     description: 'Para quien trabaja solo',
     featured: false,
     name: 'Nava Esencial',
     price: 'USD 9,83',
   },
   {
+    code: 'local',
     description: 'Para un negocio que trabaja en equipo',
     featured: true,
     name: 'Nava Local',
     price: 'USD 29,83',
   },
   {
+    code: 'multi',
     description: 'Para crecer con varias sedes',
     featured: false,
     name: 'Nava Multi',
@@ -167,6 +178,7 @@ function sessionMessage(session: CheckoutSession) {
 }
 
 export default function CheckoutExperience() {
+  const router = useRouter();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [email, setEmail] = useState('');
@@ -178,8 +190,14 @@ export default function CheckoutExperience() {
   const [attempt, setAttempt] = useState<PaymentAttempt | null>(null);
   const [isAccessDialogOpen, setIsAccessDialogOpen] = useState(false);
   const [accessView, setAccessView] = useState<AccessView>('login');
+  const [selectedPlanCode, setSelectedPlanCode] = useState<string | null>(null);
   const [verificationCode, setVerificationCode] = useState('');
   const [verificationEmail, setVerificationEmail] = useState('');
+  const [firstService, setFirstService] = useState<FirstServiceForm>({
+    durationMinutes: 30,
+    name: '',
+    price: 0,
+  });
   const [registration, setRegistration] = useState<RegistrationForm>({
     accountType: 'business',
     businessName: '',
@@ -198,9 +216,12 @@ export default function CheckoutExperience() {
 
   const loadSession = useCallback(async () => {
     try {
-      setSession(await requestJson<CheckoutSession>('session'));
+      const nextSession = await requestJson<CheckoutSession>('session');
+      setSession(nextSession);
+      return nextSession;
     } catch {
       setSession(null);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -243,7 +264,13 @@ export default function CheckoutExperience() {
         method: 'POST',
       });
       setPassword('');
-      await loadSession();
+      const nextSession = await loadSession();
+      if (nextSession?.reason === 'onboarding_required') {
+        setAccessView('setup');
+      } else if (nextSession && selectedPlanCode) {
+        setIsAccessDialogOpen(false);
+        router.push(`/checkout?plan=${encodeURIComponent(selectedPlanCode)}`);
+      }
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : 'No pudimos iniciar sesión.',
@@ -286,7 +313,7 @@ export default function CheckoutExperience() {
         method: 'POST',
       });
       await loadSession();
-      setAccessView('login');
+      setAccessView('setup');
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -302,6 +329,64 @@ export default function CheckoutExperience() {
     setError(null);
     setAccessView(view);
     setIsAccessDialogOpen(true);
+  }
+
+  function selectPlan(planCode: string) {
+    if (planCode === 'free') {
+      setSelectedPlanCode(null);
+      openAccessDialog('register');
+      return;
+    }
+    if (session) {
+      router.push(`/checkout?plan=${encodeURIComponent(planCode)}`);
+      return;
+    }
+    setSelectedPlanCode(planCode);
+    openAccessDialog('login');
+  }
+
+  async function completeAccountSetup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      await requestJson('onboarding/services', {
+        body: JSON.stringify({
+          agendaColor: '#B7791F',
+          category: null,
+          description: null,
+          downPaymentPercentage: 0,
+          durationMinutes: firstService.durationMinutes,
+          imageUri: null,
+          name: firstService.name,
+          onlineBooking: true,
+          price: firstService.price,
+          priceType: firstService.price === 0 ? 'free' : 'fixed',
+          showServiceTime: true,
+          tax: null,
+        }),
+        method: 'POST',
+      });
+      await requestJson('onboarding/complete-account-setup', {
+        body: '{}',
+        method: 'POST',
+      });
+      const nextSession = await loadSession();
+      if (nextSession && selectedPlanCode) {
+        setIsAccessDialogOpen(false);
+        router.push(`/checkout?plan=${encodeURIComponent(selectedPlanCode)}`);
+      } else {
+        setIsAccessDialogOpen(false);
+      }
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : 'No pudimos completar la configuración del negocio.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function beginCheckout(planCode: string) {
@@ -412,10 +497,10 @@ export default function CheckoutExperience() {
                 <strong>{plan.price}<em>{plan.price === 'USD 0' ? '' : ' / mes'}</em></strong>
                 <p>{plan.description}</p>
                 <a
-                  href="#contratar"
+                  href={plan.code === 'free' ? '#registrarme' : `/checkout?plan=${plan.code}`}
                   onClick={(event) => {
                     event.preventDefault();
-                    openAccessDialog('login');
+                    selectPlan(plan.code);
                   }}
                 >
                   {plan.price === 'USD 0' ? 'Empezar gratis' : 'Elegir ' + plan.name}
@@ -455,10 +540,10 @@ export default function CheckoutExperience() {
               {commercialPlans.map((plan) => (
                 <div className={plan.featured ? 'is-highlighted' : undefined} key={plan.name}>
                   <a
-                    href="#contratar"
+                    href={plan.code === 'free' ? '#registrarme' : `/checkout?plan=${plan.code}`}
                     onClick={(event) => {
                       event.preventDefault();
-                      openAccessDialog('login');
+                      selectPlan(plan.code);
                     }}
                   >
                     {plan.price === 'USD 0' ? 'Elegir Free' : 'Elegir ' + plan.name.replace('Nava ', '')}
@@ -482,10 +567,10 @@ export default function CheckoutExperience() {
                     <strong>{plan.price}<em>{plan.price === 'USD 0' ? '' : ' / mes'}</em></strong>
                     <p>{plan.description}</p>
                     <a
-                      href="#contratar"
+                      href={plan.code === 'free' ? '#registrarme' : `/checkout?plan=${plan.code}`}
                       onClick={(event) => {
                         event.preventDefault();
-                        openAccessDialog('login');
+                        selectPlan(plan.code);
                       }}
                     >
                       {plan.price === 'USD 0' ? 'Empezar gratis' : 'Elegir ' + plan.name}
@@ -548,14 +633,18 @@ export default function CheckoutExperience() {
                     ? 'Crea tu espacio.'
                     : accessView === 'verify'
                       ? 'Verifica tu correo.'
-                      : 'Continúa con tu negocio.'}
+                      : accessView === 'setup'
+                        ? 'Tu primer servicio.'
+                        : 'Continúa con tu negocio.'}
                 </h2>
                 <small>
                   {accessView === 'register'
                     ? 'Completa los datos de tu negocio y activa tus 10 días de prueba.'
                     : accessView === 'verify'
                       ? 'Te enviamos un código de seis dígitos para activar la cuenta.'
-                      : 'Inicia sesión para elegir, contratar o renovar un plan.'}
+                      : accessView === 'setup'
+                        ? 'Este paso crea tu negocio y deja lista la suscripción.'
+                        : 'Inicia sesión para elegir, contratar o renovar un plan.'}
                 </small>
               </div>
               <div className="subscription-access-content">
@@ -851,7 +940,72 @@ export default function CheckoutExperience() {
           </form>
         ) : null}
 
-        {session ? (
+        {session && accessView === 'setup' ? (
+          <form
+            className="subscription-verification-form"
+            onSubmit={completeAccountSetup}
+          >
+            <h2>Configura tu primer servicio</h2>
+            <p>
+              Crearemos tu negocio, la sede principal, tus horarios y este
+              primer servicio.
+            </p>
+            <label>
+              Nombre del servicio
+              <input
+                minLength={2}
+                onChange={(event) =>
+                  setFirstService((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+                placeholder="Ej. Corte clásico"
+                required
+                value={firstService.name}
+              />
+            </label>
+            <div className="subscription-form-grid">
+              <label>
+                Duración (minutos)
+                <input
+                  min={5}
+                  onChange={(event) =>
+                    setFirstService((current) => ({
+                      ...current,
+                      durationMinutes: Number(event.target.value),
+                    }))
+                  }
+                  required
+                  step={5}
+                  type="number"
+                  value={firstService.durationMinutes}
+                />
+              </label>
+              <label>
+                Precio (USD)
+                <input
+                  min={0}
+                  onChange={(event) =>
+                    setFirstService((current) => ({
+                      ...current,
+                      price: Number(event.target.value),
+                    }))
+                  }
+                  required
+                  step="0.01"
+                  type="number"
+                  value={firstService.price}
+                />
+              </label>
+            </div>
+            <button disabled={submitting} type="submit">
+              {submitting ? 'Creando negocio…' : 'Crear negocio y continuar'}
+            </button>
+          </form>
+        ) : null}
+
+        {session && accessView !== 'setup' ? (
           <div className="mt-8">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-black/10 bg-white p-4">
               <span>
