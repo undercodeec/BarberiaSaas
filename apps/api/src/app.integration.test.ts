@@ -2745,6 +2745,15 @@ describeWithDatabase('API con PostgreSQL', () => {
           reversedByUserId: ownerMembership.userId,
           type: 'SALE',
         },
+        {
+          amountCents: 700,
+          cashRegisterSessionId: cashSession.id,
+          createdAt: new Date('2026-08-03T08:15:00.000Z'),
+          createdByUserId: ownerMembership.userId,
+          description: 'Compra de toallas',
+          paymentMethod: 'CASH',
+          type: 'EXPENSE',
+        },
       ],
     });
     const commissionCashMovement = await database.cashMovement.findFirstOrThrow(
@@ -2795,7 +2804,17 @@ describeWithDatabase('API con PostgreSQL', () => {
         totalCents: number;
         transferCents: number;
       };
+      expenses: Array<{
+        amountCents: number;
+        count: number;
+        description: string;
+      }>;
       products: Array<{ name: string; quantity: number; revenueCents: number }>;
+      services: Array<{
+        name: string;
+        quantity: number;
+        scheduledValueCents: number;
+      }>;
       professionals: Array<{
         commissionCents: number;
         completedAppointments: number;
@@ -2842,6 +2861,16 @@ describeWithDatabase('API con PostgreSQL', () => {
         revenueCents: 3_000,
       }),
     ]);
+    expect(report.services).toEqual([
+      expect.objectContaining({
+        name: 'Corte agenda',
+        quantity: 1,
+        scheduledValueCents: 1_200,
+      }),
+    ]);
+    expect(report.expenses).toEqual([
+      { amountCents: 700, count: 1, description: 'Compra de toallas' },
+    ]);
     expect(report.cashClosures).toEqual({
       closingAmountCents: 6_200,
       count: 1,
@@ -2857,6 +2886,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(csvResponse.statusCode).toBe(200);
     expect(csvResponse.headers['content-type']).toContain('text/csv');
     expect(csvResponse.body).toContain('Cera de reporte');
+    expect(csvResponse.body).toContain('Compra de toallas');
     expect(csvResponse.body).toContain('Propietario de prueba');
 
     const forbiddenResponse = await app.inject({
@@ -3216,6 +3246,18 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(businessSummary.statusCode).toBe(200);
     expect(
       businessSummary.json<{
+        details: {
+          expenses: Array<{
+            amountCents: number;
+            count: number;
+            description: string;
+          }>;
+          otherIncome: Array<{
+            amountCents: number;
+            count: number;
+            description: string;
+          }>;
+        };
         expenses: { operatingCents: number; totalCents: number };
         income: {
           otherIncomeCents: number;
@@ -3231,6 +3273,19 @@ describeWithDatabase('API con PostgreSQL', () => {
         withdrawalsCents: number;
       }>(),
     ).toMatchObject({
+      details: {
+        expenses: [
+          { amountCents: 500, count: 1, description: 'expense de prueba' },
+        ],
+        otherIncome: expect.arrayContaining([
+          { amountCents: 800, count: 1, description: 'deposit de prueba' },
+          {
+            amountCents: 200,
+            count: 1,
+            description: 'other_income de prueba',
+          },
+        ]),
+      },
       expenses: { operatingCents: 500, totalCents: 500 },
       income: {
         otherIncomeCents: 1_000,

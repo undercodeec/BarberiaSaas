@@ -76,13 +76,21 @@ export default function BusinessSummaryScreen() {
         `/v1/reports/business-summary?range=${preset}${location}`,
       );
     },
-    queryKey: tenant.key('business-summary', preset),
+    queryKey: tenant.key('business-summary', preset, locationId ?? 'all'),
+    refetchInterval: 15_000,
+    refetchOnMount: 'always',
   });
   if (!session) return <Redirect href="/(auth)/login" />;
   if (!organizationQuery.isLoading && !canAccessFinancialReports)
     return <Redirect href="/reports" />;
 
   const report = summaryQuery.data;
+  const details = report?.details ?? {
+    expenses: [],
+    otherIncome: [],
+    products: [],
+    services: [],
+  };
   const currency = report?.currencyCode ?? 'USD';
   const periodLabel = report
     ? `${shortDate(report.period.from)} – ${shortDate(report.period.to)}`
@@ -226,6 +234,71 @@ export default function BusinessSummaryScreen() {
                 negocio. Los depósitos manuales y otros ingresos se muestran
                 separados de las ventas cobradas.
               </Text>
+            </ReportCard>
+
+            <ReportCard
+              subtitle="Conoce qué servicios, productos y movimientos forman los totales del período"
+              title="Detalle de actividad"
+            >
+              <DetailHeading label="Servicios realizados" />
+              {details.services.map((service) => (
+                <DetailRow
+                  key={service.id}
+                  label={service.name}
+                  note={`${service.quantity} realizados · valor programado ${money(service.scheduledValueCents, currency)}`}
+                  value={`${service.quantity} ${service.quantity === 1 ? 'servicio' : 'servicios'}`}
+                />
+              ))}
+              {!details.services.length ? (
+                <Text style={styles.emptyDetail}>
+                  No hay servicios realizados en este período.
+                </Text>
+              ) : null}
+
+              <DetailHeading label="Productos vendidos" />
+              {details.products.map((product) => (
+                <DetailRow
+                  key={product.id}
+                  label={product.name}
+                  note={`${product.quantity} ${product.quantity === 1 ? 'unidad' : 'unidades'}`}
+                  value={money(product.revenueCents, currency)}
+                />
+              ))}
+              {!details.products.length ? (
+                <Text style={styles.emptyDetail}>
+                  No hay productos vendidos en este período.
+                </Text>
+              ) : null}
+
+              <DetailHeading label="Egresos registrados" />
+              {details.expenses.map((expense) => (
+                <DetailRow
+                  key={expense.description}
+                  label={expense.description}
+                  note={`${expense.count} ${expense.count === 1 ? 'registro' : 'registros'}`}
+                  negative
+                  value={money(expense.amountCents, currency)}
+                />
+              ))}
+              {!details.expenses.length ? (
+                <Text style={styles.emptyDetail}>
+                  No hay egresos registrados en este período.
+                </Text>
+              ) : null}
+
+              {details.otherIncome.length ? (
+                <>
+                  <DetailHeading label="Otros ingresos" />
+                  {details.otherIncome.map((income) => (
+                    <DetailRow
+                      key={income.description}
+                      label={income.description}
+                      note={`${income.count} ${income.count === 1 ? 'registro' : 'registros'}`}
+                      value={money(income.amountCents, currency)}
+                    />
+                  ))}
+                </>
+              ) : null}
             </ReportCard>
 
             <ReportCard
@@ -500,6 +573,34 @@ function ProgressMetric({
   );
 }
 
+function DetailHeading({ label }: { readonly label: string }) {
+  return <Text style={styles.detailHeading}>{label}</Text>;
+}
+
+function DetailRow({
+  label,
+  negative = false,
+  note,
+  value,
+}: {
+  readonly label: string;
+  readonly negative?: boolean;
+  readonly note: string;
+  readonly value: string;
+}) {
+  return (
+    <View style={styles.detailRow}>
+      <View style={styles.detailCopy}>
+        <Text style={styles.detailLabel}>{label}</Text>
+        <Text style={styles.detailNote}>{note}</Text>
+      </View>
+      <Text style={[styles.detailValue, negative && styles.negativeValue]}>
+        {negative ? `−${value}` : value}
+      </Text>
+    </View>
+  );
+}
+
 function CommissionBars({
   currency,
   products,
@@ -621,6 +722,34 @@ const styles = StyleSheet.create({
     paddingBottom: 44,
     paddingHorizontal: appTheme.spacing.page,
     width: '100%',
+  },
+  detailCopy: { flex: 1, gap: 3 },
+  detailHeading: {
+    color: appTheme.colors.text,
+    fontSize: 15,
+    fontWeight: '900',
+    marginTop: 16,
+  },
+  detailLabel: { color: appTheme.colors.text, fontSize: 14, fontWeight: '800' },
+  detailNote: {
+    color: appTheme.colors.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  detailRow: {
+    alignItems: 'center',
+    borderBottomColor: appTheme.colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    paddingVertical: 11,
+  },
+  detailValue: { color: appTheme.colors.text, fontSize: 14, fontWeight: '900' },
+  emptyDetail: {
+    color: appTheme.colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 8,
   },
   errorArea: { gap: 10 },
   filterActive: { color: appTheme.colors.white },

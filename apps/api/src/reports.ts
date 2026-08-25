@@ -158,6 +158,64 @@ function sum(values: readonly number[]) {
   return values.reduce((total, value) => total + value, 0);
 }
 
+function namedAmountRows(
+  records: ReadonlyArray<{
+    readonly amountCents: number;
+    readonly description: string;
+  }>,
+) {
+  const grouped = new Map<string, { amountCents: number; count: number }>();
+  for (const record of records) {
+    const current = grouped.get(record.description) ?? {
+      amountCents: 0,
+      count: 0,
+    };
+    current.amountCents += record.amountCents;
+    current.count += 1;
+    grouped.set(record.description, current);
+  }
+  return [...grouped.entries()]
+    .map(([description, values]) => ({ description, ...values }))
+    .sort(
+      (left, right) =>
+        right.amountCents - left.amountCents ||
+        left.description.localeCompare(right.description),
+    );
+}
+
+function appointmentServiceRows(
+  appointments: ReadonlyArray<{
+    readonly services: ReadonlyArray<{
+      readonly priceCents: number;
+      readonly serviceId: string;
+      readonly serviceName: string;
+    }>;
+  }>,
+) {
+  const grouped = new Map<
+    string,
+    { name: string; quantity: number; scheduledValueCents: number }
+  >();
+  for (const appointment of appointments) {
+    for (const service of appointment.services) {
+      const current = grouped.get(service.serviceId) ?? {
+        name: service.serviceName,
+        quantity: 0,
+        scheduledValueCents: 0,
+      };
+      current.quantity += 1;
+      current.scheduledValueCents += service.priceCents;
+      grouped.set(service.serviceId, current);
+    }
+  }
+  return [...grouped.entries()]
+    .map(([id, values]) => ({ id, ...values }))
+    .sort(
+      (left, right) =>
+        right.quantity - left.quantity || left.name.localeCompare(right.name),
+    );
+}
+
 function csvCell(value: string | number | null) {
   const text = value === null ? '' : String(value);
   return /[",\r\n]/u.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
@@ -265,12 +323,16 @@ export function registerReportRoutes(
       commissionEntries,
       professionalAdvances,
       paidSettlements,
+      completedAppointments,
     ] = await Promise.all([
       database.cashMovement.findMany({
         select: {
           amountCents: true,
           appointmentId: true,
+          description: true,
           productId: true,
+          productQuantity: true,
+          product: { select: { id: true, name: true } },
           serviceId: true,
           type: true,
         },
@@ -327,6 +389,25 @@ export function registerReportRoutes(
           status: CommissionSettlementStatus.PAID,
         },
       }),
+      database.appointment.findMany({
+        select: {
+          services: {
+            select: {
+              priceCents: true,
+              serviceId: true,
+              serviceName: true,
+            },
+          },
+        },
+        where: {
+          OR: windows.map(({ end, location, start }) => ({
+            locationId: location.id,
+            startsAt: { gte: start, lt: end },
+          })),
+          organizationId: membership.organizationId,
+          status: AppointmentStatus.COMPLETED,
+        },
+      }),
     ]);
 
     const sales = movements.filter(
@@ -360,6 +441,27 @@ export function registerReportRoutes(
         .filter(({ type }) => type === CashMovementType.EXPENSE)
         .map(({ amountCents }) => amountCents),
     );
+    const productRows = movements
+      .filter(
+        (
+          movement,
+        ): movement is typeof movement & {
+          product: NonNullable<typeof movement.product>;
+        } =>
+          movement.type === CashMovementType.SALE && Boolean(movement.product),
+      )
+      .reduce((rows, movement) => {
+        const current = rows.get(movement.product.id) ?? {
+          id: movement.product.id,
+          name: movement.product.name,
+          quantity: 0,
+          revenueCents: 0,
+        };
+        current.quantity += movement.productQuantity ?? 0;
+        current.revenueCents += movement.amountCents;
+        rows.set(movement.product.id, current);
+        return rows;
+      }, new Map<string, { id: string; name: string; quantity: number; revenueCents: number }>());
     const isInFinancialWindow = (value: Date | null) =>
       Boolean(
         value && value >= financialWindow.start && value < financialWindow.end,
@@ -400,6 +502,24 @@ export function registerReportRoutes(
         totalGeneratedCents: servicesGeneratedCents,
       },
       currencyCode: reportLocations[0]?.currencyCode ?? 'USD',
+      details: {
+        expenses: namedAmountRows(
+          movements.filter(({ type }) => type === CashMovementType.EXPENSE),
+        ),
+        otherIncome: namedAmountRows(
+          movements.filter(
+            ({ type }) =>
+              type === CashMovementType.DEPOSIT ||
+              type === CashMovementType.OTHER_INCOME,
+          ),
+        ),
+        products: [...productRows.values()].sort(
+          (left, right) =>
+            right.revenueCents - left.revenueCents ||
+            left.name.localeCompare(right.name),
+        ),
+        services: appointmentServiceRows(completedAppointments),
+      },
       expenses: {
         collaboratorPaymentsCents,
         operatingCents: operatingExpensesCents,
@@ -524,14 +644,16 @@ export function registerReportRoutes(
       closedAt: { gte: start, lt: end },
       locationId: location.id,
     }));
-    const [appointments, sales, commissionEntries, cashClosures] =
+    const [appointments, movements, commissionEntries, cashClosures] =
       await Promise.all([
         database.appointment.findMany({
           select: {
             id: true,
             paymentStatus: true,
             professionalMembershipId: true,
-            services: { select: { priceCents: true } },
+            services: {
+              select: { priceCents: true, serviceId: true, serviceName: true },
+            },
             status: true,
           },
           where: {
@@ -549,15 +671,16 @@ export function registerReportRoutes(
           select: {
             amountCents: true,
             appointmentId: true,
+            description: true,
             paymentMethod: true,
             productId: true,
             productQuantity: true,
             professionalMembershipId: true,
+            type: true,
           },
           where: {
             OR: financialWindow,
             reversedAt: null,
-            type: CashMovementType.SALE,
           },
         }),
         database.commissionEntry.findMany({
@@ -583,6 +706,10 @@ export function registerReportRoutes(
           },
         }),
       ]);
+
+    const sales = movements.filter(
+      ({ type }) => type === CashMovementType.SALE,
+    );
 
     const missingAppointmentIds = sales.flatMap(({ appointmentId }) =>
       appointmentId && !appointments.some(({ id }) => id === appointmentId)
@@ -718,6 +845,14 @@ export function registerReportRoutes(
     const paidAppointments = appointments.filter(
       ({ paymentStatus }) => paymentStatus === AppointmentPaymentStatus.PAID,
     );
+    const expenseRows = namedAmountRows(
+      movements.filter(({ type }) => type === CashMovementType.EXPENSE),
+    );
+    const serviceRows = appointmentServiceRows(
+      appointments.filter(
+        ({ status }) => status === AppointmentStatus.COMPLETED,
+      ),
+    );
     const period = windows[0]?.period;
     if (!period) throw new Error('El reporte no tiene un período válido.');
     const response = {
@@ -759,6 +894,7 @@ export function registerReportRoutes(
       },
       collections: { totalCents: grossSalesCents, ...paymentTotals },
       currencyCode: reportLocations[0]?.currencyCode ?? 'USD',
+      expenses: expenseRows,
       period: {
         from: period.from,
         locationId: selectedLocation?.id ?? null,
@@ -768,6 +904,7 @@ export function registerReportRoutes(
       },
       products: productRows,
       professionals: professionalRows,
+      services: serviceRows,
       sales: {
         averageTicketCents:
           sales.length > 0 ? Math.round(grossSalesCents / sales.length) : 0,
@@ -813,6 +950,20 @@ export function registerReportRoutes(
           response.collections.transferCents,
         ],
         ['Cobros', 'Otro', null, null, response.collections.otherCents],
+        ...response.services.map((service) => [
+          'Servicios realizados',
+          'Valor programado',
+          service.name,
+          service.quantity,
+          service.scheduledValueCents,
+        ]),
+        ...response.expenses.map((expense) => [
+          'Egresos',
+          expense.description,
+          null,
+          expense.count,
+          expense.amountCents,
+        ]),
         [
           'Cierre de caja',
           'Cierres',

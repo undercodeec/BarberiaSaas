@@ -391,6 +391,11 @@ export interface DailyReportResponse {
     readonly transferCents: number;
   };
   readonly currencyCode: string;
+  readonly expenses: ReadonlyArray<{
+    readonly amountCents: number;
+    readonly count: number;
+    readonly description: string;
+  }>;
   readonly period: {
     readonly from: string;
     readonly locationId: string | null;
@@ -412,6 +417,12 @@ export interface DailyReportResponse {
     readonly saleCount: number;
     readonly salesCents: number;
   }>;
+  readonly services: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+    readonly quantity: number;
+    readonly scheduledValueCents: number;
+  }>;
   readonly sales: {
     readonly averageTicketCents: number;
     readonly grossCents: number;
@@ -430,6 +441,30 @@ export interface BusinessSummaryResponse {
     readonly totalGeneratedCents: number;
   };
   readonly currencyCode: string;
+  readonly details: {
+    readonly expenses: ReadonlyArray<{
+      readonly amountCents: number;
+      readonly count: number;
+      readonly description: string;
+    }>;
+    readonly otherIncome: ReadonlyArray<{
+      readonly amountCents: number;
+      readonly count: number;
+      readonly description: string;
+    }>;
+    readonly products: ReadonlyArray<{
+      readonly id: string;
+      readonly name: string;
+      readonly quantity: number;
+      readonly revenueCents: number;
+    }>;
+    readonly services: ReadonlyArray<{
+      readonly id: string;
+      readonly name: string;
+      readonly quantity: number;
+      readonly scheduledValueCents: number;
+    }>;
+  };
   readonly expenses: {
     readonly collaboratorPaymentsCents: number;
     readonly operatingCents: number;

@@ -61,11 +61,15 @@ export default function DailyReportScreen() {
         `/v1/reports/daily?${queryString}`,
       ),
     queryKey: tenant.key('daily-report', queryString),
+    refetchInterval: 15_000,
+    refetchOnMount: 'always',
   });
   if (!session) return <Redirect href="/(auth)/login" />;
   if (!organizationQuery.isLoading && !canAccessFinancialReports)
     return <Redirect href="/reports" />;
   const report = reportQuery.data;
+  const expenses = report?.expenses ?? [];
+  const services = report?.services ?? [];
   const currency = report?.currencyCode ?? 'USD';
   const performCsvExport = async () => {
     try {
@@ -209,6 +213,21 @@ export default function DailyReportScreen() {
                 {money(report.appointments.paidScheduledValueCents, currency)}
               </Text>
             </Section>
+            <Section title="Servicios realizados">
+              {services.map((service) => (
+                <Detail
+                  key={service.id}
+                  name={service.name}
+                  note={`${service.quantity} realizados · valor programado ${money(service.scheduledValueCents, currency)}`}
+                  value={`${service.quantity} ${service.quantity === 1 ? 'servicio' : 'servicios'}`}
+                />
+              ))}
+              {!services.length ? (
+                <Text style={styles.muted}>
+                  No hay servicios realizados en este período.
+                </Text>
+              ) : null}
+            </Section>
             <Section title="Cobros por método">
               <Amount
                 label="Efectivo"
@@ -251,6 +270,21 @@ export default function DailyReportScreen() {
               ))}
               {!report.products.length ? (
                 <Text style={styles.muted}>No hay productos vendidos.</Text>
+              ) : null}
+            </Section>
+            <Section title="Egresos registrados">
+              {expenses.map((expense) => (
+                <Detail
+                  key={expense.description}
+                  name={expense.description}
+                  note={`${expense.count} ${expense.count === 1 ? 'registro' : 'registros'}`}
+                  value={money(expense.amountCents, currency)}
+                />
+              ))}
+              {!expenses.length ? (
+                <Text style={styles.muted}>
+                  No hay egresos registrados en este período.
+                </Text>
               ) : null}
             </Section>
             <Section title="Cierre de Caja">
