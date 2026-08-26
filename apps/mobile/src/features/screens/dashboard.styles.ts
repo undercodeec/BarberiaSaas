@@ -590,6 +590,17 @@ export const styles = StyleSheet.create({
     shadowRadius: 9,
     width: 54,
   },
+  quickIconShimmer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    bottom: -20,
+    left: 21,
+    position: 'absolute',
+    shadowColor: '#B47D17',
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    top: -20,
+    width: 13,
+  },
   quickLabel: {
     color: '#1C1C1C',
     fontSize: 11,
