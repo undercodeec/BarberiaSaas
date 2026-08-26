@@ -3,6 +3,7 @@ import {
   MembershipStatus,
   OrganizationStatus,
   PlatformOverrideKind,
+  SubscriptionChangeKind,
   SubscriptionStatus,
   type DatabaseClient,
   type Prisma,
@@ -392,7 +393,17 @@ export async function reconcileSubscriptionLifecycle(
   now = new Date(),
 ) {
   const candidates = await database.subscription.findMany({
-    select: { organizationId: true },
+    select: {
+      currentPeriodEnd: true,
+      currentPeriodStart: true,
+      graceEndsAt: true,
+      id: true,
+      organization: { select: { defaultTimezone: true } },
+      organizationId: true,
+      plan: { select: { code: true } },
+      status: true,
+      trialEndsAt: true,
+    },
     where: {
       OR: [
         { status: SubscriptionStatus.TRIAL, trialEndsAt: { lte: now } },
@@ -401,10 +412,103 @@ export async function reconcileSubscriptionLifecycle(
       ],
     },
   });
-  for (const { organizationId } of candidates) {
-    await database.$transaction((transaction) =>
-      ensureOrganizationSubscription(transaction, organizationId, now),
-    );
+  for (const candidate of candidates) {
+    await database.$transaction(async (transaction) => {
+      if (
+        candidate.status === SubscriptionStatus.ACTIVE &&
+        candidate.currentPeriodEnd <= now
+      ) {
+        const graceEndsAt = new Date(
+          candidate.currentPeriodEnd.getTime() + GRACE_DAYS * DAY_MS,
+        );
+        const transitioned = await transaction.subscription.updateMany({
+          data: {
+            graceEndsAt,
+            status: SubscriptionStatus.PAST_DUE,
+            trialEndsAt: null,
+          },
+          where: {
+            currentPeriodEnd: { lte: now },
+            id: candidate.id,
+            status: SubscriptionStatus.ACTIVE,
+          },
+        });
+        if (transitioned.count === 1) {
+          await transaction.subscriptionChange.create({
+            data: {
+              billingTimezone: candidate.organization.defaultTimezone,
+              fromPlanCode: candidate.plan.code,
+              fromStatus: SubscriptionStatus.ACTIVE,
+              kind: SubscriptionChangeKind.STATUS_CHANGED,
+              metadata: { graceEndsAt: graceEndsAt.toISOString() },
+              newPeriodEnd: candidate.currentPeriodEnd,
+              newPeriodStart: candidate.currentPeriodStart,
+              organizationId: candidate.organizationId,
+              previousPeriodEnd: candidate.currentPeriodEnd,
+              reason: 'El período pagado venció; inició la gracia de 3 días.',
+              subscriptionId: candidate.id,
+              toPlanCode: candidate.plan.code,
+              toStatus: SubscriptionStatus.PAST_DUE,
+            },
+          });
+        }
+        return;
+      }
+
+      if (
+        candidate.status === SubscriptionStatus.PAST_DUE &&
+        candidate.graceEndsAt &&
+        candidate.graceEndsAt <= now
+      ) {
+        const freePlan = await transaction.plan.findUnique({
+          where: { code: 'free' },
+        });
+        if (!freePlan) throw new Error('El plan Nava Free no está disponible.');
+        const transitioned = await transaction.subscription.updateMany({
+          data: {
+            graceEndsAt: null,
+            planId: freePlan.id,
+            status: SubscriptionStatus.FREE,
+            trialEndsAt: null,
+          },
+          where: {
+            graceEndsAt: { lte: now },
+            id: candidate.id,
+            status: SubscriptionStatus.PAST_DUE,
+          },
+        });
+        if (transitioned.count === 1) {
+          await transaction.organization.update({
+            data: { status: OrganizationStatus.ACTIVE },
+            where: { id: candidate.organizationId },
+          });
+          await transaction.subscriptionChange.create({
+            data: {
+              billingTimezone: candidate.organization.defaultTimezone,
+              fromPlanCode: candidate.plan.code,
+              fromStatus: SubscriptionStatus.PAST_DUE,
+              kind: SubscriptionChangeKind.STATUS_CHANGED,
+              metadata: { graceEndsAt: candidate.graceEndsAt.toISOString() },
+              newPeriodEnd: candidate.currentPeriodEnd,
+              newPeriodStart: candidate.currentPeriodStart,
+              organizationId: candidate.organizationId,
+              previousPeriodEnd: candidate.currentPeriodEnd,
+              reason: 'La gracia de 3 días venció; se cambió a Nava Free.',
+              subscriptionId: candidate.id,
+              toPlanCode: freePlan.code,
+              toStatus: SubscriptionStatus.FREE,
+            },
+          });
+        }
+        return;
+      }
+
+      await ensureOrganizationSubscription(
+        transaction,
+        candidate.organizationId,
+        now,
+      );
+    });
   }
   return candidates.length;
 }

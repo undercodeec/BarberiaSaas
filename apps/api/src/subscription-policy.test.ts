@@ -10,6 +10,7 @@ import {
   GRACE_DAYS,
   TRIAL_DAYS,
   planDefinition,
+  reconcileSubscriptionLifecycle,
 } from './subscription-policy';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -317,5 +318,62 @@ describe('política de suscripciones', () => {
     expect(result.featureFlags.inventory).toBe(true);
     expect(result.limits.clients).toBe(250);
     expect(result.activeOverrides).toHaveLength(2);
+  });
+
+  it('audita una sola gracia y un solo cambio a Free después de 72 horas', async () => {
+    const periodEnd = new Date('2026-10-01T18:00:00.000Z');
+    let status: SubscriptionStatus = SubscriptionStatus.ACTIVE;
+    let graceEndsAt: Date | null = null;
+    const changes: Array<Record<string, unknown>> = [];
+    const transaction = {
+      organization: { update: vi.fn(async () => ({})) },
+      plan: { findUnique: vi.fn(async () => ({ code: 'free', id: 'plan-free' })) },
+      subscription: {
+        updateMany: vi.fn(async ({ data, where }: { data: Record<string, unknown>; where: { status: SubscriptionStatus } }) => {
+          if (status !== where.status) return { count: 0 };
+          status = data.status as SubscriptionStatus;
+          graceEndsAt = (data.graceEndsAt as Date | null | undefined) ?? null;
+          return { count: 1 };
+        }),
+      },
+      subscriptionChange: { create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => changes.push(data)) },
+    };
+    const database = {
+      $transaction: async (callback: (value: typeof transaction) => Promise<void>) => callback(transaction),
+      subscription: {
+        findMany: vi.fn(async ({ where }: { where: { OR: Array<{ graceEndsAt?: { lte: Date } }> } }) => {
+          const reconciliationTime = where.OR[0]?.graceEndsAt?.lte ?? where.OR[1]?.graceEndsAt?.lte ?? where.OR[2]?.graceEndsAt?.lte ?? periodEnd;
+          if (status === SubscriptionStatus.FREE) return [];
+          if (status === SubscriptionStatus.PAST_DUE && graceEndsAt && graceEndsAt > reconciliationTime) return [];
+          return [{
+          currentPeriodEnd: periodEnd,
+          currentPeriodStart: new Date(periodEnd.getTime() - 30 * DAY_MS),
+          graceEndsAt,
+          id: 'subscription-1',
+          organization: { defaultTimezone: 'America/New_York' },
+          organizationId: 'organization-1',
+          plan: { code: 'local' },
+          status,
+          trialEndsAt: null,
+          }];
+        }),
+      },
+    };
+
+    await reconcileSubscriptionLifecycle(database as never, periodEnd);
+    await reconcileSubscriptionLifecycle(database as never, periodEnd);
+    expect(status).toBe(SubscriptionStatus.PAST_DUE);
+    expect(graceEndsAt).toEqual(new Date('2026-10-04T18:00:00.000Z'));
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({
+      billingTimezone: 'America/New_York',
+      reason: 'El período pagado venció; inició la gracia de 3 días.',
+    });
+
+    const graceEnd = new Date('2026-10-04T18:00:00.000Z');
+    await reconcileSubscriptionLifecycle(database as never, graceEnd);
+    await reconcileSubscriptionLifecycle(database as never, graceEnd);
+    expect(status).toBe(SubscriptionStatus.FREE);
+    expect(changes).toHaveLength(2);
   });
 });

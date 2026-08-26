@@ -2847,14 +2847,16 @@ export async function buildApi({
   subscriptionPaymentLifecycleTimer.unref();
   const subscriptionLifecycleTimer = setInterval(
     () => {
-      void reconcileSubscriptionLifecycle(database).catch((error: unknown) =>
-        app.log.error(error),
-      );
+      void reconcileSubscriptionLifecycle(database)
+        .then((candidateCount) =>
+          app.log.info({ candidateCount }, 'Subscription lifecycle reconciled'),
+        )
+        .catch((error: unknown) => app.log.error(error));
       void processSubscriptionRenewalReminders(database, config).catch(
         (error: unknown) => app.log.error(error),
       );
     },
-    60 * 60 * 1000,
+    60_000,
   );
   subscriptionLifecycleTimer.unref();
   const sriInvoiceLifecycleTimer = setInterval(() => {
