@@ -1,4 +1,5 @@
 node_modules/
+.worktrees/
 .eas-archive/
 apps/mobile/.eas-archive/
 .pnpm-store/
