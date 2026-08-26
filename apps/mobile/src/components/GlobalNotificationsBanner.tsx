@@ -1,4 +1,5 @@
-﻿import Ionicons from '@expo/vector-icons/Ionicons';
+/* eslint-disable react-hooks/refs -- React Native Animated exposes a stable imperative value that is intentionally read by the animated style. */
+import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
   AppNotificationRecord,
   AppNotificationsResponse,
@@ -6,9 +7,11 @@ import type {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   Animated,
+  Easing,
   Modal,
   PanResponder,
   Pressable,
@@ -49,6 +52,63 @@ function relativeDate(value: string) {
     day: 'numeric',
     month: 'short',
   });
+}
+
+export function NotificationBorderOrbit() {
+  const progress = useRef(new Animated.Value(0)).current;
+  const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void AccessibilityInfo.isReduceMotionEnabled().then((isEnabled) => {
+      if (isMounted) setReduceMotion(isEnabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener(
+      'reduceMotionChanged',
+      setReduceMotion,
+    );
+
+    return () => {
+      isMounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion === null) return;
+
+    progress.stopAnimation();
+    progress.setValue(0);
+    if (reduceMotion) return;
+
+    const orbit = Animated.loop(
+      Animated.timing(progress, {
+        duration: 4_000,
+        easing: Easing.linear,
+        isInteraction: false,
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+    );
+    orbit.start();
+
+    return () => orbit.stop();
+  }, [progress, reduceMotion]);
+
+  const rotate = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[styles.borderDotOrbit, { transform: [{ rotate }] }]}
+    >
+      <View style={styles.borderDot} />
+    </Animated.View>
+  );
 }
 
 export function GlobalNotificationsBanner() {
@@ -251,9 +311,7 @@ export function GlobalNotificationsBanner() {
           style={styles.trigger}
         >
           <Ionicons color="#B47D17" name="notifications-outline" size={24} />
-          <View pointerEvents="none" style={styles.borderDotOrbit}>
-            <View style={styles.borderDot} />
-          </View>
+          <NotificationBorderOrbit />
           {unread ? (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
