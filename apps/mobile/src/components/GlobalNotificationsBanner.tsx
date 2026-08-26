@@ -84,7 +84,7 @@ export function NotificationBorderOrbit() {
 
     const orbit = Animated.loop(
       Animated.timing(progress, {
-        duration: 4_000,
+        duration: 7_000,
         easing: Easing.linear,
         isInteraction: false,
         toValue: 1,

@@ -9,6 +9,7 @@ describe('NotificationBorderOrbit', () => {
     const stop = jest.fn();
     const animation = { start, stop } as unknown as Animated.CompositeAnimation;
     const loop = jest.spyOn(Animated, 'loop').mockReturnValue(animation);
+    const timing = jest.spyOn(Animated, 'timing').mockReturnValue(animation);
 
     await act(async () => {
       render(<NotificationBorderOrbit />);
@@ -18,8 +19,13 @@ describe('NotificationBorderOrbit', () => {
     await waitFor(() => {
       expect(loop).toHaveBeenCalledTimes(1);
       expect(start).toHaveBeenCalledTimes(1);
+      expect(timing).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ duration: 7_000 }),
+      );
     });
 
     loop.mockRestore();
+    timing.mockRestore();
   });
 });
