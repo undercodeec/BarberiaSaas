@@ -414,6 +414,7 @@ function defaultProvider(
         internalReference: confirmed.clientTransactionId,
         payload: confirmed.payload,
         providerTransactionId: confirmed.providerTransactionId,
+        providerPaidAt: null,
         source: PaymentProviderEventSource.RECONCILIATION,
         status: confirmed.status,
         storeId: input.storeId,
@@ -733,7 +734,48 @@ export function registerSubscriptionPaymentRoutes(
       if (
         await recordPlatformWebhookForAudit(database, parsed.data, request.body)
       )
+      {
+        const attempt = await database.subscriptionPaymentAttempt.findUnique({
+          where: { internalReference: parsed.data.ClientTransactionId },
+        });
+        if (!attempt)
+          return reply.code(200).send({ ErrorCode: '444', Response: false });
+        if (attempt.status === SubscriptionPaymentStatus.APPLIED)
+          return reply.code(200).send({ ErrorCode: '000', Response: true });
+        if (
+          attempt.status !== SubscriptionPaymentStatus.CREATED &&
+          attempt.status !== SubscriptionPaymentStatus.LINK_CREATED &&
+          attempt.status !== SubscriptionPaymentStatus.PENDING_PROVIDER
+        )
+          return reply.code(200).send({ ErrorCode: '444', Response: false });
+        const configuration =
+          await database.platformPaymentConfiguration.findUnique({
+            where: { provider: PLATFORM_PAYMENT_PROVIDER },
+          });
+        if (
+          !configuration?.isEnabled ||
+          configuration.status !== PlatformPaymentConfigurationStatus.READY ||
+          configuration.storeId !== attempt.storeId
+        )
+          return reply.code(200).send({ ErrorCode: '444', Response: false });
+        const provider = providerOverride ?? defaultProvider(config, configuration);
+        const payment = await provider.confirmPayment({
+          amountCents: attempt.amountCents,
+          currencyCode: attempt.currencyCode,
+          internalReference: attempt.internalReference,
+          providerTransactionId: parsed.data.TransactionId,
+          storeId: attempt.storeId,
+        });
+        if (payment.internalReference !== attempt.internalReference)
+          return reply.code(200).send({ ErrorCode: '444', Response: false });
+        const result = await applyVerifiedPlatformPayment(database, {
+          ...payment,
+          source: PaymentProviderEventSource.RECONCILIATION,
+        });
+        if (!result.applied && payment.status !== 'rejected')
+          return reply.code(200).send({ ErrorCode: '444', Response: false });
         return reply.code(200).send({ ErrorCode: '000', Response: true });
+      }
       return reply.code(200).send({ ErrorCode: '444', Response: false });
     } catch (error) {
       request.log.error(error, 'platform_payphone_webhook_failed');

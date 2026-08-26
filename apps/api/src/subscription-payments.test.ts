@@ -18,7 +18,6 @@ import { ApiError } from './errors';
 import { hashOpaqueToken } from './security';
 import {
   addBillingDays,
-  applyVerifiedPlatformPayment,
   expireStaleSubscriptionPayments,
   inclusiveTaxBreakdown,
   platformPaymentEventHash,
@@ -130,6 +129,8 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
   const userIds: string[] = [];
   let app: Awaited<ReturnType<typeof buildApi>>;
   let paymentAttemptId = '';
+  const verifiedAt = new Date('2026-08-26T21:15:00.000Z');
+  const providerPaidAt = new Date('2026-08-26T21:12:31.000Z');
 
   afterAll(async () => {
     if (organizationIds.length > 0) {
@@ -284,9 +285,12 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
               TransactionId: input.providerTransactionId,
             },
             providerTransactionId: input.providerTransactionId,
+            providerPaidAt:
+              input.providerTransactionId === '9001' ? providerPaidAt : null,
             status:
               input.providerTransactionId === '9005' ? 'rejected' : 'approved',
             storeId: input.storeId,
+            ...(input.providerTransactionId === '9001' ? { verifiedAt } : {}),
           };
         },
       },
@@ -352,12 +356,13 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
         Currency: storedAttempt.currencyCode,
         StatusCode: 3,
         StoreId: storedAttempt.storeId,
-        TransactionId: 9001,
+        TransactionId: 9002,
         TransactionStatus: 'Approved',
       },
       url: '/v1/webhooks/payphone/platform',
     });
     expect(auxiliaryWebhook.statusCode).toBe(200);
+    expect(auxiliaryWebhook.json<{ Response: boolean }>().Response).toBe(false);
     expect(
       (
         await database.subscriptionPaymentAttempt.findUniqueOrThrow({
@@ -406,20 +411,17 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
     });
     expect(currencyMismatch.statusCode).toBe(409);
 
-    const verifiedAt = new Date('2026-08-26T21:15:00.000Z');
-    const providerPaidAt = new Date('2026-08-26T21:12:31.000Z');
-    const applied = await applyVerifiedPlatformPayment(database, {
-      amountCents: storedAttempt.amountCents,
-      currencyCode: storedAttempt.currencyCode,
-      internalReference: storedAttempt.internalReference,
-      payload: {},
-      providerPaidAt,
-      providerTransactionId: '9001',
-      status: 'approved',
-      storeId: storedAttempt.storeId,
-      verifiedAt,
+    const confirmed = await app.inject({
+      headers: { authorization: `Bearer ${firstToken}` },
+      method: 'POST',
+      payload: {
+        clientTransactionId: storedAttempt.internalReference,
+        id: 9001,
+      },
+      url: '/v1/subscription/payments/confirm',
     });
-    expect(applied).toMatchObject({ applied: true, duplicate: false });
+    expect(confirmed.statusCode, confirmed.body).toBe(200);
+    expect(confirmed.json<{ status: string }>().status).toBe('applied');
 
     const [
       attempt,
@@ -497,6 +499,67 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
       ).currentPeriodEnd,
     ).toEqual(previousPeriodEnd);
 
+    await database.organization.update({
+      data: { defaultTimezone: 'America/Guayaquil' },
+      where: { id: firstOrganization.id },
+    });
+    const [persistedInvoice, persistedChange] = await Promise.all([
+      database.subscriptionInvoice.findUniqueOrThrow({
+        where: { id: invoice.id },
+      }),
+      database.subscriptionChange.findUniqueOrThrow({
+        where: { id: change.id },
+      }),
+    ]);
+    expect(persistedInvoice.billingTimezone).toBe('America/Lima');
+    expect(persistedChange.billingTimezone).toBe('America/Lima');
+
+    const noProviderTimeCheckout = await app.inject({
+      headers: {
+        authorization: `Bearer ${firstToken}`,
+        'idempotency-key': `no-provider-time-${suffix}`,
+      },
+      method: 'POST',
+      payload: { planCode: 'essential' },
+      url: '/v1/subscription/checkout',
+    });
+    expect(noProviderTimeCheckout.statusCode, noProviderTimeCheckout.body).toBe(
+      201,
+    );
+    const noProviderTimeAttempt =
+      await database.subscriptionPaymentAttempt.findUniqueOrThrow({
+        where: { id: noProviderTimeCheckout.json<{ id: string }>().id },
+      });
+    const noProviderTimeConfirmation = await app.inject({
+      headers: { authorization: `Bearer ${firstToken}` },
+      method: 'POST',
+      payload: {
+        clientTransactionId: noProviderTimeAttempt.internalReference,
+        id: 9004,
+      },
+      url: '/v1/subscription/payments/confirm',
+    });
+    expect(noProviderTimeConfirmation.statusCode, noProviderTimeConfirmation.body).toBe(
+      200,
+    );
+    const [appliedWithoutProviderTime, changeWithoutProviderTime] =
+      await Promise.all([
+        database.subscriptionPaymentAttempt.findUniqueOrThrow({
+          include: { invoice: true },
+          where: { id: noProviderTimeAttempt.id },
+        }),
+        database.subscriptionChange.findFirstOrThrow({
+          where: { subscriptionPaymentAttemptId: noProviderTimeAttempt.id },
+        }),
+      ]);
+    expect(appliedWithoutProviderTime.invoice.providerPaidAt).toBeNull();
+    expect(appliedWithoutProviderTime.invoice.billingTimezone).toBe(
+      'America/Guayaquil',
+    );
+    expect(changeWithoutProviderTime.billingTimezone).toBe(
+      'America/Guayaquil',
+    );
+
     const rejectedCheckout = await app.inject({
       headers: {
         authorization: `Bearer ${firstToken}`,
@@ -535,7 +598,7 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
       await database.subscriptionChange.count({
         where: { organizationId: firstOrganization.id },
       }),
-    ).toBe(1);
+    ).toBe(2);
 
     const expiringCheckout = await app.inject({
       headers: {
