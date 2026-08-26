@@ -14,6 +14,11 @@
 > suscripciones: ahora se usa PayPhone Botón WEB `Prepare + V2/Confirm`. El
 > webhook queda solo para auditoría; Confirm autenticado es la única autoridad.
 
+> Cierre sandbox: **25 de agosto de 2026**. Se aprovisionaron credenciales WEB
+> cifradas y se completó una compra de prueba correcta: Prepare, redirección,
+> Confirm, factura `PAID`, intento `APPLIED` y suscripción `ACTIVE`. El refresh
+> no agregó otro período. Esto no habilita ni certifica producción.
+
 ## Resumen ejecutivo
 
 Se recuperaron los gates locales de formato, lint y tipos, se activaron las
@@ -22,11 +27,10 @@ facturación y pagos de suscripciones. También quedó preparada la API de check
 autenticado y la aplicación transaccional e idempotente de un pago previamente
 verificado.
 
-No se habilitó ningún cobro real. La configuración histórica de plataforma
-corresponde a una aplicación PayPhone tipo API y queda deliberadamente separada.
-Se debe crear una aplicación tipo WEB y aprovisionar su StoreId y Token cifrado
-en `PlatformPaymentConfiguration` bajo `payphone_web_button`; completar una
-compra sandbox sigue siendo obligatorio.
+No se habilitó ningún cobro productivo. La configuración histórica de plataforma
+de tipo API permanece separada; la aplicación WEB TEST se aprovisionó bajo
+`payphone_web_button` con StoreId y Token cifrado. La compra sandbox quedó
+validada y el siguiente entorno debe configurarse con credenciales independientes.
 
 El 21 de agosto se aplicaron y verificaron en Neon las cuatro migraciones que
 estaban pendientes:
@@ -43,14 +47,14 @@ misma.
 
 ## Estado por fase
 
-| Fase | Estado                        | Evidencia o pendiente principal                                                                                                                                                                                                                                                          |
-| ---- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0    | Cerrada operativamente        | Release compilado, VPS y Neon reconciliados con 58 migraciones; API/Web/Admin y Nginx verificados. Un backup se restauró correctamente en una base temporal con 54 migraciones. El panel interno está publicado en `https://admin.navacloud.app`, protegido por contraseña scrypt y OTP. |
-| 1    | Sandbox preparado, bloqueante | Prepare/Confirm WEB implementados, con webhook auxiliar. Falta crear la aplicación WEB, aprovisionar sus credenciales cifradas y realizar una compra sandbox completa.                                                                                                                   |
-| 2    | Implementada localmente       | Migración `20260820220000_subscription_billing_domain`; aislamiento e idempotencia probados en PostgreSQL.                                                                                                                                                                               |
-| 3    | Sandbox preparado             | Planes, sesión de compra, checkout owner, retorno/cancelación y consulta de intento están implementados. El redirect invoca Confirm desde backend; no activa por sí mismo. El interruptor global continúa deshabilitado hasta cargar credenciales WEB y probarlo.                        |
-| 4    | Pendiente                     | Se conserva el flujo manual de reservas; no se automatizó sin contrato verificable del proveedor.                                                                                                                                                                                        |
-| 5–7  | Parcial                       | Estados saneados y pruebas críticas del backend. Faltan checkout web completo, panel operativo, métricas/alertas, sandbox y E2E de salida.                                                                                                                                               |
+| Fase | Estado                  | Evidencia o pendiente principal                                                                                                                                                                                                                                                          |
+| ---- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0    | Cerrada operativamente  | Release compilado, VPS y Neon reconciliados con 58 migraciones; API/Web/Admin y Nginx verificados. Un backup se restauró correctamente en una base temporal con 54 migraciones. El panel interno está publicado en `https://admin.navacloud.app`, protegido por contraseña scrypt y OTP. |
+| 1    | Sandbox cerrado         | Prepare/Confirm WEB validados con credenciales WEB cifradas. El webhook es auxiliar y no concede acceso. Producción queda pendiente de credenciales y aceptación separadas.                                                                                                              |
+| 2    | Implementada localmente | Migración `20260820220000_subscription_billing_domain`; aislamiento e idempotencia probados en PostgreSQL.                                                                                                                                                                               |
+| 3    | Sandbox cerrado         | Planes, sesión de compra, checkout owner, retorno/cancelación y consulta de intento fueron validados. El redirect invoca Confirm desde backend y refresh no renueva dos veces. Producción permanece separada.                                                                            |
+| 4    | Pendiente               | Se conserva el flujo manual de reservas; no se automatizó sin contrato verificable del proveedor.                                                                                                                                                                                        |
+| 5–7  | Parcial                 | Estados saneados y pruebas críticas del backend. Faltan checkout web completo, panel operativo, métricas/alertas, sandbox y E2E de salida.                                                                                                                                               |
 
 ## Cierre operativo de Fase 0 — 21 de agosto de 2026
 
@@ -153,6 +157,18 @@ de tenants.
   `encryptedToken` y snapshots del intento) distinguen el mecanismo y conservan
   todo el historial financiero.
 
+### Ensayo sandbox cerrado (25 de agosto)
+
+- La aplicación WEB TEST fue creada y sus credenciales se guardaron cifradas
+  bajo `payphone_web_button`, sin exponer Token ni StoreId en el repositorio.
+- La prueba recorrió `Prepare → pago → redirect → Confirm` y comprobó
+  `SubscriptionInvoice=PAID`, `SubscriptionPaymentAttempt=APPLIED` y
+  `Subscription=ACTIVE`.
+- Un refresh posterior no extendió el período comercial; el webhook continuó
+  sin autoridad para otorgar acceso.
+- Producción continúa deshabilitada y requiere credenciales WEB y aceptación
+  independientes.
+
 ### Checkout web de sandbox
 
 - Se incorporó `apps/web/app/checkout`: solicita el login de Nava, conserva el
@@ -213,14 +229,14 @@ webhook, por lo que este se conserva solo como telemetría auxiliar.
 verificable activa o renueva el plan correcto. Esta sección no autoriza cobros
 reales.
 
-### Precondiciones
+### Precondiciones históricas del ensayo cerrado
 
-- Debe crearse una aplicación PayPhone Developer de tipo **WEB** en pruebas,
+- Se creó una aplicación PayPhone Developer de tipo **WEB** en pruebas,
   distinta de la aplicación API de pagos de tenants y de la configuración
   histórica de plataforma.
-- Al crearla, configurar el dominio WEB `https://navacloud.app` y la URL de
-  respuesta `https://navacloud.app/checkout/payphone/confirm`; la cancelación
-  vuelve a `https://navacloud.app/checkout/payphone/cancel`.
+- Se configuraron el dominio WEB `https://navacloud.app` y la URL de respuesta
+  `https://navacloud.app/checkout/payphone/confirm`; la cancelación vuelve a
+  `https://navacloud.app/checkout/payphone/cancel`.
 - La API y la web tienen HTTPS válido; `https://navacloud.app/checkout` carga
   el checkout autenticado.
 - Existe una cuenta de prueba verificada, con una única organización y rol

@@ -2662,6 +2662,141 @@ a {
   border-color: #f3aaa1;
   color: #8c2518;
 }
+.subscription-checkout-return {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: calc(100vh - 92px);
+  padding: clamp(24px, 5vw, 72px);
+}
+.subscription-checkout-return-card {
+  background: #fffdf8;
+  box-shadow: 0 24px 60px rgba(16, 19, 23, 0.13);
+  max-width: 680px;
+  padding: clamp(32px, 6vw, 64px);
+  text-align: center;
+  width: 100%;
+}
+.subscription-checkout-return-icon {
+  align-items: center;
+  background: #d9993c;
+  border-radius: 100%;
+  color: #fff;
+  display: inline-flex;
+  font-size: 28px;
+  font-weight: 900;
+  height: 64px;
+  justify-content: center;
+  margin-bottom: 24px;
+  width: 64px;
+}
+.subscription-checkout-return-icon.is-approved {
+  background: #26744d;
+}
+.subscription-checkout-return-icon.is-error,
+.subscription-checkout-return-icon.is-rejected {
+  background: #b74737;
+}
+.subscription-checkout-return-card .eyebrow {
+  margin: 0;
+}
+.subscription-checkout-return-card h1 {
+  font-size: clamp(38px, 6vw, 64px);
+  letter-spacing: -0.075em;
+  line-height: 0.92;
+  margin: 13px 0 18px;
+}
+.subscription-checkout-return-message {
+  color: var(--light-muted);
+  font-size: 15px;
+  line-height: 1.55;
+  margin: 0 auto;
+  max-width: 490px;
+}
+.subscription-checkout-return-hint {
+  background: #f4ecdf;
+  color: #5f4a30;
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 25px 0 0;
+  padding: 14px 17px;
+}
+.subscription-checkout-app-card {
+  align-items: center;
+  background: #171b1e;
+  color: #fffaf0;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: auto minmax(0, 1fr);
+  margin-top: 32px;
+  padding: 22px;
+  text-align: left;
+}
+.subscription-checkout-app-icon {
+  align-items: center;
+  background: var(--gold-deep);
+  display: inline-flex;
+  font-size: 18px;
+  font-weight: 900;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+.subscription-checkout-app-card p,
+.subscription-checkout-app-card h2,
+.subscription-checkout-app-card small {
+  margin: 0;
+}
+.subscription-checkout-app-card p {
+  color: var(--gold-pale);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.subscription-checkout-app-card h2 {
+  font-size: 18px;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  margin-top: 5px;
+}
+.subscription-checkout-app-card small {
+  color: rgba(255, 250, 240, 0.67);
+  display: block;
+  font-size: 11px;
+  line-height: 1.4;
+  margin-top: 8px;
+}
+.subscription-checkout-play-store {
+  align-items: center;
+  background: #fffaf0;
+  color: #171b1e;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 900;
+  gap: 7px;
+  grid-column: 1 / -1;
+  justify-content: center;
+  padding: 13px 15px;
+  text-decoration: none;
+}
+.subscription-checkout-play-store:hover {
+  background: var(--gold-pale);
+}
+.subscription-checkout-play-store.is-pending {
+  background: rgba(255, 250, 240, 0.1);
+  color: rgba(255, 250, 240, 0.68);
+}
+.subscription-checkout-return-actions {
+  margin-top: 24px;
+}
+.subscription-checkout-return-actions .subscription-checkout-primary {
+  max-width: 360px;
+}
+.subscription-checkout-return-actions .subscription-checkout-back {
+  display: inline-block;
+  margin-top: 18px;
+}
 .subscription-checkout-signin {
   background: #171b1e;
   color: #f7f4ec;
@@ -3449,7 +3584,11 @@ a {
   }
   .deck-card.has-wave {
     background:
-      radial-gradient(circle at 84% 18%, rgba(255, 255, 255, 0.9), transparent 32%),
+      radial-gradient(
+        circle at 84% 18%,
+        rgba(255, 255, 255, 0.9),
+        transparent 32%
+      ),
       linear-gradient(145deg, #ffffff 0%, #fbf2de 54%, #dfba78 100%);
   }
   .deck-card-wavefield {

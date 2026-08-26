@@ -8,6 +8,8 @@ type Confirmation = {
   readonly status: string;
 };
 
+const playStoreUrl = process.env.NEXT_PUBLIC_PLAY_STORE_URL?.trim();
+
 async function confirmPayment(id: string, clientTransactionId: string) {
   const response = await fetch('/api/checkout/payment/confirm', {
     body: JSON.stringify({ clientTransactionId, id }),
@@ -70,46 +72,84 @@ export default function PayphoneConfirmation() {
 
   return (
     <main className="subscription-checkout-page">
-      <section
-        aria-live="polite"
-        className="subscription-checkout-shell subscription-checkout-return"
-      >
-        <p className="eyebrow">Nava · PayPhone</p>
-        <h1>
-          {status === 'approved'
-            ? 'Pago aprobado'
-            : status === 'rejected'
-              ? 'Pago rechazado'
-              : status === 'error'
-                ? 'No pudimos confirmar el pago'
-                : 'Confirmando pago…'}
-        </h1>
-        <p
-          className={
-            status === 'approved'
-              ? 'subscription-checkout-alert is-success'
-              : 'subscription-checkout-alert'
-          }
-        >
-          {message}
-        </p>
-        {status === 'confirming' ? (
-          <p className="subscription-checkout-loading">
-            No cierres esta página.
-          </p>
-        ) : null}
-        {status === 'error' && id && clientTransactionId ? (
-          <button
-            className="subscription-checkout-primary"
-            onClick={() => void runConfirmation()}
-            type="button"
+      <section aria-live="polite" className="subscription-checkout-return">
+        <div className="subscription-checkout-return-card">
+          <div
+            aria-hidden="true"
+            className={`subscription-checkout-return-icon is-${status}`}
           >
-            Reintentar confirmación
-          </button>
-        ) : null}
-        <a className="subscription-checkout-back" href="/checkout">
-          Volver al checkout
-        </a>
+            {status === 'approved' ? '✓' : status === 'confirming' ? '…' : '!'}
+          </div>
+          <p className="eyebrow">Nava · Suscripciones</p>
+          <h1>
+            {status === 'approved'
+              ? 'Tu plan ya está activo.'
+              : status === 'rejected'
+                ? 'El pago no fue aprobado.'
+                : status === 'error'
+                  ? 'No pudimos confirmar el pago.'
+                  : 'Confirmando tu pago…'}
+          </h1>
+          <p className="subscription-checkout-return-message">{message}</p>
+
+          {status === 'confirming' ? (
+            <p className="subscription-checkout-return-hint">
+              Esta validación se realiza de forma segura con PayPhone. No
+              cierres esta página.
+            </p>
+          ) : null}
+
+          {status === 'approved' ? (
+            <section className="subscription-checkout-app-card">
+              <span
+                aria-hidden="true"
+                className="subscription-checkout-app-icon"
+              >
+                N
+              </span>
+              <div>
+                <p>Todo listo para empezar</p>
+                <h2>Ingresa a Nava con el usuario que acabas de crear.</h2>
+                <small>
+                  Descarga la app para administrar tu negocio, agenda y
+                  clientes.
+                </small>
+              </div>
+              {playStoreUrl ? (
+                <a
+                  className="subscription-checkout-play-store"
+                  href={playStoreUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  <span aria-hidden="true">▶</span>
+                  Descargar en Google Play
+                </a>
+              ) : (
+                <span className="subscription-checkout-play-store is-pending">
+                  Google Play · Próximamente
+                </span>
+              )}
+            </section>
+          ) : null}
+
+          <div className="subscription-checkout-return-actions">
+            {status === 'error' && id && clientTransactionId ? (
+              <button
+                className="subscription-checkout-primary"
+                onClick={() => void runConfirmation()}
+                type="button"
+              >
+                Reintentar confirmación
+              </button>
+            ) : null}
+            <a className="subscription-checkout-back" href="/checkout">
+              {status === 'approved'
+                ? 'Ver mi suscripción'
+                : 'Volver al checkout'}
+            </a>
+          </div>
+        </div>
       </section>
     </main>
   );
