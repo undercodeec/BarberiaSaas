@@ -3352,7 +3352,7 @@ a {
     height: 49svh;
     right: 33vw;
     /* Ajusta este top para subir o bajar la imagen izquierda de Operación. */
-    top: 47svh;
+    top: 58svh;
   }
   .statement-device-reservations {
     /* Ajusta este bottom para ubicar la imagen derecha de Operación. */
@@ -3477,7 +3477,7 @@ a {
     height: min(60svh, 510px);
     opacity: 1;
     right: -25vw;
-    width: 105vw;
+    width: 90vw;
   }
   .close-model-left {
     bottom: -4svh;
