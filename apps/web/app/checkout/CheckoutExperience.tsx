@@ -1,7 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+
+import {
+  formatPhoneNumber,
+  getRegistrationCountryOptions,
+  validateRegistrationBeforeSubmit,
+} from './registration';
 
 interface Plan {
   readonly code: string;
@@ -46,6 +52,7 @@ type RegistrationForm = {
   marketingOptIn: boolean;
   openingTime: string;
   password: string;
+  phoneCountryCode: string;
   phone: string;
   privacyPolicyAccepted: boolean;
 };
@@ -180,6 +187,7 @@ function sessionMessage(session: CheckoutSession) {
 
 export default function CheckoutExperience() {
   const router = useRouter();
+  const registrationCountries = useMemo(getRegistrationCountryOptions, []);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [email, setEmail] = useState('');
@@ -211,6 +219,7 @@ export default function CheckoutExperience() {
     marketingOptIn: false,
     openingTime: '09:00',
     password: '',
+    phoneCountryCode: 'EC',
     phone: '',
     privacyPolicyAccepted: false,
   });
@@ -283,11 +292,22 @@ export default function CheckoutExperience() {
 
   async function register(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const validationError = validateRegistrationBeforeSubmit(
+      registration.privacyPolicyAccepted,
+    );
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    const { phoneCountryCode, ...registrationInput } = registration;
     setSubmitting(true);
     setError(null);
     try {
       const result = await requestJson<{ email: string }>('auth/register', {
-        body: JSON.stringify(registration),
+        body: JSON.stringify({
+          ...registrationInput,
+          phone: formatPhoneNumber(phoneCountryCode, registration.phone),
+        }),
         method: 'POST',
       });
       setVerificationEmail(result.email);
@@ -763,15 +783,56 @@ export default function CheckoutExperience() {
                 />
               </label>
               <label>
+                País de atención
+                <select
+                  aria-label="País"
+                  onChange={(event) =>
+                    setRegistration((current) => ({
+                      ...current,
+                      countryCode: event.target.value,
+                    }))
+                  }
+                  required
+                  value={registration.countryCode}
+                >
+                  {registrationCountries.map((country) => (
+                    <option key={country.code} value={country.code}>
+                      {country.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Código de país
+                <select
+                  aria-label="Código de país"
+                  onChange={(event) =>
+                    setRegistration((current) => ({
+                      ...current,
+                      phoneCountryCode: event.target.value,
+                    }))
+                  }
+                  required
+                  value={registration.phoneCountryCode}
+                >
+                  {registrationCountries.map((country) => (
+                    <option key={country.code} value={country.code}>
+                      {country.name} ({country.dial})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
                 Teléfono
                 <input
+                  inputMode="tel"
                   onChange={(event) =>
                     setRegistration((current) => ({
                       ...current,
                       phone: event.target.value,
                     }))
                   }
-                  placeholder="+593..."
+                  placeholder="Número de teléfono"
                   required
                   value={registration.phone}
                 />
