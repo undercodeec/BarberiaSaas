@@ -21,7 +21,7 @@ describe('NotificationBorderOrbit', () => {
       expect(start).toHaveBeenCalledTimes(1);
       expect(timing).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ duration: 7_000 }),
+        expect.objectContaining({ duration: 24_000 }),
       );
     });
 
