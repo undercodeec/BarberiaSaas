@@ -10,6 +10,8 @@ import {
   PlatformOperatorRole,
   PlatformSupportCaseStatus,
   ProductOrderStatus,
+  SubscriptionInvoiceStatus,
+  SubscriptionPaymentStatus,
   SubscriptionStatus,
   type DatabaseClient,
   type PlatformOverrideKind,
@@ -166,6 +168,38 @@ const platformOrganizationListSchema = z.object({
     ])
     .default('all'),
   trial: z.enum(['all', 'ending_soon', 'expired']).default('all'),
+});
+const platformSubscriptionListSchema = z.object({
+  invoiceStatus: z
+    .enum(['all', 'open', 'pending', 'paid', 'expired', 'void', 'refunded'])
+    .default('all'),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  paymentStatus: z
+    .enum([
+      'all',
+      'created',
+      'link_created',
+      'pending_provider',
+      'approved',
+      'applied',
+      'failed',
+      'expired',
+      'cancelled',
+    ])
+    .default('all'),
+  search: z.string().trim().max(120).optional(),
+  status: z
+    .enum([
+      'all',
+      'trial',
+      'free',
+      'active',
+      'past_due',
+      'suspended',
+      'cancelled',
+    ])
+    .default('all'),
 });
 const platformOrganizationActionSchema = z.discriminatedUnion('action', [
   z.object({
@@ -1989,6 +2023,166 @@ function registerPlatformRoutes(
         ]),
       ),
       trialsEndingSoon,
+    };
+  });
+
+  app.get('/v1/platform/subscriptions', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'manage_billing');
+    const query = platformSubscriptionListSchema.parse(request.query);
+    const subscriptionStatus =
+      query.status === 'all'
+        ? undefined
+        : (query.status.toUpperCase() as SubscriptionStatus);
+    const invoiceStatus =
+      query.invoiceStatus === 'all'
+        ? undefined
+        : (query.invoiceStatus.toUpperCase() as SubscriptionInvoiceStatus);
+    const paymentStatus =
+      query.paymentStatus === 'all'
+        ? undefined
+        : (query.paymentStatus.toUpperCase() as SubscriptionPaymentStatus);
+    const invoiceFilter = {
+      ...(invoiceStatus ? { status: invoiceStatus } : {}),
+      ...(paymentStatus
+        ? { paymentAttempts: { some: { status: paymentStatus } } }
+        : {}),
+    };
+    const hasInvoiceFilters = Boolean(invoiceStatus || paymentStatus);
+    const where = {
+      ...(subscriptionStatus ? { status: subscriptionStatus } : {}),
+      organization: {
+        deletedAt: null,
+        ...(query.search
+          ? {
+              OR: [
+                {
+                  name: {
+                    contains: query.search,
+                    mode: 'insensitive' as const,
+                  },
+                },
+                {
+                  slug: {
+                    contains: query.search,
+                    mode: 'insensitive' as const,
+                  },
+                },
+              ],
+            }
+          : {}),
+        ...(hasInvoiceFilters
+          ? { subscriptionInvoices: { some: invoiceFilter } }
+          : {}),
+      },
+    };
+    const [total, subscriptions] = await Promise.all([
+      database.subscription.count({ where }),
+      database.subscription.findMany({
+        include: {
+          changes: {
+            orderBy: { createdAt: 'desc' },
+            select: { createdAt: true, id: true, kind: true, toStatus: true },
+            take: 3,
+          },
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              subscriptionInvoices: {
+                orderBy: { createdAt: 'desc' },
+                select: {
+                  createdAt: true,
+                  currencyCode: true,
+                  dueAt: true,
+                  id: true,
+                  paidAt: true,
+                  planCode: true,
+                  status: true,
+                  totalCents: true,
+                  paymentAttempts: {
+                    orderBy: { createdAt: 'desc' },
+                    select: {
+                      amountCents: true,
+                      appliedAt: true,
+                      createdAt: true,
+                      currencyCode: true,
+                      id: true,
+                      provider: true,
+                      status: true,
+                    },
+                    take: 1,
+                  },
+                },
+                take: 1,
+              },
+            },
+          },
+          plan: { select: { code: true, name: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+      }),
+    ]);
+    return {
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+      },
+      subscriptions: subscriptions.map((subscription) => {
+        const invoice =
+          subscription.organization.subscriptionInvoices[0] ?? null;
+        const payment = invoice?.paymentAttempts[0] ?? null;
+        return {
+          currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
+          currentPeriodStart: subscription.currentPeriodStart.toISOString(),
+          history: subscription.changes.map((change) => ({
+            createdAt: change.createdAt.toISOString(),
+            id: change.id,
+            kind: change.kind.toLowerCase(),
+            status: change.toStatus.toLowerCase(),
+          })),
+          id: subscription.id,
+          latestInvoice: invoice
+            ? {
+                createdAt: invoice.createdAt.toISOString(),
+                currencyCode: invoice.currencyCode,
+                dueAt: invoice.dueAt.toISOString(),
+                id: invoice.id,
+                paidAt: invoice.paidAt?.toISOString() ?? null,
+                planCode: invoice.planCode,
+                status: invoice.status.toLowerCase(),
+                totalCents: invoice.totalCents,
+              }
+            : null,
+          latestPayment: payment
+            ? {
+                amountCents: payment.amountCents,
+                appliedAt: payment.appliedAt?.toISOString() ?? null,
+                createdAt: payment.createdAt.toISOString(),
+                currencyCode: payment.currencyCode,
+                id: payment.id,
+                provider: payment.provider,
+                status: payment.status.toLowerCase(),
+              }
+            : null,
+          organization: subscription.organization,
+          plan: subscription.plan,
+          status: subscription.status.toLowerCase(),
+          trialEndsAt: subscription.trialEndsAt?.toISOString() ?? null,
+          updatedAt: subscription.updatedAt.toISOString(),
+        };
+      }),
     };
   });
 

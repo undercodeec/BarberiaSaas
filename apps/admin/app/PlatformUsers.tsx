@@ -99,7 +99,11 @@ function UserDetail({
   }
 
   return (
-    <section className="content-card" aria-label="Ficha de usuario">
+    <section
+      aria-label="Ficha de usuario"
+      className="content-card user-detail-banner"
+      id={`user-detail-${user.account.id}`}
+    >
       <div className="toolbar-row">
         <div>
           <span className="card-kicker">Ficha 360°</span>
@@ -493,50 +497,62 @@ export function PlatformUsers({
           </label>
         </div>
       </section>
-      {detail ? (
-        <UserDetail
-          canManage={canManage}
-          detail={detail}
-          onClose={() => setDetail(null)}
-          onMutated={() => {
-            setRefreshKey((value) => value + 1);
-            void getPlatformUserDetail(token, detail.user.account.id).then(
-              setDetail,
-            );
-          }}
-          onOpenOrganization={onOpenOrganization}
-          token={token}
-        />
-      ) : null}
       <section className="table-card">
         {loading ? (
           <div className="panel-loader">Cargando usuarios…</div>
         ) : data?.users.length ? (
-          data.users.map((user) => (
-            <article className="event-row" key={user.id}>
-              <div className="event-main">
-                <strong>{user.name}</strong>
-                <span>
-                  {user.email} · {user.phone ?? 'Sin teléfono'}
-                </span>
-                <small>{user.id}</small>
+          data.users.map((user) => {
+            const isExpanded = detail?.user.account.id === user.id;
+            return (
+              <div className="user-list-item" key={user.id}>
+                <article className="event-row">
+                  <div className="event-main">
+                    <strong>{user.name}</strong>
+                    <span>
+                      {user.email} · {user.phone ?? 'Sin teléfono'}
+                    </span>
+                    <small>{user.id}</small>
+                  </div>
+                  <div className="event-meta">
+                    <span className="channel-badge">
+                      {titleCase(user.status)}
+                    </span>
+                    <small>
+                      {user.roles.join(', ') || 'Sin rol'} · {user.memberships}{' '}
+                      organizaciones · {user.security.activeSessions} sesiones
+                    </small>
+                    <button
+                      aria-controls={`user-detail-${user.id}`}
+                      aria-expanded={isExpanded}
+                      className="button button--ghost"
+                      onClick={() =>
+                        isExpanded ? setDetail(null) : void openDetail(user)
+                      }
+                      type="button"
+                    >
+                      {isExpanded ? 'Ocultar ficha' : 'Ver ficha'}
+                    </button>
+                  </div>
+                </article>
+                {isExpanded && detail ? (
+                  <UserDetail
+                    canManage={canManage}
+                    detail={detail}
+                    onClose={() => setDetail(null)}
+                    onMutated={() => {
+                      setRefreshKey((value) => value + 1);
+                      void getPlatformUserDetail(
+                        token,
+                        detail.user.account.id,
+                      ).then(setDetail);
+                    }}
+                    onOpenOrganization={onOpenOrganization}
+                    token={token}
+                  />
+                ) : null}
               </div>
-              <div className="event-meta">
-                <span className="channel-badge">{titleCase(user.status)}</span>
-                <small>
-                  {user.roles.join(', ') || 'Sin rol'} · {user.memberships}{' '}
-                  organizaciones · {user.security.activeSessions} sesiones
-                </small>
-                <button
-                  className="button button--ghost"
-                  onClick={() => void openDetail(user)}
-                  type="button"
-                >
-                  Ver ficha
-                </button>
-              </div>
-            </article>
-          ))
+            );
+          })
         ) : (
           <div className="empty-state">
             No se encontraron usuarios con esos filtros.

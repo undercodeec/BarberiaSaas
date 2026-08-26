@@ -10,6 +10,13 @@
 > Estado global: **MVP funcional para piloto controlado, todavía no listo para
 > declararse producción estable**.
 
+> Actualización del panel Admin: **26 de agosto de 2026**. El panel está
+> publicado en `https://admin.navacloud.app` desde el 21 de agosto de 2026,
+> con `nava-admin.service`, HTTPS y el commit `0ead479` verificados entonces.
+> El `HEAD` local actual (`457cb26`) es posterior a aquel despliegue e incluye
+> avances de Administración de Usuarios y Memberships que todavía requieren
+> validación y publicación controlada; no se deben asumir en producción.
+
 > Actualización de políticas y suscripciones: **23 de agosto de 2026**. Esta
 > actualización complementa el corte histórico: las reglas vigentes de negocio
 > se definen en `Politicas_y_terminos_Nava.md` cuando exista contradicción.
@@ -112,7 +119,7 @@ el código actual y tiene evidencia proporcional a su riesgo.
 | Reserva pública              | Funcional         | Catálogo, disponibilidad, OTP, política, idempotencia, gestión por token, reseñas y recordatorios implementados.                                                            |
 | Comercio de productos        | Parcial           | Catálogo, carrito, pedidos, reserva de stock, PayPhone y gestión operativa existen; faltan endurecimiento público y pruebas específicas.                                    |
 | Planes y suscripciones       | Funcional en TEST | Trial, plan Free, límites, feature flags y checkout WEB Prepare/Confirm están validados en sandbox. Producción requiere credenciales WEB y aceptación separadas.            |
-| Panel interno                | Funcional, local  | Operación segura y OTP existen. La modernización visual y nuevos filtros están sin commit y sin validación visual autenticada final.                                        |
+| Panel interno                | Funcional, desplegado | Admin está publicado con login/OTP, servicio y HTTPS. El árbol actual añade navegación Usuario↔Organización y administración de Memberships posteriores al commit desplegado; faltan validación autenticada y despliegue de esos avances. |
 | Calidad                      | Bloqueada         | Esquema, tipos, pruebas, E2E básico y builds pasan; lint y formato global fallan. Se omitieron 28 pruebas PostgreSQL.                                                       |
 | Producción                   | Piloto            | Hay evidencia histórica de API/Web en VPS, Neon, TLS, FCM y Maps. No se revalidaron hoy servicios, migraciones productivas ni recorrido completo.                           |
 | Android                      | Preparado         | `0.1.12` / code `34` está compilado y archivado; falta registrar su publicación y comprobar la versión recibida desde Play.                                                 |
@@ -129,10 +136,10 @@ el código actual y tiene evidencia proporcional a su riesgo.
   - `apps/admin`: Next.js 16 para operación interna de Nava.
 - Paquetes compartidos para base de datos, validación, permisos, cliente HTTP,
   configuración, dominio, tokens de diseño y utilidades de prueba.
-- El árbol estaba sincronizado con `origin/main` en el commit auditado, pero
-  contenía cambios locales sin commit en el panel administrativo, filtros de
-  organizaciones, prompt visual, lockfile y este documento. Esos cambios no se
-  deben asumir desplegados.
+- El corte histórico de 19 de agosto contenía cambios locales sin commit en el
+  panel administrativo. Al 26 de agosto el árbol local está limpio; aun así,
+  sus cambios posteriores a `0ead479` no se deben asumir desplegados hasta
+  publicar el commit revisado y ejecutar la aceptación funcional.
 
 ## Arquitectura vigente
 
@@ -445,27 +452,41 @@ Mobile / Web pública / Admin
       `SRI_ENV=test`; solo después, en una tarea independiente, evaluar producción
       con `SRI_PRODUCTION_ENABLED=true`.
 
-### Fase 12 — Panel interno: funcional, con cambios locales
+### Fase 12 — Panel interno: funcional, desplegado con avances pendientes
 
 - [x] Acceso limitado por `PLATFORM_ADMIN_EMAILS`, login y segundo factor OTP.
-- [~] Continuación Super Admin (23 de agosto de 2026): la primera entrega de
-  Usuarios Nava está implementada localmente con listado global paginado,
+- [x] El 21 de agosto de 2026 se desplegó `https://admin.navacloud.app` con
+  `nava-admin.service` en el puerto local `3001`, Nginx/Certbot y el commit
+  `0ead479`. La base registraba 58 migraciones aplicadas. Esta es evidencia
+  histórica de despliegue, no una comprobación realizada el 26 de agosto.
+- [~] Continuación Super Admin (código local al 26 de agosto de 2026): Usuarios
+  Nava incluye listado global paginado,
   búsqueda/filtros en backend, PII enmascarada, ficha 360°, consulta de
   Memberships, suspensión/reactivación, revocación total de sesiones y
-  solicitud segura de recuperación de contraseña. La migración
+  solicitud segura de recuperación de contraseña. El árbol actual también
+  incluye navegación Usuario↔Organización y administración de Memberships.
+  La migración
   `20260823160000_platform_user_administration` agrega el estado de
-  suspensión y debe aplicarse junto con las demás migraciones pendientes.
-  Falta validación contra PostgreSQL real, navegación Usuario↔Organización,
-  administración de Memberships y las fases restantes de la propuesta.
+  suspensión; confirmar su estado con `pnpm db:status` antes del despliegue.
+  Falta validación contra PostgreSQL real y la aceptación de roles, PII y los
+  flujos operativos antes de publicar esta continuación.
 - [x] Métricas, organizaciones, plan, trial, uso, errores de notificación,
       auditoría y diagnóstico de soporte sin suplantación.
 - [x] Acciones de cambio de plan, suspensión y reactivación auditadas.
 - [x] Filtros por búsqueda, estado, plan y vencimiento de prueba.
+- [~] Billing de plataforma (código local): existe una sección global de
+      Suscripciones exclusiva para Billing/Super Admin. Consulta datos reales de
+      la suscripción, la última factura, el último intento de pago y los tres
+      cambios más recientes, con filtros backend; no expone URLs, referencias ni
+      secretos de PayPhone, y no simula cobros. Falta desplegarla y completar una
+      vista de historial transaccional íntegro por organización.
 - [x] Rediseño responsive “Nava Control Center”, partículas con Anime.js y
       actualización manual de datos.
-- [ ] El rediseño y los filtros están en el árbol local sin commit.
-- [ ] Completar revisión visual autenticada en escritorio/móvil y desplegar un
-      servicio Admin; el runbook actual solo contempla API y Web pública.
+- [ ] Completar revisión visual autenticada en escritorio/móvil, Axe y los
+      casos de aceptación de roles, PII, incidencias y auditoría.
+- [ ] Desplegar de forma controlada el commit posterior a `0ead479` que contiene
+      Usuarios Nava, navegación y Memberships, y registrar el commit,
+      migraciones y aceptación resultantes.
 
 ### Fase 13 — Estabilización: pendiente
 
@@ -553,8 +574,10 @@ con una marca histórica de “lint aprobado”.
 Estos puntos provienen de evidencia histórica del proyecto. **No fueron
 revalidados por SSH, Google Cloud, Neon ni Play Console durante esta auditoría**.
 
-- API y Web pública desplegadas en `/opt/nava/app` sobre una VPS, con
-  `nava-api.service` y `nava-web.service` administrados por systemd.
+- API, Web pública y Admin fueron desplegados en `/opt/nava/app` sobre una VPS,
+  con `nava-api.service`, `nava-web.service` y `nava-admin.service`
+  administrados por systemd. El Admin fue validado el 21 de agosto de 2026 en
+  `https://admin.navacloud.app`; el commit confirmado fue `0ead479`.
 - Nginx/TLS exponen `https://api.navacloud.app` y
   `https://reservas.navacloud.app`; PostgreSQL productivo está en Neon.
 - Los secretos de la API viven en `/etc/nava/api.env`.
@@ -563,14 +586,13 @@ revalidados por SSH, Google Cloud, Neon ni Play Console durante esta auditoría*
   apuntar a esa ruta. Existe registro de una notificación real exitosa.
 - Google Maps Android quedó validado en desarrollo y en una instalación desde
   Google Play después de autorizar el paquete y la firma efectiva de Play.
-- La última constancia explícita de migraciones productivas decía 42 aplicadas
-  el 11 de agosto; el repositorio hoy contiene 52. Hay que reconciliar
-  `prisma migrate status` antes del próximo despliegue.
-- El último despliegue explícitamente documentado de API/Web fue el commit
-  `d603fe1`; el `HEAD` auditado es posterior. No asumir que producción contiene
-  pedidos públicos, la última migración o los cambios locales de Admin.
-- No hay constancia de un servicio `nava-admin.service` ni de exposición del
-  panel interno en la VPS actual.
+- La evidencia del despliegue Admin del 21 de agosto registró 58 migraciones
+  aplicadas. Como el código actual es posterior y contiene nuevas migraciones,
+  hay que reconciliar `pnpm db:status` antes del próximo despliegue.
+- El último despliegue de Admin explícitamente documentado fue `0ead479`; el
+  `HEAD` local actual (`457cb26`) es posterior. No asumir que producción
+  contiene los avances actuales de Usuarios Nava/Memberships ni sus
+  migraciones hasta confirmar el despliegue.
 
 ### Runbook vigente de VPS y Neon
 
@@ -694,7 +716,8 @@ curl -fsS https://api.navacloud.app/health
    desde cliente y configuraciones “Próximamente”.
 5. Decidir si pagos parciales/múltiples son requisito del piloto; hoy Caja solo
    admite cobro total por un método.
-6. Desplegar y probar el panel Admin modernizado.
+6. Validar y desplegar los avances posteriores a `0ead479` del panel Admin
+   (Usuarios Nava, navegación y Memberships).
 7. Añadir métricas, alertas y trazabilidad operativa de colas, pagos y errores.
 
 ### P2 — Después del piloto

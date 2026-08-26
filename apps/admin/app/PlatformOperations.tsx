@@ -1897,7 +1897,7 @@ export function OrganizationDetailModal({
   }
   return (
     <div aria-modal="true" className="modal-backdrop" role="dialog">
-      <div className="modal-card modal-card--wide">
+      <div className="modal-card modal-card--wide organization-detail-modal">
         <button
           aria-label="Cerrar"
           className="modal-close"

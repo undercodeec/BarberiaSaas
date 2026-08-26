@@ -48,6 +48,49 @@ export interface OrganizationList {
   };
 }
 
+export interface PlatformSubscriptionList {
+  readonly pagination: OrganizationList['pagination'];
+  readonly subscriptions: readonly {
+    readonly currentPeriodEnd: string;
+    readonly currentPeriodStart: string;
+    readonly history: readonly {
+      readonly createdAt: string;
+      readonly id: string;
+      readonly kind: string;
+      readonly status: string;
+    }[];
+    readonly id: string;
+    readonly latestInvoice: {
+      readonly createdAt: string;
+      readonly currencyCode: string;
+      readonly dueAt: string;
+      readonly id: string;
+      readonly paidAt: string | null;
+      readonly planCode: string;
+      readonly status: string;
+      readonly totalCents: number;
+    } | null;
+    readonly latestPayment: {
+      readonly amountCents: number;
+      readonly appliedAt: string | null;
+      readonly createdAt: string;
+      readonly currencyCode: string;
+      readonly id: string;
+      readonly provider: string;
+      readonly status: string;
+    } | null;
+    readonly organization: {
+      readonly id: string;
+      readonly name: string;
+      readonly slug: string;
+    };
+    readonly plan: { readonly code: string; readonly name: string };
+    readonly status: string;
+    readonly trialEndsAt: string | null;
+    readonly updatedAt: string;
+  }[];
+}
+
 export interface PlatformUser {
   readonly createdAt: string;
   readonly email: string;
@@ -534,6 +577,31 @@ export async function getOrganizations(
   if (input.search) query.set('search', input.search);
   return request<OrganizationList>(
     `/v1/platform/organizations?${query.toString()}`,
+    {},
+    token,
+  );
+}
+
+export async function getPlatformSubscriptions(
+  token: string,
+  input: {
+    readonly invoiceStatus: string;
+    readonly page: number;
+    readonly paymentStatus: string;
+    readonly search: string;
+    readonly status: string;
+  },
+) {
+  const query = new URLSearchParams({
+    invoiceStatus: input.invoiceStatus,
+    page: String(input.page),
+    pageSize: '12',
+    paymentStatus: input.paymentStatus,
+    status: input.status,
+  });
+  if (input.search) query.set('search', input.search);
+  return request<PlatformSubscriptionList>(
+    `/v1/platform/subscriptions?${query.toString()}`,
     {},
     token,
   );

@@ -74,6 +74,32 @@ verificados. La aceptación funcional restante se limita a las comprobaciones de
 roles, PII y flujos operativos enumeradas arriba cuando se incorporen operadores
 adicionales.
 
+## Actualización de Suscripciones — pendiente de aceptación autenticada
+
+El Admin incorpora una sección **Suscripciones** para los roles `billing` y
+`super_admin`. Consulta la suscripción vigente, la última factura, el último
+intento de pago y movimientos recientes desde rutas internas de la API. No
+expone URLs de cobro, referencias de proveedor ni secretos PayPhone.
+
+Después de desplegar el commit correspondiente, ejecutar y registrar:
+
+- [ ] Login con `billing` o `super_admin`: aparece **Suscripciones** en el menú.
+- [ ] Login con `support`, `operations` o `read_only`: la entrada no aparece y
+      `GET /v1/platform/subscriptions` responde `403` si se intenta acceder.
+- [ ] Buscar una organización conocida y contrastar plan, estado y periodo con
+      la ficha de Organización.
+- [ ] Verificar una factura pagada y un intento `APPLIED` contra el registro
+      transaccional de la misma organización.
+- [ ] Verificar una organización sin factura o sin intento: se muestra como
+      ausencia de evidencia de cobro, no como pago confirmado.
+- [ ] Confirmar que la pantalla no contiene URL de pago, token, StoreId,
+      referencia de proveedor ni datos PayPhone sensibles.
+- [ ] Revisar escritorio y móvil, y ejecutar Axe autenticado.
+
+El build, typecheck y pruebas unitarias locales no sustituyen esta aceptación
+contra PostgreSQL y credenciales reales. Al completarla, registrar aquí fecha,
+commit desplegado, operador/rol de prueba y resultado de cada punto.
+
 ## Relación con suscripciones PayPhone
 
 El panel Admin y la API comercial comparten la misma base PostgreSQL: el panel

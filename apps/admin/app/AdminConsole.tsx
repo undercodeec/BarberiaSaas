@@ -36,6 +36,7 @@ import {
   PlatformOperations,
 } from './PlatformOperations';
 import { PlatformUsers } from './PlatformUsers';
+import { PlatformSubscriptions } from './PlatformSubscriptions';
 
 const SESSION_KEY = 'nava.platform.session';
 const dateFormatter = new Intl.DateTimeFormat('es-EC', {
@@ -61,6 +62,7 @@ type View =
   | 'overview'
   | 'privacy'
   | 'security'
+  | 'subscriptions'
   | 'users';
 type ModalState = {
   readonly organization: PlatformOrganization;
@@ -1266,7 +1268,14 @@ export default function AdminConsole() {
           ]
         : []),
       ...(operatorPermissions.billing
-        ? [{ icon: 'audit', id: 'overrides' as const, label: 'Excepciones' }]
+        ? [
+            {
+              icon: 'dashboard',
+              id: 'subscriptions' as const,
+              label: 'Suscripciones',
+            },
+            { icon: 'audit', id: 'overrides' as const, label: 'Excepciones' },
+          ]
         : []),
       { icon: 'dashboard', id: 'health' as const, label: 'Estado técnico' },
       ...(operator?.role === 'super_admin'
@@ -1622,6 +1631,9 @@ export default function AdminConsole() {
               selectedUser={selectedUser}
               token={token}
             />
+          ) : null}
+          {view === 'subscriptions' && token && operatorPermissions.billing ? (
+            <PlatformSubscriptions onToast={setToast} token={token} />
           ) : null}
           {view === 'notifications' ? (
             <Notifications
