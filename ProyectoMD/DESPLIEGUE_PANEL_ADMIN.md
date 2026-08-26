@@ -84,20 +84,24 @@ verificados. La aceptación funcional restante se limita a las comprobaciones de
 roles, PII y flujos operativos enumeradas arriba cuando se incorporen operadores
 adicionales.
 
-## Actualización de Suscripciones — pendiente de aceptación autenticada
+## Actualización de Suscripciones — desplegada y validada operativamente
 
 El Admin incorpora una sección **Suscripciones** para los roles `billing` y
-`super_admin`. Consulta la suscripción vigente, la última factura, el último
-intento de pago y movimientos recientes desde rutas internas de la API. No
-expone URLs de cobro, referencias de proveedor ni secretos PayPhone.
+`super_admin`. Consulta en tiempo real la suscripción vigente, la última
+factura, el último intento de pago y movimientos recientes desde rutas internas
+de la API. No expone URLs de cobro, referencias de proveedor ni secretos
+PayPhone. El pull en la VPS y la comprobación de estados activos y otros estados
+de suscripción se realizaron el 26 de agosto de 2026.
 
-Después de desplegar el commit correspondiente, ejecutar y registrar:
+Comprobaciones realizadas o a conservar como regresión:
 
-- [ ] Login con `billing` o `super_admin`: aparece **Suscripciones** en el menú.
+- [x] Login con `billing` o `super_admin`: aparece **Suscripciones** en el menú.
 - [ ] Login con `support`, `operations` o `read_only`: la entrada no aparece y
       `GET /v1/platform/subscriptions` responde `403` si se intenta acceder.
-- [ ] Buscar una organización conocida y contrastar plan, estado y periodo con
-      la ficha de Organización.
+- [x] Buscar una organización conocida y contrastar plan y estado con la ficha
+      de Organización.
+- [x] Afinar la tarjeta de suscripción activa para mostrar de forma inequívoca
+      el inicio del período y su fecha de vencimiento.
 - [ ] Verificar una factura pagada y un intento `APPLIED` contra el registro
       transaccional de la misma organización.
 - [ ] Verificar una organización sin factura o sin intento: se muestra como

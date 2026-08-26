@@ -474,12 +474,14 @@ Mobile / Web pública / Admin
       auditoría y diagnóstico de soporte sin suplantación.
 - [x] Acciones de cambio de plan, suspensión y reactivación auditadas.
 - [x] Filtros por búsqueda, estado, plan y vencimiento de prueba.
-- [~] Billing de plataforma (código local): existe una sección global de
-      Suscripciones exclusiva para Billing/Super Admin. Consulta datos reales de
+- [~] Billing de plataforma (desplegado y validado operativamente el 26 de
+      agosto de 2026): existe una sección global de Suscripciones exclusiva para
+      Billing/Super Admin. Consulta datos reales en tiempo real de
       la suscripción, la última factura, el último intento de pago y los tres
       cambios más recientes, con filtros backend; no expone URLs, referencias ni
-      secretos de PayPhone, y no simula cobros. Falta desplegarla y completar una
-      vista de historial transaccional íntegro por organización.
+      secretos de PayPhone, y no simula cobros. La vista distingue el inicio y
+      vencimiento del período activo; falta completar un historial transaccional
+      íntegro por organización.
 - [x] Rediseño responsive “Nava Control Center”, partículas con Anime.js y
       actualización manual de datos.
 - [ ] Completar revisión visual autenticada en escritorio/móvil, Axe y los
@@ -716,8 +718,9 @@ curl -fsS https://api.navacloud.app/health
    desde cliente y configuraciones “Próximamente”.
 5. Decidir si pagos parciales/múltiples son requisito del piloto; hoy Caja solo
    admite cobro total por un método.
-6. Validar y desplegar los avances posteriores a `0ead479` del panel Admin
-   (Usuarios Nava, navegación y Memberships).
+6. Registrar el commit y las migraciones exactos del despliegue posterior a
+   `0ead479` del panel Admin (Usuarios Nava, navegación y Memberships), y
+   conservar su aceptación como evidencia de regresión.
 7. Añadir métricas, alertas y trazabilidad operativa de colas, pagos y errores.
 
 ### P2 — Después del piloto

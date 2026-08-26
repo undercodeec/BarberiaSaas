@@ -188,14 +188,17 @@ export function PlatformSubscriptions({
               <div className="subscription-card-grid">
                 <section>
                   <span className="subscription-card-label">
-                    Periodo vigente
+                    {subscription.status === 'active'
+                      ? 'Suscripción activa'
+                      : 'Periodo vigente'}
                   </span>
                   <strong>
-                    {formatDate(subscription.currentPeriodStart)} →{' '}
-                    {formatDate(subscription.currentPeriodEnd)}
+                    Inicio: {formatDate(subscription.currentPeriodStart)}
                   </strong>
                   <small>
-                    Trial hasta {formatDate(subscription.trialEndsAt)}
+                    {subscription.status === 'trial'
+                      ? `Finaliza prueba: ${formatDate(subscription.trialEndsAt)}`
+                      : `Vence: ${formatDate(subscription.currentPeriodEnd)}`}
                   </small>
                 </section>
                 <section>
