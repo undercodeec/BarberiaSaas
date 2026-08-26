@@ -3375,28 +3375,20 @@ a {
     margin: 58px auto 0;
     min-height: 0;
     /* El gesto vertical controla una tarjeta por vez mientras el mazo está activo. */
-    opacity: 1;
-    touch-action: pan-y;
-    transform: none;
+    touch-action: none;
     width: calc(100vw - 140px);
   }
   .deck-card {
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
-    transition: none;
   }
-  .deck-card.is-passing,
-  .deck-card.is-returning {
-    opacity: 1;
-    transform: translateY(-4px) scale(1.01);
+  .deck-card.has-wave {
+    background:
+      radial-gradient(circle at 84% 18%, rgba(255, 255, 255, 0.9), transparent 32%),
+      linear-gradient(145deg, #ffffff 0%, #fbf2de 54%, #dfba78 100%);
   }
-  .deck-svg-ribbon-one,
-  .deck-svg-ribbon-two,
-  .deck-svg-ribbon-three,
-  .deck-svg-ribbon-four,
-  .deck-svg-ribbon-five,
-  .deck-svg-particles {
-    animation: none;
+  .deck-card-wavefield {
+    display: none;
   }
   .deck-card h3 {
     font-size: 10vw;

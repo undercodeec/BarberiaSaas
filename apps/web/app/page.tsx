@@ -290,7 +290,7 @@ export default function HomePage() {
   };
   useEffect(() => {
     const onWheel = (event: WheelEvent) => {
-      if (window.matchMedia('(max-width: 800px)').matches) return;
+      if (!window.matchMedia('(max-width: 800px)').matches) return;
       const isDeckSceneActive =
         storyProgressRef.current >= 0.65 && storyProgressRef.current < 1;
       const direction = Math.sign(event.deltaY);
@@ -322,7 +322,6 @@ export default function HomePage() {
       deckTouchYRef.current = event.touches[0]?.clientY ?? null;
     };
     const onTouchMove = (event: TouchEvent) => {
-      // En móvil el mazo es estático y el gesto conserva el scroll de página.
       if (window.matchMedia('(max-width: 800px)').matches) return;
       const touch = event.touches[0];
       const previousY = deckTouchYRef.current;
