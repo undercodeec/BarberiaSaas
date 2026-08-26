@@ -332,6 +332,7 @@ describe('autenticación y onboarding', () => {
       confirmPassword: 'clave-segura',
       countryCode: 'EC',
       email: 'ana@example.com',
+      timezone: 'America/Lima',
       fullName: 'Ana Dueña',
       openingTime: '09:00',
       password: 'clave-segura',
@@ -342,6 +343,26 @@ describe('autenticación y onboarding', () => {
     if (result.success) {
       expect(result.data.marketingOptIn).toBe(false);
     }
+  });
+
+  it('acepta zonas IANA y rechaza valores que no lo son', () => {
+    const valid = {
+      accountType: 'business' as const,
+      businessName: 'Barbería Ana',
+      city: 'Quito',
+      closingTime: '18:00',
+      confirmPassword: 'clave-segura',
+      countryCode: 'EC',
+      email: 'zona@example.com',
+      fullName: 'Ana Dueña',
+      openingTime: '09:00',
+      password: 'clave-segura',
+      phone: '+593999999999',
+      privacyPolicyAccepted: true,
+      timezone: 'America/Lima',
+    };
+    expect(signUpSchema.safeParse({ ...valid, timezone: 'America/Lima' }).success).toBe(true);
+    expect(signUpSchema.safeParse({ ...valid, timezone: 'UTC+5' }).success).toBe(false);
   });
 
   it('rechaza un horario de registro que cierre antes de abrir', () => {

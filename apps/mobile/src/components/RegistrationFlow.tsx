@@ -50,6 +50,7 @@ import {
   TimeField,
 } from './RegistrationSelectors';
 import { requireApiClient } from '../lib/api';
+import { detectTimezone, TIMEZONE_OPTIONS } from '../lib/timezones';
 import { useAuth } from '../providers/AuthProvider';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -139,6 +140,7 @@ export function RegistrationFlow() {
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const [timezonePickerVisible, setTimezonePickerVisible] = useState(false);
   const revealFocusedField = useCallback(() => {
     const focusedInput = TextInput.State.currentlyFocusedInput();
     if (!focusedInput) return;
@@ -223,6 +225,7 @@ export function RegistrationFlow() {
       password: '',
       phone: '',
       privacyPolicyAccepted: false,
+      timezone: detectTimezone(),
     },
   });
   const values = getValues();
@@ -323,6 +326,7 @@ export function RegistrationFlow() {
       password,
       phone,
       privacyPolicyAccepted,
+      timezone,
     }) => {
       if (!email.trim() || !password || !confirmPassword) {
         setFormError('Completa tu correo y contraseña.');
@@ -358,6 +362,7 @@ export function RegistrationFlow() {
           password,
           phone: `${phoneCountry.dial} ${phone.trim()}`,
           privacyPolicyAccepted,
+          timezone,
         });
         setVerificationEmail(response.email);
         setVerificationExpiresAt(response.verificationExpiresAt);
@@ -687,9 +692,51 @@ export function RegistrationFlow() {
                               />
                             )}
                           />
+                          <Controller
+                            control={control}
+                            name="timezone"
+                            render={({ field, fieldState }) => (
+                              <View style={{ marginTop: 16 }}>
+                                <Text style={s.label}>Zona horaria del negocio</Text>
+                                <Pressable
+                                  onPress={() => setTimezonePickerVisible(true)}
+                                  style={s.timezoneSelect}
+                                >
+                                  <Text style={s.timezoneSelectText}>{field.value}</Text>
+                                </Pressable>
+                                {fieldState.error ? <Text style={s.error}>{fieldState.error.message}</Text> : null}
+                                <Modal
+                                  animationType="slide"
+                                  onRequestClose={() => setTimezonePickerVisible(false)}
+                                  visible={timezonePickerVisible}
+                                >
+                                  <SafeAreaView style={s.timezoneModal}>
+                                    <View style={s.timezoneModalHeader}>
+                                      <Text style={s.title}>Zona horaria</Text>
+                                      <Pressable onPress={() => setTimezonePickerVisible(false)}><Text style={s.backText}>Listo</Text></Pressable>
+                                    </View>
+                                    <ScrollView>
+                                      {TIMEZONE_OPTIONS.map((timezone) => (
+                                        <Pressable
+                                          key={timezone.value}
+                                          onPress={() => {
+                                            field.onChange(timezone.value);
+                                            setTimezonePickerVisible(false);
+                                          }}
+                                          style={s.timezoneOption}
+                                        >
+                                          <Text style={s.timezoneOptionText}>{timezone.label}</Text>
+                                        </Pressable>
+                                      ))}
+                                    </ScrollView>
+                                  </SafeAreaView>
+                                </Modal>
+                              </View>
+                            )}
+                          />
                           <Next
                             onPress={() =>
-                              requireFields(['country', 'city'], 'schedule')
+                              requireFields(['country', 'city', 'timezone'], 'schedule')
                             }
                           />
                         </Section>

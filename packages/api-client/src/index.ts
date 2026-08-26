@@ -84,6 +84,7 @@ export interface OnboardingAccountDetailsResponse {
   readonly closingTime: string | null;
   readonly onboardingCompletedAt: string | null;
   readonly phone: string | null;
+  readonly timezone: string | null;
 }
 
 export interface BusinessLocation {

@@ -222,6 +222,12 @@ export const s = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: -0.7,
   },
+  timezoneModal: { backgroundColor: appTheme.colors.surfaceMuted, flex: 1, padding: 20 },
+  timezoneModalHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
+  timezoneOption: { borderBottomColor: appTheme.colors.border, borderBottomWidth: 1, paddingVertical: 15 },
+  timezoneOptionText: { color: appTheme.colors.text, fontSize: 15 },
+  timezoneSelect: { backgroundColor: appTheme.colors.surface, borderColor: appTheme.colors.border, borderRadius: 14, borderWidth: 1, minHeight: 54, justifyContent: 'center', paddingHorizontal: 16 },
+  timezoneSelectText: { color: appTheme.colors.text, fontSize: 16 },
   tool: {
     backgroundColor: appTheme.colors.accentWash,
     borderRadius: 150,

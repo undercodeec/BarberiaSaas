@@ -41,6 +41,17 @@ const newPasswordSchema = passwordSchema.min(
 const timeSchema = z
   .string()
   .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/u, 'La hora debe tener formato HH:MM.');
+export const timezoneSchema = z.string().trim().max(64).refine(
+  (timezone) => {
+    try {
+      new Intl.DateTimeFormat('es', { timeZone: timezone }).format();
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  { message: 'La zona horaria no es válida.' },
+);
 const businessNameSchema = z
   .string()
   .trim()
@@ -117,6 +128,7 @@ export const signUpSchema = z
     openingTime: timeSchema,
     password: newPasswordSchema,
     phone: phoneSchema,
+    timezone: timezoneSchema,
   })
   .refine((value) => value.password === value.confirmPassword, {
     message: 'Las contraseñas no coinciden.',
@@ -199,6 +211,7 @@ export const updateOnboardingAccountDetailsSchema = z.object({
   facebookUrl: optionalProfileUrl,
   instagramUrl: optionalProfileUrl,
   phone: phoneSchema,
+  timezone: timezoneSchema,
 });
 
 const latitudeSchema = z.number().finite().min(-90).max(90);
@@ -270,17 +283,7 @@ export const locationOnboardingSchema = z.object({
   name: z.string().trim().min(2, 'Ingresa el nombre de la sucursal.').max(120),
   phone: z.string().trim().min(7, 'Ingresa un teléfono válido.').max(24),
   slug: slugSchema,
-  timezone: z.string().refine(
-    (timezone) => {
-      try {
-        new Intl.DateTimeFormat('es', { timeZone: timezone }).format();
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    { message: 'La zona horaria no es válida.' },
-  ),
+  timezone: timezoneSchema,
   whatsappPhone: z
     .string()
     .trim()

@@ -31,6 +31,7 @@ import { KeyboardAwareScrollView as ScrollView } from '../../src/components/Keyb
 import { CountryCityFields } from '../../src/components/RegistrationSelectors';
 import { requireApiClient } from '../../src/lib/api';
 import { accountQueryKey, accountQueryPrefix } from '../../src/lib/query-keys';
+import { detectTimezone } from '../../src/lib/timezones';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const PRIMARY = appTheme.colors.accent;
@@ -60,6 +61,7 @@ export default function ProfileEditScreen() {
   const [businessAddress, setBusinessAddress] = useState('');
   const [businessCity, setBusinessCity] = useState('');
   const [businessCountryCode, setBusinessCountryCode] = useState('EC');
+  const [businessTimezone, setBusinessTimezone] = useState(detectTimezone);
   const [businessCoverImage, setBusinessCoverImage] = useState<string | null>(
     null,
   );
@@ -100,6 +102,7 @@ export default function ProfileEditScreen() {
     setBusinessAddress(accountDetails.addressLine ?? '');
     setBusinessCity(accountDetails.city ?? '');
     setBusinessCountryCode(accountDetails.countryCode ?? 'EC');
+    setBusinessTimezone(accountDetails.timezone ?? detectTimezone());
     setBusinessCoverImage(accountDetails.coverImageUri);
     setFacebookUrl(accountDetails.facebookUrl ?? '');
     setInstagramUrl(accountDetails.instagramUrl ?? '');
@@ -136,6 +139,7 @@ export default function ProfileEditScreen() {
             facebookUrl: facebookUrl.trim() || null,
             instagramUrl: instagramUrl.trim() || null,
             phone: phone.trim() || accountDetails.phone || '',
+            timezone: businessTimezone,
           },
           method: 'PATCH',
         });
@@ -321,6 +325,12 @@ export default function ProfileEditScreen() {
                 setBusinessCountryCode(country.code);
                 setBusinessCity('');
               }}
+            />
+            <Field
+              label="Zona horaria del negocio (IANA)"
+              onChangeText={setBusinessTimezone}
+              placeholder="America/Guayaquil"
+              value={businessTimezone}
             />
             <Field
               label="Enlace de Facebook"

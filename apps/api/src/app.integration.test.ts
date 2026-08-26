@@ -195,6 +195,7 @@ function registrationProfilePayload() {
     openingTime: '09:00',
     phone: `+5939${String(registrationProfileSequence).padStart(8, '0')}`,
     privacyPolicyAccepted: true,
+    timezone: 'America/Guayaquil',
   } as const;
 }
 

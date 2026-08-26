@@ -8,6 +8,7 @@ import {
   getRegistrationCountryOptions,
   validateRegistrationBeforeSubmit,
 } from './registration';
+import { detectTimezone, TIMEZONE_OPTIONS } from './timezones';
 
 interface Plan {
   readonly code: string;
@@ -55,6 +56,7 @@ type RegistrationForm = {
   phoneCountryCode: string;
   phone: string;
   privacyPolicyAccepted: boolean;
+  timezone: string;
 };
 
 type FirstServiceForm = {
@@ -222,6 +224,7 @@ export default function CheckoutExperience() {
     phoneCountryCode: 'EC',
     phone: '',
     privacyPolicyAccepted: false,
+    timezone: detectTimezone(),
   });
 
   const loadSession = useCallback(async () => {
@@ -849,6 +852,26 @@ export default function CheckoutExperience() {
                   required
                   value={registration.city}
                 />
+              </label>
+              <label>
+                Zona horaria del negocio
+                <select
+                  aria-label="Zona horaria"
+                  onChange={(event) =>
+                    setRegistration((current) => ({
+                      ...current,
+                      timezone: event.target.value,
+                    }))
+                  }
+                  required
+                  value={registration.timezone}
+                >
+                  {TIMEZONE_OPTIONS.map((timezone) => (
+                    <option key={timezone.value} value={timezone.value}>
+                      {timezone.label}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label>
                 Tipo de cuenta

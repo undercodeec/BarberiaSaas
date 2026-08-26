@@ -466,6 +466,7 @@ interface RegistrationProfileDraft {
   readonly countryCode: string;
   readonly openingTime: string;
   readonly phone: string;
+  readonly timezone: string;
 }
 
 function completeRegistrationProfile(input: {
@@ -476,6 +477,7 @@ function completeRegistrationProfile(input: {
   readonly countryCode: string | null;
   readonly openingTime: string | null;
   readonly phone: string | null;
+  readonly timezone: string | null;
 }): RegistrationProfileDraft | null {
   if (
     !input.accountType ||
@@ -484,7 +486,8 @@ function completeRegistrationProfile(input: {
     !input.closingTime ||
     !input.countryCode ||
     !input.openingTime ||
-    !input.phone
+    !input.phone ||
+    !input.timezone
   ) {
     return null;
   }
@@ -496,6 +499,7 @@ function completeRegistrationProfile(input: {
     countryCode: input.countryCode,
     openingTime: input.openingTime,
     phone: input.phone,
+    timezone: input.timezone,
   };
 }
 
@@ -1111,6 +1115,7 @@ export async function buildApi({
           countryCode: input.countryCode,
           openingTime: input.openingTime,
           phone: input.phone.trim(),
+          timezone: input.timezone,
         },
         verificationMailer,
       });
@@ -1281,6 +1286,7 @@ export async function buildApi({
           closingTime,
           countryCode,
           openingTime,
+          timezone,
         } = registrationProfile;
         const profileData = {
           accountType,
@@ -1291,6 +1297,7 @@ export async function buildApi({
           countryCode,
           openingTime,
           phoneKey: normalizePhone(registrationProfile.phone),
+          timezone,
         };
         await transaction.userRegistrationProfile.upsert({
           create: { ...profileData, userId: user.id },
@@ -2060,6 +2067,7 @@ export async function buildApi({
       facebookUrl: profile?.facebookUrl ?? null,
       openingTime: profile?.openingTime ?? null,
       phone: user.phone,
+      timezone: profile?.timezone ?? null,
       instagramUrl: profile?.instagramUrl ?? null,
       onboardingCompletedAt:
         profile?.onboardingCompletedAt?.toISOString() ?? null,
@@ -2107,12 +2115,16 @@ export async function buildApi({
                 facebookUrl: input.facebookUrl,
                 instagramUrl: input.instagramUrl,
                 phoneKey: normalizePhone(input.phone),
+                timezone: input.timezone,
               },
               where: { userId: user.id },
             });
           if (activeMembership) {
             await transaction.organization.update({
-              data: { name: input.businessName },
+              data: {
+                defaultTimezone: input.timezone,
+                name: input.businessName,
+              },
               where: { id: activeMembership.organizationId },
             });
             const locationId =
@@ -2124,6 +2136,7 @@ export async function buildApi({
                   city: input.city,
                   countryCode: input.countryCode,
                   phone: input.phone,
+                  timezone: input.timezone,
                   whatsappPhone: input.phone,
                 },
                 where: { id: locationId },
@@ -2156,6 +2169,7 @@ export async function buildApi({
           updatedProfile.onboardingCompletedAt?.toISOString() ?? null,
         openingTime: updatedProfile.openingTime,
         phone: updatedUser.phone,
+        timezone: updatedProfile.timezone,
       };
     } catch (error) {
       if (isUniqueConstraintError(error)) {
@@ -2322,7 +2336,7 @@ export async function buildApi({
       const organization = await transaction.organization.create({
         data: {
           currencyCode: 'USD',
-          defaultTimezone: 'America/Guayaquil',
+          defaultTimezone: profile.timezone,
           name: profile.businessName,
           slug: organizationSlug,
         },
@@ -2338,7 +2352,7 @@ export async function buildApi({
           organizationId: organization.id,
           phone: user.phone ?? profile.phoneKey,
           slug: 'principal',
-          timezone: 'America/Guayaquil',
+          timezone: profile.timezone,
           whatsappPhone: user.phone ?? profile.phoneKey,
         },
       });
