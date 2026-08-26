@@ -3312,9 +3312,10 @@ a {
     right: 5%;
   }
   .statement-scroll {
-    height: 500svh;
+    /* dvh sigue el viewport real al contraerse/expandirse la barra del navegador. */
+    height: 500dvh;
     /* Cubre el hero completo después de que este termina de revelarse. */
-    margin-top: -100svh;
+    margin-top: -100dvh;
   }
   .portal-close-scroll {
     height: 200svh;
@@ -3322,8 +3323,8 @@ a {
   .statement-fold {
     border: 0;
     border-radius: 0;
-    height: 100svh;
-    min-height: 100svh;
+    height: 100dvh;
+    min-height: 100dvh;
     padding: 15vh 30px 10vh;
   }
   .statement-fold h2,
@@ -3366,7 +3367,7 @@ a {
   }
   .deck-stage {
     display: block;
-    height: 100svh;
+    height: 100dvh;
     padding: 12vh 30px 105px;
   }
   .module-deck {

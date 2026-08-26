@@ -1,10 +1,6 @@
-/* eslint-disable react-hooks/refs -- React Native Animated exposes stable imperative values that are intentionally read by animated styles. */
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef } from 'react';
 import {
-  Animated,
-  Easing,
   Platform,
   Pressable,
   StyleSheet,
@@ -99,49 +95,9 @@ export function useNativeLayoutMetrics(sheetRatio = 0.88) {
 }
 
 function GoldIndicator() {
-  const translateX = useRef(new Animated.Value(-14)).current;
-
-  useEffect(() => {
-    let isActive = true;
-
-    const move = (toValue: number): void => {
-      Animated.timing(translateX, {
-        duration: 5_500,
-        easing: Easing.inOut(Easing.sin),
-        isInteraction: false,
-        toValue,
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished && isActive) move(toValue > 0 ? -14 : 14);
-      });
-    };
-
-    move(14);
-    return () => {
-      isActive = false;
-      translateX.stopAnimation();
-    };
-  }, [translateX]);
-
-  const opacity = translateX.interpolate({
-    extrapolate: 'clamp',
-    inputRange: [-14, 0, 14],
-    outputRange: [0.72, 1, 0.72],
-  });
-  const scale = translateX.interpolate({
-    extrapolate: 'clamp',
-    inputRange: [-14, 0, 14],
-    outputRange: [0.86, 1.2, 0.86],
-  });
-
   return (
     <View pointerEvents="none" style={styles.goldIndicator}>
-      <Animated.View
-        style={[
-          styles.goldIndicatorFlare,
-          { opacity, transform: [{ translateX }, { scale }] },
-        ]}
-      />
+      <View style={styles.goldIndicatorFlare} />
     </View>
   );
 }

@@ -9,7 +9,6 @@ import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Animated,
-  Easing,
   Modal,
   PanResponder,
   Pressable,
@@ -62,7 +61,6 @@ export function GlobalNotificationsBanner() {
   const organizationQuery = useCurrentOrganization();
   const [isOpen, setIsOpen] = useState(false);
   const [isTriggerPositionReady, setIsTriggerPositionReady] = useState(false);
-  const [borderDotProgress] = useState(() => new Animated.Value(0));
   const [translateX] = useState(() => new Animated.Value(-520));
   const [triggerPosition] = useState(() => new Animated.ValueXY());
   const clampTriggerPosition = useCallback(
@@ -172,31 +170,6 @@ export function GlobalNotificationsBanner() {
     [setTriggerPosition, triggerPosition],
   );
 
-  useEffect(() => {
-    // Mantener la órbita en el driver nativo evita que el punto se quede
-    // detenido cuando el hilo de JavaScript se ocupa con una consulta o gesto.
-    const borderDotAnimation = Animated.loop(
-      Animated.timing(borderDotProgress, {
-        duration: 24_000,
-        easing: Easing.linear,
-        isInteraction: false,
-        toValue: 1,
-        useNativeDriver: true,
-      }),
-    );
-
-    borderDotAnimation.start();
-    return () => {
-      borderDotAnimation.stop();
-      borderDotProgress.setValue(0);
-    };
-  }, [borderDotProgress]);
-
-  const borderDotRotation = borderDotProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
   const query = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -278,15 +251,9 @@ export function GlobalNotificationsBanner() {
           style={styles.trigger}
         >
           <Ionicons color="#B47D17" name="notifications-outline" size={24} />
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.borderDotOrbit,
-              { transform: [{ rotate: borderDotRotation }] },
-            ]}
-          >
+          <View pointerEvents="none" style={styles.borderDotOrbit}>
             <View style={styles.borderDot} />
-          </Animated.View>
+          </View>
           {unread ? (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>

@@ -423,27 +423,8 @@ export function OpenButtonFlare() {
 
   useEffect(() => {
     // Traslación, opacidad y escala se ejecutan en el driver nativo de Android.
-    const flareAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(flareProgress, {
-          duration: 2_200,
-          easing: Easing.inOut(Easing.sin),
-          isInteraction: false,
-          toValue: 1,
-          useNativeDriver: true,
-        }),
-        Animated.timing(flareProgress, {
-          duration: 2_200,
-          easing: Easing.inOut(Easing.sin),
-          isInteraction: false,
-          toValue: 0,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-
     // El destello queda fijo en Mobile para evitar repintados continuos.
-    return () => flareAnimation.stop();
+    return undefined;
   }, [flareProgress]);
 
   const translateX = flareProgress.interpolate({
