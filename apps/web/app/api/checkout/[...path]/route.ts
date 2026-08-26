@@ -19,6 +19,10 @@ const routes = {
   },
   'onboarding/services': { method: 'POST', upstream: 'v1/onboarding/services' },
   payment: { method: 'POST', upstream: 'v1/subscription/checkout' },
+  'payment/confirm': {
+    method: 'POST',
+    upstream: 'v1/subscription/payments/confirm',
+  },
   plans: { method: 'GET', upstream: 'v1/subscription/plans' },
   session: { method: 'GET', upstream: 'v1/subscription/session' },
 } as const;

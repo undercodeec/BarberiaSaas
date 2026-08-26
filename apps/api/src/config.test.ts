@@ -70,11 +70,11 @@ describe('configuración de cobros de plataforma', () => {
         32,
         4,
       ).toString('base64'),
-      PLATFORM_PAYPHONE_WEBHOOK_ALLOWED_IPS: '203.0.113.10',
       PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS: '1500',
       PLATFORM_SUBSCRIPTION_TERMS_VERSION: 'sandbox-v1',
     });
     expect(config.PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS).toBe(1500);
+    expect(config.PLATFORM_PAYPHONE_WEBHOOK_ALLOWED_IPS).toBe('');
   });
 });
 

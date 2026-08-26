@@ -18,7 +18,10 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import type { ApiConfig } from './config';
 import { ApiError } from './errors';
-import { requestPayphoneLink } from './payphone-payments';
+import {
+  confirmPayphoneWebButton,
+  preparePayphoneWebButton,
+} from './payphone-web-button';
 import { decryptPlatformPaymentCredential } from './security';
 import { ensureOrganizationSubscription } from './subscription-policy';
 
@@ -31,6 +34,12 @@ const checkoutSchema = z.object({
   planCode: z.string().trim().min(1).max(40),
 });
 const paymentParamsSchema = z.object({ id: z.uuid() });
+const confirmPaymentSchema = z.object({
+  clientTransactionId: z.string().trim().min(1).max(15),
+  id: z.coerce.number().int().positive(),
+});
+
+const PLATFORM_PAYMENT_PROVIDER = 'payphone_web_button';
 
 type Authenticate = (
   database: DatabaseClient,
@@ -40,7 +49,7 @@ type Authenticate = (
 }>;
 
 export interface PlatformPaymentProvider {
-  createLink(input: {
+  preparePayment(input: {
     readonly amountCents: number;
     readonly currencyCode: string;
     readonly internalReference: string;
@@ -50,6 +59,13 @@ export interface PlatformPaymentProvider {
     readonly paymentUrl: string;
     readonly providerPayload?: Prisma.InputJsonValue;
   }>;
+  confirmPayment(input: {
+    readonly amountCents: number;
+    readonly currencyCode: string;
+    readonly internalReference: string;
+    readonly providerTransactionId: string;
+    readonly storeId: string;
+  }): Promise<VerifiedPlatformPayment>;
 }
 
 export interface VerifiedPlatformPayment {
@@ -67,7 +83,11 @@ export interface VerifiedPlatformPayment {
 const payphonePlatformWebhookSchema = z.object({
   Amount: z.coerce.number().int().positive(),
   ClientTransactionId: z.string().trim().min(1).max(15),
-  Currency: z.string().trim().length(3).transform((value) => value.toUpperCase()),
+  Currency: z
+    .string()
+    .trim()
+    .length(3)
+    .transform((value) => value.toUpperCase()),
   StatusCode: z.coerce.number().int(),
   StoreId: z.string().trim().min(1).max(160),
   TransactionId: z.union([z.string(), z.number().int()]).transform(String),
@@ -175,19 +195,62 @@ function jsonSnapshot(
 export function platformPaymentEventHash(
   payment: Pick<
     VerifiedPlatformPayment,
-    'internalReference' | 'providerTransactionId' | 'status'
+    'internalReference' | 'providerTransactionId' | 'source' | 'status'
   >,
 ) {
   return createHash('sha256')
     .update(
       [
         'payphone',
+        payment.source ?? PaymentProviderEventSource.RECONCILIATION,
         payment.providerTransactionId,
         payment.internalReference,
         payment.status,
       ].join(':'),
     )
     .digest('hex');
+}
+
+async function recordPlatformWebhookForAudit(
+  database: DatabaseClient,
+  payment: z.infer<typeof payphonePlatformWebhookSchema>,
+  payload: unknown,
+) {
+  const attempt = await database.subscriptionPaymentAttempt.findUnique({
+    where: { internalReference: payment.ClientTransactionId },
+  });
+  if (!attempt) return false;
+  const eventHash = platformPaymentEventHash({
+    internalReference: payment.ClientTransactionId,
+    providerTransactionId: payment.TransactionId,
+    source: PaymentProviderEventSource.WEBHOOK,
+    status:
+      payment.StatusCode === 3 &&
+      payment.TransactionStatus.toLowerCase() === 'approved'
+        ? 'approved'
+        : 'rejected',
+  });
+  if (
+    await database.paymentProviderEvent.findUnique({
+      where: { providerEventHash: eventHash },
+    })
+  )
+    return true;
+  await database.paymentProviderEvent.create({
+    data: {
+      internalReference: payment.ClientTransactionId,
+      organizationId: attempt.organizationId,
+      payload: sanitizePlatformProviderPayload(payload),
+      processedAt: new Date(),
+      providerEventHash: eventHash,
+      providerTransactionId: payment.TransactionId,
+      source: PaymentProviderEventSource.WEBHOOK,
+      subscriptionPaymentAttemptId: attempt.id,
+      validationErrorCode: 'WEBHOOK_AUXILIARY',
+      validationStatus: PaymentProviderValidationStatus.IGNORED,
+    },
+  });
+  return true;
 }
 
 export function addBillingDays(date: Date, days: number) {
@@ -283,27 +346,52 @@ function defaultProvider(
   config: ApiConfig,
   configuration: { encryptedToken: string },
 ): PlatformPaymentProvider {
+  function token() {
+    if (!config.PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY)
+      throw new ApiError(
+        503,
+        'PLATFORM_PAYMENT_ENCRYPTION_NOT_CONFIGURED',
+        'El checkout todavía no está configurado.',
+      );
+    return decryptPlatformPaymentCredential({
+      encodedKey: config.PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY,
+      encryptedSecret: configuration.encryptedToken,
+    });
+  }
+  function checkoutUrl(path: string) {
+    return new URL(
+      path,
+      `${config.PLATFORM_CHECKOUT_URL.replace(/\/+$/u, '')}/`,
+    ).toString();
+  }
   return {
-    async createLink(input) {
-      if (!config.PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY)
-        throw new ApiError(
-          503,
-          'PLATFORM_PAYMENT_ENCRYPTION_NOT_CONFIGURED',
-          'El checkout todavía no está configurado.',
-        );
-      const token = decryptPlatformPaymentCredential({
-        encodedKey: config.PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY,
-        encryptedSecret: configuration.encryptedToken,
+    async preparePayment(input) {
+      return preparePayphoneWebButton({
+        amountCents: input.amountCents,
+        cancellationUrl: checkoutUrl('payphone/cancel'),
+        clientTransactionId: input.internalReference,
+        currencyCode: input.currencyCode,
+        reference: `Suscripción ${input.planName}`.slice(0, 100),
+        responseUrl: checkoutUrl('payphone/confirm'),
+        storeId: input.storeId,
+        token: token(),
+      });
+    },
+    async confirmPayment(input) {
+      const confirmed = await confirmPayphoneWebButton({
+        clientTransactionId: input.internalReference,
+        providerTransactionId: input.providerTransactionId,
+        token: token(),
       });
       return {
-        paymentUrl: await requestPayphoneLink({
-          amountCents: input.amountCents,
-          clientTransactionId: input.internalReference,
-          expireInHours: 24,
-          reference: `Suscripción ${input.planName}`.slice(0, 100),
-          storeId: input.storeId,
-          token,
-        }),
+        amountCents: confirmed.amountCents,
+        currencyCode: confirmed.currencyCode,
+        internalReference: confirmed.clientTransactionId,
+        payload: confirmed.payload,
+        providerTransactionId: confirmed.providerTransactionId,
+        source: PaymentProviderEventSource.RECONCILIATION,
+        status: confirmed.status,
+        storeId: input.storeId,
       };
     },
   };
@@ -600,33 +688,17 @@ export function registerSubscriptionPaymentRoutes(
   );
 
   app.post('/v1/webhooks/payphone/platform', async (request, reply) => {
-    if (!webhookAllowedIps.has(request.ip))
+    if (webhookAllowedIps.size > 0 && !webhookAllowedIps.has(request.ip))
       return reply.code(403).send({ ErrorCode: '777', Response: false });
 
     const parsed = payphonePlatformWebhookSchema.safeParse(request.body);
     if (!parsed.success)
       return reply.code(200).send({ ErrorCode: '444', Response: false });
 
-    const payment = parsed.data;
-    if (
-      config.PLATFORM_PAYMENTS_ENABLED !== 'true' ||
-      payment.StatusCode !== 3 ||
-      payment.TransactionStatus.toLowerCase() !== 'approved'
-    )
-      return reply.code(200).send({ ErrorCode: '222', Response: false });
-
     try {
-      const result = await applyVerifiedPlatformPayment(database, {
-        amountCents: payment.Amount,
-        currencyCode: payment.Currency,
-        internalReference: payment.ClientTransactionId,
-        payload: request.body,
-        providerTransactionId: payment.TransactionId,
-        source: PaymentProviderEventSource.WEBHOOK,
-        status: 'approved',
-        storeId: payment.StoreId,
-      });
-      if (result.applied || result.duplicate)
+      if (
+        await recordPlatformWebhookForAudit(database, parsed.data, request.body)
+      )
         return reply.code(200).send({ ErrorCode: '000', Response: true });
       return reply.code(200).send({ ErrorCode: '444', Response: false });
     } catch (error) {
@@ -721,12 +793,11 @@ export function registerSubscriptionPaymentRoutes(
     }
     const configuration =
       await database.platformPaymentConfiguration.findUnique({
-        where: { provider: 'payphone' },
+        where: { provider: PLATFORM_PAYMENT_PROVIDER },
       });
     if (
       !configuration?.isEnabled ||
-      configuration.status !== PlatformPaymentConfigurationStatus.READY ||
-      !configuration.webhookAuthorizedAt
+      configuration.status !== PlatformPaymentConfigurationStatus.READY
     )
       throw new ApiError(
         503,
@@ -843,6 +914,7 @@ export function registerSubscriptionPaymentRoutes(
           internalReference: internalReference(),
           invoiceId: invoice.id,
           organizationId: membership.organizationId,
+          provider: PLATFORM_PAYMENT_PROVIDER,
           storeId: configuration.storeId,
         },
         include: { invoice: true },
@@ -869,7 +941,7 @@ export function registerSubscriptionPaymentRoutes(
 
     const provider = providerOverride ?? defaultProvider(config, configuration);
     try {
-      const link = await provider.createLink({
+      const link = await provider.preparePayment({
         amountCents: created.attempt.amountCents,
         currencyCode: created.attempt.currencyCode,
         internalReference: created.attempt.internalReference,
@@ -914,6 +986,104 @@ export function registerSubscriptionPaymentRoutes(
       ]);
       throw error;
     }
+  });
+
+  app.post('/v1/subscription/payments/confirm', async (request) => {
+    const { user } = await authenticate(database, request);
+    const membership = await ownerScope(database, user.id);
+    const input = confirmPaymentSchema.parse(request.body);
+    await expireStaleSubscriptionPayments(database);
+    const attempt = await database.subscriptionPaymentAttempt.findFirst({
+      include: { invoice: true },
+      where: {
+        internalReference: input.clientTransactionId,
+        organizationId: membership.organizationId,
+        provider: PLATFORM_PAYMENT_PROVIDER,
+      },
+    });
+    if (!attempt)
+      throw new ApiError(
+        404,
+        'SUBSCRIPTION_PAYMENT_NOT_FOUND',
+        'El intento de pago no existe.',
+      );
+    if (attempt.status === SubscriptionPaymentStatus.APPLIED)
+      return publicAttempt(attempt);
+    if (
+      attempt.status !== SubscriptionPaymentStatus.CREATED &&
+      attempt.status !== SubscriptionPaymentStatus.LINK_CREATED &&
+      attempt.status !== SubscriptionPaymentStatus.PENDING_PROVIDER
+    )
+      return publicAttempt(attempt);
+
+    const configuration =
+      await database.platformPaymentConfiguration.findUnique({
+        where: { provider: PLATFORM_PAYMENT_PROVIDER },
+      });
+    if (
+      !configuration?.isEnabled ||
+      configuration.status !== PlatformPaymentConfigurationStatus.READY ||
+      configuration.storeId !== attempt.storeId
+    )
+      throw new ApiError(
+        503,
+        'PLATFORM_PAYMENT_PROVIDER_NOT_READY',
+        'PayPhone todavía no está habilitado para confirmar suscripciones.',
+      );
+
+    const provider = providerOverride ?? defaultProvider(config, configuration);
+    let payment: VerifiedPlatformPayment;
+    try {
+      payment = await provider.confirmPayment({
+        amountCents: attempt.amountCents,
+        currencyCode: attempt.currencyCode,
+        internalReference: attempt.internalReference,
+        providerTransactionId: String(input.id),
+        storeId: attempt.storeId,
+      });
+    } catch (error) {
+      const errorCode =
+        error instanceof ApiError ? error.code : 'PAYPHONE_CONFIRM_UNAVAILABLE';
+      await database.subscriptionPaymentAttempt.update({
+        data: { lastErrorCode: errorCode },
+        where: { id: attempt.id },
+      });
+      throw error;
+    }
+    if (payment.internalReference !== attempt.internalReference) {
+      await database.subscriptionPaymentAttempt.update({
+        data: { lastErrorCode: 'PAYPHONE_CONFIRM_REFERENCE_MISMATCH' },
+        where: { id: attempt.id },
+      });
+      throw new ApiError(
+        409,
+        'PAYPHONE_CONFIRM_REFERENCE_MISMATCH',
+        'La confirmación no corresponde al intento de pago.',
+      );
+    }
+
+    const result = await applyVerifiedPlatformPayment(database, {
+      ...payment,
+      source: PaymentProviderEventSource.RECONCILIATION,
+    });
+    const updated = await database.subscriptionPaymentAttempt.findUniqueOrThrow(
+      {
+        include: { invoice: true },
+        where: { id: attempt.id },
+      },
+    );
+    if (!result.applied && payment.status !== 'rejected') {
+      await database.subscriptionPaymentAttempt.update({
+        data: { lastErrorCode: result.reason ?? 'PAYPHONE_CONFIRM_INVALID' },
+        where: { id: attempt.id },
+      });
+      throw new ApiError(
+        409,
+        result.reason ?? 'PAYPHONE_CONFIRM_INVALID',
+        'La confirmación de PayPhone no coincide con el pago pendiente.',
+      );
+    }
+    return publicAttempt(updated);
   });
 
   app.get('/v1/subscription/payments/:id', async (request) => {

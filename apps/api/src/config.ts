@@ -77,6 +77,7 @@ const environmentSchema = z
       .default('2026-08-23'),
     PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY: optionalText,
     PLATFORM_PAYPHONE_WEBHOOK_ALLOWED_IPS: z.string().default(''),
+    PLATFORM_CHECKOUT_URL: z.url().default('https://navacloud.app/checkout'),
     PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS: optionalBasisPoints,
     PLATFORM_SUBSCRIPTION_TERMS_VERSION: optionalText,
     SRI_AUTHORIZATION_DELAY_SECONDS: z.coerce
@@ -146,17 +147,6 @@ const environmentSchema = z
         message:
           'PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY es obligatoria al habilitar cobros de plataforma.',
         path: ['PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY'],
-      });
-    }
-    if (
-      value.PLATFORM_PAYMENTS_ENABLED === 'true' &&
-      !value.PLATFORM_PAYPHONE_WEBHOOK_ALLOWED_IPS.trim()
-    ) {
-      context.addIssue({
-        code: 'custom',
-        message:
-          'PLATFORM_PAYPHONE_WEBHOOK_ALLOWED_IPS es obligatoria al habilitar cobros de plataforma.',
-        path: ['PLATFORM_PAYPHONE_WEBHOOK_ALLOWED_IPS'],
       });
     }
     if (

@@ -1,65 +1,836 @@
-# Summary
+# Objetivo
 
-A warm, paper-toned feature comparison + pricing matrix for 'Tablr', a data-table component product. On desktop (>=1024px) it's a single CSS-grid matrix: a sticky-feeling pricing header row of three plan columns (Starter / Studio / Scale) over feature-group sections (Core grid, AI & automation, Team & governance, Support), where the recommended middle plan (Studio) is a full-height dark 'ink' column with rounded top/bottom corners and a terracotta 'Most popular' badge so the eye lands on it. Each feature row is a label cell plus a value cell per plan that renders either a numeric/text value (tabular-nums) or a check / dash glyph. Below 1024px the whole matrix reflows into three stacked per-plan cards led by the recommended Studio card, each card grouping the same features under labelled sub-headers in a definition-list. Sits inside a full landing page (sticky translucent nav, grain hero with a billing toggle, feature strip, footer) on Inter, in a cream + ink + terracotta + olive palette.
+Modificar exclusivamente el flujo de **pagos de suscripciones de la plataforma NAVA** para utilizar **PayPhone Botón de Pago WEB con Prepare + Confirm**, haciendo que la confirmación autenticada servidor-a-servidor contra PayPhone sea la única autoridad que pueda activar o renovar una suscripción.
 
-# Style
+No reconstruyas desde cero el dominio de suscripciones existente.
 
-A warm, earthy editorial-SaaS aesthetic on a soft cream 'paper' canvas (#faf6f0) with near-black warm 'ink' text (#2b251d) and a two-accent system: a terracotta/clay family (#c4633f, deeper #a84f2e) as the primary action + highlight color and an olive/sage family (#6b7048, deep #565b39) as the secondary accent for 'included' checks and group labels. Surfaces are barely-there warm off-whites (card #fffdfa, warm band #f3ece1), borders are a soft sand hairline (#e6ddce / #efe8db), and the recommended plan inverts to a dark ink panel. Depth is gentle: a faint dotted paper grain, soft small shadows, and one lift shadow with a terracotta-tinted glow on the highlighted plan. Numbers use tabular-nums so prices and counts align. The whole thing feels hand-warm and document-like rather than cold/neon, all on a single Inter type system.
+Antes de modificar código, inspecciona completamente la implementación actual y reutiliza todo lo que sea compatible.
 
-## Spec
+---
 
-Use a warm paper + ink + terracotta + olive design system. Page background is cream 'paper' #faf6f0; card surfaces are #fffdfa (paper.card) and a warmer band #f3ece1 (paper.warm). Text is warm near-black 'ink' #2b251d, with softer tones #5c5346 (ink.soft), #6e6557 (ink.faint), #8a8170 (ink.mute) for hierarchy. Primary accent is terracotta: #c4633f (terra) and #a84f2e (terra.deep) for buttons/badges/highlights, with #e8a888 (terra.soft) and a wash #f7e6dc for tints; an even darker #8f3f22 is the button hover. Secondary accent is olive/sage: #6b7048 (olive) and #565b39 (olive.deep) for 'included' check glyphs, group labels, and the savings pill, with #a9ad8c (olive.soft) and wash #e9ebdf. Hairline borders are sand: #e6ddce (line) and #efe8db (line.soft). The recommended plan column/card inverts to a dark ink #2b251d panel with cream text on it (use paper at /55 /70 opacities for secondary text, terra.soft #e8a888 for its check glyphs, paper/10 dividers). One typeface only: Inter (Google Fonts, weights 400/500/600/700/800/900). Numeric values use font-variant-numeric: tabular-nums. Add a subtle paper grain via a radial-gradient dot: radial-gradient(circle at 1px 1px, rgba(43,37,29,0.05) 1px, transparent 0) on a 22px tile. Shadows are soft and warm: a 'soft' shadow 0 1px 2px rgba(43,37,29,0.04), 0 8px 24px -12px rgba(43,37,29,0.12); a 'lift' shadow 0 2px 4px rgba(43,37,29,0.05), 0 24px 48px -20px rgba(168,79,46,0.28) used only on the highlighted plan; a 'nav' shadow 0 1px 0 rgba(43,37,29,0.06). Corners are rounded (lg ~8px on cells/buttons, 2xl ~16px on cards, full pills on badges/CTAs). Icons are Phosphor (ph:*) via Iconify; check/dash glyphs are inline 24x24 stroke-width-3 SVGs (check = M20 6 9 17l-5-5, dash = M6 12h12).
+# Contexto actual
 
-# Layout & Structure
+NAVA ya tiene implementado:
 
-A centered max-w-6xl (1152px) column with px-6 lg:px-8 gutters runs the whole page (nav, hero, matrix, feature strip, footer share it). The comparison section has a heading + billing toggle header row, then TWO renderings of the same data: a desktop-only (hidden lg:block) CSS grid matrix with 4 columns (label + 3 plans) where the middle plan is a continuous dark ink panel, and a mobile/tablet (lg:hidden) stack of three per-plan cards led by the recommended one. Feature rows are organized into four labelled groups (Core grid, AI & automation, Team & governance, Support) separated by hairline rules.
+* Dominio de suscripciones.
+* `SubscriptionInvoice`.
+* `SubscriptionPaymentAttempt`.
+* `PaymentProviderEvent`.
+* `SubscriptionChange`.
+* `PlatformPaymentConfiguration`.
+* Credenciales PayPhone cifradas mediante AES-256-GCM.
+* `PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY`.
+* Checkout autenticado en `/checkout`.
+* Sesión almacenada mediante cookie `HttpOnly`.
+* Idempotencia en creación de checkout.
+* Validaciones de organización y rol `OWNER`.
+* Precio obtenido siempre desde backend.
+* Estados de factura, intento y suscripción.
+* Aplicación transaccional e idempotente de pagos.
+* Webhook actual:
 
-## Section header + billing toggle
+`POST /v1/webhooks/payphone/platform`
 
-Above the matrix, a `flex flex-col gap-6 md:flex-row md:items-end md:justify-between mb-8` header: on the left a max-w-md block with a terracotta uppercase eyebrow (`text-[12.5px] font-bold uppercase tracking-[0.18em] text-terra-deep` reading 'Pricing'), an `text-[30px] sm:text-[34px] font-extrabold tracking-tight` H2 ('Every column compared.'), and a `text-[15px] text-ink-soft` subhead. On the right, a self-start Monthly/Yearly billing toggle: a pill `inline-flex items-center gap-3 rounded-full border border-line bg-paper-card px-4 py-2.5 shadow-soft` holding a 'Monthly' label, a custom checkbox switch (a 44x24 rounded track that turns terracotta #c4633f when checked with a 20x20 knob that translateX(20px) on a cubic-bezier(.34,1.56,.64,1) spring), a 'Yearly' label, and an olive savings pill ('-20%' in `bg-olive-wash text-olive-deep`).
+* Interruptor global:
 
-## Desktop matrix grid (>=1024px)
+`PLATFORM_PAYMENTS_ENABLED`
 
-A `hidden lg:block` wrapper with an inner `min-w-[760px]` holding a `grid grid-cols-[minmax(180px,1.4fr)_repeat(3,minmax(150px,1fr))]`. Column 0 is the feature-label column; columns 1-3 are Starter / Studio / Scale. Render every cell as a direct grid child (no nested table) so the dark Studio column can be a continuous vertical panel. Group separators and group-label rows span the full width using `col-span-4` (a hairline rule) followed by four `col-span-1` cells (the label cell + three spacers, where the Studio spacer carries `bg-ink` to continue the dark column).
+Actualmente las suscripciones utilizan o están preparadas alrededor de **API Link + Notificación Externa**.
 
-## Plan header row (3 pricing cards)
+Quiero cambiar solamente el mecanismo de pago de suscripciones de NAVA.
 
-The first grid row is the pricing header. Column 0 is a brand cell (a 36x36 ink tile with a ph:table-fill icon + a two-line caption). Each plan cell shows the plan name (`text-[14px] font-bold`), a price lockup with a baseline-aligned '$' + a big tabular-nums number (`text-[34px] font-extrabold`) + a '/mo' suffix, a one-line description, and a full-width CTA. The Studio (recommended) cell is a dark ink panel `rounded-t-2xl bg-ink text-paper shadow-lift pt-9` carrying an absolutely-positioned terracotta 'Most popular' badge (`bg-terra-deep text-paper` pill with a star SVG) and a filled terracotta CTA; Starter/Scale use bordered `bg-paper-card` ghost CTAs.
+Las integraciones PayPhone particulares de cada barbería/tenant NO deben modificarse.
 
-## Feature group + rows
+---
 
-Each group starts with a full-width hairline (`col-span-4 border-t border-line` for the first, `border-line-soft` after) then a group-label row: the label cell holds a tiny uppercase group title (`text-[12px] font-bold uppercase tracking-[0.16em]`, alternating terra-deep / olive-deep), and the three value spacers keep the Studio column dark (`bg-ink`). Each feature row is four cells: a label cell (`.row-lbl`) and three value cells (`.row-val` for Starter/Scale, `.row-val-hl` with a dark ink background for Studio). A value cell renders either a tabular-nums text value (e.g. '100k', 'Unlimited', '25 / mo') or a glyph: an olive check (`.ico-chk` #6b7048) / terra-soft check on dark (`.ico-chk-hl` #e8a888), or a muted dash (`.ico-dash` #a89a78) / paper-50 dash on dark (`.ico-dash-hl`).
+# Nueva arquitectura
 
-## Footer CTA row
+Implementar:
 
-Close the grid with a full-width `col-span-4 border-t border-line` then a final row of four cells: an empty label cell, then a 'Choose Starter' ghost button, the 'Choose Studio' filled terracotta button inside the dark column's `rounded-b-2xl bg-ink shadow-lift` closing panel, and a 'Choose Scale' ghost button, so the dark Studio column is capped top and bottom into one continuous rounded panel. Under the whole section, a centered `text-[13px] text-ink-faint` reassurance line ('All plans include a 14-day trial. Cancel any time...').
+```text
+Usuario
+   ↓
+navacloud.app/checkout
+   ↓
+Backend NAVA
+   ↓
+PayPhone Button/Prepare
+   ↓
+URL segura entregada por PayPhone
+   ↓
+Usuario paga con tarjeta
+   ↓
+PayPhone redirige a NAVA
+   ↓
+NAVA recibe:
+- id
+- clientTransactionId
+   ↓
+Backend NAVA
+   ↓
+PayPhone Button/V2/Confirm
+   ↓
+PayPhone devuelve estado real
+   ↓
+NAVA valida
+   ↓
+SubscriptionInvoice = PAID
+SubscriptionPaymentAttempt = APPLIED
+Subscription = ACTIVE
+```
 
-## Mobile/tablet reflow (<1024px)
+La confirmación de la transacción debe realizarse **exclusivamente desde el backend**.
 
-A `lg:hidden space-y-5` stack replaces the grid below lg with three per-plan cards LED BY the recommended Studio card. The Studio card is a `rounded-2xl bg-ink text-paper shadow-lift` panel with a 'Most popular' badge top-right, a large price lockup, a filled terracotta 'Choose Studio' CTA, then the four feature groups each rendered as a labelled sub-header + a `<dl class="divide-y divide-paper/10">` definition list of `flex items-center justify-between py-2.5` rows (dt = feature label in paper/70, dd = value or check/dash glyph). Starter and Scale follow as `rounded-2xl border border-line bg-paper-card shadow-soft` light cards with the same group/dl structure (divide-y divide-line-soft, ink text). This is the key responsive move: the dense matrix becomes legible self-contained cards on small screens, recommended-first.
+Nunca llamar a `Confirm` directamente desde JavaScript del navegador porque el Bearer Token jamás debe exponerse al frontend.
 
-# Special Components
+---
 
-## Component
+# Endpoints oficiales PayPhone
 
-Make the middle (recommended) plan a continuous full-height dark ink #2b251d panel that runs from the pricing header through every feature group to the footer CTA, with rounded-t-2xl on the header cell and rounded-b-2xl on the footer cell and a warm terracotta-tinted lift shadow, so it reads as one elevated card embedded in the matrix. Keep it dark across all rows by giving the group-separator spacers and value cells in that column a bg-ink, and recolor its content for the dark surface (cream text, terra-soft #e8a888 checks, paper/10 dividers).
+Utilizar la API oficial del Botón de Pago.
 
-## Component
+Preparación:
 
-On the recommended plan, an absolutely-positioned pill badge `bg-terra-deep #a84f2e text-paper` (`text-[10.5px] font-bold uppercase tracking-[0.08em]`) reading 'Most popular' with a small inline star SVG, pinned top-left on desktop (top-3 left-5) and top-right on the mobile card (top-4 right-4).
+```text
+POST /api/button/Prepare
+```
 
-## Component
+Confirmación:
 
-A custom CSS toggle inside a bordered pill: a hidden checkbox drives a 44x24 (h-6 w-11) rounded track that transitions from sand #e6ddce to terracotta #c4633f when checked, with a 20x20 knob (bg paper.card, soft shadow) that translateX(20px) on a springy cubic-bezier(.34,1.56,.64,1) transition. Flank it with 'Monthly' / 'Yearly' labels (the active side in solid ink) and an olive '-20%' savings pill.
+```text
+POST /api/button/V2/Confirm
+```
 
-## Component
+Ambos contra el host oficial de pagos de PayPhone.
 
-Render boolean feature availability as inline 24x24 stroke-width-3 round-cap SVGs, NOT emoji or font icons: included = a check (path 'M20 6 9 17l-5-5') colored olive #6b7048 on light cells and terra-soft #e8a888 on the dark Studio cells; not-included = a short dash (path 'M6 12h12') colored muted sand #a89a78 on light and paper-at-50% on dark. Numeric/text values (10k, 60, Unlimited, '25 / mo') use font-semibold with tabular-nums instead of a glyph.
+Autenticación:
 
-## Component
+```text
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+```
 
-The hero above the matrix uses the paper grain plus two large blurred radial blobs (a terra-wash #f7e6dc blob top-left, an olive-wash #e9ebdf blob top-right, both blur-3xl opacity-60) and a thin terracotta top hairline gradient, with a status-pill eyebrow ('The data table component for AI product teams', pulsing olive dot), an `text-[40px] sm:text-[56px] font-extrabold` H1 with the word 'earn' set in terracotta italic, and two CTAs (a filled terra-deep 'Compare plans' + a ghost 'Watch demo').
+No hardcodear Token ni StoreID.
 
-# Special Notes
+Obtenerlos de la configuración cifrada de plataforma.
 
-Single typeface: Inter from Google Fonts (weights 400/500/600/700/800/900), set as the sans family; numeric values use font-variant-numeric: tabular-nums (the .tnum class). Icons are Phosphor via Iconify (ph:table-fill, ph:arrow-right-bold, ph:arrow-down-bold, ph:play-circle, ph:lightning-fill, ph:magic-wand-fill, ph:wheelchair-fill, ph:github-logo-fill); the check/dash availability marks and the 'Most popular' star are hand-inlined SVGs, not icon-font glyphs. Exact palette tokens: paper #faf6f0 (page), paper.card #fffdfa, paper.warm #f3ece1; ink #2b251d (text + dark panel), ink.soft #5c5346, ink.faint #6e6557, ink.mute #8a8170; terra #c4633f, terra.deep #a84f2e, terra.soft #e8a888, terra.wash #f7e6dc, plus #8f3f22 as the button-hover terracotta; olive #6b7048, olive.deep #565b39, olive.soft #a9ad8c, olive.wash #e9ebdf; line #e6ddce, line.soft #efe8db; helper glyph colors ico-dash #a89a78 (light) and rgba(250,246,240,0.5) (dark). The two named fixes vs a generic comparison table: (1) a real mobile reflow -- below lg the dense 4-column matrix becomes three stacked, self-contained per-plan definition-list cards led by the recommended plan, so nothing is squished or horizontally scrolled on phones; (2) contrast fixes -- 'included' checks are olive (not low-contrast gray), missing features use a clearly muted dash, the dark Studio column recolors its content to cream / terra-soft / paper-opacity tokens that clear contrast on #2b251d, and group labels + the eyebrow carry hierarchy via weight + uppercase tracking rather than faint color. Everything shares one centered max-w-6xl (1152px) container at px-6 lg:px-8, rendered cleanly with no overflow at 1280/768/390.
+---
+
+# IMPORTANTE: aplicación PayPhone tipo WEB
+
+El Botón de Pago PayPhone requiere una aplicación de PayPhone Developer de tipo:
+
+```text
+WEB
+```
+
+No asumir que las credenciales actuales de la aplicación tipo `API` sirven automáticamente para Botón de Pago.
+
+Revisa cómo está diseñado `PlatformPaymentConfiguration`.
+
+Si es necesario diferenciar credenciales, realiza el cambio mínimo y limpio para soportar una configuración de plataforma destinada al:
+
+```text
+PAYPHONE_WEB_BUTTON
+```
+
+o mecanismo equivalente consistente con la arquitectura existente.
+
+Debe seguir almacenándose el Token cifrado.
+
+Nunca mostrar el Token:
+
+* en logs;
+* en respuestas API;
+* en frontend;
+* en errores;
+* en commits.
+
+Si todavía no existen credenciales WEB, deja la implementación preparada y al final indícame exactamente qué Token y StoreID debo cargar manualmente.
+
+No bloquees el desarrollo por no tener aún esas credenciales.
+
+---
+
+# 1. Preparación de pago
+
+Cuando el OWNER seleccione un plan de pago:
+
+1. Validar sesión.
+2. Validar organización.
+3. Validar rol `OWNER`.
+4. Validar plan.
+5. Obtener precio exclusivamente del backend.
+6. Crear/reutilizar `SubscriptionInvoice`.
+7. Crear/reutilizar `SubscriptionPaymentAttempt`.
+8. Generar `clientTransactionId` único.
+9. Mantener la idempotencia existente.
+10. Ejecutar PayPhone `Button/Prepare`.
+
+Para NAVA actualmente:
+
+```text
+currency = USD
+PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS=0
+```
+
+Todos los montos enviados a PayPhone deben estar expresados en centavos.
+
+Validar siempre:
+
+```text
+amount =
+amountWithoutTax +
+amountWithTax +
+tax +
+service +
+tip
+```
+
+Para una suscripción sin impuesto usar la representación mínima compatible con la documentación oficial, por ejemplo conceptualmente:
+
+```text
+amount = precio_en_centavos
+amountWithoutTax = precio_en_centavos
+currency = USD
+clientTransactionId = referencia_unica
+storeId = StoreID de NAVA
+reference = nombre/referencia de suscripción
+responseUrl = callback de NAVA
+```
+
+No enviar valores tributarios inventados.
+
+---
+
+# 2. URL de respuesta
+
+Implementar una URL específica para el retorno de PayPhone.
+
+Puede ser, si encaja con la arquitectura existente:
+
+```text
+https://navacloud.app/checkout/payphone/confirm
+```
+
+o una ruta equivalente.
+
+Debe recibir los parámetros retornados por PayPhone:
+
+```text
+id
+clientTransactionId
+```
+
+IMPORTANTE:
+
+La presencia de estos parámetros NO significa que el pago esté aprobado.
+
+Nunca activar una suscripción simplemente porque el usuario regresó desde PayPhone.
+
+---
+
+# 3. Confirmación servidor-a-servidor
+
+Al recibir:
+
+```text
+id
+clientTransactionId
+```
+
+el backend debe localizar exclusivamente el `SubscriptionPaymentAttempt` correspondiente.
+
+Después ejecutar:
+
+```text
+POST /api/button/V2/Confirm
+```
+
+con:
+
+```json
+{
+  "id": "<PayPhone transaction id>",
+  "clientTxId": "<clientTransactionId>"
+}
+```
+
+utilizando el Bearer Token cifrado de NAVA.
+
+Esta llamada debe ejecutarse desde el servidor.
+
+---
+
+# 4. Regla de autoridad
+
+A partir de esta implementación:
+
+## ÚNICA AUTORIDAD PARA ACTIVAR SUSCRIPCIÓN
+
+Respuesta autenticada obtenida directamente desde:
+
+```text
+PayPhone Button/V2/Confirm
+```
+
+Un:
+
+* redirect;
+* query parameter;
+* webhook;
+* callback del navegador;
+
+por sí solo NO puede activar una suscripción.
+
+---
+
+# 5. Validaciones obligatorias
+
+Antes de aplicar el pago comprobar como mínimo:
+
+```text
+transactionStatus === "Approved"
+statusCode === 3
+```
+
+Además validar contra los datos almacenados previamente:
+
+* `clientTransactionId`;
+* monto esperado;
+* moneda `USD`;
+* factura asociada;
+* intento asociado;
+* organización;
+* plan;
+* configuración PayPhone usada;
+* que el intento no haya sido aplicado anteriormente.
+
+No confiar en valores enviados por el navegador para:
+
+* monto;
+* plan;
+* organización;
+* precio;
+* duración;
+* impuestos.
+
+El backend continúa siendo la fuente de verdad.
+
+Si la respuesta oficial de `Confirm` no devuelve alguno de estos campos, no inventar una validación imposible. Validar todos los campos disponibles y documentar cuáles no pueden contrastarse directamente.
+
+---
+
+# 6. Aplicación transaccional
+
+Reutilizar la lógica transaccional existente.
+
+Una confirmación válida debe producir exactamente una vez:
+
+```text
+SubscriptionPaymentAttempt -> APPLIED
+SubscriptionInvoice -> PAID
+Subscription -> ACTIVE
+SubscriptionChange -> auditoría
+```
+
+Mantener el período comercial actual:
+
+```text
+billingPeriodDays = 30
+```
+
+Un reintento, refresh del navegador o segunda llamada a confirmación NO puede sumar otros 30 días.
+
+La operación debe continuar siendo idempotente.
+
+---
+
+# 7. Regla crítica de PayPhone: 5 minutos
+
+PayPhone establece que la fase `Confirm` debe ejecutarse dentro de los primeros **5 minutos posteriores al pago**.
+
+Si no se confirma dentro de ese período, PayPhone puede realizar un reverso automático.
+
+Por tanto:
+
+* ejecutar `Confirm` inmediatamente al regresar de PayPhone;
+* no utilizar colas lentas para esta operación;
+* manejar correctamente timeout de red;
+* permitir retry controlado e idempotente;
+* nunca asumir `PAID` ante timeout;
+* dejar el intento en estado conciliable cuando el resultado sea incierto.
+
+No crear una segunda compra automáticamente ante un timeout.
+
+---
+
+# 8. Webhook existente
+
+NO eliminar inmediatamente:
+
+```text
+POST /v1/webhooks/payphone/platform
+```
+
+Pero cambiar su responsabilidad.
+
+La Notificación Externa NO debe tener autoridad para:
+
+```text
+Subscription = ACTIVE
+```
+
+El webhook puede conservarse para:
+
+* auditoría;
+* observabilidad;
+* conciliación;
+* detección de eventos;
+* registro de `PaymentProviderEvent`;
+* diagnóstico.
+
+Si actualmente `processWebhook()` o una función equivalente aplica directamente entitlement, refactorizar esa dependencia.
+
+Debe quedar claramente separado:
+
+```text
+Webhook recibido
+!=
+Pago confirmado
+```
+
+y:
+
+```text
+Confirm autenticado contra PayPhone
+=
+puede aplicar pago
+```
+
+---
+
+# 9. Allowlist de IPs
+
+Al utilizar `Button/V2/Confirm` como autoridad de pago, la activación de suscripciones NO debe depender de:
+
+```text
+PLATFORM_PAYPHONE_WEBHOOK_ALLOWED_IPS
+```
+
+Antes de eliminar cualquier variable, busca todas sus referencias.
+
+Si solamente existe para autenticar el webhook de suscripciones, conviértela en control opcional del webhook o retírala de forma segura.
+
+No elimines mecanismos utilizados en otras partes del sistema.
+
+De igual manera, no modifiques globalmente:
+
+```text
+API_TRUST_PROXY
+```
+
+sin revisar previamente todas sus dependencias.
+
+No cambies configuración Nginx únicamente para poder confiar en la IP del webhook.
+
+---
+
+# 10. Frontend
+
+Actualizar `/checkout` manteniendo el diseño actual.
+
+Flujo esperado:
+
+```text
+Seleccionar plan
+↓
+Pagar con PayPhone
+↓
+backend prepara transacción
+↓
+redirigir al formulario PayPhone
+↓
+usuario paga
+↓
+PayPhone vuelve a NAVA
+↓
+NAVA confirma backend-to-backend
+↓
+mostrar resultado
+```
+
+Estados mínimos:
+
+```text
+Preparando pago...
+Redirigiendo a PayPhone...
+Confirmando pago...
+Pago aprobado
+Pago rechazado
+Pago cancelado
+No pudimos confirmar el pago
+```
+
+Nunca mostrar al usuario:
+
+* Token;
+* StoreID innecesariamente;
+* payload completo de PayPhone;
+* datos internos;
+* stack traces.
+
+---
+
+# 11. Cancelación
+
+Configurar `cancellationUrl` hacia una ruta adecuada de NAVA.
+
+Una cancelación:
+
+* no activa plan;
+* no marca factura como pagada;
+* no crea una segunda factura;
+* permite al usuario regresar al checkout.
+
+---
+
+# 12. Datos sensibles
+
+Mantener la política actual de minimización.
+
+Aunque `Confirm` pueda devolver información como:
+
+* email;
+* documento;
+* BIN;
+* últimos dígitos;
+* teléfono;
+
+NO persistir esos datos salvo que exista una necesidad funcional explícita.
+
+Guardar solamente lo indispensable para:
+
+* conciliación;
+* identificación de transacción;
+* auditoría;
+* estado;
+* importe;
+* moneda;
+* referencia PayPhone.
+
+No almacenar datos de tarjeta.
+
+---
+
+# 13. Pruebas
+
+Agregar pruebas automatizadas como mínimo para:
+
+### Pago aprobado
+
+```text
+Prepare OK
+Confirm statusCode=3
+transactionStatus=Approved
+```
+
+Resultado:
+
+```text
+invoice=PAID
+attempt=APPLIED
+subscription=ACTIVE
+```
+
+### Confirm repetido
+
+Ejecutar dos veces la misma confirmación.
+
+Resultado:
+
+```text
+solo una aplicación
+solo un período agregado
+```
+
+### clientTransactionId incorrecto
+
+Resultado:
+
+```text
+rechazado
+sin entitlement
+```
+
+### monto incorrecto
+
+Resultado:
+
+```text
+rechazado
+sin entitlement
+```
+
+### moneda incorrecta
+
+Resultado:
+
+```text
+rechazado
+sin entitlement
+```
+
+### pago rechazado
+
+Resultado:
+
+```text
+sin entitlement
+```
+
+### cancelación
+
+Resultado:
+
+```text
+sin entitlement
+```
+
+### timeout de PayPhone
+
+Resultado:
+
+```text
+sin marcar PAID
+sin entitlement
+estado conciliable
+```
+
+### callback falso
+
+Simular manualmente:
+
+```text
+?id=123&clientTransactionId=...
+```
+
+sin que PayPhone confirme la transacción.
+
+Resultado:
+
+```text
+NO activar suscripción
+```
+
+### refresh
+
+Refrescar página después de una aprobación.
+
+Resultado:
+
+```text
+NO extender nuevamente la suscripción
+```
+
+### webhook falso
+
+Enviar POST manual al webhook.
+
+Resultado:
+
+```text
+puede quedar auditado/rechazado según implementación
+NO activar suscripción
+```
+
+---
+
+# 14. Sandbox primero
+
+No habilitar producción automáticamente.
+
+Mantener:
+
+```text
+PLATFORM_PAYMENTS_ENABLED=false
+```
+
+hasta terminar la implementación.
+
+Después de compilar, migrar y probar, indicarme exactamente qué debo hacer manualmente para realizar el primer ensayo sandbox.
+
+No ejecutar compras reales.
+
+---
+
+# 15. Migraciones
+
+Antes de crear una migración nueva:
+
+1. inspeccionar el esquema actual;
+2. determinar si realmente hace falta modificar tablas;
+3. reutilizar columnas existentes cuando semánticamente correspondan.
+
+No crear tablas duplicadas.
+
+No modificar migraciones antiguas ya aplicadas.
+
+Si hace falta una migración, debe ser:
+
+* aditiva;
+* segura;
+* compatible con rollback lógico;
+* sin borrar historial financiero.
+
+---
+
+# 16. No modificar integraciones de barberías
+
+Existen integraciones PayPhone correspondientes a los tenants/barberías.
+
+Este cambio corresponde EXCLUSIVAMENTE al cobro que **NAVA realiza por sus propias suscripciones**.
+
+No tocar:
+
+```text
+PayphoneConfiguration
+```
+
+o mecanismos de cobro de reservas de las barberías salvo que el análisis demuestre que comparten código genérico y sea imprescindible hacer un cambio compatible.
+
+Las credenciales PayPhone de NAVA deben continuar completamente separadas de las de los tenants.
+
+---
+
+# 17. Verificación técnica
+
+Ejecuta los gates disponibles en el repositorio:
+
+* format;
+* lint;
+* typecheck;
+* tests;
+* build;
+* migraciones/status de BD cuando corresponda.
+
+No declares terminada la implementación si alguno falla.
+
+---
+
+# 18. Documentación
+
+Actualizar:
+
+```text
+ESTADO_PROYECTO.md
+```
+
+y el documento de avance correspondiente.
+
+Debe quedar registrado que:
+
+```text
+API Link dejó de ser el flujo principal de suscripciones
+```
+
+y que ahora:
+
+```text
+PayPhone Botón de Pago WEB
+Prepare
++
+Button/V2/Confirm
+```
+
+es el flujo principal.
+
+Registrar además que:
+
+```text
+Notificación Externa = mecanismo auxiliar
+Confirm API = autoridad de pago
+```
+
+---
+
+# 19. Resultado que debes entregarme
+
+Cuando termines, no me des solamente un resumen genérico.
+
+Quiero:
+
+## A. Auditoría inicial
+
+Qué encontraste actualmente y qué decidiste reutilizar.
+
+## B. Archivos modificados
+
+Lista exacta.
+
+## C. Migraciones
+
+Indicar si fueron necesarias.
+
+## D. Flujo final
+
+Explícalo brevemente.
+
+## E. Seguridad
+
+Confirma que ningún redirect o webhook puede activar una suscripción sin verificación PayPhone.
+
+## F. Variables
+
+Dime exactamente cuáles:
+
+* permanecen;
+* se agregan;
+* dejan de utilizarse.
+
+Sin mostrar secretos.
+
+## G. Configuración manual PayPhone
+
+Indícame qué tengo que crear/configurar en PayPhone Developer para la aplicación tipo WEB:
+
+* dominio;
+* URL de respuesta;
+* Token;
+* StoreID.
+
+## H. VPS
+
+Dame los comandos exactos necesarios para desplegar los cambios en mi VPS, pero NO los ejecutes por tu cuenta.
+
+## I. Sandbox
+
+Dame el procedimiento exacto para hacer una sola compra de prueba y comprobar:
+
+```text
+Prepare
+→ pago
+→ redirect
+→ Confirm
+→ Invoice PAID
+→ Attempt APPLIED
+→ Subscription ACTIVE
+```
+
+## J. Gate final
+
+No habilites pagos reales.
+
+Al final dime explícitamente:
+
+```text
+LISTO PARA SANDBOX
+```
+
+o:
+
+```text
+NO LISTO PARA SANDBOX
+```
+
+y enumera cualquier bloqueo restante.

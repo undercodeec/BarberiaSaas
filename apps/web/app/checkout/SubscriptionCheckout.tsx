@@ -108,7 +108,10 @@ export default function SubscriptionCheckout() {
   }, []);
 
   useEffect(() => {
-    void loadCheckout();
+    const timer = window.setTimeout(() => {
+      void loadCheckout();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadCheckout]);
 
   const paidPlans = useMemo(
@@ -116,10 +119,15 @@ export default function SubscriptionCheckout() {
     [plans],
   );
   const selectedPlan =
-    paidPlans.find((plan) => plan.code === requestedPlan) ?? paidPlans[0] ?? null;
+    paidPlans.find((plan) => plan.code === requestedPlan) ??
+    paidPlans[0] ??
+    null;
 
   useEffect(() => {
-    if (!attempt || !['created', 'link_created', 'pending_provider'].includes(attempt.status))
+    if (
+      !attempt ||
+      !['created', 'link_created', 'pending_provider'].includes(attempt.status)
+    )
       return;
     const timer = window.setInterval(() => {
       void requestJson<PaymentAttempt>(`payments/${attempt.id}`)
@@ -143,8 +151,7 @@ export default function SubscriptionCheckout() {
         method: 'POST',
       });
       setAttempt(result);
-      if (result.paymentUrl)
-        window.open(result.paymentUrl, '_blank', 'noopener,noreferrer');
+      if (result.paymentUrl) window.location.assign(result.paymentUrl);
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -173,19 +180,31 @@ export default function SubscriptionCheckout() {
         </a>
       </header>
 
-      <section className="subscription-checkout-shell" aria-labelledby="checkout-title">
+      <section
+        className="subscription-checkout-shell"
+        aria-labelledby="checkout-title"
+      >
         <div className="subscription-checkout-heading">
           <p className="eyebrow">Nava · Checkout seguro</p>
           <h1 id="checkout-title">Confirma tu plan.</h1>
-          <ol aria-label="Progreso de la compra" className="subscription-checkout-steps">
+          <ol
+            aria-label="Progreso de la compra"
+            className="subscription-checkout-steps"
+          >
             <li className="is-complete">1. Plan</li>
             <li className="is-current">2. Pago</li>
             <li>3. Activación</li>
           </ol>
         </div>
 
-        {error ? <p className="subscription-checkout-alert is-error" role="alert">{error}</p> : null}
-        {loading ? <p className="subscription-checkout-loading">Cargando tu checkout…</p> : null}
+        {error ? (
+          <p className="subscription-checkout-alert is-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {loading ? (
+          <p className="subscription-checkout-loading">Cargando tu checkout…</p>
+        ) : null}
 
         {!loading && !session ? (
           <section className="subscription-checkout-signin">
@@ -207,26 +226,42 @@ export default function SubscriptionCheckout() {
               <p className="subscription-checkout-kicker">Resumen del pedido</p>
               <h2>{selectedPlan.name}</h2>
               <strong>
-                {formatMoney(selectedPlan.monthlyPriceCents!, selectedPlan.currencyCode)}
+                {formatMoney(
+                  selectedPlan.monthlyPriceCents!,
+                  selectedPlan.currencyCode,
+                )}
                 <small> / cada 30 días</small>
               </strong>
               <ul>
-                {selectedPlan.features.slice(0, 4).map((feature) => <li key={feature}>{feature}</li>)}
+                {selectedPlan.features.slice(0, 4).map((feature) => (
+                  <li key={feature}>{feature}</li>
+                ))}
               </ul>
-              <button className="subscription-checkout-link" onClick={() => router.push('/suscripciones')} type="button">
+              <button
+                className="subscription-checkout-link"
+                onClick={() => router.push('/suscripciones')}
+                type="button"
+              >
                 Comparar todos los planes
               </button>
             </section>
 
             <section className="subscription-checkout-payment">
               <p className="subscription-checkout-kicker">Datos de compra</p>
-              <h2>{session.organization ? session.organization.name : 'Tu negocio'}</h2>
+              <h2>
+                {session.organization
+                  ? session.organization.name
+                  : 'Tu negocio'}
+              </h2>
               {!session.canCheckout ? (
-                <p className="subscription-checkout-alert">{checkoutMessage(session)}</p>
+                <p className="subscription-checkout-alert">
+                  {checkoutMessage(session)}
+                </p>
               ) : (
                 <>
                   <label htmlFor="discount-code">
-                    Código fundador <small>Opcional, solo para Nava Local</small>
+                    Código fundador{' '}
+                    <small>Opcional, solo para Nava Local</small>
                   </label>
                   <input
                     autoCapitalize="characters"
@@ -242,10 +277,13 @@ export default function SubscriptionCheckout() {
                     onClick={() => void startPayment()}
                     type="button"
                   >
-                    {submitting ? 'Preparando pago…' : `Pagar ${formatMoney(selectedPlan.monthlyPriceCents!, selectedPlan.currencyCode)}`}
+                    {submitting
+                      ? 'Preparando pago…'
+                      : `Pagar ${formatMoney(selectedPlan.monthlyPriceCents!, selectedPlan.currencyCode)}`}
                   </button>
                   <p className="subscription-checkout-security">
-                    Serás dirigido a PayPhone en una nueva pestaña. La activación ocurre solo después de validar el pago.
+                    Serás dirigido a PayPhone. La activación ocurre solo después
+                    de confirmar el pago con PayPhone.
                   </p>
                 </>
               )}
@@ -254,10 +292,15 @@ export default function SubscriptionCheckout() {
         ) : null}
 
         {!loading && session && paidPlans.length > 1 ? (
-          <nav aria-label="Cambiar plan" className="subscription-checkout-plans">
+          <nav
+            aria-label="Cambiar plan"
+            className="subscription-checkout-plans"
+          >
             {paidPlans.map((plan) => (
               <button
-                className={selectedPlan?.code === plan.code ? 'is-selected' : undefined}
+                className={
+                  selectedPlan?.code === plan.code ? 'is-selected' : undefined
+                }
                 key={plan.code}
                 onClick={() => switchPlan(plan.code)}
                 type="button"
@@ -270,7 +313,13 @@ export default function SubscriptionCheckout() {
 
         {attempt ? (
           <section aria-live="polite" className="subscription-checkout-status">
-            <span className={attempt.status.toLowerCase() === 'applied' ? 'is-success' : undefined}>
+            <span
+              className={
+                attempt.status.toLowerCase() === 'applied'
+                  ? 'is-success'
+                  : undefined
+              }
+            >
               {attempt.status.toLowerCase() === 'applied' ? '✓' : '…'}
             </span>
             <div>
@@ -278,7 +327,10 @@ export default function SubscriptionCheckout() {
               <h2>{attemptMessage(attempt.status)}</h2>
               <small>
                 {attempt.invoice.planName} · Enlace válido hasta{' '}
-                {new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(attempt.expiresAt))}
+                {new Intl.DateTimeFormat('es-EC', {
+                  dateStyle: 'medium',
+                  timeStyle: 'short',
+                }).format(new Date(attempt.expiresAt))}
               </small>
             </div>
           </section>

@@ -11,6 +11,8 @@ import { encryptPlatformPaymentCredential } from './security';
 
 loadEnvironment({ path: process.env.API_ENV_FILE ?? '.env' });
 
+const PLATFORM_PAYMENT_PROVIDER = 'payphone_web_button';
+
 function requiredEnvironment(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`${name} es obligatoria.`);
@@ -28,7 +30,9 @@ async function ask(question: string): Promise<string> {
 
 async function askSecret(question: string): Promise<string> {
   if (!input.isTTY || !output.isTTY)
-    throw new Error('Este comando debe ejecutarse desde una terminal interactiva.');
+    throw new Error(
+      'Este comando debe ejecutarse desde una terminal interactiva.',
+    );
 
   output.write(question);
   input.setRawMode(true);
@@ -74,8 +78,8 @@ async function main(): Promise<void> {
   const encryptionKey = requiredEnvironment(
     'PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY',
   );
-  const storeId = await ask('StoreId de PayPhone: ');
-  const token = await askSecret('Token de PayPhone (no se mostrara): ');
+  const storeId = await ask('StoreId de PayPhone WEB: ');
+  const token = await askSecret('Token de PayPhone WEB (no se mostrara): ');
   const environmentAnswer = (
     await ask('Entorno [TEST/PRODUCTION] (TEST): ')
   ).toUpperCase();
@@ -90,16 +94,17 @@ async function main(): Promise<void> {
     throw new Error('El StoreId no puede superar 160 caracteres.');
 
   const confirmation = await ask(
-    `Escriba CONFIGURAR para habilitar PayPhone ${environment}: `,
+    `Escriba CONFIGURAR para habilitar PayPhone WEB ${environment}: `,
   );
   if (confirmation !== 'CONFIGURAR') throw new Error('OperaciÃ³n cancelada.');
 
   const database = createDatabaseClient({ connectionString: databaseUrl });
   try {
     await database.platformPaymentConfiguration.upsert({
-      where: { provider: 'payphone' },
+      where: { provider: PLATFORM_PAYMENT_PROVIDER },
       create: {
         environment,
+        provider: PLATFORM_PAYMENT_PROVIDER,
         storeId,
         encryptedToken: encryptPlatformPaymentCredential({
           secret: token,

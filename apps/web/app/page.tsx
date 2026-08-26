@@ -179,6 +179,8 @@ export default function HomePage() {
   const [plansHold, setPlansHold] = useState<FixedSectionMetrics | null>(null);
   const [closeProgress, setCloseProgress] = useState(0);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMenuClosing, setIsMenuClosing] = useState(false);
+  const menuCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const updateMotion = () => {
@@ -289,14 +291,6 @@ export default function HomePage() {
     }, 420);
   };
 
-  const advanceDeckFromCard = () => {
-    if (!window.matchMedia('(max-width: 800px)').matches) return;
-    const isDeckSceneActive =
-      storyProgressRef.current >= 0.66 && storyProgressRef.current < 0.98;
-    if (!isDeckSceneActive || deckIndex >= modules.length - 1) return;
-    shiftDeck(1);
-  };
-
   useEffect(() => {
     const onWheel = (event: WheelEvent) => {
       if (window.matchMedia('(max-width: 800px)').matches) return;
@@ -370,12 +364,30 @@ export default function HomePage() {
     };
   }, [deck, deckIndex]);
 
-  useEffect(() => {
+  const closeMenu = () => {
     if (!isMenuOpen) return;
+    setIsMenuOpen(false);
+    setIsMenuClosing(true);
+    if (menuCloseTimerRef.current) clearTimeout(menuCloseTimerRef.current);
+    menuCloseTimerRef.current = setTimeout(() => setIsMenuClosing(false), 680);
+  };
+
+  const toggleMenu = () => {
+    if (isMenuOpen) {
+      closeMenu();
+      return;
+    }
+    if (menuCloseTimerRef.current) clearTimeout(menuCloseTimerRef.current);
+    setIsMenuClosing(false);
+    setIsMenuOpen(true);
+  };
+
+  useEffect(() => {
+    if (!isMenuOpen && !isMenuClosing) return;
 
     const previousOverflow = document.body.style.overflow;
     const closeFromKeyboard = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsMenuOpen(false);
+      if (event.key === 'Escape') closeMenu();
     };
 
     document.body.style.overflow = 'hidden';
@@ -384,7 +396,14 @@ export default function HomePage() {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', closeFromKeyboard);
     };
-  }, [isMenuOpen]);
+  }, [isMenuClosing, isMenuOpen]);
+
+  useEffect(
+    () => () => {
+      if (menuCloseTimerRef.current) clearTimeout(menuCloseTimerRef.current);
+    },
+    [],
+  );
 
   const portalStyle = { '--portal-progress': portalProgress } as CSSProperties;
 
@@ -401,7 +420,7 @@ export default function HomePage() {
           aria-controls="portal-menu-panel"
           aria-expanded={isMenuOpen}
           className="portal-menu-toggle"
-          onClick={() => setIsMenuOpen((current) => !current)}
+          onClick={toggleMenu}
           type="button"
         >
           <span className="portal-menu-toggle-label" aria-hidden="true">
@@ -414,12 +433,20 @@ export default function HomePage() {
         </button>
       </header>
 
-      <div className={isMenuOpen ? 'portal-menu is-open' : 'portal-menu'}>
+      <div
+        className={
+          isMenuOpen
+            ? 'portal-menu is-open'
+            : isMenuClosing
+              ? 'portal-menu is-closing'
+              : 'portal-menu'
+        }
+      >
         <button
           aria-label="Cerrar men\u00fa"
           className="portal-menu-backdrop"
-          onClick={() => setIsMenuOpen(false)}
-          tabIndex={isMenuOpen ? 0 : -1}
+          onClick={closeMenu}
+          tabIndex={isMenuOpen || isMenuClosing ? 0 : -1}
           type="button"
         />
         <div aria-hidden="true" className="portal-menu-layers">
@@ -442,7 +469,7 @@ export default function HomePage() {
                 data-menu-item
                 href={item.href}
                 key={item.href}
-                onClick={() => setIsMenuOpen(false)}
+                onClick={closeMenu}
               >
                 <small>{item.number}</small>
                 <span>{item.label}</span>
@@ -451,7 +478,7 @@ export default function HomePage() {
           </nav>
           <div className="portal-menu-footer">
             <p>Tu negocio, siempre en movimiento.</p>
-            <a href={trialLink} onClick={() => setIsMenuOpen(false)}>
+            <a href={trialLink} onClick={closeMenu}>
               Solicitar una demo <Arrow />
             </a>
           </div>
@@ -616,7 +643,6 @@ export default function HomePage() {
                         .join(' ')}
                       data-position={position}
                       key={module}
-                      onClick={advanceDeckFromCard}
                       style={{ '--deck-position': position } as CSSProperties}
                     >
                       <span>0{originalIndex + 1}</span>
@@ -720,6 +746,24 @@ export default function HomePage() {
                     />
                   ))}
                 </div>
+              </div>
+              <div aria-label="Navegación de módulos" className="deck-controls">
+                <button
+                  aria-label="Módulo anterior"
+                  disabled={deckIndex === 0}
+                  onClick={() => shiftDeck(-1)}
+                  type="button"
+                >
+                  ←
+                </button>
+                <button
+                  aria-label="Siguiente módulo"
+                  disabled={deckIndex === modules.length - 1}
+                  onClick={() => shiftDeck(1)}
+                  type="button"
+                >
+                  →
+                </button>
               </div>
             </div>
           </section>

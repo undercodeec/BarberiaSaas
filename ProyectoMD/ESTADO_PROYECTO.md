@@ -21,24 +21,27 @@
 > localmente y requieren desplegar sus migraciones y configuración productiva
 > antes de declararlos operativos.
 
-### Actualización de suscripciones PayPhone TEST (25 de agosto de 2026)
+### Actualización de suscripciones PayPhone Botón WEB (25 de agosto de 2026)
 
 - [x] La web comercial está publicada en `https://navacloud.app`, con TLS
       válido. El flujo de planes conserva la selección tras registro/login,
       crea el negocio inicial y dirige al checkout autenticado.
-- [x] La API recibe `POST /v1/webhooks/payphone/platform`. Valida el origen por
-      allowlist, el estado aprobado, StoreId, monto, moneda e idempotencia antes
-      de aplicar una suscripción; los eventos duplicados no amplían el acceso.
-- [x] PayPhone tiene registrada para sandbox la URL
-      `https://api.navacloud.app/v1/webhooks/payphone/platform`. En la VPS se
-      generó la clave de cifrado de plataforma y se aprovisionó el StoreId y
-      token TEST mediante el comando interactivo
-      `payphone:platform:configure`; el token queda cifrado AES-256-GCM en la
-      base de datos y no se guarda en Git, frontend ni logs.
-- [ ] Los cobros siguen deshabilitados hasta obtener de PayPhone las IPs de
-      origen (o un mecanismo criptográfico verificable), configurar
-      `PLATFORM_PAYPHONE_WEBHOOK_ALLOWED_IPS`, endurecer el encabezado Nginx
-      `X-Forwarded-For` y ejecutar una compra sandbox completa.
+- [x] API Link dejó de ser el mecanismo de suscripciones. El checkout prepara
+      el pago con `POST /api/button/Prepare` y el retorno activa el flujo de
+      confirmación servidor-a-servidor con `POST /api/button/V2/Confirm`.
+- [x] El redirect, parámetros de URL y `POST /v1/webhooks/payphone/platform`
+      no pueden activar una suscripción. El webhook solo registra un evento
+      auxiliar de auditoría; Confirm autenticado valida la transacción y aplica
+      el entitlement idempotentemente.
+- [ ] Se requiere una aplicación PayPhone Developer de tipo **WEB** para
+      `https://navacloud.app`, con respuesta
+      `https://navacloud.app/checkout/payphone/confirm`. Su Token y StoreId
+      deben aprovisionarse de nuevo con `payphone:platform:configure`; la
+      configuración anterior de tipo API queda separada y no se reutiliza.
+- [ ] Los cobros permanecen deshabilitados hasta desplegar el cambio, cargar las
+      credenciales WEB cifradas y ejecutar una compra sandbox completa. La
+      allowlist `PLATFORM_PAYPHONE_WEBHOOK_ALLOWED_IPS` queda como control
+      opcional de auditoría, no como autoridad de pago.
 
 ### Validación del corte de políticas (23 de agosto de 2026)
 
@@ -54,10 +57,10 @@
       si se usa analítica, `NEXT_PUBLIC_GA_MEASUREMENT_ID`, requieren revisión
       operativa antes de declararlos públicos.
 - [~] El módulo propio de facturación SRI está desplegado en TEST con migraciones
-      y validación XSD local. Siguen pendientes la comprobación del certificado
-      `.p12` como usuario de servicio, los datos fiscales definitivos, la
-      homologación SRI y la prueba SMTP real. PayPhone productivo, backups 30/90
-      y ensayo de restauración tampoco se pueden certificar desde el repositorio.
+  y validación XSD local. Siguen pendientes la comprobación del certificado
+  `.p12` como usuario de servicio, los datos fiscales definitivos, la
+  homologación SRI y la prueba SMTP real. PayPhone productivo, backups 30/90
+  y ensayo de restauración tampoco se pueden certificar desde el repositorio.
 
 ### Actualización de despliegue SRI TEST (24 de agosto de 2026)
 
@@ -99,18 +102,18 @@ el código actual y tiene evidencia proporcional a su riesgo.
 
 ## Resumen ejecutivo
 
-| Área                         | Estado           | Situación actual                                                                                                                                                            |
-| ---------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Arquitectura y monorepo      | Completo         | pnpm/Turborepo, TypeScript estricto, CI, cuatro aplicaciones y paquetes compartidos.                                                                                        |
-| Autenticación y multi-tenant | Funcional        | Registro y OTP, sesiones opacas, recuperación, onboarding, roles y aislamiento por organización implementados. Las integraciones PostgreSQL no se ejecutaron en este corte. |
-| Operación de barbería        | Funcional        | Equipo, servicios, horarios, agenda, clientes, Caja, comisiones, inventario, reportes y notificaciones tienen API y UI móvil.                                               |
-| Reserva pública              | Funcional        | Catálogo, disponibilidad, OTP, política, idempotencia, gestión por token, reseñas y recordatorios implementados.                                                            |
-| Comercio de productos        | Parcial          | Catálogo, carrito, pedidos, reserva de stock, PayPhone y gestión operativa existen; faltan endurecimiento público y pruebas específicas.                                    |
-| Planes y suscripciones       | Sandbox preparado | Trial, plan Free, límites, feature flags, checkout web y receptor PayPhone están implementados; configuración TEST cifrada aprovisionada. Falta allowlist verificable y ensayo completo antes de habilitar cobros. |
-| Panel interno                | Funcional, local | Operación segura y OTP existen. La modernización visual y nuevos filtros están sin commit y sin validación visual autenticada final.                                        |
-| Calidad                      | Bloqueada        | Esquema, tipos, pruebas, E2E básico y builds pasan; lint y formato global fallan. Se omitieron 28 pruebas PostgreSQL.                                                       |
-| Producción                   | Piloto           | Hay evidencia histórica de API/Web en VPS, Neon, TLS, FCM y Maps. No se revalidaron hoy servicios, migraciones productivas ni recorrido completo.                           |
-| Android                      | Preparado        | `0.1.12` / code `34` está compilado y archivado; falta registrar su publicación y comprobar la versión recibida desde Play.                                                 |
+| Área                         | Estado            | Situación actual                                                                                                                                                                                          |
+| ---------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Arquitectura y monorepo      | Completo          | pnpm/Turborepo, TypeScript estricto, CI, cuatro aplicaciones y paquetes compartidos.                                                                                                                      |
+| Autenticación y multi-tenant | Funcional         | Registro y OTP, sesiones opacas, recuperación, onboarding, roles y aislamiento por organización implementados. Las integraciones PostgreSQL no se ejecutaron en este corte.                               |
+| Operación de barbería        | Funcional         | Equipo, servicios, horarios, agenda, clientes, Caja, comisiones, inventario, reportes y notificaciones tienen API y UI móvil.                                                                             |
+| Reserva pública              | Funcional         | Catálogo, disponibilidad, OTP, política, idempotencia, gestión por token, reseñas y recordatorios implementados.                                                                                          |
+| Comercio de productos        | Parcial           | Catálogo, carrito, pedidos, reserva de stock, PayPhone y gestión operativa existen; faltan endurecimiento público y pruebas específicas.                                                                  |
+| Planes y suscripciones       | Sandbox preparado | Trial, plan Free, límites, feature flags, checkout WEB Prepare/Confirm y receptor auxiliar están implementados. Faltan credenciales WEB cifradas, despliegue y ensayo completo antes de habilitar cobros. |
+| Panel interno                | Funcional, local  | Operación segura y OTP existen. La modernización visual y nuevos filtros están sin commit y sin validación visual autenticada final.                                                                      |
+| Calidad                      | Bloqueada         | Esquema, tipos, pruebas, E2E básico y builds pasan; lint y formato global fallan. Se omitieron 28 pruebas PostgreSQL.                                                                                     |
+| Producción                   | Piloto            | Hay evidencia histórica de API/Web en VPS, Neon, TLS, FCM y Maps. No se revalidaron hoy servicios, migraciones productivas ni recorrido completo.                                                         |
+| Android                      | Preparado         | `0.1.12` / code `34` está compilado y archivado; falta registrar su publicación y comprobar la versión recibida desde Play.                                                                               |
 
 ## Estado del repositorio auditado
 

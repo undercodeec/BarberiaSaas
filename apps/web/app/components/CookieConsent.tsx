@@ -60,16 +60,7 @@ export function CookieConsent() {
   };
 
   if (choice && !configured) {
-    return (
-      <button
-        aria-label="Modificar preferencias de cookies"
-        onClick={() => setConfigured(true)}
-        style={styles.reopenButton}
-        type="button"
-      >
-        Cookies
-      </button>
-    );
+    return null;
   }
 
   return (
@@ -181,19 +172,6 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
     minHeight: 40,
     padding: '8px 12px',
-  },
-  reopenButton: {
-    background: '#fffdf8',
-    border: '1px solid #d9cdb9',
-    borderRadius: 999,
-    bottom: 16,
-    color: '#171717',
-    cursor: 'pointer',
-    fontWeight: 700,
-    padding: '9px 14px',
-    position: 'fixed',
-    right: 16,
-    zIndex: 100,
   },
   secondaryButton: {
     background: '#fffdf8',

@@ -14,10 +14,10 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { buildApi } from './app';
 import { readConfig } from './config';
+import { ApiError } from './errors';
 import { hashOpaqueToken } from './security';
 import {
   addBillingDays,
-  applyVerifiedPlatformPayment,
   expireStaleSubscriptionPayments,
   inclusiveTaxBreakdown,
   platformPaymentEventHash,
@@ -143,7 +143,7 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
       await database.user.deleteMany({ where: { id: { in: userIds } } });
     }
     await database.platformPaymentConfiguration.deleteMany({
-      where: { provider: 'payphone' },
+      where: { provider: 'payphone_web_button' },
     });
     await app?.close();
   });
@@ -208,6 +208,7 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
       data: {
         encryptedToken: 'encrypted-only-for-provider-override',
         isEnabled: true,
+        provider: 'payphone_web_button',
         status: PlatformPaymentConfigurationStatus.READY,
         storeId: 'nava-store-sandbox',
         webhookAuthorizedAt: new Date(),
@@ -223,15 +224,44 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
           32,
           13,
         ).toString('base64'),
-        PLATFORM_PAYPHONE_WEBHOOK_ALLOWED_IPS: '127.0.0.1',
         PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS: '0',
         PLATFORM_SUBSCRIPTION_TERMS_VERSION: 'sandbox-2026-08',
       }),
       database,
       platformPaymentProvider: {
-        async createLink(input) {
+        async preparePayment(input) {
           return {
             paymentUrl: `https://sandbox.example.test/pay/${input.internalReference}`,
+          };
+        },
+        async confirmPayment(input) {
+          if (input.providerTransactionId === '9006')
+            throw new ApiError(
+              502,
+              'PAYPHONE_CONFIRM_UNAVAILABLE',
+              'Timeout simulado de PayPhone.',
+            );
+          return {
+            amountCents:
+              input.providerTransactionId === '9002'
+                ? input.amountCents + 1
+                : input.amountCents,
+            currencyCode:
+              input.providerTransactionId === '9003'
+                ? 'EUR'
+                : input.currencyCode,
+            internalReference: input.internalReference,
+            payload: {
+              Amount: input.amountCents,
+              Document: 'sensitive-document',
+              Email: 'sensitive@example.com',
+              StatusCode: input.providerTransactionId === '9005' ? 2 : 3,
+              TransactionId: input.providerTransactionId,
+            },
+            providerTransactionId: input.providerTransactionId,
+            status:
+              input.providerTransactionId === '9005' ? 'rejected' : 'approved',
+            storeId: input.storeId,
           };
         },
       },
@@ -289,29 +319,20 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
       await database.subscriptionPaymentAttempt.findUniqueOrThrow({
         where: { id: paymentAttemptId },
       });
-    const verifiedPayment = {
-      amountCents: storedAttempt.amountCents,
-      currencyCode: storedAttempt.currencyCode,
-      internalReference: storedAttempt.internalReference,
+    const auxiliaryWebhook = await app.inject({
+      method: 'POST',
       payload: {
         Amount: storedAttempt.amountCents,
-        Document: 'sensitive-document',
-        Email: 'sensitive@example.com',
+        ClientTransactionId: storedAttempt.internalReference,
+        Currency: storedAttempt.currencyCode,
         StatusCode: 3,
-        TransactionId: 98_765,
+        StoreId: storedAttempt.storeId,
+        TransactionId: 9001,
+        TransactionStatus: 'Approved',
       },
-      providerTransactionId: '98765',
-      status: 'approved' as const,
-      storeId: storedAttempt.storeId,
-      verifiedAt: new Date('2026-08-20T20:00:00Z'),
-    };
-    await expect(
-      applyVerifiedPlatformPayment(database, {
-        ...verifiedPayment,
-        amountCents: storedAttempt.amountCents + 1,
-        providerTransactionId: 'mismatch-98765',
-      }),
-    ).resolves.toMatchObject({ applied: false, reason: 'AMOUNT_MISMATCH' });
+      url: '/v1/webhooks/payphone/platform',
+    });
+    expect(auxiliaryWebhook.statusCode).toBe(200);
     expect(
       (
         await database.subscriptionPaymentAttempt.findUniqueOrThrow({
@@ -320,12 +341,57 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
       ).status,
     ).toBe(SubscriptionPaymentStatus.PENDING_PROVIDER);
 
-    await expect(
-      applyVerifiedPlatformPayment(database, verifiedPayment),
-    ).resolves.toMatchObject({ applied: true, duplicate: false });
-    await expect(
-      applyVerifiedPlatformPayment(database, verifiedPayment),
-    ).resolves.toMatchObject({ applied: true, duplicate: true });
+    const falseCallback = await app.inject({
+      headers: { authorization: `Bearer ${firstToken}` },
+      method: 'POST',
+      payload: { clientTransactionId: 'N0000000000000', id: 9001 },
+      url: '/v1/subscription/payments/confirm',
+    });
+    expect(falseCallback.statusCode).toBe(404);
+
+    const timeoutConfirmation = await app.inject({
+      headers: { authorization: `Bearer ${firstToken}` },
+      method: 'POST',
+      payload: {
+        clientTransactionId: storedAttempt.internalReference,
+        id: 9006,
+      },
+      url: '/v1/subscription/payments/confirm',
+    });
+    expect(timeoutConfirmation.statusCode).toBe(502);
+
+    const amountMismatch = await app.inject({
+      headers: { authorization: `Bearer ${firstToken}` },
+      method: 'POST',
+      payload: {
+        clientTransactionId: storedAttempt.internalReference,
+        id: 9002,
+      },
+      url: '/v1/subscription/payments/confirm',
+    });
+    expect(amountMismatch.statusCode).toBe(409);
+    const currencyMismatch = await app.inject({
+      headers: { authorization: `Bearer ${firstToken}` },
+      method: 'POST',
+      payload: {
+        clientTransactionId: storedAttempt.internalReference,
+        id: 9003,
+      },
+      url: '/v1/subscription/payments/confirm',
+    });
+    expect(currencyMismatch.statusCode).toBe(409);
+
+    const confirmed = await app.inject({
+      headers: { authorization: `Bearer ${firstToken}` },
+      method: 'POST',
+      payload: {
+        clientTransactionId: storedAttempt.internalReference,
+        id: 9001,
+      },
+      url: '/v1/subscription/payments/confirm',
+    });
+    expect(confirmed.statusCode, confirmed.body).toBe(200);
+    expect(confirmed.json<{ status: string }>().status).toBe('applied');
 
     const [attempt, invoice, subscription, changes, auditEntries, events] =
       await Promise.all([
@@ -356,10 +422,10 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
     expect(subscription.status).toBe(SubscriptionStatus.ACTIVE);
     expect(changes).toBe(1);
     expect(auditEntries).toBe(1);
-    expect(events).toHaveLength(2);
+    expect(events.length).toBeGreaterThanOrEqual(3);
     expect(
-      events.every(
-        (event) => event.source === PaymentProviderEventSource.RECONCILIATION,
+      events.some(
+        (event) => event.source === PaymentProviderEventSource.WEBHOOK,
       ),
     ).toBe(true);
     expect(JSON.stringify(attempt.providerPayload)).not.toContain(
@@ -368,6 +434,24 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
     expect(JSON.stringify(attempt.providerPayload)).not.toContain(
       'sensitive-document',
     );
+    const previousPeriodEnd = subscription.currentPeriodEnd;
+    const repeatedConfirmation = await app.inject({
+      headers: { authorization: `Bearer ${firstToken}` },
+      method: 'POST',
+      payload: {
+        clientTransactionId: storedAttempt.internalReference,
+        id: 9001,
+      },
+      url: '/v1/subscription/payments/confirm',
+    });
+    expect(repeatedConfirmation.statusCode).toBe(200);
+    expect(
+      (
+        await database.subscription.findUniqueOrThrow({
+          where: { organizationId: firstOrganization.id },
+        })
+      ).currentPeriodEnd,
+    ).toEqual(previousPeriodEnd);
 
     const rejectedCheckout = await app.inject({
       headers: {
@@ -383,20 +467,19 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
       await database.subscriptionPaymentAttempt.findUniqueOrThrow({
         where: { id: rejectedCheckout.json<{ id: string }>().id },
       });
-    await expect(
-      applyVerifiedPlatformPayment(database, {
-        amountCents: rejectedAttempt.amountCents,
-        currencyCode: rejectedAttempt.currencyCode,
-        internalReference: rejectedAttempt.internalReference,
-        payload: { StatusCode: 2, TransactionId: 98_766 },
-        providerTransactionId: '98766',
-        status: 'rejected',
-        storeId: rejectedAttempt.storeId,
-      }),
-    ).resolves.toMatchObject({
-      applied: false,
-      reason: 'PROVIDER_REJECTED',
+    const rejectedConfirmation = await app.inject({
+      headers: { authorization: `Bearer ${firstToken}` },
+      method: 'POST',
+      payload: {
+        clientTransactionId: rejectedAttempt.internalReference,
+        id: 9005,
+      },
+      url: '/v1/subscription/payments/confirm',
     });
+    expect(rejectedConfirmation.statusCode).toBe(200);
+    expect(rejectedConfirmation.json<{ status: string }>().status).toBe(
+      'rejected',
+    );
     expect(
       (
         await database.subscriptionPaymentAttempt.findUniqueOrThrow({
