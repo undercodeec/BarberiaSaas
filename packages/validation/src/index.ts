@@ -34,6 +34,10 @@ const passwordSchema = z
   .string()
   .min(8, 'La contraseña debe tener al menos 8 caracteres.')
   .max(72);
+const newPasswordSchema = passwordSchema.min(
+  12,
+  'La nueva contraseña debe tener al menos 12 caracteres.',
+);
 const timeSchema = z
   .string()
   .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/u, 'La hora debe tener formato HH:MM.');
@@ -97,7 +101,7 @@ export const signUpSchema = z
     businessName: businessNameSchema,
     city: z.string().trim().min(2, 'Selecciona una ciudad.').max(120),
     closingTime: timeSchema,
-    confirmPassword: passwordSchema,
+    confirmPassword: newPasswordSchema,
     countryCode: z
       .string()
       .regex(/^[A-Z]{2}$/u, 'El código de país no es válido.'),
@@ -111,7 +115,7 @@ export const signUpSchema = z
         'Debes aceptar la Política de Privacidad para crear tu cuenta.',
       ),
     openingTime: timeSchema,
-    password: passwordSchema,
+    password: newPasswordSchema,
     phone: phoneSchema,
   })
   .refine((value) => value.password === value.confirmPassword, {
@@ -246,7 +250,7 @@ export const updateBusinessLocationSchema = z.object({
 });
 
 export const resetPasswordSchema = z.object({
-  password: passwordSchema,
+  password: newPasswordSchema,
   token: z.string().min(32, 'El enlace de recuperación no es válido.'),
 });
 

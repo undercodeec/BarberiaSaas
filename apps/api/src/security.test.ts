@@ -8,6 +8,7 @@ import {
   decryptPlatformPaymentCredential,
   hashOpaqueToken,
   hashPassword,
+  passwordHashNeedsUpgrade,
   encryptPlatformPaymentCredential,
   verifyPassword,
 } from './security';
@@ -20,7 +21,19 @@ describe('seguridad de credenciales', () => {
       true,
     );
     await expect(verifyPassword('clave-incorrecta', hash)).resolves.toBe(false);
+    expect(hash).toContain('scrypt$32768$8$1$');
+    expect(passwordHashNeedsUpgrade(hash)).toBe(false);
     expect(hash).not.toContain('Una-clave-segura-123');
+  });
+
+  it('acepta hashes heredados y los identifica para actualización', async () => {
+    const legacyHash =
+      'scrypt$16384$8$1$CQkJCQkJCQkJCQkJCQkJCQ$4Rgs9_9vLvkmypy7oawyCRDNKT8nR2JiJn9UoYba9-kmNAlqETBfrVulIniQ_GVZJcs13sYzakrjgiJKgzHzCg';
+
+    await expect(verifyPassword('Clave-segura-123', legacyHash)).resolves.toBe(
+      true,
+    );
+    expect(passwordHashNeedsUpgrade(legacyHash)).toBe(true);
   });
 
   it('genera tokens impredecibles y solo persiste su huella', () => {

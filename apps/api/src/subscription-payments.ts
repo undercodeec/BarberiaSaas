@@ -688,8 +688,11 @@ export function registerSubscriptionPaymentRoutes(
   );
 
   app.post('/v1/webhooks/payphone/platform', async (request, reply) => {
-    if (webhookAllowedIps.size > 0 && !webhookAllowedIps.has(request.ip))
-      return reply.code(403).send({ ErrorCode: '777', Response: false });
+    if (
+      webhookAllowedIps.size === 0 ||
+      !webhookAllowedIps.has(request.ip)
+    )
+      return reply.code(404).send({ ErrorCode: '777', Response: false });
 
     const parsed = payphonePlatformWebhookSchema.safeParse(request.body);
     if (!parsed.success)

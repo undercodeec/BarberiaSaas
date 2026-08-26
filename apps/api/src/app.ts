@@ -59,7 +59,6 @@ import type {
 } from './notifications';
 import { registerProfileRoutes } from './profile';
 import { registerPayphoneRoutes } from './payphone';
-import { registerPayphonePaymentRoutes } from './payphone-payments';
 import {
   processProductOrderLifecycle,
   registerProductOrderRoutes,
@@ -86,6 +85,7 @@ import {
   createVerificationCode,
   hashOpaqueToken,
   hashPassword,
+  passwordHashNeedsUpgrade,
   verifyPassword,
 } from './security';
 import {
@@ -123,7 +123,8 @@ interface AuthRateLimitBucket {
   resetAt: number;
 }
 
-type AuthRateLimitScope = 'register' | 'resend-verification';
+type AuthRateLimitScope =
+  'login' | 'recover' | 'register' | 'resend-verification';
 
 function enforceAuthIpRateLimit({
   buckets,
@@ -175,11 +176,15 @@ function enforceAuthIpRateLimit({
   if (allowed) return;
 
   reply.header('retry-after', String(retryAfterSeconds));
+  const errorCode = {
+    login: 'AUTH_LOGIN_RATE_LIMITED',
+    recover: 'AUTH_RECOVER_RATE_LIMITED',
+    register: 'AUTH_REGISTER_RATE_LIMITED',
+    'resend-verification': 'AUTH_RESEND_RATE_LIMITED',
+  } as const;
   throw new ApiError(
     429,
-    scope === 'register'
-      ? 'AUTH_REGISTER_RATE_LIMITED'
-      : 'AUTH_RESEND_RATE_LIMITED',
+    errorCode[scope],
     'Has realizado demasiadas solicitudes. Espera unos minutos antes de intentarlo nuevamente.',
   );
 }
@@ -884,11 +889,19 @@ export async function buildApi({
   recoveryMailer = null,
   verificationMailer = null,
 }: BuildApiOptions) {
+  const trustedProxyIps = config.API_TRUSTED_PROXY_IPS.split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
   const app = Fastify({
     bodyLimit: 1_048_576,
     logger: config.APP_ENV === 'production',
     requestTimeout: 30_000,
-    trustProxy: config.API_TRUST_PROXY === 'true',
+    trustProxy:
+      config.API_TRUST_PROXY === 'true'
+        ? trustedProxyIps.length > 0
+          ? trustedProxyIps
+          : config.APP_ENV === 'local'
+        : false,
   });
   const authRateLimitBuckets = new Map<string, AuthRateLimitBucket>();
   const googleMapsRateLimitBuckets = new Map<string, AuthRateLimitBucket>();
@@ -1124,7 +1137,15 @@ export async function buildApi({
     }
   });
 
-  app.post('/v1/auth/login', async (request) => {
+  app.post('/v1/auth/login', async (request, reply) => {
+    enforceAuthIpRateLimit({
+      buckets: authRateLimitBuckets,
+      limit: config.AUTH_LOGIN_RATE_LIMIT_MAX,
+      reply,
+      request,
+      scope: 'login',
+      windowMs: authRateLimitWindowMs,
+    });
     const input = signInSchema.parse(request.body);
     const user = await database.user.findUnique({
       where: { email: normalizeEmail(input.email) },
@@ -1147,6 +1168,12 @@ export async function buildApi({
         'EMAIL_NOT_VERIFIED',
         'Verifica tu correo antes de iniciar sesión.',
       );
+    }
+    if (passwordHashNeedsUpgrade(user.passwordHash)) {
+      await database.user.update({
+        data: { passwordHash: await hashPassword(input.password) },
+        where: { id: user.id },
+      });
     }
     return {
       session: await createSession(database, user.id),
@@ -1788,7 +1815,15 @@ export async function buildApi({
     return reply.code(204).send();
   });
 
-  app.post('/v1/auth/recover', async (request) => {
+  app.post('/v1/auth/recover', async (request, reply) => {
+    enforceAuthIpRateLimit({
+      buckets: authRateLimitBuckets,
+      limit: config.AUTH_RECOVER_RATE_LIMIT_MAX,
+      reply,
+      request,
+      scope: 'recover',
+      windowMs: authRateLimitWindowMs,
+    });
     const { email } = recoverAccessSchema.parse(request.body);
     const user = await database.user.findUnique({
       where: { email: normalizeEmail(email) },
@@ -2758,7 +2793,6 @@ export async function buildApi({
   registerCommissionRoutes(app, database, authenticate);
   registerProfileRoutes(app, database, authenticate);
   registerPayphoneRoutes(app, database, authenticate, config);
-  registerPayphonePaymentRoutes(app, database, authenticate);
   registerSubscriptionPaymentRoutes(
     app,
     database,

@@ -73,6 +73,8 @@ describe('limitación de autenticación por IP', () => {
         API_TRUST_PROXY: 'true',
         APP_ENV: 'local',
         AUTH_IP_RATE_LIMIT_WINDOW_SECONDS: '60',
+        AUTH_LOGIN_RATE_LIMIT_MAX: '2',
+        AUTH_RECOVER_RATE_LIMIT_MAX: '2',
         AUTH_REGISTER_RATE_LIMIT_MAX: '2',
         AUTH_RESEND_RATE_LIMIT_MAX: '2',
         CORS_ORIGIN: 'http://localhost:8081',
@@ -138,6 +140,31 @@ describe('limitación de autenticación por IP', () => {
         code: 'AUTH_RESEND_RATE_LIMITED',
       });
       expect(Number(blockedResend.headers['retry-after'])).toBeGreaterThan(0);
+
+      for (const url of ['/v1/auth/login', '/v1/auth/recover']) {
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          const response = await app.inject({
+            headers,
+            method: 'POST',
+            payload: {},
+            url,
+          });
+          expect(response.statusCode).toBe(400);
+        }
+
+        const blocked = await app.inject({
+          headers,
+          method: 'POST',
+          payload: {},
+          url,
+        });
+        expect(blocked.statusCode).toBe(429);
+        expect(blocked.json<{ code: string }>().code).toBe(
+          url === '/v1/auth/login'
+            ? 'AUTH_LOGIN_RATE_LIMITED'
+            : 'AUTH_RECOVER_RATE_LIMITED',
+        );
+      }
 
       const otherIp = await app.inject({
         headers: { 'x-forwarded-for': '203.0.113.11' },

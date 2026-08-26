@@ -44,10 +44,7 @@ import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
-import {
-  AgendaCalendarModal,
-  PayphonePaymentModal,
-} from '../../src/features/screens/agenda-components';
+import { AgendaCalendarModal } from '../../src/features/screens/agenda-components';
 import {
   addDays,
   calendarDateForTimeZone,
@@ -58,7 +55,6 @@ import {
   sameDate,
   timelineMinutes,
   type AgendaStatusFilter,
-  type PayphoneManualConfirmationResponse,
 } from '../../src/features/screens/agenda-model';
 
 export default function AgendaScreen() {
@@ -246,10 +242,6 @@ export default function AgendaScreen() {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedAppointment, setSelectedAppointment] =
     useState<AppointmentRecord | null>(null);
-  const [manualPaymentSheetOpen, setManualPaymentSheetOpen] = useState(false);
-  const [manualPaymentConfirmed, setManualPaymentConfirmed] = useState(false);
-  const [manualPaymentNote, setManualPaymentNote] = useState('');
-  const [manualPaymentReference, setManualPaymentReference] = useState('');
   const [dayContentOpacity] = useState(() => new Animated.Value(1));
   const [timelineTransitionX] = useState(() => new Animated.Value(0));
   const [settingsSheetTranslateY] = useState(() => new Animated.Value(0));
@@ -491,7 +483,9 @@ export default function AgendaScreen() {
     selectedDaySchedules,
   ]);
 
-  const manualPaymentQuery = useQuery({
+  /* La confirmación manual está deshabilitada: Nava no marcará un pago como
+   * aprobado sin una verificación criptográfica o servidor-a-servidor. */
+  /* const manualPaymentQuery = useQuery({
     enabled: Boolean(session && selectedAppointment),
     queryFn: () =>
       requireApiClient().request<PayphoneManualConfirmationResponse>(
@@ -544,6 +538,7 @@ export default function AgendaScreen() {
       ]);
     },
   });
+  */
   const filteredAppointments = useMemo(() => {
     return (appointmentsQuery.data ?? []).filter((appointment) => {
       if (!showCancelled && appointment.status === 'cancelled') return false;
@@ -1372,7 +1367,9 @@ export default function AgendaScreen() {
                   : 'Profesional histórico (Nava Local)'}
               </Text>
             </Pressable>
-            {selectedAppointment?.paymentStatus === 'pending' &&
+            {/* La confirmación manual PayPhone permanece deshabilitada hasta
+                integrar la verificación oficial del proveedor. */}
+            {/* {selectedAppointment?.paymentStatus === 'pending' &&
             manualPaymentQuery.data?.eligible ? (
               <Pressable
                 onPress={() => {
@@ -1388,7 +1385,7 @@ export default function AgendaScreen() {
                   Registrar cobro PayPhone
                 </Text>
               </Pressable>
-            ) : null}
+            ) : null} */}
             <Pressable
               onPress={() => {
                 if (!selectedAppointment?.clientPhone) {
@@ -1460,7 +1457,7 @@ export default function AgendaScreen() {
         </Pressable>
       </Modal>
 
-      <PayphonePaymentModal
+      {/* <PayphonePaymentModal
         bottomInset={layout.bottomInset}
         confirmed={manualPaymentConfirmed}
         data={manualPaymentQuery.data}
@@ -1474,7 +1471,7 @@ export default function AgendaScreen() {
         reference={manualPaymentReference}
         sheetMaxHeight={layout.sheetMaxHeight}
         visible={manualPaymentSheetOpen}
-      />
+      /> */}
       <Animated.View
         {...floatingBookingPanResponder.panHandlers}
         onLayout={({ nativeEvent }) => {

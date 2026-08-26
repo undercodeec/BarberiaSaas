@@ -14,7 +14,7 @@
   respuesta `HTTP/2 200`.
 - Acceso: bootstrap protegido con contraseña derivada mediante scrypt y OTP por
   correo. `PLATFORM_ADMIN_PASSWORD_HASH` debe comenzar por
-  `scrypt$16384$8$1$`; no admite hashes bcrypt ni se pega en el formulario.
+  `scrypt$32768$8$1$`; no admite hashes bcrypt ni se pega en el formulario.
 
 La plantilla systemd inicia el binario local de Next directamente. Así conserva
 `ProtectHome=true` sin depender de la caché de Corepack/pnpm en `/home/nava`.
@@ -25,6 +25,16 @@ La plantilla systemd inicia el binario local de Next directamente. Así conserva
 - API y migraciones actualizadas, incluida `20260820190000_platform_operations_center`.
 - `PLATFORM_ADMIN_EMAILS`, `PLATFORM_ADMIN_PASSWORD_HASH` y SMTP configurados en la API.
 - `NEXT_PUBLIC_API_URL` con la URL pública HTTPS de la API durante el build del Admin.
+
+Genere el hash bootstrap en una terminal interactiva y copie únicamente la salida
+en el gestor de secretos:
+
+```bash
+pnpm --filter @barber-saas/api password:hash
+```
+
+El comando no muestra ni guarda la contraseña y genera el formato
+`scrypt$32768$8$1$` exigido en producción.
 
 ## Preparación
 

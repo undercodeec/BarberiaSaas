@@ -47,6 +47,8 @@ import {
   createOpaqueToken,
   createVerificationCode,
   hashOpaqueToken,
+  hashPassword,
+  passwordHashNeedsUpgrade,
   verifyPassword,
 } from './security';
 import {
@@ -410,6 +412,11 @@ const platformConfigurationActionSchema = z.object({
 const PLATFORM_ACCESS_CODE_DURATION_MS = 5 * 60 * 1000;
 const PLATFORM_ACCESS_MAX_FAILED_ATTEMPTS = 5;
 const PLATFORM_SESSION_DURATION_MS = 12 * 60 * 60 * 1000;
+const MAX_PLATFORM_LOGIN_RATE_LIMIT_BUCKETS = 10_000;
+const platformLoginRateLimitBuckets = new Map<
+  string,
+  { count: number; resetAt: number }
+>();
 const SUBSCRIPTION_CONTROLLED_PREFIXES = [
   '/v1/appointments',
   '/v1/booking-settings',
@@ -436,6 +443,47 @@ interface AuthenticatedIdentity {
     readonly fullName: string;
     readonly id: string;
   };
+}
+
+function enforcePlatformLoginRateLimit(
+  config: ApiConfig,
+  request: FastifyRequest,
+) {
+  const now = Date.now();
+  const key = request.ip;
+  if (
+    !platformLoginRateLimitBuckets.has(key) &&
+    platformLoginRateLimitBuckets.size >= MAX_PLATFORM_LOGIN_RATE_LIMIT_BUCKETS
+  ) {
+    for (const [bucketKey, bucket] of platformLoginRateLimitBuckets) {
+      if (bucket.resetAt <= now)
+        platformLoginRateLimitBuckets.delete(bucketKey);
+    }
+    if (
+      platformLoginRateLimitBuckets.size >=
+      MAX_PLATFORM_LOGIN_RATE_LIMIT_BUCKETS
+    ) {
+      const oldestKey = platformLoginRateLimitBuckets.keys().next().value as
+        string | undefined;
+      if (oldestKey) platformLoginRateLimitBuckets.delete(oldestKey);
+    }
+  }
+  const current = platformLoginRateLimitBuckets.get(key);
+  const windowMs = config.AUTH_IP_RATE_LIMIT_WINDOW_SECONDS * 1000;
+  const bucket =
+    !current || current.resetAt <= now
+      ? { count: 0, resetAt: now + windowMs }
+      : current;
+  if (!current || current.resetAt <= now)
+    platformLoginRateLimitBuckets.set(key, bucket);
+  if (bucket.count >= config.PLATFORM_LOGIN_RATE_LIMIT_MAX) {
+    throw new ApiError(
+      429,
+      'PLATFORM_LOGIN_RATE_LIMITED',
+      'Has realizado demasiados intentos. Espera unos minutos antes de intentarlo nuevamente.',
+    );
+  }
+  bucket.count += 1;
 }
 
 type Authenticate = (
@@ -1006,6 +1054,7 @@ function registerPlatformRoutes(
   });
 
   app.post('/v1/platform/login', async (request) => {
+    enforcePlatformLoginRateLimit(config, request);
     const input = signInSchema.parse(request.body);
     const email = input.email.trim().toLowerCase();
     const user = await database.user.findUnique({
@@ -1048,6 +1097,16 @@ function registerPlatformRoutes(
         'PLATFORM_ACCESS_DELIVERY_UNAVAILABLE',
         'El envío de códigos de acceso no está disponible.',
       );
+    }
+    if (
+      user.platformOperator &&
+      user.passwordHash &&
+      passwordHashNeedsUpgrade(user.passwordHash)
+    ) {
+      await database.user.update({
+        data: { passwordHash: await hashPassword(input.password) },
+        where: { id: user.id },
+      });
     }
     const now = new Date();
     const expiresAt = new Date(

@@ -15,6 +15,7 @@ const environmentSchema = z
     API_HOST: z.string().min(1).default('0.0.0.0'),
     API_PORT: z.coerce.number().int().min(1).max(65_535).default(4000),
     API_TRUST_PROXY: z.enum(['true', 'false']).default('false'),
+    API_TRUSTED_PROXY_IPS: z.string().default(''),
     APP_ENV: z
       .enum(['local', 'preview', 'staging', 'production'])
       .default('local'),
@@ -24,6 +25,18 @@ const environmentSchema = z
       .min(1)
       .max(86_400)
       .default(900),
+    AUTH_LOGIN_RATE_LIMIT_MAX: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(10_000)
+      .default(10),
+    AUTH_RECOVER_RATE_LIMIT_MAX: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(10_000)
+      .default(5),
     AUTH_REGISTER_RATE_LIMIT_MAX: z.coerce
       .number()
       .int()
@@ -77,6 +90,12 @@ const environmentSchema = z
       .default('2026-08-23'),
     PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY: optionalText,
     PLATFORM_PAYPHONE_WEBHOOK_ALLOWED_IPS: z.string().default(''),
+    PLATFORM_LOGIN_RATE_LIMIT_MAX: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(10_000)
+      .default(5),
     PLATFORM_CHECKOUT_URL: z.url().default('https://navacloud.app/checkout'),
     PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS: optionalBasisPoints,
     PLATFORM_SUBSCRIPTION_TERMS_VERSION: optionalText,
@@ -107,7 +126,7 @@ const environmentSchema = z
       .enum(['GENERAL', 'RIMPE', 'RIMPE_NEGOCIO_POPULAR'])
       .default('GENERAL'),
     PAYPHONE_CREDENTIALS_ENCRYPTION_KEY: optionalText,
-    PUBLIC_WEB_URL: z.url().default('https://book.nava.app'),
+    PUBLIC_WEB_URL: z.url().default('https://navacloud.app'),
     SMTP_FROM: optionalText,
     SMTP_HOST: optionalText,
     SMTP_PASSWORD: optionalText,
@@ -116,6 +135,29 @@ const environmentSchema = z
     SMTP_USER: optionalText,
   })
   .superRefine((value, context) => {
+    if (
+      value.APP_ENV !== 'local' &&
+      value.API_TRUST_PROXY === 'true' &&
+      !value.API_TRUSTED_PROXY_IPS.trim()
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'API_TRUSTED_PROXY_IPS es obligatoria al habilitar API_TRUST_PROXY fuera de local.',
+        path: ['API_TRUSTED_PROXY_IPS'],
+      });
+    }
+    if (
+      value.APP_ENV !== 'local' &&
+      value.PLATFORM_DEVELOPMENT_BYPASS === 'true'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'PLATFORM_DEVELOPMENT_BYPASS solo puede habilitarse en desarrollo local.',
+        path: ['PLATFORM_DEVELOPMENT_BYPASS'],
+      });
+    }
     if (
       value.APP_ENV === 'production' &&
       (!value.SMTP_FROM || !value.SMTP_HOST)
@@ -126,6 +168,45 @@ const environmentSchema = z
         path: ['SMTP_HOST'],
       });
     }
+    if (value.APP_ENV === 'production') {
+      const invalidCorsOrigin = value.CORS_ORIGIN.split(',')
+        .map((origin) => origin.trim())
+        .some((origin) => {
+          try {
+            const url = new URL(origin);
+            return (
+              url.protocol !== 'https:' ||
+              Boolean(url.username || url.password) ||
+              url.pathname !== '/' ||
+              Boolean(url.search || url.hash)
+            );
+          } catch {
+            return true;
+          }
+        });
+      if (invalidCorsOrigin) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'CORS_ORIGIN debe contener únicamente orígenes HTTPS exactos en producción.',
+          path: ['CORS_ORIGIN'],
+        });
+      }
+      if (new URL(value.PUBLIC_WEB_URL).protocol !== 'https:') {
+        context.addIssue({
+          code: 'custom',
+          message: 'PUBLIC_WEB_URL debe usar HTTPS en producción.',
+          path: ['PUBLIC_WEB_URL'],
+        });
+      }
+      if (new URL(value.MOBILE_INVITATION_URL).protocol !== 'https:') {
+        context.addIssue({
+          code: 'custom',
+          message: 'MOBILE_INVITATION_URL debe usar HTTPS en producción.',
+          path: ['MOBILE_INVITATION_URL'],
+        });
+      }
+    }
     if (
       value.APP_ENV === 'production' &&
       value.PLATFORM_ADMIN_EMAILS &&
@@ -135,6 +216,19 @@ const environmentSchema = z
         code: 'custom',
         message:
           'PLATFORM_ADMIN_PASSWORD_HASH es obligatorio cuando el panel interno está habilitado en producción.',
+        path: ['PLATFORM_ADMIN_PASSWORD_HASH'],
+      });
+    }
+    if (
+      value.APP_ENV === 'production' &&
+      value.PLATFORM_ADMIN_EMAILS &&
+      value.PLATFORM_ADMIN_PASSWORD_HASH &&
+      !value.PLATFORM_ADMIN_PASSWORD_HASH.startsWith('scrypt$32768$8$1$')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'PLATFORM_ADMIN_PASSWORD_HASH debe usar los parámetros scrypt$32768$8$1$ vigentes.',
         path: ['PLATFORM_ADMIN_PASSWORD_HASH'],
       });
     }

@@ -297,7 +297,7 @@ export function ResetPasswordScreen() {
                   autoComplete={name === 'password' ? 'new-password' : 'off'}
                   onBlur={field.onBlur}
                   onChangeText={field.onChange}
-                  placeholder="Mínimo 8 caracteres"
+                  placeholder="Mínimo 12 caracteres"
                   placeholderTextColor={appTheme.colors.textMuted}
                   secureTextEntry={!showPassword}
                   style={styles.passwordInput}

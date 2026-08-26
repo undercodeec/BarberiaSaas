@@ -14,7 +14,7 @@
     "@barber-saas/design-tokens": "workspace:*",
     "animejs": "^4.5.0",
     "country-state-city": "^3.2.1",
-    "next": "16.2.10",
+    "next": "16.2.11",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },

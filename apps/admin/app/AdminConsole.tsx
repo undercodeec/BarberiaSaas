@@ -13,7 +13,6 @@ import {
   getNotificationFailures,
   getOrganizations,
   getOverview,
-  getPlatformSession,
   requestPlatformAccessCode,
   retryNotificationDelivery,
   signOut,
@@ -38,7 +37,6 @@ import {
 import { PlatformUsers } from './PlatformUsers';
 import { PlatformSubscriptions } from './PlatformSubscriptions';
 
-const SESSION_KEY = 'nava.platform.session';
 const dateFormatter = new Intl.DateTimeFormat('es-EC', {
   dateStyle: 'medium',
   timeStyle: 'short',
@@ -160,18 +158,6 @@ function Icon({ name }: { readonly name: string }) {
         {paths[name]}
       </g>
     </svg>
-  );
-}
-
-function LoadingScreen() {
-  return (
-    <main className="auth-shell">
-      <div className="loading-lockup">
-        <div className="brand-mark brand-mark--large">N</div>
-        <div aria-label="Cargando" className="loader" role="status" />
-        <p>Preparando el centro de operaciones…</p>
-      </div>
-    </main>
   );
 }
 
@@ -1089,8 +1075,8 @@ function OperationModal({
 
 export default function AdminConsole() {
   const [authState, setAuthState] = useState<
-    'anonymous' | 'authenticated' | 'checking' | 'challenge'
-  >('checking');
+    'anonymous' | 'authenticated' | 'challenge'
+  >('anonymous');
   const [operator, setOperator] = useState<Operator | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
@@ -1119,8 +1105,10 @@ export default function AdminConsole() {
   const [trial, setTrial] = useState('all');
   const [selected, setSelected] = useState<PlatformOrganization | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
-  const [detailOrganization, setDetailOrganization] =
-    useState<Pick<PlatformOrganization, 'id' | 'name'> | null>(null);
+  const [detailOrganization, setDetailOrganization] = useState<Pick<
+    PlatformOrganization,
+    'id' | 'name'
+  > | null>(null);
   const [selectedUser, setSelectedUser] = useState<{
     readonly id: string;
     readonly requestId: number;
@@ -1131,33 +1119,6 @@ export default function AdminConsole() {
   );
   const [toast, setToast] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-
-  useEffect(() => {
-    const storedToken = window.sessionStorage.getItem(SESSION_KEY);
-    let active = true;
-    if (!storedToken) {
-      queueMicrotask(() => {
-        if (active) setAuthState('anonymous');
-      });
-      return () => {
-        active = false;
-      };
-    }
-    void getPlatformSession(storedToken)
-      .then(({ operator: currentOperator }) => {
-        if (!active) return;
-        setOperator(currentOperator);
-        setToken(storedToken);
-        setAuthState('authenticated');
-      })
-      .catch(() => {
-        window.sessionStorage.removeItem(SESSION_KEY);
-        if (active) setAuthState('anonymous');
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -1324,7 +1285,6 @@ export default function AdminConsole() {
     try {
       const { operator: developmentOperator, session } =
         await startDevelopmentSession();
-      window.sessionStorage.setItem(SESSION_KEY, session.token);
       setOperator(developmentOperator);
       setToken(session.token);
       setAuthState('authenticated');
@@ -1345,7 +1305,6 @@ export default function AdminConsole() {
     setLoginError(null);
     try {
       const session = await verifyPlatformAccessCode(challengeToken, code);
-      window.sessionStorage.setItem(SESSION_KEY, session.session.token);
       setOperator(session.operator);
       setToken(session.session.token);
       setChallengeToken(null);
@@ -1390,7 +1349,6 @@ export default function AdminConsole() {
 
   async function logout() {
     if (token) await signOut(token).catch(() => undefined);
-    window.sessionStorage.removeItem(SESSION_KEY);
     setToken(null);
     setChallengeToken(null);
     setChallengeExpiresAt(null);
@@ -1466,7 +1424,6 @@ export default function AdminConsole() {
     }
   }
 
-  if (authState === 'checking') return <LoadingScreen />;
   if (authState === 'anonymous')
     return (
       <PlatformLogin

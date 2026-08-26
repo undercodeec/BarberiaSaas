@@ -9,18 +9,23 @@ import {
 } from 'node:crypto';
 
 const KEY_LENGTH = 64;
-const SCRYPT_COST = 16_384;
+const SCRYPT_COST = 32_768;
+const LEGACY_SCRYPT_COST = 16_384;
 const SCRYPT_BLOCK_SIZE = 8;
 const SCRYPT_PARALLELIZATION = 1;
 
-function deriveKey(password: string, salt: Buffer): Promise<Buffer> {
+function deriveKey(
+  password: string,
+  salt: Buffer,
+  cost = SCRYPT_COST,
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     scrypt(
       password,
       salt,
       KEY_LENGTH,
       {
-        N: SCRYPT_COST,
+        N: cost,
         maxmem: 64 * 1024 * 1024,
         p: SCRYPT_PARALLELIZATION,
         r: SCRYPT_BLOCK_SIZE,
@@ -54,7 +59,7 @@ export async function verifyPassword(
     encodedHash.split('$');
   if (
     algorithm !== 'scrypt' ||
-    cost !== String(SCRYPT_COST) ||
+    (cost !== String(LEGACY_SCRYPT_COST) && cost !== String(SCRYPT_COST)) ||
     blockSize !== String(SCRYPT_BLOCK_SIZE) ||
     parallelization !== String(SCRYPT_PARALLELIZATION) ||
     !saltValue ||
@@ -66,11 +71,23 @@ export async function verifyPassword(
   const expectedKey = Buffer.from(keyValue, 'base64url');
   const actualKey = await deriveKey(
     password,
-    Buffer.from(saltValue, 'base64url'),
+    Buffer.from(saltValue!, 'base64url'),
+    Number(cost),
   );
   return (
     expectedKey.length === actualKey.length &&
     timingSafeEqual(expectedKey, actualKey)
+  );
+}
+
+/** Los hashes antiguos se actualizan tras una autenticación correcta. */
+export function passwordHashNeedsUpgrade(encodedHash: string): boolean {
+  const [algorithm, cost, blockSize, parallelization] = encodedHash.split('$');
+  return (
+    algorithm === 'scrypt' &&
+    cost === String(LEGACY_SCRYPT_COST) &&
+    blockSize === String(SCRYPT_BLOCK_SIZE) &&
+    parallelization === String(SCRYPT_PARALLELIZATION)
   );
 }
 

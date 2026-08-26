@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsup && node scripts/copy-sri-schemas.mjs",
     "dev": "tsx watch src/index.ts",
+    "password:hash": "tsx src/generate-password-hash.ts",
     "start": "node dist/index.js",
     "payphone:platform:configure": "tsx src/configure-platform-payphone.ts",
     "sri:certificate:check": "tsx src/inspect-sri-certificate.ts",

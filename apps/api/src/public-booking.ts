@@ -46,7 +46,7 @@ import {
 
 const PUBLIC_VERIFICATION_DURATION_MS = 10 * 60 * 1000;
 const MANAGEMENT_AFTER_END_MS = 30 * 24 * 60 * 60 * 1000;
-const DEFAULT_PUBLIC_BOOKING_BASE_URL = 'https://book.nava.app';
+const DEFAULT_PUBLIC_BOOKING_BASE_URL = 'https://navacloud.app';
 
 const publicPathSchema = z.object({
   locationSlug: z.string().trim().min(1).max(80),
