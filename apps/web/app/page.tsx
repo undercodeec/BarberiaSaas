@@ -322,7 +322,8 @@ export default function HomePage() {
       deckTouchYRef.current = event.touches[0]?.clientY ?? null;
     };
     const onTouchMove = (event: TouchEvent) => {
-      if (!window.matchMedia('(max-width: 800px)').matches) return;
+      // En móvil el mazo es estático y el gesto conserva el scroll de página.
+      if (window.matchMedia('(max-width: 800px)').matches) return;
       const touch = event.touches[0];
       const previousY = deckTouchYRef.current;
       if (!touch || previousY === null) return;
