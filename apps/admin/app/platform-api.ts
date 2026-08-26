@@ -80,12 +80,14 @@ export interface PlatformSubscriptionList {
       readonly status: string;
     } | null;
     readonly organization: {
+      readonly defaultTimezone: string;
       readonly id: string;
       readonly name: string;
       readonly slug: string;
     };
     readonly plan: { readonly code: string; readonly name: string };
     readonly status: string;
+    readonly subscriptionStartedAt: string | null;
     readonly trialEndsAt: string | null;
     readonly updatedAt: string;
   }[];

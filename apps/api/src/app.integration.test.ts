@@ -1,4 +1,7 @@
-import { createDatabaseClient } from '@barber-saas/database';
+import {
+  createDatabaseClient,
+  PlatformOverrideKind,
+} from '@barber-saas/database';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildApi } from './app';
@@ -8,6 +11,7 @@ import type {
   PlatformAccessMessage,
   VerificationMessage,
 } from './recovery-mailer';
+import { hashPassword } from './security';
 import { GRACE_DAYS, TRIAL_DAYS } from './subscription-policy';
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
@@ -1214,6 +1218,42 @@ describeWithDatabase('API con PostgreSQL', () => {
         expect.objectContaining({ available: true, code: 'multi' }),
       ]),
       usage: { locations: 1, teamMembers: 1 },
+    });
+
+    await database.platformFeatureOverride.create({
+      data: {
+        booleanValue: true,
+        createdByUserId: (
+          await database.membership.findFirstOrThrow({
+            where: {
+              organizationId: organization.organizationId,
+              role: 'OWNER',
+              status: 'ACTIVE',
+            },
+          })
+        ).userId,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        key: 'team',
+        kind: PlatformOverrideKind.FEATURE,
+        organizationId: organization.organizationId,
+        reason: 'Validar entitlement efectivo en Mobile',
+      },
+    });
+    const overriddenSubscriptionResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      url: '/v1/subscription',
+    });
+    expect(
+      overriddenSubscriptionResponse.json<{
+        current: {
+          featureFlags: { team: boolean };
+          limits: { locations: number };
+        };
+      }>().current,
+    ).toMatchObject({
+      featureFlags: { team: true },
+      limits: { locations: 3 },
     });
 
     await database.subscription.update({
@@ -3626,11 +3666,28 @@ describeWithDatabase('API con PostgreSQL', () => {
     }>();
     expect(createdOperatorBody.operator.role).toBe('support');
 
-    const supportLogin = await app.inject({
+    const reusedApplicationPassword = await app.inject({
       method: 'POST',
       payload: {
         email: 'not-platform@example.com',
         password: 'Clave-segura-123',
+      },
+      url: '/v1/platform/login',
+    });
+    expect(reusedApplicationPassword.statusCode).toBe(401);
+    await database.platformOperator.update({
+      data: {
+        adminPasswordHash: await hashPassword('Clave-panel-segura-456'),
+        adminPasswordSetAt: new Date(),
+      },
+      where: { userId: createdOperatorBody.operator.userId },
+    });
+
+    const supportLogin = await app.inject({
+      method: 'POST',
+      payload: {
+        email: 'not-platform@example.com',
+        password: 'Clave-panel-segura-456',
       },
       url: '/v1/platform/login',
     });

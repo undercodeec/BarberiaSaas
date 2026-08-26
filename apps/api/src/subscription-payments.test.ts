@@ -21,6 +21,7 @@ import {
   expireStaleSubscriptionPayments,
   inclusiveTaxBreakdown,
   platformPaymentEventHash,
+  resolveAppliedSubscriptionPeriod,
   resolveFounderPromotion,
   sanitizePlatformProviderPayload,
 } from './subscription-payments';
@@ -30,6 +31,24 @@ describe('dominio de pagos de suscripción', () => {
     expect(addBillingDays(new Date('2026-01-31T12:00:00Z'), 30)).toEqual(
       new Date('2026-03-02T12:00:00Z'),
     );
+  });
+
+  it('conserva el inicio de acceso al registrar una renovación anticipada', () => {
+    const period = resolveAppliedSubscriptionPeriod({
+      billingPeriodDays: 30,
+      currentPeriodEnd: new Date('2026-09-15T15:00:00.000Z'),
+      currentPeriodStart: new Date('2026-08-16T15:00:00.000Z'),
+      now: new Date('2026-08-26T18:30:00.000Z'),
+      renewsCurrentPeriod: true,
+    });
+
+    expect(period.subscriptionPeriodStartsAt).toEqual(
+      new Date('2026-08-16T15:00:00.000Z'),
+    );
+    expect(period.invoicePeriodStartsAt).toEqual(
+      new Date('2026-09-15T15:00:00.000Z'),
+    );
+    expect(period.periodEndsAt).toEqual(new Date('2026-10-15T15:00:00.000Z'));
   });
 
   it('desglosa impuestos sin alterar el precio final publicado', () => {

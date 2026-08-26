@@ -257,6 +257,30 @@ export function addBillingDays(date: Date, days: number) {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 }
 
+export function resolveAppliedSubscriptionPeriod(input: {
+  readonly billingPeriodDays: number;
+  readonly currentPeriodEnd: Date;
+  readonly currentPeriodStart: Date;
+  readonly now: Date;
+  readonly renewsCurrentPeriod: boolean;
+}) {
+  const invoicePeriodStartsAt = input.renewsCurrentPeriod
+    ? input.currentPeriodEnd
+    : input.now;
+  return {
+    invoicePeriodStartsAt,
+    periodEndsAt: addBillingDays(
+      invoicePeriodStartsAt,
+      input.billingPeriodDays,
+    ),
+    // Una renovación anticipada extiende el acceso existente. No debe hacer que
+    // el inicio de la suscripción parezca una fecha futura en el panel.
+    subscriptionPeriodStartsAt: input.renewsCurrentPeriod
+      ? input.currentPeriodStart
+      : input.now,
+  };
+}
+
 function internalReference() {
   return `N${randomBytes(7).toString('hex')}`;
 }
@@ -531,13 +555,14 @@ export async function applyVerifiedPlatformPayment(
       previousPlan.id === attempt.invoice.planId &&
       subscription.status === SubscriptionStatus.ACTIVE &&
       subscription.currentPeriodEnd > now;
-    const periodStartsAt = renewsCurrentPeriod
-      ? subscription.currentPeriodEnd
-      : now;
-    const periodEndsAt = addBillingDays(
-      periodStartsAt,
-      attempt.invoice.billingPeriodDays,
-    );
+    const { invoicePeriodStartsAt, periodEndsAt, subscriptionPeriodStartsAt } =
+      resolveAppliedSubscriptionPeriod({
+        billingPeriodDays: attempt.invoice.billingPeriodDays,
+        currentPeriodEnd: subscription.currentPeriodEnd,
+        currentPeriodStart: subscription.currentPeriodStart,
+        now,
+        renewsCurrentPeriod,
+      });
     const kind = renewsCurrentPeriod
       ? SubscriptionChangeKind.RENEWED
       : subscription.status === SubscriptionStatus.TRIAL ||
@@ -550,7 +575,7 @@ export async function applyVerifiedPlatformPayment(
     await transaction.subscription.update({
       data: {
         currentPeriodEnd: periodEndsAt,
-        currentPeriodStart: periodStartsAt,
+        currentPeriodStart: subscriptionPeriodStartsAt,
         graceEndsAt: null,
         planId: attempt.invoice.planId,
         renewalReminderSentAt: null,
@@ -575,7 +600,7 @@ export async function applyVerifiedPlatformPayment(
       data: {
         paidAt: now,
         periodEndsAt,
-        periodStartsAt,
+        periodStartsAt: invoicePeriodStartsAt,
         status: SubscriptionInvoiceStatus.PAID,
       },
       where: { id: attempt.invoice.id },
@@ -604,7 +629,7 @@ export async function applyVerifiedPlatformPayment(
         invoiceId: attempt.invoice.id,
         kind,
         newPeriodEnd: periodEndsAt,
-        newPeriodStart: periodStartsAt,
+        newPeriodStart: invoicePeriodStartsAt,
         organizationId: attempt.organizationId,
         previousPeriodEnd: subscription.currentPeriodEnd,
         reason: 'Pago de suscripción verificado con PayPhone.',

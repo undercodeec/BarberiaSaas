@@ -12,8 +12,17 @@ const dateFormatter = new Intl.DateTimeFormat('es-EC', {
   timeStyle: 'short',
 });
 
-function formatDate(value: string | null) {
-  return value ? dateFormatter.format(new Date(value)) : '—';
+function formatDate(value: string | null, timezone?: string) {
+  if (!value) return '—';
+  try {
+    return new Intl.DateTimeFormat('es-EC', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      ...(timezone ? { timeZone: timezone } : {}),
+    }).format(new Date(value));
+  } catch {
+    return dateFormatter.format(new Date(value));
+  }
 }
 
 function formatMoney(cents: number, currency: string) {
@@ -193,12 +202,20 @@ export function PlatformSubscriptions({
                       : 'Periodo vigente'}
                   </span>
                   <strong>
-                    Inicio: {formatDate(subscription.currentPeriodStart)}
+                    Suscrito desde:{' '}
+                    {formatDate(
+                      subscription.subscriptionStartedAt ??
+                        subscription.currentPeriodStart,
+                      subscription.organization.defaultTimezone,
+                    )}
                   </strong>
                   <small>
                     {subscription.status === 'trial'
-                      ? `Finaliza prueba: ${formatDate(subscription.trialEndsAt)}`
-                      : `Vence: ${formatDate(subscription.currentPeriodEnd)}`}
+                      ? `Finaliza prueba: ${formatDate(subscription.trialEndsAt, subscription.organization.defaultTimezone)}`
+                      : `Vence: ${formatDate(subscription.currentPeriodEnd, subscription.organization.defaultTimezone)}`}
+                  </small>
+                  <small>
+                    Zona horaria: {subscription.organization.defaultTimezone}
                   </small>
                 </section>
                 <section>

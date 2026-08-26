@@ -1065,8 +1065,18 @@ function registerPlatformRoutes(
       ? user.platformOperator.isActive
       : configuredPlatformEmails(config).has(email);
     const passwordHash = user?.platformOperator
-      ? user.passwordHash
+      ? user.platformOperator.adminPasswordHash
       : config.PLATFORM_ADMIN_PASSWORD_HASH;
+    const platformPasswordMatches = Boolean(
+      passwordHash &&
+      user &&
+      (await verifyPassword(input.password, passwordHash)),
+    );
+    const reusesApplicationPassword = Boolean(
+      platformPasswordMatches &&
+      user?.passwordHash &&
+      (await verifyPassword(input.password, user.passwordHash)),
+    );
     if (
       !authorized ||
       !passwordHash ||
@@ -1074,7 +1084,8 @@ function registerPlatformRoutes(
       user.deletedAt ||
       user.suspendedAt ||
       !user.emailVerifiedAt ||
-      !(await verifyPassword(input.password, passwordHash))
+      !platformPasswordMatches ||
+      reusesApplicationPassword
     ) {
       if (user) {
         await createPlatformAudit(database, {
@@ -1098,14 +1109,13 @@ function registerPlatformRoutes(
         'El envío de códigos de acceso no está disponible.',
       );
     }
-    if (
-      user.platformOperator &&
-      user.passwordHash &&
-      passwordHashNeedsUpgrade(user.passwordHash)
-    ) {
-      await database.user.update({
-        data: { passwordHash: await hashPassword(input.password) },
-        where: { id: user.id },
+    if (user.platformOperator && passwordHashNeedsUpgrade(passwordHash)) {
+      await database.platformOperator.update({
+        data: {
+          adminPasswordHash: await hashPassword(input.password),
+          adminPasswordSetAt: new Date(),
+        },
+        where: { id: user.platformOperator.id },
       });
     }
     const now = new Date();
@@ -2151,6 +2161,7 @@ function registerPlatformRoutes(
           },
           organization: {
             select: {
+              defaultTimezone: true,
               id: true,
               name: true,
               slug: true,
@@ -2191,6 +2202,30 @@ function registerPlatformRoutes(
         where,
       }),
     ]);
+    const firstPaidInvoices =
+      subscriptions.length === 0
+        ? []
+        : await database.subscriptionInvoice.findMany({
+            distinct: ['organizationId'],
+            orderBy: [{ organizationId: 'asc' }, { periodStartsAt: 'asc' }],
+            select: { organizationId: true, periodStartsAt: true },
+            where: {
+              organizationId: {
+                in: subscriptions.map(
+                  (subscription) => subscription.organization.id,
+                ),
+              },
+              periodStartsAt: { not: null },
+              status: SubscriptionInvoiceStatus.PAID,
+            },
+          });
+    const subscriptionStarts = new Map(
+      firstPaidInvoices.flatMap((invoice) =>
+        invoice.periodStartsAt
+          ? [[invoice.organizationId, invoice.periodStartsAt] as const]
+          : [],
+      ),
+    );
     return {
       pagination: {
         page: query.page,
@@ -2238,6 +2273,10 @@ function registerPlatformRoutes(
           organization: subscription.organization,
           plan: subscription.plan,
           status: subscription.status.toLowerCase(),
+          subscriptionStartedAt:
+            subscriptionStarts
+              .get(subscription.organization.id)
+              ?.toISOString() ?? null,
           trialEndsAt: subscription.trialEndsAt?.toISOString() ?? null,
           updatedAt: subscription.updatedAt.toISOString(),
         };
@@ -4727,8 +4766,11 @@ export function registerOperationsRoutes(
         canManage: current.role === MembershipRole.OWNER,
         currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
         currentPeriodStart: subscription.currentPeriodStart.toISOString(),
-        featureFlags: parsePlanFeatureFlags(currentPlan.featureFlags),
+        // Platform exceptions are enforced by getSubscriptionUsage. Return the
+        // same effective flags to Mobile so its navigation matches the API.
+        featureFlags: subscriptionUsage.featureFlags,
         graceEndsAt: subscription.graceEndsAt?.toISOString() ?? null,
+        limits: subscriptionUsage.limits,
         planCode: currentPlan.code,
         readOnly:
           subscription.status === SubscriptionStatus.CANCELLED ||

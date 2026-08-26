@@ -237,7 +237,7 @@ export default function SubscriptionScreen() {
               label="Sucursales"
               value={
                 subscription
-                  ? `${subscription.usage.locations} / ${currentPlan?.limits.locations ?? '-'}`
+                  ? `${subscription.usage.locations} / ${subscription.current.limits.locations}`
                   : '-'
               }
             />
@@ -331,7 +331,7 @@ export default function SubscriptionScreen() {
 
         {subscription ? (
           <View style={styles.capabilityCard}>
-            <Text style={styles.infoTitle}>Capacidades del plan</Text>
+            <Text style={styles.infoTitle}>Capacidades activas</Text>
             <Capability
               label="Equipo y colaboradores"
               value={subscription.current.featureFlags.team}

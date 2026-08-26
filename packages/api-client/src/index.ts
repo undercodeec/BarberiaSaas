@@ -691,6 +691,13 @@ export interface SubscriptionResponse {
     readonly currentPeriodStart: string;
     readonly featureFlags: SubscriptionFeatureFlags;
     readonly graceEndsAt: string | null;
+    /** Limits after active platform exceptions have been applied. */
+    readonly limits: {
+      readonly clients: number | null;
+      readonly locations: number;
+      readonly rolling30DayBookings: number | null;
+      readonly teamMembers: number | null;
+    };
     readonly planCode: 'essential' | 'free' | 'local' | 'multi';
     readonly readOnly: boolean;
     readonly simulationAvailable: boolean;

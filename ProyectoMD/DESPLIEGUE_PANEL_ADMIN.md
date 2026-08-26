@@ -36,6 +36,19 @@ pnpm --filter @barber-saas/api password:hash
 El comando no muestra ni guarda la contraseña y genera el formato
 `scrypt$32768$8$1$` exigido en producción.
 
+La contraseña bootstrap del panel debe ser distinta a la contraseña de la
+cuenta Nava que usa Mobile. Los operadores registrados también mantienen un hash
+administrativo separado (`platform_operators.admin_password_hash`); después de
+aplicar la migración, asígnelo desde la VPS sin imprimirlo:
+
+```bash
+pnpm --filter @barber-saas/api platform:operator:password -- operador@nava.ec
+```
+
+El comando exige una clave de 12 a 72 caracteres, pide confirmación y rechaza
+una clave que coincida con la contraseña de Mobile. Los operadores existentes
+no podrán acceder al panel hasta recibir esta credencial independiente.
+
 ## Preparación
 
 Desde `/opt/nava/app`, después de revisar el commit que se va a publicar:
