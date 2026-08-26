@@ -2,6 +2,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
   MovementReportResponse,
   OnboardingAccountDetailsResponse,
+  SubscriptionFeatureFlags,
+  SubscriptionResponse,
 } from '@barber-saas/api-client';
 import { useQuery } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
@@ -36,6 +38,7 @@ type ReportMenuItem = {
   readonly id: string;
   readonly movementKind?: 'deposits' | 'expenses' | 'sales';
   readonly planning?: string;
+  readonly requiredFeatures?: readonly (keyof SubscriptionFeatureFlags)[];
   readonly requiresFinancialReportsAccess?: boolean;
   readonly route?: string;
   readonly status: 'available' | 'planned';
@@ -111,6 +114,7 @@ const reportSections: readonly ReportSection[] = [
         title: 'Pagar a colaboradores',
         description: 'Pagar a tus colaboradores por rango de fechas.',
         icon: 'cash-outline',
+        requiredFeatures: ['team', 'commissions'],
         requiresFinancialReportsAccess: true,
         route: '/wallet?tab=commissions',
         status: 'available',
@@ -121,6 +125,7 @@ const reportSections: readonly ReportSection[] = [
         description:
           'Liquidaciones pagadas, anticipos, descuentos y reversos auditables.',
         icon: 'receipt-outline',
+        requiredFeatures: ['team', 'commissions'],
         requiresFinancialReportsAccess: true,
         route: '/wallet?tab=commissions',
         status: 'available',
@@ -130,6 +135,7 @@ const reportSections: readonly ReportSection[] = [
         title: 'Alerta de inventario',
         description: 'Descubre los productos que est\u00e1n agotados.',
         icon: 'shield-outline',
+        requiredFeatures: ['inventory'],
         route: '/inventory?filter=low-stock',
         status: 'available',
       },
@@ -187,6 +193,13 @@ export default function ReportsScreen() {
       ),
     queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
   });
+  const subscriptionQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<SubscriptionResponse>('/v1/subscription'),
+    queryKey: accountQueryKey(user?.id, 'subscription'),
+  });
+  const featureFlags = subscriptionQuery.data?.current.featureFlags;
   const isSolo = accountQuery.data?.accountType === 'professional';
   const role = organizationQuery.data?.membership.role;
   const canAccessFinancialReports = role === 'owner' || role === 'manager';
@@ -213,6 +226,14 @@ export default function ReportsScreen() {
   const isOpening = useRef(false);
   const openReport = useCallback(
     (item: ReportMenuItem) => {
+      if (
+        item.requiredFeatures?.some(
+          (feature) => !featureFlags || featureFlags[feature] === false,
+        )
+      ) {
+        router.push('/subscription' as never);
+        return;
+      }
       if (item.route) {
         router.push(item.route as never);
         return;
@@ -236,7 +257,7 @@ export default function ReportsScreen() {
         ],
       );
     },
-    [router],
+    [featureFlags, router],
   );
   const goBack = useCallback(() => {
     if (router.canGoBack()) {
@@ -297,6 +318,13 @@ export default function ReportsScreen() {
                   <ReportNavigationCard
                     item={item}
                     key={item.id}
+                    locked={Boolean(
+                      item.requiredFeatures &&
+                      (!featureFlags ||
+                        item.requiredFeatures.some(
+                          (feature) => featureFlags[feature] === false,
+                        )),
+                    )}
                     onPress={() => openReport(item)}
                   />
                 ))}
@@ -607,18 +635,31 @@ function ReportChip({
 
 function ReportNavigationCard({
   item,
+  locked,
   onPress,
 }: {
   readonly item: ReportMenuItem;
+  readonly locked: boolean;
   readonly onPress: () => void;
 }) {
   return (
     <Pressable
-      accessibilityHint="Abre esta secci\u00f3n de reportes"
-      accessibilityLabel={[item.title, item.description].join('. ')}
+      accessibilityHint={
+        locked
+          ? 'Disponible con Nava Local. Abre la suscripción para actualizar.'
+          : 'Abre esta sección de reportes'
+      }
+      accessibilityLabel={[
+        item.title,
+        locked ? 'Requiere Nava Local' : item.description,
+      ].join('. ')}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.card,
+        locked && styles.cardPlanLocked,
+        pressed && styles.pressed,
+      ]}
     >
       <View style={styles.iconContainer}>
         <Ionicons
@@ -636,7 +677,9 @@ function ReportNavigationCard({
             </View>
           ) : null}
         </View>
-        <Text style={styles.cardDescription}>{item.description}</Text>
+        <Text style={styles.cardDescription}>
+          {locked ? 'Disponible con Nava Local' : item.description}
+        </Text>
       </View>
       <View style={styles.chevron}>
         <Ionicons
@@ -681,6 +724,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   cardList: { gap: 16, marginTop: 14 },
+  cardPlanLocked: { opacity: 0.46 },
   cardTitle: {
     color: appTheme.colors.text,
     flex: 1,

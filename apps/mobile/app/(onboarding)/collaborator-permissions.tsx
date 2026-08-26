@@ -1,5 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { TeamMember, TeamResponse } from '@barber-saas/api-client';
+import type {
+  SubscriptionResponse,
+  TeamMember,
+  TeamResponse,
+} from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -13,7 +17,7 @@ import {
   goldButtonShadow,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
-import { tenantQueryPrefix } from '../../src/lib/query-keys';
+import { accountQueryKey, tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
@@ -60,6 +64,12 @@ export default function CollaboratorPermissionsScreen() {
   const { session, user } = useAuth();
   const tenant = useTenantScope();
   const organizationQuery = useCurrentOrganization();
+  const subscriptionQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<SubscriptionResponse>('/v1/subscription'),
+    queryKey: accountQueryKey(user?.id, 'subscription'),
+  });
   const teamQuery = useQuery({
     enabled: Boolean(session && organizationQuery.data),
     queryFn: () => requireApiClient().request<TeamResponse>('/v1/team'),
@@ -90,7 +100,10 @@ export default function CollaboratorPermissionsScreen() {
   });
   if (!session) return <Redirect href="/(auth)/login" />;
 
-  const canManage = organizationQuery.data?.membership.role === 'owner';
+  const teamEnabled =
+    subscriptionQuery.data?.current.featureFlags.team ?? false;
+  const canManage =
+    organizationQuery.data?.membership.role === 'owner' && teamEnabled;
   const editableMembers = (teamQuery.data?.members ?? []).filter(
     (member) => member.role !== 'owner' && member.user.id !== user?.id,
   );
@@ -128,7 +141,10 @@ export default function CollaboratorPermissionsScreen() {
             seguridad.
           </Text>
         </View>
-        {!canManage ? (
+        {!teamEnabled ? (
+          <InlineMessage message="Los permisos para colaboradores requieren Nava Local. Actualiza tu plan para administrarlos." />
+        ) : null}
+        {!canManage && teamEnabled ? (
           <InlineMessage message="Solo el propietario puede cambiar perfiles de acceso." />
         ) : null}
         {mutation.error ? (
@@ -160,9 +176,9 @@ export default function CollaboratorPermissionsScreen() {
                   accessibilityRole="radio"
                   accessibilityState={{
                     checked: selected,
-                    disabled: !canManage,
+                    disabled: !canManage || !teamEnabled,
                   }}
-                  disabled={!canManage || mutation.isPending}
+                  disabled={!canManage || !teamEnabled || mutation.isPending}
                   key={profile.role}
                   onPress={() =>
                     mutation.mutate({ member, role: profile.role })
@@ -170,6 +186,7 @@ export default function CollaboratorPermissionsScreen() {
                   style={({ pressed }) => [
                     styles.profile,
                     selected ? styles.profileSelected : null,
+                    !teamEnabled ? styles.profilePlanLocked : null,
                     pressed ? styles.pressed : null,
                   ]}
                 >
@@ -305,6 +322,7 @@ const styles = StyleSheet.create({
     backgroundColor: appTheme.colors.accentWash,
     borderColor: appTheme.colors.accentWash,
   },
+  profilePlanLocked: { opacity: 0.46 },
   screen: appStyles.screen,
   subtitle: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 2 },
   title: { color: appTheme.colors.text, fontSize: 23, fontWeight: '900' },

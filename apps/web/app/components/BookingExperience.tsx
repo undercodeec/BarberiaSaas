@@ -1397,9 +1397,13 @@ function BusinessHero({
       />
       <div className="absolute inset-x-0 bottom-0 p-5 pb-9 text-white sm:p-8 sm:pb-11">
         <p className="text-xs font-black tracking-[0.18em] text-white/75 uppercase">
-          {catalog.location.name}
+          {catalog.location.name === catalog.organization.name
+            ? 'Reservas online'
+            : `Sucursal ${catalog.location.name}`}
         </p>
-        <h2 className="sr-only">{catalog.organization.name}</h2>
+        <h2 className="mt-2 text-3xl leading-none font-black tracking-[-0.045em] sm:text-4xl">
+          {catalog.organization.name}
+        </h2>
         <span className="mt-4 inline-flex rounded-full border border-[#EBD8AA]/70 bg-[#FFF9EE]/15 px-3 py-1 text-xs font-bold">
           Barbería
         </span>

@@ -142,8 +142,14 @@ export default function AccountTypeScreen() {
                 pressed ? styles.pressed : null,
               ]}
             >
-              <View style={styles.iconBox}>
-                <Ionicons color="#101c2d" name={option.icon} size={27} />
+              <View
+                style={[styles.iconBox, selected && styles.iconBoxSelected]}
+              >
+                <Ionicons
+                  color={selected ? appTheme.colors.accentDark : '#101c2d'}
+                  name={option.icon}
+                  size={27}
+                />
               </View>
               <View style={styles.headerCopy}>
                 <Text style={styles.optionTitle}>{option.title}</Text>
@@ -193,12 +199,13 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   iconBox: {
     alignItems: 'center',
-    backgroundColor: appTheme.colors.border,
-    borderRadius: 16,
-    height: 52,
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderRadius: 18,
+    height: 60,
     justifyContent: 'center',
-    width: 52,
+    width: 60,
   },
+  iconBoxSelected: { backgroundColor: appTheme.colors.accentWash },
   notice: {
     alignItems: 'flex-start',
     backgroundColor: appTheme.colors.surface,
@@ -219,7 +226,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: appTheme.colors.surface,
     borderRadius: 20,
-    borderWidth: 0,
+    borderColor: 'transparent',
+    borderWidth: 1,
     flexDirection: 'row',
     gap: 13,
     minHeight: 92,
@@ -235,7 +243,7 @@ const styles = StyleSheet.create({
   },
   optionSelected: {
     backgroundColor: appTheme.colors.accentWash,
-    borderColor: appTheme.colors.accentWash,
+    borderColor: appTheme.colors.accentDark,
   },
   optionTitle: { color: appTheme.colors.text, fontSize: 17, fontWeight: '900' },
   pressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },
