@@ -1,6 +1,7 @@
 import {
   effectiveLocationLimit,
   hasLockedSubscriptionFeature,
+  minimumPlanForFeatures,
 } from './subscription-entitlements';
 
 describe('entitlements de suscripción en Mobile', () => {
@@ -13,6 +14,7 @@ describe('entitlements de suscripción en Mobile', () => {
       hasLockedSubscriptionFeature(
         {
           commissions: true,
+          fullReports: true,
           inventory: false,
           multiLocation: true,
           publicBooking: true,
@@ -23,6 +25,12 @@ describe('entitlements de suscripción en Mobile', () => {
         ['inventory'],
       ),
     ).toBe(true);
+  });
+
+  it('identifica el plan mínimo para inventario y reportes completos', () => {
+    expect(minimumPlanForFeatures(['inventory'])).toBe('Nava Esencial');
+    expect(minimumPlanForFeatures(['fullReports'])).toBe('Nava Esencial');
+    expect(minimumPlanForFeatures(['team', 'commissions'])).toBe('Nava Local');
   });
 
   it('tolera la respuesta anterior de la API sin límites efectivos', () => {

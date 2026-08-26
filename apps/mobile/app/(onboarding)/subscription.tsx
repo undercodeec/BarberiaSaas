@@ -154,7 +154,7 @@ export default function SubscriptionScreen() {
     : null;
   const advancedModulesCopy =
     subscription?.current.planCode === 'essential'
-      ? 'Nava Esencial está pensado para operación individual. Los módulos de equipo y operación ampliada requieren Nava Local, salvo una habilitación especial activa.'
+      ? 'Nava Esencial incluye inventario y reportes completos para operación individual. El trabajo con equipo, comisiones y varias sucursales requiere Nava Local.'
       : subscription?.current.planCode === 'free'
         ? 'Estos módulos no forman parte de Nava Free. Tus datos históricos se conservan y puedes activarlos con Nava Local.'
         : 'Estos módulos forman parte de la operación ampliada de tu plan y reflejan cualquier habilitación especial vigente.';
@@ -371,10 +371,6 @@ export default function SubscriptionScreen() {
             <Capability
               label="Comisiones"
               value={subscription.current.featureFlags.commissions}
-            />
-            <Capability
-              label="Inventario"
-              value={subscription.current.featureFlags.inventory}
             />
             <Capability
               label="Múltiples sucursales"

@@ -14,6 +14,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import { zonedDateTimeToUtc } from './agenda';
 import { ApiError } from './errors';
+import { getEntitlements } from './subscription-policy';
 
 type Authenticate = (
   database: DatabaseClient,
@@ -217,6 +218,22 @@ function serviceSaleRows(
     );
 }
 
+async function requireFullReports(
+  database: DatabaseClient,
+  organizationId: string,
+) {
+  const entitlements = await database.$transaction((transaction) =>
+    getEntitlements(transaction, organizationId),
+  );
+  if (!entitlements.featureFlags.fullReports) {
+    throw new ApiError(
+      403,
+      'PLAN_FEATURE_NOT_INCLUDED',
+      'Los reportes completos requieren Nava Esencial o un plan superior.',
+    );
+  }
+}
+
 function csvCell(value: string | number | null) {
   const text = value === null ? '' : String(value);
   return /[",\r\n]/u.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
@@ -256,6 +273,7 @@ export function registerReportRoutes(
         'No tienes permiso para consultar reportes globales.',
       );
     }
+    await requireFullReports(database, membership.organizationId);
 
     const accessibleLocations =
       membership.role === MembershipRole.OWNER
@@ -1050,6 +1068,7 @@ export function registerReportRoutes(
         'FORBIDDEN',
         'No tienes permiso para consultar reportes financieros.',
       );
+    await requireFullReports(database, membership.organizationId);
     const accessibleLocations =
       membership.role === MembershipRole.OWNER
         ? await database.location.findMany({

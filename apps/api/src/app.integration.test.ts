@@ -1446,6 +1446,81 @@ describeWithDatabase('API con PostgreSQL', () => {
     );
   });
 
+  it('habilita inventario y reportes completos en Nava Esencial', async () => {
+    const ownerToken = await register('essential-entitlements@example.com');
+    const organization = await onboard(ownerToken, 'essential-entitlements');
+    const [essentialPlan, freePlan] = await Promise.all([
+      database.plan.findUniqueOrThrow({ where: { code: 'essential' } }),
+      database.plan.findUniqueOrThrow({ where: { code: 'free' } }),
+    ]);
+    await database.subscription.update({
+      data: {
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        currentPeriodStart: new Date(),
+        graceEndsAt: null,
+        planId: essentialPlan.id,
+        status: 'ACTIVE',
+        trialEndsAt: null,
+      },
+      where: { organizationId: organization.organizationId },
+    });
+
+    const essentialSubscription = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      url: '/v1/subscription',
+    });
+    expect(essentialSubscription.statusCode).toBe(200);
+    expect(
+      essentialSubscription.json<{
+        current: {
+          featureFlags: { fullReports: boolean; inventory: boolean };
+          planCode: string;
+        };
+      }>().current,
+    ).toMatchObject({
+      featureFlags: { fullReports: true, inventory: true },
+      planCode: 'essential',
+    });
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${ownerToken}` },
+          method: 'GET',
+          url: '/v1/inventory',
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${ownerToken}` },
+          method: 'GET',
+          url: '/v1/reports/business-summary?range=today',
+        })
+      ).statusCode,
+    ).toBe(200);
+
+    await database.subscription.update({
+      data: { planId: freePlan.id, status: 'FREE' },
+      where: { organizationId: organization.organizationId },
+    });
+    for (const url of [
+      '/v1/inventory',
+      '/v1/reports/business-summary?range=today',
+    ]) {
+      const response = await app.inject({
+        headers: { authorization: `Bearer ${ownerToken}` },
+        method: 'GET',
+        url,
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ code: string }>().code).toBe(
+        'PLAN_FEATURE_NOT_INCLUDED',
+      );
+    }
+  });
+
   it('vence planes activos, aplica gracia y suspende nuevas escrituras', async () => {
     const ownerToken = await register('active-expiry-owner@example.com');
     const organization = await onboard(ownerToken, 'active-expiry');

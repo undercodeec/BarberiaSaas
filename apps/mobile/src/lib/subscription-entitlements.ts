@@ -12,6 +12,16 @@ export function hasLockedSubscriptionFeature(
   );
 }
 
+export function minimumPlanForFeatures(
+  requiredFeatures: readonly (keyof SubscriptionFeatureFlags)[] | undefined,
+): 'Nava Esencial' | 'Nava Local' {
+  return requiredFeatures?.every(
+    (feature) => feature === 'fullReports' || feature === 'inventory',
+  )
+    ? 'Nava Esencial'
+    : 'Nava Local';
+}
+
 export function effectiveLocationLimit(subscription: {
   readonly current: {
     readonly limits?: { readonly locations: number };

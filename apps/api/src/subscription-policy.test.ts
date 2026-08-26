@@ -222,6 +222,7 @@ describe('política de suscripciones', () => {
     const multi = planDefinition('multi');
 
     expect(free).toMatchObject({
+      featureFlags: { fullReports: false, inventory: false },
       limits: {
         clients: 100,
         locations: 1,
@@ -242,7 +243,8 @@ describe('política de suscripciones', () => {
     });
     expect(essential?.featureFlags).toMatchObject({
       commissions: false,
-      inventory: false,
+      fullReports: true,
+      inventory: true,
       team: false,
     });
     expect(local).toMatchObject({
@@ -257,6 +259,7 @@ describe('política de suscripciones', () => {
     });
     expect(local?.featureFlags).toMatchObject({
       commissions: true,
+      fullReports: true,
       inventory: true,
       multiLocation: true,
       team: true,

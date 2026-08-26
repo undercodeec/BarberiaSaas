@@ -26,7 +26,10 @@ import {
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { accountQueryKey } from '../../src/lib/query-keys';
-import { hasLockedSubscriptionFeature } from '../../src/lib/subscription-entitlements';
+import {
+  hasLockedSubscriptionFeature,
+  minimumPlanForFeatures,
+} from '../../src/lib/subscription-entitlements';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -279,6 +282,9 @@ export default function BusinessSettingsScreen() {
                     item.requiredFeature ? [item.requiredFeature] : undefined,
                   )}
                   onPress={() => openItem(item)}
+                  requiredPlan={minimumPlanForFeatures(
+                    item.requiredFeature ? [item.requiredFeature] : undefined,
+                  )}
                 />
               ))}
             </View>
@@ -324,21 +330,23 @@ function SettingsNavigationCard({
   item,
   locked,
   onPress,
+  requiredPlan,
 }: {
   readonly item: SettingsMenuItem;
   readonly locked: boolean;
   readonly onPress: () => void;
+  readonly requiredPlan: 'Nava Esencial' | 'Nava Local';
 }) {
   return (
     <Pressable
       accessibilityHint={
         locked
-          ? 'Disponible con Nava Local. Abre la suscripci\u00f3n para actualizar.'
+          ? `Disponible con ${requiredPlan}. Abre la suscripción para actualizar.`
           : 'Abre esta configuraci\u00f3n'
       }
       accessibilityLabel={[
         item.title,
-        locked ? 'Requiere Nava Local' : item.description,
+        locked ? `Requiere ${requiredPlan}` : item.description,
       ].join('. ')}
       accessibilityRole="button"
       onPress={onPress}
@@ -362,7 +370,7 @@ function SettingsNavigationCard({
           numberOfLines={1}
           style={styles.cardDescription}
         >
-          {locked ? 'Disponible con Nava Local' : item.description}
+          {locked ? `Disponible con ${requiredPlan}` : item.description}
         </Text>
       </View>
       <View style={styles.chevron}>

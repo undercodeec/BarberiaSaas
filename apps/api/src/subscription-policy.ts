@@ -25,6 +25,7 @@ export interface PlanLimits {
 
 export interface PlanFeatureFlags {
   readonly commissions: boolean;
+  readonly fullReports: boolean;
   readonly inventory: boolean;
   readonly multiLocation: boolean;
   readonly publicBooking: boolean;
@@ -39,6 +40,7 @@ export const SUBSCRIPTION_PLANS = [
     code: 'free',
     featureFlags: {
       commissions: false,
+      fullReports: false,
       inventory: false,
       multiLocation: false,
       publicBooking: true,
@@ -69,7 +71,8 @@ export const SUBSCRIPTION_PLANS = [
     code: 'essential',
     featureFlags: {
       commissions: false,
-      inventory: false,
+      fullReports: true,
+      inventory: true,
       multiLocation: false,
       publicBooking: true,
       reports: true,
@@ -81,7 +84,7 @@ export const SUBSCRIPTION_PLANS = [
       'Reservas y clientes ilimitados',
       'Agenda y reservas publicas',
       'Servicios e historial de clientes',
-      'Caja operativa y reportes esenciales',
+      'Caja operativa, inventario y reportes completos',
     ],
     limits: {
       clients: null,
@@ -98,6 +101,7 @@ export const SUBSCRIPTION_PLANS = [
     code: 'local',
     featureFlags: {
       commissions: true,
+      fullReports: true,
       inventory: true,
       multiLocation: true,
       publicBooking: true,
@@ -128,6 +132,7 @@ export const SUBSCRIPTION_PLANS = [
     code: 'multi',
     featureFlags: {
       commissions: true,
+      fullReports: true,
       inventory: true,
       multiLocation: true,
       publicBooking: true,
@@ -179,6 +184,7 @@ export function parsePlanFeatureFlags(
     value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   return {
     commissions: flags.commissions === true,
+    fullReports: flags.fullReports === true,
     inventory: flags.inventory === true,
     multiLocation: flags.multiLocation === true,
     publicBooking: flags.publicBooking !== false,

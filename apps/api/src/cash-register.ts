@@ -595,7 +595,7 @@ export function registerCashRegisterRoutes(
           throw new ApiError(
             403,
             'PLAN_FEATURE_NOT_INCLUDED',
-            'El inventario requiere Nava Local.',
+            'El inventario requiere Nava Esencial o un plan superior.',
           );
         await transaction.$queryRaw`
           WITH lock AS MATERIALIZED (

@@ -27,7 +27,10 @@ import {
 import { requireApiClient } from '../../src/lib/api';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { accountQueryKey } from '../../src/lib/query-keys';
-import { hasLockedSubscriptionFeature } from '../../src/lib/subscription-entitlements';
+import {
+  hasLockedSubscriptionFeature,
+  minimumPlanForFeatures,
+} from '../../src/lib/subscription-entitlements';
 import { shareTemporaryExport } from '../../src/lib/temporary-export';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
@@ -71,6 +74,7 @@ const reportSections: readonly ReportSection[] = [
         description:
           'Ventas, gastos, pagos, resultado neto y comisiones por período.',
         icon: 'bar-chart-outline',
+        requiredFeatures: ['fullReports'],
         requiresFinancialReportsAccess: true,
         route: '/business-summary',
         status: 'available',
@@ -98,6 +102,7 @@ const reportSections: readonly ReportSection[] = [
           'Movimientos de gasto por fecha, sucursal, categoría y responsable.',
         icon: 'trending-down-outline',
         movementKind: 'expenses',
+        requiredFeatures: ['fullReports'],
         requiresFinancialReportsAccess: true,
         status: 'available',
       },
@@ -107,6 +112,7 @@ const reportSections: readonly ReportSection[] = [
         description: 'Entradas de dinero que no corresponden a una venta.',
         icon: 'trending-up-outline',
         movementKind: 'deposits',
+        requiredFeatures: ['fullReports'],
         requiresFinancialReportsAccess: true,
         status: 'available',
       },
@@ -136,7 +142,7 @@ const reportSections: readonly ReportSection[] = [
         title: 'Alerta de inventario',
         description: 'Descubre los productos que est\u00e1n agotados.',
         icon: 'shield-outline',
-        requiredFeatures: ['inventory'],
+        requiredFeatures: ['fullReports', 'inventory'],
         route: '/inventory?filter=low-stock',
         status: 'available',
       },
@@ -153,6 +159,7 @@ const reportSections: readonly ReportSection[] = [
           'Detalle paginado por fecha, método, servicio, profesional y cliente.',
         icon: 'pricetag-outline',
         movementKind: 'sales',
+        requiredFeatures: ['fullReports'],
         status: 'available',
       },
       {
@@ -322,6 +329,7 @@ export default function ReportsScreen() {
                       item.requiredFeatures,
                     )}
                     onPress={() => openReport(item)}
+                    requiredPlan={minimumPlanForFeatures(item.requiredFeatures)}
                   />
                 ))}
             </View>
@@ -633,21 +641,23 @@ function ReportNavigationCard({
   item,
   locked,
   onPress,
+  requiredPlan,
 }: {
   readonly item: ReportMenuItem;
   readonly locked: boolean;
   readonly onPress: () => void;
+  readonly requiredPlan: 'Nava Esencial' | 'Nava Local';
 }) {
   return (
     <Pressable
       accessibilityHint={
         locked
-          ? 'Disponible con Nava Local. Abre la suscripción para actualizar.'
+          ? `Disponible con ${requiredPlan}. Abre la suscripción para actualizar.`
           : 'Abre esta sección de reportes'
       }
       accessibilityLabel={[
         item.title,
-        locked ? 'Requiere Nava Local' : item.description,
+        locked ? `Requiere ${requiredPlan}` : item.description,
       ].join('. ')}
       accessibilityRole="button"
       onPress={onPress}
@@ -674,7 +684,7 @@ function ReportNavigationCard({
           ) : null}
         </View>
         <Text style={styles.cardDescription}>
-          {locked ? 'Disponible con Nava Local' : item.description}
+          {locked ? `Disponible con ${requiredPlan}` : item.description}
         </Text>
       </View>
       <View style={styles.chevron}>

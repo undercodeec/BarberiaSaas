@@ -109,9 +109,10 @@ const comparisonGroups = [
   {
     label: 'Control del negocio',
     features: [
-      { label: 'Caja e informes', values: [true, true, true, true] },
+      { label: 'Caja', values: [true, true, true, true] },
+      { label: 'Reportes completos', values: [false, true, true, true] },
       { label: 'Comisiones', values: [false, false, true, true] },
-      { label: 'Inventario', values: [false, false, true, true] },
+      { label: 'Inventario', values: [false, true, true, true] },
       { label: 'Roles y permisos', values: [false, false, true, true] },
     ],
   },

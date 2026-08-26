@@ -72,6 +72,7 @@ function formatDate(value: string | null) {
 
 function titleCase(value: string) {
   return value
+    .replace(/([a-z])([A-Z])/gu, '$1 $2')
     .replaceAll('_', ' ')
     .replace(/^./u, (letter) => letter.toUpperCase());
 }
@@ -915,6 +916,7 @@ function OverridesView({
   const [reason, setReason] = useState('');
   const featureKeys = [
     'commissions',
+    'fullReports',
     'inventory',
     'multiLocation',
     'publicBooking',

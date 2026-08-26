@@ -50,7 +50,7 @@ const plans = [
       ['Reservas', 'Ilimitadas'],
       ['Clientes', 'Ilimitados'],
       ['Reservas online', 'Agenda y reservas públicas'],
-      ['Operación', 'Caja e informes esenciales'],
+      ['Operación', 'Caja, inventario y reportes completos'],
     ],
     description: 'Para quien atiende solo y quiere operar sin límites.',
     name: 'Nava Esencial',

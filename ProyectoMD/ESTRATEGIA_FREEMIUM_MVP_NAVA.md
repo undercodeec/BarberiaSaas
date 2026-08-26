@@ -472,9 +472,10 @@ Incluye:
 - reservas públicas;
 - servicios e historial de clientes;
 - caja;
-- reportes para operación individual.
+- inventario;
+- reportes completos para operación individual.
 
-No está pensado para equipos.
+No está pensado para equipos: mantiene un profesional activo y una sucursal.
 
 ### Nava Local
 
@@ -1057,6 +1058,8 @@ USD 9.83 / mes
 1 sucursal
 reservas ilimitadas
 clientes ilimitados
+inventario
+reportes completos para operación individual
 
 Nava Local
 USD 29.83 / mes

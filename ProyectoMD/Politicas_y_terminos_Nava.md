@@ -132,6 +132,12 @@ Los planes definidos para el lanzamiento son:
 | Nava Local    |      USD 29,83 |
 | Nava Multi    |      USD 48,83 |
 
+Nava Esencial incluye operación individual con un profesional y una sucursal,
+reservas y clientes ilimitados, agenda y reservas públicas, servicios e
+historial de clientes, caja, inventario y reportes completos para la operación
+individual. Las funciones de equipo, comisiones y múltiples sucursales requieren
+Nava Local o un plan superior.
+
 ## 4.1. Reglas generales de precios
 
 - Los precios publicados corresponden al **valor final que paga el usuario** al momento de contratar.

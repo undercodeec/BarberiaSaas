@@ -344,6 +344,13 @@ Mobile / Web pública / Admin
 ### Fase 11 — Planes y límites: funcional, pendiente de habilitación externa
 
 - [x] Planes `free`, `essential`, `local` y `multi` con límites y feature flags.
+- [x] Nava Esencial habilita inventario y reportes completos para operación
+      individual, además de reservas y clientes ilimitados. Conserva el límite
+      de un profesional y una sucursal; equipo, comisiones y múltiples sedes
+      comienzan en Nava Local.
+- [x] La migración `20260826160000_essential_inventory_full_reports` actualiza
+      el catálogo persistido y las suscripciones Esencial existentes reciben
+      los nuevos entitlements sin recompra ni modificación del período pagado.
 - [x] Trial de 10 días; al finalizar pasa directamente a Nava Free. Los planes
       pagados tienen 3 días de gracia y, ante impago, bajan automáticamente a
       Nava Free sin eliminar datos.
@@ -356,8 +363,9 @@ Mobile / Web pública / Admin
       La pantalla Suscripción muestra el uso real, el límite de 25 reservas y
       la explicación de los datos históricos. Para evitar confundir Nava
       Esencial con Free, separa las inclusiones reales del plan adquirido
-      (reservas/clientes ilimitados, agenda, servicios, historial, caja y
-      reportes individuales) de los módulos avanzados que requieren Nava Local.
+      (reservas/clientes ilimitados, agenda, servicios, historial, caja,
+      inventario y reportes completos) de los módulos de equipo, comisiones y
+      múltiples sedes que requieren Nava Local.
 - [x] Refuerzo de degradación Free: Caja sólo permite seleccionar profesionales
       habilitados; inventario y ventas/comisiones premium quedan inactivos o
       redirigen a Suscripción. La importación y alta manual de clientes respetan

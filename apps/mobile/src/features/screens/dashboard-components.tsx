@@ -4,7 +4,6 @@ import { styles } from './dashboard.styles';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState } from 'react';
 import {
-  AccessibilityInfo,
   Animated,
   Easing,
   KeyboardAvoidingView,
@@ -261,16 +260,18 @@ export function QuickAction({
   icon,
   label,
   locked = false,
+  lockedPlan = 'Nava Local',
   onPress,
 }: {
   readonly icon: React.ComponentProps<typeof Ionicons>['name'];
   readonly label: string;
   readonly locked?: boolean;
+  readonly lockedPlan?: 'Nava Esencial' | 'Nava Local';
   readonly onPress: () => void;
 }) {
   return (
     <Pressable
-      accessibilityHint={locked ? 'Disponible con Nava Local.' : undefined}
+      accessibilityHint={locked ? `Disponible con ${lockedPlan}.` : undefined}
       accessibilityRole="button"
       accessibilityState={{ disabled: locked }}
       onPress={onPress}

@@ -11,12 +11,12 @@ import {
   PlatformSupportCaseStatus,
   ProductOrderStatus,
   SubscriptionInvoiceStatus,
-  SubscriptionPaymentStatus,
   SubscriptionStatus,
   type DatabaseClient,
   type PlatformOverrideKind,
   type PlatformPrivacyRequestStatus,
   type PlatformPrivacyRequestType,
+  type SubscriptionPaymentStatus,
   type PlatformSupportCasePriority,
 } from '@barber-saas/database';
 import {
@@ -330,6 +330,7 @@ const platformPrivacyUpdateSchema = z.object({
 });
 const PLATFORM_FEATURE_KEYS = [
   'commissions',
+  'fullReports',
   'inventory',
   'multiLocation',
   'publicBooking',
@@ -4737,7 +4738,9 @@ export function registerOperationsRoutes(
         throw new ApiError(
           403,
           'PLAN_FEATURE_NOT_INCLUDED',
-          'Esta funcion requiere Nava Local.',
+          feature === 'inventory'
+            ? 'El inventario requiere Nava Esencial o un plan superior.'
+            : 'Esta función requiere Nava Local.',
         );
     }
   });

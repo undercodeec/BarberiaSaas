@@ -540,8 +540,9 @@ export default function DashboardScreen() {
           />
           <QuickAction
             icon="cube-outline"
-            label={inventoryEnabled ? 'Inventario' : 'Inventario (Local)'}
+            label={inventoryEnabled ? 'Inventario' : 'Inventario (Esencial)'}
             locked={!inventoryEnabled}
+            lockedPlan="Nava Esencial"
             onPress={() =>
               router.push(inventoryEnabled ? '/inventory' : '/subscription')
             }

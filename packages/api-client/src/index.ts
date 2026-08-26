@@ -660,6 +660,7 @@ export interface ServicesResponse {
 
 export interface SubscriptionFeatureFlags {
   readonly commissions: boolean;
+  readonly fullReports: boolean;
   readonly inventory: boolean;
   readonly multiLocation: boolean;
   readonly publicBooking: boolean;
