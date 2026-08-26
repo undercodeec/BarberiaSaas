@@ -134,163 +134,49 @@ export function LiquidWaveSurface({
 
 export function DashboardProgress({ caption, value }: DashboardProgressProps) {
   const normalizedValue = Math.min(100, Math.max(0, value));
-  const [progress] = useState(() => new Animated.Value(0));
-  const [firstWave] = useState(() => new Animated.Value(0));
-  const [secondWave] = useState(() => new Animated.Value(0));
-  const [displayValue, setDisplayValue] = useState(0);
-  const [tankWidth, setTankWidth] = useState(0);
-  const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    void AccessibilityInfo.isReduceMotionEnabled().then((isEnabled) => {
-      if (isMounted) setReduceMotion(isEnabled);
-    });
-
-    const subscription = AccessibilityInfo.addEventListener(
-      'reduceMotionChanged',
-      setReduceMotion,
-    );
-
-    return () => {
-      isMounted = false;
-      subscription.remove();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (reduceMotion === null) return;
-
-    const listenerId = progress.addListener(({ value: animatedValue }) => {
-      setDisplayValue(Math.round(animatedValue));
-    });
-
-    progress.stopAnimation();
-    progress.setValue(0);
-
-    const animation = Animated.timing(progress, {
-      duration: reduceMotion ? 0 : 780,
-      easing: Easing.out(Easing.cubic),
-      toValue: normalizedValue,
-      useNativeDriver: false,
-    });
-
-    animation.start();
-    return () => {
-      animation.stop();
-      progress.removeListener(listenerId);
-    };
-  }, [normalizedValue, progress, reduceMotion]);
-
-  useEffect(() => {
-    if (reduceMotion === null || tankWidth === 0) return;
-
-    firstWave.stopAnimation();
-    secondWave.stopAnimation();
-    firstWave.setValue(0);
-    secondWave.setValue(0);
-
-    if (reduceMotion) return;
-
-    let isActive = true;
-
-    const startWaveCycle = (
-      animatedValue: Animated.Value,
-      duration: number,
-    ) => {
-      if (!isActive) return;
-
-      animatedValue.setValue(0);
-      Animated.timing(animatedValue, {
-        duration,
-        easing: Easing.linear,
-        isInteraction: false,
-        toValue: 1,
-        useNativeDriver: false,
-      }).start(({ finished }) => {
-        if (finished) startWaveCycle(animatedValue, duration);
-      });
-    };
-
-    startWaveCycle(firstWave, 4_000);
-    startWaveCycle(secondWave, 6_000);
-
-    return () => {
-      isActive = false;
-      firstWave.stopAnimation();
-      secondWave.stopAnimation();
-    };
-  }, [firstWave, reduceMotion, secondWave, tankWidth]);
-
-  const fillHeight = progress.interpolate({
-    inputRange: [0, 100],
-    outputRange: ['0%', '100%'],
-  });
-  const firstWaveTranslateX = firstWave.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -tankWidth],
-  });
-  const secondWaveTranslateX = secondWave.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-tankWidth, 0],
-  });
   return (
     <View
       accessibilityLabel={`${normalizedValue}% ${caption}`}
       accessibilityRole="progressbar"
       accessibilityValue={{ max: 100, min: 0, now: normalizedValue }}
-      onLayout={(event) => setTankWidth(event.nativeEvent.layout.width)}
       pointerEvents="none"
       style={dashboardProgressStyles.tank}
     >
       <TankGradient />
       <View style={dashboardProgressStyles.ambientGlow} />
 
-      <Animated.View
-        style={[dashboardProgressStyles.liquid, { height: fillHeight }]}
+      <View
+        style={[
+          dashboardProgressStyles.liquid,
+          { height: `${normalizedValue}%` },
+        ]}
       >
         <LiquidGradient />
 
-        <Animated.View
+        <View
           style={[
             dashboardProgressStyles.waveTrack,
             dashboardProgressStyles.primaryWave,
-            {
-              transform: [{ translateX: firstWaveTranslateX }],
-              width: tankWidth * 2,
-            },
           ]}
         >
-          <View style={{ width: tankWidth }}>
-            <LiquidWaveSurface copy={1} />
-          </View>
-          <View style={{ width: tankWidth }}>
-            <LiquidWaveSurface copy={2} />
-          </View>
-        </Animated.View>
+          <LiquidWaveSurface copy={1} />
+        </View>
 
-        <Animated.View
+        <View
           style={[
             dashboardProgressStyles.waveTrack,
             dashboardProgressStyles.secondaryWave,
-            {
-              transform: [{ translateX: secondWaveTranslateX }],
-              width: tankWidth * 2,
-            },
           ]}
         >
-          <View style={{ width: tankWidth }}>
-            <LiquidWaveSurface copy={1} secondary />
-          </View>
-          <View style={{ width: tankWidth }}>
-            <LiquidWaveSurface copy={2} secondary />
-          </View>
-        </Animated.View>
-      </Animated.View>
+          <LiquidWaveSurface copy={2} secondary />
+        </View>
+      </View>
 
       <View style={dashboardProgressStyles.label}>
-        <Text style={dashboardProgressStyles.percentage}>{displayValue}%</Text>
+        <Text style={dashboardProgressStyles.percentage}>
+          {normalizedValue}%
+        </Text>
         <Text style={dashboardProgressStyles.caption}>{caption}</Text>
       </View>
     </View>
@@ -364,10 +250,10 @@ export const dashboardProgressStyles = StyleSheet.create({
     zIndex: 0,
   },
   waveTrack: {
-    flexDirection: 'row',
     height: 20,
     left: 0,
     position: 'absolute',
+    right: 0,
   },
 });
 
@@ -382,30 +268,6 @@ export function QuickAction({
   readonly locked?: boolean;
   readonly onPress: () => void;
 }) {
-  const shimmerTranslateX = useRef(new Animated.Value(-82)).current;
-
-  useEffect(() => {
-    const shimmerAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(shimmerTranslateX, {
-          duration: 860,
-          easing: Easing.out(Easing.cubic),
-          toValue: 82,
-          useNativeDriver: true,
-        }),
-        Animated.delay(1650),
-        Animated.timing(shimmerTranslateX, {
-          duration: 0,
-          toValue: -82,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-
-    shimmerAnimation.start();
-    return () => shimmerAnimation.stop();
-  }, [shimmerTranslateX]);
-
   return (
     <Pressable
       accessibilityHint={locked ? 'Disponible con Nava Local.' : undefined}
@@ -416,18 +278,6 @@ export function QuickAction({
     >
       <View style={styles.quickIcon}>
         <Ionicons color="#B47D17" name={icon} size={30} />
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.quickIconShimmer,
-            {
-              transform: [
-                { translateX: shimmerTranslateX },
-                { rotate: '22deg' },
-              ],
-            },
-          ]}
-        />
       </View>
       <Text style={styles.quickLabel}>{label}</Text>
     </Pressable>
@@ -592,7 +442,7 @@ export function OpenButtonFlare() {
       ]),
     );
 
-    flareAnimation.start();
+    // El destello queda fijo en Mobile para evitar repintados continuos.
     return () => flareAnimation.stop();
   }, [flareProgress]);
 
