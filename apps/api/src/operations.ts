@@ -42,6 +42,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import type { ApiConfig } from './config';
 import { ApiError, isUniqueConstraintError } from './errors';
+import { resolvePlatformLoginCredentials } from './platform-login-credentials';
 import type { InvitationMailer, PlatformAccessMailer } from './recovery-mailer';
 import {
   createOpaqueToken,
@@ -1062,12 +1063,33 @@ function registerPlatformRoutes(
       include: { platformOperator: true },
       where: { email },
     });
-    const authorized = user?.platformOperator
-      ? user.platformOperator.isActive
-      : configuredPlatformEmails(config).has(email);
-    const passwordHash = user?.platformOperator
-      ? user.platformOperator.adminPasswordHash
-      : config.PLATFORM_ADMIN_PASSWORD_HASH;
+    const accountIsEligible = Boolean(
+      user && !user.deletedAt && !user.suspendedAt && user.emailVerifiedAt,
+    );
+    const credentials = resolvePlatformLoginCredentials({
+      bootstrapPasswordHash: config.PLATFORM_ADMIN_PASSWORD_HASH,
+      configuredEmails: configuredPlatformEmails(config),
+      user,
+    });
+    if (
+      accountIsEligible &&
+      credentials.source === 'operator_password_not_configured'
+    ) {
+      await createPlatformAudit(database, {
+        action: 'platform.login.failed',
+        actorUserId: user!.id,
+        entityId: user!.platformOperator!.id,
+        entityType: 'platform_operator',
+        metadata: { reason: 'operator_password_not_configured' },
+      });
+      throw new ApiError(
+        409,
+        'PLATFORM_OPERATOR_PASSWORD_NOT_CONFIGURED',
+        'Este operador no tiene una contraseña administrativa configurada. Solicita su configuración mediante el comando operativo de la VPS.',
+      );
+    }
+    const passwordHash =
+      'passwordHash' in credentials ? credentials.passwordHash : undefined;
     const platformPasswordMatches = Boolean(
       passwordHash &&
       user &&
@@ -1079,12 +1101,10 @@ function registerPlatformRoutes(
       (await verifyPassword(input.password, user.passwordHash)),
     );
     if (
-      !authorized ||
+      credentials.source === 'unauthorized' ||
       !passwordHash ||
       !user ||
-      user.deletedAt ||
-      user.suspendedAt ||
-      !user.emailVerifiedAt ||
+      !accountIsEligible ||
       !platformPasswordMatches ||
       reusesApplicationPassword
     ) {
@@ -1110,7 +1130,11 @@ function registerPlatformRoutes(
         'El envío de códigos de acceso no está disponible.',
       );
     }
-    if (user.platformOperator && passwordHashNeedsUpgrade(passwordHash)) {
+    if (
+      credentials.source === 'operator' &&
+      user.platformOperator &&
+      passwordHashNeedsUpgrade(passwordHash)
+    ) {
       await database.platformOperator.update({
         data: {
           adminPasswordHash: await hashPassword(input.password),
@@ -1412,10 +1436,17 @@ function registerPlatformRoutes(
     const before = await database.platformOperator.findUnique({
       where: { userId: user.id },
     });
+    if (before && input.isActive && !before.adminPasswordHash) {
+      throw new ApiError(
+        409,
+        'PLATFORM_OPERATOR_PASSWORD_NOT_CONFIGURED',
+        'Configura una contraseña administrativa antes de activar al operador.',
+      );
+    }
     const saved = await database.platformOperator.upsert({
       create: {
         createdByUserId: operator.id,
-        isActive: input.isActive,
+        isActive: false,
         role: platformRole(input.role),
         userId: user.id,
       },
@@ -1479,6 +1510,13 @@ function registerPlatformRoutes(
         'No puedes desactivar tu propio acceso.',
       );
     }
+    if (input.isActive && !before.adminPasswordHash) {
+      throw new ApiError(
+        409,
+        'PLATFORM_OPERATOR_PASSWORD_NOT_CONFIGURED',
+        'Configura una contraseña administrativa antes de activar al operador.',
+      );
+    }
     const saved = await database.platformOperator.update({
       data: { isActive: input.isActive, role: platformRole(input.role) },
       where: { id },
@@ -1490,7 +1528,12 @@ function registerPlatformRoutes(
       });
     }
     await createPlatformAudit(database, {
-      action: 'platform.operator.updated',
+      action:
+        saved.isActive && !before.isActive
+          ? 'platform.operator.activated'
+          : !saved.isActive && before.isActive
+            ? 'platform.operator.deactivated'
+            : 'platform.operator.updated',
       actorUserId: operator.id,
       afterData: { isActive: saved.isActive, role: saved.role },
       beforeData: { isActive: before.isActive, role: before.role },

@@ -42,12 +42,55 @@ administrativo separado (`platform_operators.admin_password_hash`); después de
 aplicar la migración, asígnelo desde la VPS sin imprimirlo:
 
 ```bash
-pnpm --filter @barber-saas/api platform:operator:password -- operador@nava.ec
+export API_ENV_FILE=/etc/nava/api.env
+pnpm --filter @barber-saas/api platform:operator:password operador@nava.ec
+unset API_ENV_FILE
 ```
 
 El comando exige una clave de 12 a 72 caracteres, pide confirmación y rechaza
 una clave que coincida con la contraseña de Mobile. Los operadores existentes
 no podrán acceder al panel hasta recibir esta credencial independiente.
+
+También se acepta el separador de pnpm, sin tratarlo como correo:
+
+```bash
+API_ENV_FILE=/etc/nava/api.env \
+  pnpm --filter @barber-saas/api platform:operator:password -- operador@nava.ec
+```
+
+## Credenciales Admin y flujo de inicialización
+
+La credencial Mobile sigue siendo exclusivamente `users.password_hash`. La
+credencial del panel para un operador persistente es exclusivamente
+`platform_operators.admin_password_hash`; ambas deben ser distintas.
+
+`PLATFORM_ADMIN_PASSWORD_HASH` es un bootstrap limitado a un correo de
+`PLATFORM_ADMIN_EMAILS` que aún no posee un registro `PlatformOperator`. Si el
+operador ya existe, nunca se usa el bootstrap como fallback. Un operador activo
+sin hash administrativo recibe `409 PLATFORM_OPERATOR_PASSWORD_NOT_CONFIGURED`
+en el login, se registra el evento sin secretos y debe configurarse mediante el
+comando interactivo de la VPS.
+
+Los nuevos operadores se crean inactivos, aun si el alta solicita activarlos.
+El orden operativo obligatorio es:
+
+```bash
+cd /opt/nava/app
+export API_ENV_FILE=/etc/nava/api.env
+pnpm --filter @barber-saas/api platform:operator:password soporte@navacloud.app
+unset API_ENV_FILE
+```
+
+Después, un superadministrador activa el operador desde el panel. La API no
+permite activar un operador que todavía no tenga `admin_password_hash`.
+
+Tras desplegar este cambio de API, reconstruya la API según el procedimiento
+habitual y reinicie el proceso para cargar el código nuevo:
+
+```bash
+sudo systemctl restart nava-api.service
+sudo systemctl status nava-api.service --no-pager
+```
 
 ## Preparación
 

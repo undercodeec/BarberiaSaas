@@ -3,6 +3,7 @@ import { config as loadEnvironment } from 'dotenv';
 import { stdin, stdout } from 'node:process';
 
 import { hashPassword, verifyPassword } from './security';
+import { parsePlatformOperatorPasswordEmail } from './platform-operator-password-cli';
 
 loadEnvironment({ path: process.env.API_ENV_FILE ?? '.env' });
 
@@ -54,12 +55,7 @@ async function readPassword(prompt: string): Promise<string> {
 }
 
 async function main() {
-  const email = process.argv[2]?.trim().toLowerCase();
-  if (!email) {
-    throw new Error(
-      'Uso: pnpm --filter @barber-saas/api platform:operator:password -- correo@ejemplo.com',
-    );
-  }
+  const email = parsePlatformOperatorPasswordEmail(process.argv.slice(2));
   const password = await readPassword(
     'Contraseña exclusiva del panel (no se mostrará): ',
   );
@@ -78,11 +74,18 @@ async function main() {
       include: { platformOperator: true },
       where: { email },
     });
-    if (!user?.platformOperator || !user.platformOperator.isActive) {
+    if (!user)
       throw new Error(
-        'No existe un operador de plataforma activo con ese correo.',
+        'USER_NOT_FOUND: No existe una cuenta Nava con ese correo.',
       );
-    }
+    if (!user.platformOperator)
+      throw new Error(
+        'PLATFORM_OPERATOR_NOT_FOUND: La cuenta existe, pero no tiene un operador de plataforma.',
+      );
+    if (!user.platformOperator.isActive)
+      stdout.write(
+        'PLATFORM_OPERATOR_INACTIVE: Se configurará la contraseña; active el operador después desde el panel.\n',
+      );
     if (
       user.passwordHash &&
       (await verifyPassword(password, user.passwordHash))
@@ -110,7 +113,9 @@ async function main() {
       }),
       database.platformAuditLog.create({
         data: {
-          action: 'platform.operator.password_configured',
+          action: user.platformOperator.adminPasswordHash
+            ? 'platform.operator.password_changed'
+            : 'platform.operator.password_configured',
           actorUserId: user.id,
           entityId: user.platformOperator.id,
           entityType: 'platform_operator',

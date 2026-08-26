@@ -3737,9 +3737,10 @@ describeWithDatabase('API con PostgreSQL', () => {
     });
     expect(createdOperator.statusCode).toBe(201);
     const createdOperatorBody = createdOperator.json<{
-      operator: { id: string; role: string; userId: string };
+      operator: { id: string; isActive: boolean; role: string; userId: string };
     }>();
     expect(createdOperatorBody.operator.role).toBe('support');
+    expect(createdOperatorBody.operator.isActive).toBe(false);
 
     const reusedApplicationPassword = await app.inject({
       method: 'POST',
@@ -3750,6 +3751,35 @@ describeWithDatabase('API con PostgreSQL', () => {
       url: '/v1/platform/login',
     });
     expect(reusedApplicationPassword.statusCode).toBe(401);
+
+    const pendingActivation = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'PATCH',
+      payload: { isActive: true, role: 'support' },
+      url: `/v1/platform/operators/${createdOperatorBody.operator.id}`,
+    });
+    expect(pendingActivation.statusCode).toBe(409);
+    expect(pendingActivation.json<{ code: string }>().code).toBe(
+      'PLATFORM_OPERATOR_PASSWORD_NOT_CONFIGURED',
+    );
+
+    await database.platformOperator.update({
+      data: { isActive: true },
+      where: { userId: createdOperatorBody.operator.userId },
+    });
+    const pendingPasswordLogin = await app.inject({
+      method: 'POST',
+      payload: {
+        email: 'not-platform@example.com',
+        password: 'Clave-panel-segura-456',
+      },
+      url: '/v1/platform/login',
+    });
+    expect(pendingPasswordLogin.statusCode).toBe(409);
+    expect(pendingPasswordLogin.json<{ code: string }>().code).toBe(
+      'PLATFORM_OPERATOR_PASSWORD_NOT_CONFIGURED',
+    );
+
     await database.platformOperator.update({
       data: {
         adminPasswordHash: await hashPassword('Clave-panel-segura-456'),
@@ -3757,6 +3787,14 @@ describeWithDatabase('API con PostgreSQL', () => {
       },
       where: { userId: createdOperatorBody.operator.userId },
     });
+
+    const activatedOperator = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'PATCH',
+      payload: { isActive: true, role: 'support' },
+      url: `/v1/platform/operators/${createdOperatorBody.operator.id}`,
+    });
+    expect(activatedOperator.statusCode).toBe(200);
 
     const supportLogin = await app.inject({
       method: 'POST',
