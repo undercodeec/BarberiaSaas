@@ -18,6 +18,7 @@ import { ApiError } from './errors';
 import { hashOpaqueToken } from './security';
 import {
   addBillingDays,
+  applyVerifiedPlatformPayment,
   expireStaleSubscriptionPayments,
   inclusiveTaxBreakdown,
   platformPaymentEventHash,
@@ -184,7 +185,11 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
     });
     userIds.push(firstUser.id, secondUser.id);
     const firstOrganization = await database.organization.create({
-      data: { name: `Suscripción ${suffix}`, slug: `subscription-${suffix}` },
+      data: {
+        defaultTimezone: 'America/Lima',
+        name: `Suscripción ${suffix}`,
+        slug: `subscription-${suffix}`,
+      },
     });
     const secondOrganization = await database.organization.create({
       data: {
@@ -401,44 +406,63 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
     });
     expect(currencyMismatch.statusCode).toBe(409);
 
-    const confirmed = await app.inject({
-      headers: { authorization: `Bearer ${firstToken}` },
-      method: 'POST',
-      payload: {
-        clientTransactionId: storedAttempt.internalReference,
-        id: 9001,
-      },
-      url: '/v1/subscription/payments/confirm',
+    const verifiedAt = new Date('2026-08-26T21:15:00.000Z');
+    const providerPaidAt = new Date('2026-08-26T21:12:31.000Z');
+    const applied = await applyVerifiedPlatformPayment(database, {
+      amountCents: storedAttempt.amountCents,
+      currencyCode: storedAttempt.currencyCode,
+      internalReference: storedAttempt.internalReference,
+      payload: {},
+      providerPaidAt,
+      providerTransactionId: '9001',
+      status: 'approved',
+      storeId: storedAttempt.storeId,
+      verifiedAt,
     });
-    expect(confirmed.statusCode, confirmed.body).toBe(200);
-    expect(confirmed.json<{ status: string }>().status).toBe('applied');
+    expect(applied).toMatchObject({ applied: true, duplicate: false });
 
-    const [attempt, invoice, subscription, changes, auditEntries, events] =
-      await Promise.all([
-        database.subscriptionPaymentAttempt.findUniqueOrThrow({
-          where: { id: paymentAttemptId },
-        }),
-        database.subscriptionInvoice.findFirstOrThrow({
-          where: { organizationId: firstOrganization.id },
-        }),
-        database.subscription.findUniqueOrThrow({
-          where: { organizationId: firstOrganization.id },
-        }),
-        database.subscriptionChange.count({
-          where: { organizationId: firstOrganization.id },
-        }),
-        database.auditLog.count({
-          where: {
-            action: 'subscription.payment_applied',
-            organizationId: firstOrganization.id,
-          },
-        }),
-        database.paymentProviderEvent.findMany({
-          where: { organizationId: firstOrganization.id },
-        }),
-      ]);
+    const [
+      attempt,
+      invoice,
+      subscription,
+      changes,
+      change,
+      auditEntries,
+      events,
+    ] = await Promise.all([
+      database.subscriptionPaymentAttempt.findUniqueOrThrow({
+        where: { id: paymentAttemptId },
+      }),
+      database.subscriptionInvoice.findFirstOrThrow({
+        where: { organizationId: firstOrganization.id },
+      }),
+      database.subscription.findUniqueOrThrow({
+        where: { organizationId: firstOrganization.id },
+      }),
+      database.subscriptionChange.count({
+        where: { organizationId: firstOrganization.id },
+      }),
+      database.subscriptionChange.findFirstOrThrow({
+        where: { organizationId: firstOrganization.id },
+      }),
+      database.auditLog.count({
+        where: {
+          action: 'subscription.payment_applied',
+          organizationId: firstOrganization.id,
+        },
+      }),
+      database.paymentProviderEvent.findMany({
+        where: { organizationId: firstOrganization.id },
+      }),
+    ]);
     expect(attempt.status).toBe(SubscriptionPaymentStatus.APPLIED);
     expect(invoice.status).toBe(SubscriptionInvoiceStatus.PAID);
+    expect(invoice.billingTimezone).toBe('America/Lima');
+    expect(invoice.providerPaidAt).toEqual(providerPaidAt);
+    expect(invoice.paidAt).toEqual(verifiedAt);
+    expect(attempt.approvedAt).toEqual(verifiedAt);
+    expect(attempt.appliedAt).toEqual(verifiedAt);
+    expect(change.billingTimezone).toBe('America/Lima');
     expect(subscription.status).toBe(SubscriptionStatus.ACTIVE);
     expect(changes).toBe(1);
     expect(auditEntries).toBe(1);

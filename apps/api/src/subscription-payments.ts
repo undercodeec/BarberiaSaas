@@ -77,6 +77,7 @@ export interface VerifiedPlatformPayment {
   readonly status: 'approved' | 'rejected';
   readonly storeId: string;
   readonly source?: PaymentProviderEventSource;
+  readonly providerPaidAt?: Date | null;
   readonly verifiedAt?: Date;
 }
 
@@ -448,7 +449,10 @@ export async function applyVerifiedPlatformPayment(
     }
 
     const attempt = await transaction.subscriptionPaymentAttempt.findUnique({
-      include: { invoice: { include: { plan: true } } },
+      include: {
+        invoice: { include: { plan: true } },
+        organization: { select: { defaultTimezone: true } },
+      },
       where: { internalReference: payment.internalReference },
     });
     if (!attempt)
@@ -601,6 +605,7 @@ export async function applyVerifiedPlatformPayment(
         paidAt: now,
         periodEndsAt,
         periodStartsAt: invoicePeriodStartsAt,
+        providerPaidAt: payment.providerPaidAt ?? null,
         status: SubscriptionInvoiceStatus.PAID,
       },
       where: { id: attempt.invoice.id },
@@ -626,6 +631,7 @@ export async function applyVerifiedPlatformPayment(
       data: {
         fromPlanCode: previousPlan.code,
         fromStatus: subscription.status,
+        billingTimezone: attempt.organization.defaultTimezone,
         invoiceId: attempt.invoice.id,
         kind,
         newPeriodEnd: periodEndsAt,
@@ -910,6 +916,7 @@ export function registerSubscriptionPaymentRoutes(
         data: {
           billingPeriodDays: BILLING_PERIOD_DAYS,
           billingPeriodMonths: 1,
+          billingTimezone: membership.organization.defaultTimezone,
           commercialTermsVersion: config.PLATFORM_SUBSCRIPTION_TERMS_VERSION!,
           currencyCode: plan.currencyCode,
           dueAt: expiresAt,
