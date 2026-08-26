@@ -8,8 +8,13 @@ const PAYPHONE_BUTTON_CONFIRM_URL =
   'https://pay.payphonetodoesposible.com/api/button/V2/Confirm';
 
 const prepareResponseSchema = z.object({
-  paymentId: z.coerce.number().int().positive().optional(),
-  payWithCard: z.string().url().optional(),
+paymentId: z
+  .union([
+    z.string().trim().min(1),
+    z.number().int().positive(),
+  ])
+  .transform(String)
+  .optional(),  payWithCard: z.string().url().optional(),
   payWithPayPhone: z.string().url().optional(),
 });
 
