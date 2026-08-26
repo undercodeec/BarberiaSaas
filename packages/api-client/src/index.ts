@@ -692,7 +692,7 @@ export interface SubscriptionResponse {
     readonly featureFlags: SubscriptionFeatureFlags;
     readonly graceEndsAt: string | null;
     /** Limits after active platform exceptions have been applied. */
-    readonly limits: {
+    readonly limits?: {
       readonly clients: number | null;
       readonly locations: number;
       readonly rolling30DayBookings: number | null;

@@ -27,6 +27,7 @@ import {
 import { requireApiClient } from '../../src/lib/api';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { accountQueryKey } from '../../src/lib/query-keys';
+import { hasLockedSubscriptionFeature } from '../../src/lib/subscription-entitlements';
 import { shareTemporaryExport } from '../../src/lib/temporary-export';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
@@ -198,6 +199,8 @@ export default function ReportsScreen() {
     queryFn: () =>
       requireApiClient().request<SubscriptionResponse>('/v1/subscription'),
     queryKey: accountQueryKey(user?.id, 'subscription'),
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
   const featureFlags = subscriptionQuery.data?.current.featureFlags;
   const isSolo = accountQuery.data?.accountType === 'professional';
@@ -226,11 +229,7 @@ export default function ReportsScreen() {
   const isOpening = useRef(false);
   const openReport = useCallback(
     (item: ReportMenuItem) => {
-      if (
-        item.requiredFeatures?.some(
-          (feature) => !featureFlags || featureFlags[feature] === false,
-        )
-      ) {
+      if (hasLockedSubscriptionFeature(featureFlags, item.requiredFeatures)) {
         router.push('/subscription' as never);
         return;
       }
@@ -318,12 +317,9 @@ export default function ReportsScreen() {
                   <ReportNavigationCard
                     item={item}
                     key={item.id}
-                    locked={Boolean(
-                      item.requiredFeatures &&
-                      (!featureFlags ||
-                        item.requiredFeatures.some(
-                          (feature) => featureFlags[feature] === false,
-                        )),
+                    locked={hasLockedSubscriptionFeature(
+                      featureFlags,
+                      item.requiredFeatures,
                     )}
                     onPress={() => openReport(item)}
                   />

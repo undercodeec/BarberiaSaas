@@ -13,6 +13,7 @@ import {
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { accountQueryKey, accountQueryPrefix } from '../../src/lib/query-keys';
+import { effectiveLocationLimit } from '../../src/lib/subscription-entitlements';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const STATUS_LABELS: Record<SubscriptionResponse['current']['status'], string> =
@@ -96,6 +97,8 @@ export default function SubscriptionScreen() {
     queryFn: () =>
       requireApiClient().request<SubscriptionResponse>('/v1/subscription'),
     queryKey: accountQueryKey(user?.id, 'subscription'),
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
   const simulateSubscription = useMutation({
     mutationFn: (status: 'active' | 'suspended') =>
@@ -146,6 +149,9 @@ export default function SubscriptionScreen() {
       ? `${subscription.usage.teamMembers} guardados · ${subscription.usage.teamMemberLimit} operativo`
       : `${subscription.usage.teamMembers} / ${subscription.usage.teamMemberLimit ?? 'Ilimitados'}`
     : '-';
+  const locationLimit = subscription
+    ? effectiveLocationLimit(subscription)
+    : null;
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -237,7 +243,7 @@ export default function SubscriptionScreen() {
               label="Sucursales"
               value={
                 subscription
-                  ? `${subscription.usage.locations} / ${subscription.current.limits.locations}`
+                  ? `${subscription.usage.locations} / ${locationLimit ?? '-'}`
                   : '-'
               }
             />

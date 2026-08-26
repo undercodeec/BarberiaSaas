@@ -26,6 +26,7 @@ import {
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { accountQueryKey } from '../../src/lib/query-keys';
+import { hasLockedSubscriptionFeature } from '../../src/lib/subscription-entitlements';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -155,6 +156,8 @@ export default function BusinessSettingsScreen() {
     queryFn: () =>
       requireApiClient().request<SubscriptionResponse>('/v1/subscription'),
     queryKey: accountQueryKey(user?.id, 'subscription'),
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
   const featureFlags = subscriptionQuery.data?.current.featureFlags;
   const isSolo = accountQuery.data?.accountType === 'professional';
@@ -186,8 +189,10 @@ export default function BusinessSettingsScreen() {
   const openItem = useCallback(
     (item: SettingsMenuItem) => {
       if (
-        item.requiredFeature &&
-        featureFlags?.[item.requiredFeature] === false
+        hasLockedSubscriptionFeature(
+          featureFlags,
+          item.requiredFeature ? [item.requiredFeature] : undefined,
+        )
       ) {
         router.push('/subscription' as never);
         return;
@@ -269,9 +274,9 @@ export default function BusinessSettingsScreen() {
                 <SettingsNavigationCard
                   item={item}
                   key={item.id}
-                  locked={Boolean(
-                    item.requiredFeature &&
-                    featureFlags?.[item.requiredFeature] === false,
+                  locked={hasLockedSubscriptionFeature(
+                    featureFlags,
+                    item.requiredFeature ? [item.requiredFeature] : undefined,
                   )}
                   onPress={() => openItem(item)}
                 />
