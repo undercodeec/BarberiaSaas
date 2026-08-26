@@ -12,13 +12,13 @@ const dateFormatter = new Intl.DateTimeFormat('es-EC', {
   timeStyle: 'short',
 });
 
-function formatDate(value: string | null, timezone?: string) {
+export function formatSubscriptionDate(value: string | null, timezone: string) {
   if (!value) return '—';
   try {
     return new Intl.DateTimeFormat('es-EC', {
       dateStyle: 'medium',
       timeStyle: 'short',
-      ...(timezone ? { timeZone: timezone } : {}),
+      timeZone: timezone,
     }).format(new Date(value));
   } catch {
     return dateFormatter.format(new Date(value));
@@ -203,7 +203,7 @@ export function PlatformSubscriptions({
                   </span>
                   <strong>
                     Suscrito desde:{' '}
-                    {formatDate(
+                    {formatSubscriptionDate(
                       subscription.subscriptionStartedAt ??
                         subscription.currentPeriodStart,
                       subscription.organization.defaultTimezone,
@@ -211,8 +211,8 @@ export function PlatformSubscriptions({
                   </strong>
                   <small>
                     {subscription.status === 'trial'
-                      ? `Finaliza prueba: ${formatDate(subscription.trialEndsAt, subscription.organization.defaultTimezone)}`
-                      : `Vence: ${formatDate(subscription.currentPeriodEnd, subscription.organization.defaultTimezone)}`}
+                      ? `Finaliza prueba: ${formatSubscriptionDate(subscription.trialEndsAt, subscription.organization.defaultTimezone)}`
+                      : `Vence: ${formatSubscriptionDate(subscription.currentPeriodEnd, subscription.organization.defaultTimezone)}`}
                   </small>
                   <small>
                     Zona horaria: {subscription.organization.defaultTimezone}
@@ -231,8 +231,11 @@ export function PlatformSubscriptions({
                         )}
                       </strong>
                       <small>
-                        Vence {formatDate(subscription.latestInvoice.dueAt)} ·{' '}
-                        pagada {formatDate(subscription.latestInvoice.paidAt)}
+                        Vence {formatSubscriptionDate(subscription.latestInvoice.dueAt, subscription.latestInvoice.billingTimezone)} ·{' '}
+                        pagada {formatSubscriptionDate(subscription.latestInvoice.paidAt, subscription.latestInvoice.billingTimezone)}
+                      </small>
+                      <small>
+                        Pago proveedor: {subscription.latestInvoice.providerPaidAt ? formatSubscriptionDate(subscription.latestInvoice.providerPaidAt, subscription.latestInvoice.billingTimezone) : 'No informado por PayPhone'} · {subscription.latestInvoice.billingTimezone}
                       </small>
                     </>
                   ) : (
@@ -256,7 +259,10 @@ export function PlatformSubscriptions({
                       </strong>
                       <small>
                         {label(subscription.latestPayment.provider)} · creado{' '}
-                        {formatDate(subscription.latestPayment.createdAt)}
+                        {formatSubscriptionDate(subscription.latestPayment.createdAt, subscription.latestPayment.billingTimezone)}
+                      </small>
+                      <small>
+                        Verificado: {formatSubscriptionDate(subscription.latestPayment.appliedAt, subscription.latestPayment.billingTimezone)}
                       </small>
                     </>
                   ) : (
@@ -272,7 +278,7 @@ export function PlatformSubscriptions({
                   {subscription.history.map((entry) => (
                     <small key={entry.id}>
                       {label(entry.kind)} · {label(entry.status)} ·{' '}
-                      {formatDate(entry.createdAt)}
+                      {formatSubscriptionDate(entry.createdAt, entry.billingTimezone)}
                     </small>
                   ))}
                 </footer>

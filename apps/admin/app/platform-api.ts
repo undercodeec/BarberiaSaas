@@ -53,7 +53,9 @@ export interface PlatformSubscriptionList {
   readonly subscriptions: readonly {
     readonly currentPeriodEnd: string;
     readonly currentPeriodStart: string;
+    readonly graceEndsAt: string | null;
     readonly history: readonly {
+      readonly billingTimezone: string;
       readonly createdAt: string;
       readonly id: string;
       readonly kind: string;
@@ -61,11 +63,13 @@ export interface PlatformSubscriptionList {
     }[];
     readonly id: string;
     readonly latestInvoice: {
+      readonly billingTimezone: string;
       readonly createdAt: string;
       readonly currencyCode: string;
       readonly dueAt: string;
       readonly id: string;
       readonly paidAt: string | null;
+      readonly providerPaidAt: string | null;
       readonly planCode: string;
       readonly status: string;
       readonly totalCents: number;
@@ -73,6 +77,7 @@ export interface PlatformSubscriptionList {
     readonly latestPayment: {
       readonly amountCents: number;
       readonly appliedAt: string | null;
+      readonly billingTimezone: string;
       readonly createdAt: string;
       readonly currencyCode: string;
       readonly id: string;

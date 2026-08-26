@@ -2200,7 +2200,13 @@ function registerPlatformRoutes(
         include: {
           changes: {
             orderBy: { createdAt: 'desc' },
-            select: { createdAt: true, id: true, kind: true, toStatus: true },
+            select: {
+              billingTimezone: true,
+              createdAt: true,
+              id: true,
+              kind: true,
+              toStatus: true,
+            },
             take: 3,
           },
           organization: {
@@ -2212,11 +2218,13 @@ function registerPlatformRoutes(
               subscriptionInvoices: {
                 orderBy: { createdAt: 'desc' },
                 select: {
+                  billingTimezone: true,
                   createdAt: true,
                   currencyCode: true,
                   dueAt: true,
                   id: true,
                   paidAt: true,
+                  providerPaidAt: true,
                   planCode: true,
                   status: true,
                   totalCents: true,
@@ -2284,7 +2292,9 @@ function registerPlatformRoutes(
         return {
           currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
           currentPeriodStart: subscription.currentPeriodStart.toISOString(),
+          graceEndsAt: subscription.graceEndsAt?.toISOString() ?? null,
           history: subscription.changes.map((change) => ({
+            billingTimezone: change.billingTimezone,
             createdAt: change.createdAt.toISOString(),
             id: change.id,
             kind: change.kind.toLowerCase(),
@@ -2293,11 +2303,13 @@ function registerPlatformRoutes(
           id: subscription.id,
           latestInvoice: invoice
             ? {
+                billingTimezone: invoice.billingTimezone,
                 createdAt: invoice.createdAt.toISOString(),
                 currencyCode: invoice.currencyCode,
                 dueAt: invoice.dueAt.toISOString(),
                 id: invoice.id,
                 paidAt: invoice.paidAt?.toISOString() ?? null,
+                providerPaidAt: invoice.providerPaidAt?.toISOString() ?? null,
                 planCode: invoice.planCode,
                 status: invoice.status.toLowerCase(),
                 totalCents: invoice.totalCents,
@@ -2311,6 +2323,9 @@ function registerPlatformRoutes(
                 currencyCode: payment.currencyCode,
                 id: payment.id,
                 provider: payment.provider,
+                billingTimezone:
+                  invoice?.billingTimezone ??
+                  subscription.organization.defaultTimezone,
                 status: payment.status.toLowerCase(),
               }
             : null,
