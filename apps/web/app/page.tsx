@@ -288,9 +288,18 @@ export default function HomePage() {
       }, 110);
     }, 420);
   };
+
+  const advanceDeckFromCard = () => {
+    if (!window.matchMedia('(max-width: 800px)').matches) return;
+    const isDeckSceneActive =
+      storyProgressRef.current >= 0.66 && storyProgressRef.current < 0.98;
+    if (!isDeckSceneActive || deckIndex >= modules.length - 1) return;
+    shiftDeck(1);
+  };
+
   useEffect(() => {
     const onWheel = (event: WheelEvent) => {
-      if (!window.matchMedia('(max-width: 800px)').matches) return;
+      if (window.matchMedia('(max-width: 800px)').matches) return;
       const isDeckSceneActive =
         storyProgressRef.current >= 0.65 && storyProgressRef.current < 1;
       const direction = Math.sign(event.deltaY);
@@ -607,6 +616,7 @@ export default function HomePage() {
                         .join(' ')}
                       data-position={position}
                       key={module}
+                      onClick={advanceDeckFromCard}
                       style={{ '--deck-position': position } as CSSProperties}
                     >
                       <span>0{originalIndex + 1}</span>
