@@ -152,6 +152,12 @@ export default function SubscriptionScreen() {
   const locationLimit = subscription
     ? effectiveLocationLimit(subscription)
     : null;
+  const advancedModulesCopy =
+    subscription?.current.planCode === 'essential'
+      ? 'Nava Esencial está pensado para operación individual. Los módulos de equipo y operación ampliada requieren Nava Local, salvo una habilitación especial activa.'
+      : subscription?.current.planCode === 'free'
+        ? 'Estos módulos no forman parte de Nava Free. Tus datos históricos se conservan y puedes activarlos con Nava Local.'
+        : 'Estos módulos forman parte de la operación ampliada de tu plan y reflejan cualquier habilitación especial vigente.';
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -335,20 +341,32 @@ export default function SubscriptionScreen() {
           </View>
         ) : null}
 
+        {currentPlan ? (
+          <View style={styles.capabilityCard}>
+            <Text style={styles.infoTitle}>Incluido en {currentPlan.name}</Text>
+            <Text style={styles.infoCopy}>
+              Estas son las capacidades reales del plan que tienes activo.
+            </Text>
+            {currentPlan.features.map((feature) => (
+              <View key={feature} style={styles.featureRow}>
+                <Ionicons
+                  color="#287247"
+                  name="checkmark-circle-outline"
+                  size={19}
+                />
+                <Text style={styles.featureLabel}>{feature}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         {subscription ? (
           <View style={styles.capabilityCard}>
-            <Text style={styles.infoTitle}>Capacidades activas</Text>
+            <Text style={styles.infoTitle}>Módulos avanzados</Text>
+            <Text style={styles.infoCopy}>{advancedModulesCopy}</Text>
             <Capability
               label="Equipo y colaboradores"
               value={subscription.current.featureFlags.team}
-            />
-            <Capability
-              label="Reservas públicas"
-              value={subscription.current.featureFlags.publicBooking}
-            />
-            <Capability
-              label="Nava Wallet"
-              value={subscription.current.featureFlags.wallet}
             />
             <Capability
               label="Comisiones"
@@ -357,10 +375,6 @@ export default function SubscriptionScreen() {
             <Capability
               label="Inventario"
               value={subscription.current.featureFlags.inventory}
-            />
-            <Capability
-              label="Reportes"
-              value={subscription.current.featureFlags.reports}
             />
             <Capability
               label="Múltiples sucursales"
@@ -498,7 +512,7 @@ function Capability({
       />
       <Text style={styles.featureLabel}>{label}</Text>
       <Text style={value ? styles.enabledLabel : styles.soonLabel}>
-        {value ? 'Incluida' : 'No incluida'}
+        {value ? 'Activo' : 'Requiere Nava Local'}
       </Text>
     </View>
   );

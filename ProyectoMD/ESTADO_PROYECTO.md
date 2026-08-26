@@ -353,8 +353,11 @@ Mobile / Web pública / Admin
       operativo y marca los demás como históricos; API y app móvil bloquean sus
       nuevas reservas, disponibilidad en línea, edición operativa y asignación
       de servicios, mientras la interfaz los mantiene visibles con opacidad.
-      La pantalla Suscripción muestra el uso real, el límite de 25 reservas,
-      las capacidades vigentes y la explicación de los datos históricos.
+      La pantalla Suscripción muestra el uso real, el límite de 25 reservas y
+      la explicación de los datos históricos. Para evitar confundir Nava
+      Esencial con Free, separa las inclusiones reales del plan adquirido
+      (reservas/clientes ilimitados, agenda, servicios, historial, caja y
+      reportes individuales) de los módulos avanzados que requieren Nava Local.
 - [x] Refuerzo de degradación Free: Caja sólo permite seleccionar profesionales
       habilitados; inventario y ventas/comisiones premium quedan inactivos o
       redirigen a Suscripción. La importación y alta manual de clientes respetan
