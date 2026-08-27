@@ -127,6 +127,31 @@ export const signUpSchema = z
     path: ['closingTime'],
   });
 
+export const invitationSignUpSchema = z
+  .object({
+    confirmPassword: newPasswordSchema,
+    email: emailSchema,
+    fullName: z.string().trim().min(2, 'Ingresa tu nombre completo.').max(120),
+    password: newPasswordSchema,
+    privacyPolicyAccepted: z
+      .boolean()
+      .refine(
+        (value) => value,
+        'Debes aceptar la Política de Privacidad para crear tu cuenta.',
+      ),
+    token: z
+      .string()
+      .trim()
+      .regex(
+        /^[A-Za-z0-9_-]{32,512}$/u,
+        'La invitación no es válida o ya venció.',
+      ),
+  })
+  .refine((value) => value.password === value.confirmPassword, {
+    message: 'Las contraseñas no coinciden.',
+    path: ['confirmPassword'],
+  });
+
 export const registrationAvailabilitySchema = z
   .object({
     email: emailSchema.optional(),
@@ -705,6 +730,7 @@ export type SignInInput = z.infer<typeof signInSchema>;
 export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
 export type CloseOwnedBusinessInput = z.infer<typeof closeOwnedBusinessSchema>;
 export type SignUpInput = z.infer<typeof signUpSchema>;
+export type InvitationSignUpInput = z.infer<typeof invitationSignUpSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export type UpdateOnboardingCollaboratorInput = z.infer<
   typeof updateOnboardingCollaboratorSchema

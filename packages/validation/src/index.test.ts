@@ -10,6 +10,7 @@ import {
   createAppointmentSchema,
   createSlug,
   dailyAppointmentsQuerySchema,
+  invitationSignUpSchema,
   locationOnboardingSchema,
   mapsAutocompleteSchema,
   mapsReverseGeocodeSchema,
@@ -286,6 +287,29 @@ describe('motor de agenda', () => {
 });
 
 describe('autenticación y onboarding', () => {
+  it('valida el registro mínimo de una persona invitada', () => {
+    expect(
+      invitationSignUpSchema.safeParse({
+        confirmPassword: 'Clave-segura-123',
+        email: 'invitee@example.com',
+        fullName: 'Persona Invitada',
+        password: 'Clave-segura-123',
+        privacyPolicyAccepted: true,
+        token: 'x'.repeat(32),
+      }).success,
+    ).toBe(true);
+    expect(
+      invitationSignUpSchema.safeParse({
+        confirmPassword: 'Clave-segura-123',
+        email: 'invitee@example.com',
+        fullName: 'Persona Invitada',
+        password: 'Clave-segura-123',
+        privacyPolicyAccepted: false,
+        token: 'x'.repeat(32),
+      }).success,
+    ).toBe(false);
+  });
+
   it('rechaza contraseñas distintas', () => {
     const result = signUpSchema.safeParse({
       accountType: 'business',

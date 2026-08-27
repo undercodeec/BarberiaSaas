@@ -1169,6 +1169,95 @@ describeWithDatabase('API con PostgreSQL', () => {
     );
   });
 
+  it('registra y acepta desde una invitación sin crear perfil de negocio', async () => {
+    const ownerToken = await register('web-invitation-owner@example.com');
+    const organization = await onboard(ownerToken, 'web-invitation');
+    const invitedEmail = 'web-invitation-member@example.com';
+    const invitationResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        email: invitedEmail,
+        fullName: 'Colaborador desde web',
+        locationId: organization.locationId,
+        role: 'barber',
+      },
+      url: '/v1/team/invitations',
+    });
+    expect(invitationResponse.statusCode).toBe(201);
+    const invitationToken = lastInvitationToken();
+
+    const invalidRegistration = await app.inject({
+      method: 'POST',
+      payload: {
+        confirmPassword: 'Clave-segura-123',
+        email: 'otro-correo@example.com',
+        fullName: 'Otro correo',
+        password: 'Clave-segura-123',
+        privacyPolicyAccepted: true,
+        token: invitationToken,
+      },
+      url: '/v1/auth/invitation-register',
+    });
+    expect(invalidRegistration.statusCode).toBe(400);
+    expect(invalidRegistration.json<{ code: string }>().code).toBe(
+      'INVALID_INVITATION',
+    );
+
+    const registration = await app.inject({
+      method: 'POST',
+      payload: {
+        confirmPassword: 'Clave-segura-123',
+        email: invitedEmail,
+        fullName: 'Colaborador desde web',
+        password: 'Clave-segura-123',
+        privacyPolicyAccepted: true,
+        token: invitationToken,
+      },
+      url: '/v1/auth/invitation-register',
+    });
+    expect(registration.statusCode).toBe(201);
+    const verification = registration.json<{
+      developmentVerificationCode: string;
+      email: string;
+    }>();
+    const verified = await app.inject({
+      method: 'POST',
+      payload: {
+        code: verification.developmentVerificationCode,
+        email: verification.email,
+      },
+      url: '/v1/auth/verify-email',
+    });
+    expect(verified.statusCode).toBe(200);
+    const acceptance = await app.inject({
+      headers: {
+        authorization: `Bearer ${verified.json<{ session: { token: string } }>().session.token}`,
+      },
+      method: 'POST',
+      payload: { token: invitationToken },
+      url: '/v1/team/invitations/accept',
+    });
+    expect(acceptance.statusCode).toBe(200);
+
+    const invitedUser = await database.user.findUniqueOrThrow({
+      where: { email: invitedEmail },
+    });
+    expect(
+      await database.userRegistrationProfile.findUnique({
+        where: { userId: invitedUser.id },
+      }),
+    ).toBeNull();
+    expect(
+      await database.membership.findFirst({
+        where: {
+          organizationId: organization.organizationId,
+          userId: invitedUser.id,
+        },
+      }),
+    ).toMatchObject({ status: 'ACTIVE' });
+  });
+
   it('expone suscripción simulada y protege el cambio a cuenta individual', async () => {
     const ownerToken = await register('settings-owner@example.com');
     const organization = await onboard(ownerToken, 'settings-account');

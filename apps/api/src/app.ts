@@ -21,6 +21,7 @@ import {
   createOnboardingCollaboratorSchema,
   createOnboardingServiceSchema,
   deleteAccountSchema,
+  invitationSignUpSchema,
   mapsAutocompleteSchema,
   mapsPlaceDetailsSchema,
   mapsReverseGeocodeSchema,
@@ -1131,6 +1132,94 @@ export async function buildApi({
           409,
           'REGISTRATION_DATA_ALREADY_EXISTS',
           'El correo, teléfono o nombre del negocio ya está registrado.',
+        );
+      }
+      throw error;
+    }
+  });
+
+  app.post('/v1/auth/invitation-register', async (request, reply) => {
+    enforceAuthIpRateLimit({
+      buckets: authRateLimitBuckets,
+      limit: config.AUTH_REGISTER_RATE_LIMIT_MAX,
+      reply,
+      request,
+      scope: 'register',
+      windowMs: authRateLimitWindowMs,
+    });
+    const input = invitationSignUpSchema.parse(request.body);
+    const email = normalizeEmail(input.email);
+    const invitation = await database.teamInvitation.findFirst({
+      where: {
+        email,
+        expiresAt: { gt: new Date() },
+        status: InvitationStatus.PENDING,
+        tokenHash: hashOpaqueToken(input.token),
+      },
+    });
+    if (!invitation) {
+      throw new ApiError(
+        400,
+        'INVALID_INVITATION',
+        'La invitación no es válida o ya venció.',
+      );
+    }
+    try {
+      const retention = await activeAccountDeletionRetention(database, {
+        email,
+      });
+      if (retention.email) {
+        throw new ApiError(
+          409,
+          'ACCOUNT_DELETION_RETENTION_ACTIVE',
+          'Estos datos estarán disponibles nuevamente 90 días después de eliminar la cuenta.',
+        );
+      }
+      const existingUser = await database.user.findUnique({ where: { email } });
+      if (existingUser?.passwordHash && existingUser.emailVerifiedAt) {
+        throw new ApiError(
+          409,
+          'EMAIL_ALREADY_EXISTS',
+          'Ya existe una cuenta con ese correo. Inicia sesión para aceptar la invitación.',
+        );
+      }
+      const pendingRegistration = await database.pendingRegistration.findUnique(
+        { where: { email } },
+      );
+      assertVerificationNotLocked(pendingRegistration?.lockedUntil ?? null);
+      if (pendingRegistration && pendingRegistration.expiresAt > new Date()) {
+        throw new ApiError(
+          409,
+          'EMAIL_ALREADY_EXISTS',
+          'Ese correo ya está registrado o pendiente de verificación.',
+        );
+      }
+      const verification = await issueVerificationCode({
+        appEnvironment: config.APP_ENV,
+        database,
+        email,
+        fullName: input.fullName.trim(),
+        passwordHash: await hashPassword(input.password),
+        privacyPolicyAccepted: input.privacyPolicyAccepted,
+        verificationMailer,
+      });
+      return reply.code(201).send({
+        ...(verification.developmentVerificationCode
+          ? {
+              developmentVerificationCode:
+                verification.developmentVerificationCode,
+            }
+          : {}),
+        email,
+        verificationExpiresAt: verification.verificationExpiresAt,
+        verificationRequired: true,
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new ApiError(
+          409,
+          'REGISTRATION_DATA_ALREADY_EXISTS',
+          'El correo ya está registrado.',
         );
       }
       throw error;
