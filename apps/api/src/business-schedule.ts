@@ -1,4 +1,8 @@
-import { MembershipStatus, type DatabaseClient } from '@barber-saas/database';
+import {
+  MembershipRole,
+  MembershipStatus,
+  type DatabaseClient,
+} from '@barber-saas/database';
 import {
   hasPermission,
   type MembershipRole as PermissionRole,
@@ -6,6 +10,7 @@ import {
 } from '@barber-saas/permissions';
 import { replaceBusinessScheduleSchema } from '@barber-saas/validation';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { z } from 'zod';
 
 import { ApiError } from './errors';
 
@@ -21,6 +26,10 @@ type Authenticate = (
   database: DatabaseClient,
   request: FastifyRequest,
 ) => Promise<AuthenticatedIdentity>;
+
+const businessScheduleQuerySchema = z.object({
+  locationId: z.uuid().optional(),
+});
 
 function permissionRole(role: string): PermissionRole {
   return role.toLowerCase() as PermissionRole;
@@ -169,12 +178,27 @@ export function registerBusinessScheduleRoutes(
   app.get('/v1/business-schedule', async (request) => {
     const { user } = await authenticate(database, request);
     const current = await requireMembership(database, user.id, 'schedule.read');
-    const locationId = current.memberLocations[0]?.locationId;
+    const input = businessScheduleQuerySchema.parse(request.query);
+    const locationId =
+      input.locationId ?? current.memberLocations[0]?.locationId;
     if (!locationId) {
       throw new ApiError(
         404,
         'LOCATION_NOT_FOUND',
         'No encontramos una sucursal activa para tu cuenta.',
+      );
+    }
+    if (
+      current.role !== MembershipRole.OWNER &&
+      current.role !== MembershipRole.MANAGER &&
+      !current.memberLocations.some(
+        (location) => location.locationId === locationId,
+      )
+    ) {
+      throw new ApiError(
+        403,
+        'LOCATION_FORBIDDEN',
+        'No tienes acceso a esta sucursal.',
       );
     }
     await requireLocation(database, current.organizationId, locationId);

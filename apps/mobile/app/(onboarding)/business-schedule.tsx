@@ -54,6 +54,13 @@ const DAY_NAMES: Record<number, string> = {
 };
 const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
 
+type AccessibleLocationsResponse = {
+  readonly locations: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+  }>;
+};
+
 function formatMinute(minute: number) {
   const hour = Math.floor(minute / 60);
   return `${String(hour).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
@@ -87,15 +94,28 @@ export default function BusinessScheduleScreen() {
   const [editingDay, setEditingDay] = useState<BusinessScheduleDay | null>(
     null,
   );
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(
+    null,
+  );
   const [requestError, setRequestError] = useState<string | null>(null);
 
   const scheduleQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
       requireApiClient().request<BusinessScheduleResponse>(
-        '/v1/business-schedule',
+        selectedLocationId
+          ? `/v1/business-schedule?locationId=${encodeURIComponent(selectedLocationId)}`
+          : '/v1/business-schedule',
       ),
-    queryKey: tenant.key('business-schedule'),
+    queryKey: tenant.key('business-schedule', selectedLocationId ?? 'default'),
+  });
+  const accessibleLocationsQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<AccessibleLocationsResponse>(
+        '/v1/locations/accessible',
+      ),
+    queryKey: tenant.key('accessible-locations'),
   });
 
   const saveMutation = useMutation({
@@ -237,6 +257,42 @@ export default function BusinessScheduleScreen() {
             </Text>
           </View>
         </View>
+        {(accessibleLocationsQuery.data?.locations.length ?? 0) > 1 ? (
+          <View style={styles.locationSelector}>
+            <Text style={styles.locationSelectorLabel}>Sucursal</Text>
+            <View style={styles.locationOptions}>
+              {accessibleLocationsQuery.data?.locations.map((location) => {
+                const selected =
+                  (selectedLocationId ?? scheduleQuery.data?.locationId) ===
+                  location.id;
+                return (
+                  <Pressable
+                    key={location.id}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    onPress={() => {
+                      setDayOverrides({});
+                      setSelectedLocationId(location.id);
+                    }}
+                    style={[
+                      styles.locationOption,
+                      selected && styles.locationOptionSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.locationOptionLabel,
+                        selected && styles.locationOptionLabelSelected,
+                      ]}
+                    >
+                      {location.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
 
         {scheduleQuery.isPending ? (
           <View style={styles.stateContainer}>
@@ -702,6 +758,27 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   introTitle: { color: COLORS.text, fontSize: 19, fontWeight: '800' },
+  locationOption: {
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  locationOptionLabel: { color: COLORS.text, fontSize: 13, fontWeight: '700' },
+  locationOptionLabelSelected: { color: appTheme.colors.accentDark },
+  locationOptionSelected: {
+    backgroundColor: appTheme.colors.accentWash,
+    borderColor: appTheme.colors.accent,
+  },
+  locationOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  locationSelector: { gap: 9 },
+  locationSelectorLabel: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
   pressed: { opacity: 0.72, transform: [{ scale: 0.985 }] },
   requestError: {
     color: COLORS.danger,

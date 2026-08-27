@@ -58,9 +58,20 @@ function movementIsIncome(type: CashMovementRecord['type']) {
   );
 }
 
+type AccessibleLocationsResponse = {
+  readonly locations: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+  }>;
+};
+
 export default function CashRegisterScreen() {
   const { session, user } = useAuth();
   const tenant = useTenantScope();
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(
+    null,
+  );
+  const locationId = selectedLocationId ?? tenant.scope.locationId;
   const layout = useNativeLayoutMetrics(0.92);
   const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const router = useRouter();
@@ -173,11 +184,19 @@ export default function CashRegisterScreen() {
   const [closingAmount, setClosingAmount] = useState('');
   const [closingNote, setClosingNote] = useState('');
   const [isBaseInfoVisible, setIsBaseInfoVisible] = useState(false);
+  const accessibleLocationsQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<AccessibleLocationsResponse>(
+        '/v1/locations/accessible',
+      ),
+    queryKey: tenant.key('accessible-locations'),
+  });
   const cashQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
       requireApiClient().request<CurrentCashRegisterResponse>(
-        '/v1/cash-register/current',
+        `/v1/cash-register/current?locationId=${encodeURIComponent(locationId)}`,
       ),
     queryKey: tenant.key('cash-register-current'),
   });
@@ -194,7 +213,9 @@ export default function CashRegisterScreen() {
   const inventoryQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
-      requireApiClient().request<InventoryResponse>('/v1/inventory'),
+      requireApiClient().request<InventoryResponse>(
+        `/v1/inventory?locationId=${encodeURIComponent(locationId)}`,
+      ),
     queryKey: tenant.key('inventory'),
   });
   const subscriptionQuery = useQuery({
@@ -207,7 +228,7 @@ export default function CashRegisterScreen() {
     enabled: Boolean(session),
     queryFn: () =>
       requireApiClient().request<CashRegisterSummaryResponse>(
-        '/v1/cash-register/summary',
+        `/v1/cash-register/summary?locationId=${encodeURIComponent(locationId)}`,
       ),
     queryKey: tenant.key('cash-register-summary'),
   });
@@ -220,6 +241,7 @@ export default function CashRegisterScreen() {
         '/v1/cash-register/open',
         {
           body: {
+            locationId,
             openingAmountCents: Math.round(amount * 100),
             responsibleMembershipId: responsibleId ?? undefined,
           },
@@ -282,6 +304,7 @@ export default function CashRegisterScreen() {
         );
       return requireApiClient().request('/v1/cash-register/movements', {
         body: {
+          locationId,
           amountCents: Math.round(amount * 100),
           description: movementDescription.trim(),
           paymentMethod: movementPayment,
@@ -346,6 +369,7 @@ export default function CashRegisterScreen() {
         throw new Error('Ingresa el efectivo contado válido.');
       return requireApiClient().request('/v1/cash-register/close', {
         body: {
+          locationId,
           closingAmountCents: Math.round(amount * 100),
           note: closingNote.trim() || undefined,
         },
@@ -422,6 +446,43 @@ export default function CashRegisterScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Caja</Text>
       </View>
+      {(accessibleLocationsQuery.data?.locations.length ?? 0) > 1 ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 8,
+            paddingHorizontal: 20,
+            paddingBottom: 10,
+          }}
+        >
+          {accessibleLocationsQuery.data?.locations.map((location) => {
+            const selected = location.id === locationId;
+            return (
+              <Pressable
+                key={location.id}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                onPress={() => setSelectedLocationId(location.id)}
+                style={{
+                  backgroundColor: selected ? '#F7E8B8' : '#FFFFFF',
+                  borderColor: selected ? '#B47D17' : '#E5E7EB',
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  paddingHorizontal: 12,
+                  paddingVertical: 7,
+                }}
+              >
+                <Text
+                  style={{ color: '#111827', fontSize: 13, fontWeight: '800' }}
+                >
+                  {location.name}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
       {sessionData ? (
         <ScrollView
           contentContainerStyle={[
@@ -452,7 +513,7 @@ export default function CashRegisterScreen() {
                 accessibilityLabel="Ver detalle de caja"
                 onPress={() =>
                   router.push({
-                    params: { sessionId: sessionData.id },
+                    params: { locationId, sessionId: sessionData.id },
                     pathname: '/cash-register-detail',
                   })
                 }

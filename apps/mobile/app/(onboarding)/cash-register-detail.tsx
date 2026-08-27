@@ -37,14 +37,17 @@ export default function CashRegisterDetailScreen() {
   const { session } = useAuth();
   const tenant = useTenantScope();
   const router = useRouter();
-  const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  const { locationId, sessionId } = useLocalSearchParams<{
+    locationId?: string;
+    sessionId: string;
+  }>();
   const [arePaymentMethodsVisible, setArePaymentMethodsVisible] =
     useState(false);
   const detailQuery = useQuery({
     enabled: Boolean(session && sessionId),
     queryFn: () =>
       requireApiClient().request<CashRegisterDetailResponse>(
-        `/v1/cash-register/sessions/${sessionId}`,
+        `/v1/cash-register/sessions/${sessionId}?locationId=${encodeURIComponent(locationId ?? tenant.scope.locationId)}`,
       ),
     queryKey: tenant.key('cash-register-detail', sessionId),
   });

@@ -546,40 +546,6 @@ export default function TeamManagementScreen() {
                     ) : null}
                   </View>
                 ) : null}
-                {member.user.id === user?.id &&
-                (member.role === 'barber' || member.role === 'owner') ? (
-                  <View style={styles.ownScheduleSection}>
-                    <Text style={styles.onlineBookingLabel}>Mi horario</Text>
-                    {member.locations.map((location) => (
-                      <Pressable
-                        accessibilityLabel={`Configurar mi horario en ${location.name}`}
-                        accessibilityRole="button"
-                        key={location.id}
-                        onPress={() =>
-                          router.push({
-                            params: {
-                              locationId: location.id,
-                              locationName: location.name,
-                              membershipId: member.id,
-                              professionalName: member.user.fullName,
-                            },
-                            pathname: '/professional-schedule',
-                          })
-                        }
-                        style={styles.ownScheduleButton}
-                      >
-                        <Ionicons
-                          color={appTheme.colors.accentDark}
-                          name="time-outline"
-                          size={18}
-                        />
-                        <Text style={styles.ownScheduleButtonLabel}>
-                          {location.name}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                ) : null}
               </View>
             );
           })}
@@ -894,31 +860,6 @@ export default function TeamManagementScreen() {
                               Cargando servicios…
                             </Text>
                           ) : null}
-                          <Pressable
-                            accessibilityLabel={`Configurar horario de ${editingMember.user.fullName} en ${location.name}`}
-                            accessibilityRole="button"
-                            onPress={() =>
-                              router.push({
-                                params: {
-                                  locationId,
-                                  locationName: location.name,
-                                  membershipId: editingMember.id,
-                                  professionalName: editingMember.user.fullName,
-                                },
-                                pathname: '/professional-schedule',
-                              })
-                            }
-                            style={styles.scheduleButton}
-                          >
-                            <Ionicons
-                              color={appTheme.colors.accentDark}
-                              name="time-outline"
-                              size={18}
-                            />
-                            <Text style={styles.scheduleButtonLabel}>
-                              Configurar horario en esta sucursal
-                            </Text>
-                          </Pressable>
                         </View>
                       );
                     })}

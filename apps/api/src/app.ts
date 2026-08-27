@@ -2431,6 +2431,10 @@ export async function buildApi({
           whatsappPhone: user.phone ?? profile.phoneKey,
         },
       });
+      await transaction.organization.update({
+        data: { primaryLocationId: location.id },
+        where: { id: organization.id },
+      });
       const membership = await transaction.membership.create({
         data: {
           organizationId: organization.id,
@@ -2706,6 +2710,10 @@ export async function buildApi({
             timezone: input.location.timezone,
             whatsappPhone: input.location.whatsappPhone,
           },
+        });
+        await transaction.organization.update({
+          data: { primaryLocationId: location.id },
+          where: { id: organization.id },
         });
         const membership = await transaction.membership.create({
           data: {

@@ -299,23 +299,14 @@ export async function assertBookable(
     );
   }
   const weekday = weekdayFor(localDate);
-  const [schedules, businessSchedule] = await Promise.all([
-    database.weeklySchedule.findMany({
-      where: {
+  const businessSchedule = await database.businessWeeklySchedule.findUnique({
+    where: {
+      locationId_weekday: {
         locationId: input.locationId,
-        membershipId: input.professionalMembershipId,
         weekday,
       },
-    }),
-    database.businessWeeklySchedule.findUnique({
-      where: {
-        locationId_weekday: {
-          locationId: input.locationId,
-          weekday,
-        },
-      },
-    }),
-  ]);
+    },
+  });
   const businessStart = businessSchedule
     ? zonedDateTimeToUtc(
         localDate,
@@ -339,7 +330,19 @@ export async function assertBookable(
       'El horario seleccionado está fuera del horario del negocio.',
     );
   }
-  const insideWorkingHours = schedules.some((schedule) => {
+  const appointment = await database.appointment.findFirst({
+    where: {
+      endsAt: { gt: input.startsAt },
+      ...(input.ignoreAppointmentId
+        ? { id: { not: input.ignoreAppointmentId } }
+        : {}),
+      professionalMembershipId: input.professionalMembershipId,
+      reservesSlot: true,
+      startsAt: { lt: input.endsAt },
+    },
+  });
+  if (appointment) {
+    /* Legacy professional schedule and block validation intentionally disabled.
     const scheduleStart = zonedDateTimeToUtc(
       localDate,
       schedule.startMinute,
@@ -387,7 +390,7 @@ export async function assertBookable(
       'El profesional tiene un bloqueo en ese horario.',
     );
   }
-  if (appointment) {
+  */
     throw new ApiError(
       409,
       'APPOINTMENT_CONFLICT',
@@ -518,49 +521,35 @@ export function registerAgendaRoutes(
       context.location.timezone,
     );
     const weekday = weekdayFor(input.date);
-    const [schedules, businessSchedule, blocks, appointments] =
-      await Promise.all([
-        database.weeklySchedule.findMany({
-          orderBy: { startMinute: 'asc' },
-          where: {
+    const [schedules, businessSchedule, appointments] = await Promise.all([
+      database.businessWeeklySchedule.findMany({
+        orderBy: { startMinute: 'asc' },
+        where: {
+          locationId: input.locationId,
+          weekday,
+        },
+      }),
+      database.businessWeeklySchedule.findUnique({
+        where: {
+          locationId_weekday: {
             locationId: input.locationId,
-            membershipId: input.membershipId,
             weekday,
           },
-        }),
-        database.businessWeeklySchedule.findUnique({
-          where: {
-            locationId_weekday: {
-              locationId: input.locationId,
-              weekday,
-            },
-          },
-        }),
-        database.scheduleBlock.findMany({
-          where: {
-            endsAt: { gt: dayStart },
-            membershipId: input.membershipId,
-            startsAt: { lt: dayEnd },
-          },
-        }),
-        database.appointment.findMany({
-          where: {
-            endsAt: { gt: dayStart },
-            professionalMembershipId: input.membershipId,
-            reservesSlot: true,
-            startsAt: { lt: dayEnd },
-          },
-        }),
-      ]);
+        },
+      }),
+      database.appointment.findMany({
+        where: {
+          endsAt: { gt: dayStart },
+          professionalMembershipId: input.membershipId,
+          reservesSlot: true,
+          startsAt: { lt: dayEnd },
+        },
+      }),
+    ]);
     if (!businessSchedule?.isOpen) {
       return { durationMinutes, slots: [], unavailableSlots: [] };
     }
     const occupiedRanges = [
-      ...blocks.map((block) => ({
-        endsAt: block.endsAt,
-        reason: 'blocked' as const,
-        startsAt: block.startsAt,
-      })),
       ...appointments.map((appointment) => ({
         endsAt: appointment.endsAt,
         reason: 'occupied' as const,

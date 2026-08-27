@@ -489,47 +489,33 @@ async function calculatePublicAvailability(
     context.location.timezone,
   );
   const weekday = weekdayFor(input.date);
-  const [schedules, businessSchedule, blocks, appointments] = await Promise.all(
-    [
-      database.weeklySchedule.findMany({
-        orderBy: { startMinute: 'asc' },
-        where: {
+  const [schedules, businessSchedule, appointments] = await Promise.all([
+    database.businessWeeklySchedule.findMany({
+      orderBy: { startMinute: 'asc' },
+      where: {
+        locationId: input.locationId,
+        weekday,
+      },
+    }),
+    database.businessWeeklySchedule.findUnique({
+      where: {
+        locationId_weekday: {
           locationId: input.locationId,
-          membershipId: input.membershipId,
           weekday,
         },
-      }),
-      database.businessWeeklySchedule.findUnique({
-        where: {
-          locationId_weekday: {
-            locationId: input.locationId,
-            weekday,
-          },
-        },
-      }),
-      database.scheduleBlock.findMany({
-        where: {
-          endsAt: { gt: dayStart },
-          membershipId: input.membershipId,
-          startsAt: { lt: dayEnd },
-        },
-      }),
-      database.appointment.findMany({
-        where: {
-          endsAt: { gt: dayStart },
-          professionalMembershipId: input.membershipId,
-          reservesSlot: true,
-          startsAt: { lt: dayEnd },
-        },
-      }),
-    ],
-  );
+      },
+    }),
+    database.appointment.findMany({
+      where: {
+        endsAt: { gt: dayStart },
+        professionalMembershipId: input.membershipId,
+        reservesSlot: true,
+        startsAt: { lt: dayEnd },
+      },
+    }),
+  ]);
   if (!businessSchedule?.isOpen) return { durationMinutes, slots: [] };
   const occupied = [
-    ...blocks.map((block) => ({
-      endsAt: block.endsAt,
-      startsAt: block.startsAt,
-    })),
     ...appointments.map((appointment) => ({
       endsAt: appointment.endsAt,
       startsAt: appointment.startsAt,

@@ -4986,6 +4986,26 @@ export function registerOperationsRoutes(
             'PLAN_LIMIT_REACHED',
             `Tu plan actual permite ${maximumLocations} sucursal${maximumLocations === 1 ? '' : 'es'}.`,
           );
+        const organization = await transaction.organization.findUniqueOrThrow({
+          select: { primaryLocationId: true },
+          where: { id: current.organizationId },
+        });
+        const templateSchedule = organization.primaryLocationId
+          ? await transaction.businessWeeklySchedule.findMany({
+              orderBy: { weekday: 'asc' },
+              where: { locationId: organization.primaryLocationId },
+            })
+          : [];
+        const templateServiceIds = organization.primaryLocationId
+          ? await transaction.professionalService.findMany({
+              distinct: ['serviceId'],
+              select: { serviceId: true },
+              where: {
+                locationId: organization.primaryLocationId,
+                service: { isActive: true },
+              },
+            })
+          : [];
         const created = await transaction.location.create({
           data: {
             addressLine: input.addressLine || null,
@@ -5022,10 +5042,15 @@ export function registerOperationsRoutes(
           current.role === MembershipRole.OWNER ||
           current.role === MembershipRole.BARBER
         ) {
-          const activeServices = await transaction.service.findMany({
-            select: { id: true },
-            where: { isActive: true, organizationId: current.organizationId },
-          });
+          const activeServices = templateServiceIds.length
+            ? templateServiceIds.map(({ serviceId }) => ({ id: serviceId }))
+            : await transaction.service.findMany({
+                select: { id: true },
+                where: {
+                  isActive: true,
+                  organizationId: current.organizationId,
+                },
+              });
           if (activeServices.length > 0) {
             await transaction.professionalService.createMany({
               data: activeServices.map((service) => ({
@@ -5038,14 +5063,19 @@ export function registerOperationsRoutes(
           }
         }
         await transaction.businessWeeklySchedule.createMany({
-          data: Array.from({ length: 7 }, (_, weekday) => ({
-            endMinute: 1080,
-            isOpen: true,
-            locationId: created.id,
-            organizationId: current.organizationId,
-            startMinute: 540,
-            weekday,
-          })),
+          data: Array.from({ length: 7 }, (_, weekday) => {
+            const template = templateSchedule.find(
+              (schedule) => schedule.weekday === weekday,
+            );
+            return {
+              endMinute: template?.endMinute ?? 1080,
+              isOpen: template?.isOpen ?? true,
+              locationId: created.id,
+              organizationId: current.organizationId,
+              startMinute: template?.startMinute ?? 540,
+              weekday,
+            };
+          }),
         });
         await transaction.auditLog.create({
           data: {
@@ -5120,6 +5150,30 @@ export function registerOperationsRoutes(
       })),
       used: activeLocationCount,
     };
+  });
+
+  app.get('/v1/locations/accessible', async (request) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(database, user.id, 'location.read');
+    const canOperateAllLocations =
+      current.role === MembershipRole.OWNER ||
+      current.role === MembershipRole.MANAGER;
+    const locations = await database.location.findMany({
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, name: true },
+      where: {
+        isActive: true,
+        organizationId: current.organizationId,
+        ...(canOperateAllLocations
+          ? {}
+          : {
+              memberLocations: {
+                some: { membershipId: current.id },
+              },
+            }),
+      },
+    });
+    return { locations };
   });
 
   app.get('/v1/locations/booking-context', async (request) => {

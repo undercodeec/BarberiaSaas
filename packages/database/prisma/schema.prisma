@@ -811,6 +811,7 @@ model Organization {
   status                             OrganizationStatus           @default(TRIAL)
   currencyCode                       String                       @default("USD") @map("currency_code") @db.Char(3)
   defaultTimezone                    String                       @default("America/Guayaquil") @map("default_timezone") @db.VarChar(64)
+  primaryLocationId                  String?                      @map("primary_location_id") @db.Uuid
   bookingConfirmationEnabled         Boolean                      @default(true) @map("booking_confirmation_enabled")
   bookingReminderMinutes             Int                          @default(1440) @map("booking_reminder_minutes")
   bookingConfirmationDeadlineMinutes Int                          @default(360) @map("booking_confirmation_deadline_minutes")

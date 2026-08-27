@@ -33,6 +33,7 @@ const createMovementSchema = z.object({
   amountCents: z.number().int().min(1).max(100_000_000),
   appointmentId: z.uuid().optional(),
   description: z.string().trim().min(2).max(240),
+  locationId: z.uuid().optional(),
   paymentMethod: z.enum(['cash', 'card', 'transfer', 'other']).optional(),
   productId: z.uuid().optional(),
   productQuantity: z.number().int().min(1).max(10_000).optional(),
@@ -42,22 +43,62 @@ const createMovementSchema = z.object({
 });
 const closeCashRegisterSchema = z.object({
   closingAmountCents: z.number().int().min(0).max(100_000_000),
+  locationId: z.uuid().optional(),
   note: z.string().trim().max(500).optional(),
 });
 const openCashRegisterSchema = z.object({
+  locationId: z.uuid().optional(),
   openingAmountCents: z.number().int().min(0).max(100_000_000),
   responsibleMembershipId: z.string().uuid().optional(),
 });
+const cashLocationQuerySchema = z.object({ locationId: z.uuid().optional() });
 
 async function scope(database: DatabaseClient, userId: string) {
   const membership = await database.membership.findFirst({
-    include: { memberLocations: { take: 1 } },
+    include: { memberLocations: true },
     where: { status: MembershipStatus.ACTIVE, userId },
   });
   return {
     locationId: membership?.memberLocations[0]?.locationId ?? null,
+    locationIds:
+      membership?.memberLocations.map(({ locationId }) => locationId) ?? [],
     organizationId: membership?.organizationId ?? null,
+    role: membership?.role ?? null,
   };
+}
+
+async function locationScope(
+  database: DatabaseClient,
+  currentScope: Awaited<ReturnType<typeof scope>>,
+  requestedLocationId: string | undefined,
+) {
+  if (!currentScope.organizationId) return currentScope;
+  const locationId = requestedLocationId ?? currentScope.locationId;
+  if (!locationId)
+    throw new ApiError(
+      409,
+      'CASH_LOCATION_REQUIRED',
+      'Selecciona una sucursal para operar caja.',
+    );
+  const location = await database.location.findFirst({
+    where: {
+      id: locationId,
+      isActive: true,
+      organizationId: currentScope.organizationId,
+    },
+  });
+  if (!location)
+    throw new ApiError(404, 'LOCATION_NOT_FOUND', 'La sucursal no existe.');
+  const canAccessAll =
+    currentScope.role === MembershipRole.OWNER ||
+    currentScope.role === MembershipRole.MANAGER;
+  if (!canAccessAll && !currentScope.locationIds.includes(locationId))
+    throw new ApiError(
+      403,
+      'LOCATION_FORBIDDEN',
+      'No tienes acceso a esta sucursal.',
+    );
+  return { ...currentScope, locationId };
 }
 
 function publicSession(session: {
@@ -219,13 +260,21 @@ export function registerCashRegisterRoutes(
 ) {
   app.get('/v1/cash-register/current', async (request) => {
     const { user } = await authenticate(database, request);
-    const currentScope = await scope(database, user.id);
+    const input = cashLocationQuerySchema.parse(request.query);
+    const currentScope = await locationScope(
+      database,
+      await scope(database, user.id),
+      input.locationId,
+    );
     const session = await database.cashRegisterSession.findFirst({
       orderBy: { openedAt: 'desc' },
       where: {
         status: CashRegisterStatus.OPEN,
         ...(currentScope.organizationId
-          ? { organizationId: currentScope.organizationId }
+          ? {
+              organizationId: currentScope.organizationId,
+              locationId: currentScope.locationId,
+            }
           : { ownerUserId: user.id }),
       },
     });
@@ -235,12 +284,19 @@ export function registerCashRegisterRoutes(
   app.post('/v1/cash-register/open', async (request, reply) => {
     const { user } = await authenticate(database, request);
     const input = openCashRegisterSchema.parse(request.body);
-    const currentScope = await scope(database, user.id);
+    const currentScope = await locationScope(
+      database,
+      await scope(database, user.id),
+      input.locationId,
+    );
     const existing = await database.cashRegisterSession.findFirst({
       where: {
         status: CashRegisterStatus.OPEN,
         ...(currentScope.organizationId
-          ? { organizationId: currentScope.organizationId }
+          ? {
+              organizationId: currentScope.organizationId,
+              locationId: currentScope.locationId,
+            }
           : { ownerUserId: user.id }),
       },
     });
@@ -309,14 +365,22 @@ export function registerCashRegisterRoutes(
   });
   app.get('/v1/cash-register/summary', async (request) => {
     const { user } = await authenticate(database, request);
-    const currentScope = await scope(database, user.id);
+    const input = cashLocationQuerySchema.parse(request.query);
+    const currentScope = await locationScope(
+      database,
+      await scope(database, user.id),
+      input.locationId,
+    );
     const session = await database.cashRegisterSession.findFirst({
       include: { movements: { orderBy: { createdAt: 'desc' } } },
       orderBy: { openedAt: 'desc' },
       where: {
         status: CashRegisterStatus.OPEN,
         ...(currentScope.organizationId
-          ? { organizationId: currentScope.organizationId }
+          ? {
+              organizationId: currentScope.organizationId,
+              locationId: currentScope.locationId,
+            }
           : { ownerUserId: user.id }),
       },
     });
@@ -331,7 +395,12 @@ export function registerCashRegisterRoutes(
 
   app.get('/v1/cash-register/history', async (request) => {
     const { user } = await authenticate(database, request);
-    const currentScope = await scope(database, user.id);
+    const input = cashLocationQuerySchema.parse(request.query);
+    const currentScope = await locationScope(
+      database,
+      await scope(database, user.id),
+      input.locationId,
+    );
     const sessions = await database.cashRegisterSession.findMany({
       include: { movements: true },
       orderBy: { openedAt: 'desc' },
@@ -339,7 +408,10 @@ export function registerCashRegisterRoutes(
       where: {
         status: CashRegisterStatus.CLOSED,
         ...(currentScope.organizationId
-          ? { organizationId: currentScope.organizationId }
+          ? {
+              organizationId: currentScope.organizationId,
+              locationId: currentScope.locationId,
+            }
           : { organizationId: null, ownerUserId: user.id }),
       },
     });
@@ -359,13 +431,21 @@ export function registerCashRegisterRoutes(
     const { sessionId } = z
       .object({ sessionId: z.uuid() })
       .parse(request.params);
-    const currentScope = await scope(database, user.id);
+    const input = cashLocationQuerySchema.parse(request.query);
+    const currentScope = await locationScope(
+      database,
+      await scope(database, user.id),
+      input.locationId,
+    );
     const session = await database.cashRegisterSession.findFirst({
       include: { movements: { orderBy: { createdAt: 'desc' } } },
       where: {
         id: sessionId,
         ...(currentScope.organizationId
-          ? { organizationId: currentScope.organizationId }
+          ? {
+              organizationId: currentScope.organizationId,
+              locationId: currentScope.locationId,
+            }
           : { organizationId: null, ownerUserId: user.id }),
       },
     });
@@ -456,12 +536,19 @@ export function registerCashRegisterRoutes(
         'PAYMENT_METHOD_REQUIRED',
         'Selecciona el método de pago del ingreso.',
       );
-    const currentScope = await scope(database, user.id);
+    const currentScope = await locationScope(
+      database,
+      await scope(database, user.id),
+      input.locationId,
+    );
     const session = await database.cashRegisterSession.findFirst({
       where: {
         status: CashRegisterStatus.OPEN,
         ...(currentScope.organizationId
-          ? { organizationId: currentScope.organizationId }
+          ? {
+              organizationId: currentScope.organizationId,
+              locationId: currentScope.locationId,
+            }
           : { ownerUserId: user.id }),
       },
     });
@@ -484,6 +571,7 @@ export function registerCashRegisterRoutes(
           where: {
             id: input.appointmentId,
             organizationId: currentScope.organizationId,
+            ...(session.locationId ? { locationId: session.locationId } : {}),
           },
         });
         if (!appointment)
@@ -771,13 +859,20 @@ export function registerCashRegisterRoutes(
   app.post('/v1/cash-register/close', async (request) => {
     const { user } = await authenticate(database, request);
     const input = closeCashRegisterSchema.parse(request.body);
-    const currentScope = await scope(database, user.id);
+    const currentScope = await locationScope(
+      database,
+      await scope(database, user.id),
+      input.locationId,
+    );
     const session = await database.cashRegisterSession.findFirst({
       include: { movements: true },
       where: {
         status: CashRegisterStatus.OPEN,
         ...(currentScope.organizationId
-          ? { organizationId: currentScope.organizationId }
+          ? {
+              organizationId: currentScope.organizationId,
+              locationId: currentScope.locationId,
+            }
           : { ownerUserId: user.id }),
       },
     });
