@@ -1,16 +1,15 @@
 ALTER TABLE "organizations"
-  ADD COLUMN "primary_location_id" UUID;
+  ADD COLUMN IF NOT EXISTS "primary_location_id" UUID;
 
 UPDATE "organizations" AS organization
-SET "primary_location_id" = location."id"
-FROM LATERAL (
-  SELECT "id"
-  FROM "locations"
-  WHERE "organization_id" = organization."id"
-    AND "is_active" = true
-  ORDER BY "created_at" ASC
+SET "primary_location_id" = (
+  SELECT location."id"
+  FROM "locations" AS location
+  WHERE location."organization_id" = organization."id"
+    AND location."is_active" = true
+  ORDER BY location."created_at" ASC
   LIMIT 1
-) AS location
+)
 WHERE organization."primary_location_id" IS NULL;
 
 CREATE INDEX "organizations_primary_location_id_idx"
