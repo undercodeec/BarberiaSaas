@@ -2,7 +2,10 @@ import { OnlinePaymentStatus } from '@barber-saas/database';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ApiConfig } from './config';
-import { createPayphonePaymentLink } from './payphone-payments';
+import {
+  createPayphonePaymentLink,
+  registerPayphonePaymentRoutes,
+} from './payphone-payments';
 import { encryptPaymentCredential } from './security';
 
 const organizationId = 'f025f4bd-e0dd-4b20-92a3-aa1158848c04';
@@ -113,5 +116,108 @@ describe('API Link PayPhone', () => {
     expect(result.status).toBe('pending_verification');
     expect(database.paymentAttempt.create).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('confirmación manual PayPhone', () => {
+  it('ignora una caja abierta en otra sucursal', async () => {
+    const organizationId = 'f025f4bd-e0dd-4b20-92a3-aa1158848c04';
+    const appointmentId = 'e5cf4e5b-cbe8-40b5-aec9-aed5f3a201a8';
+    const locationId = '5083ccf2-d7fc-496a-99ca-f2d2d4189f90';
+    const foreignCashRegisterSession = {
+      id: '5bff4b87-7772-4dcb-a0e0-4133b75288f8',
+      locationId: '84c67557-6f4b-4110-bfa1-30bac8c1d654',
+    };
+    const cashRegisterSession = {
+      findFirst: vi
+        .fn()
+        .mockImplementation(({ where }) =>
+          Promise.resolve(
+            where.locationId === locationId ? null : foreignCashRegisterSession,
+          ),
+        ),
+    };
+    const transaction = {
+      $queryRaw: vi.fn(),
+      appointment: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: appointmentId,
+          locationId,
+          organizationId,
+          paymentStatus: 'PENDING',
+          professionalMembershipId: 'ba015738-3f23-4eee-a4b5-2d8deed0c5fb',
+          services: [],
+        }),
+      },
+      cashRegisterSession,
+      payphoneConfiguration: {
+        findUnique: vi.fn().mockResolvedValue({
+          connectionStatus: 'CONNECTED',
+          isEnabled: true,
+        }),
+      },
+      paymentAttempt: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce({
+            amountCents: 1_250,
+            id: '7c80c66a-6111-4a38-8b28-5d550f0042fd',
+          })
+          .mockResolvedValueOnce(null),
+        updateMany: vi.fn(),
+      },
+    };
+    const database = {
+      $transaction: (
+        callback: (client: typeof transaction) => Promise<unknown>,
+      ) => callback(transaction),
+      appointment: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: appointmentId,
+          locationId,
+          organizationId,
+          paymentStatus: 'PENDING',
+          professionalMembershipId: 'ba015738-3f23-4eee-a4b5-2d8deed0c5fb',
+          services: [],
+        }),
+      },
+      membership: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'f3b17fe6-496c-44ae-b6ff-04ddd44819ad',
+          organizationId,
+          role: 'OWNER',
+          status: 'ACTIVE',
+        }),
+      },
+    };
+    let handler: ((request: unknown) => Promise<unknown>) | undefined;
+    registerPayphonePaymentRoutes(
+      {
+        get: vi.fn(),
+        post: (
+          _path: string,
+          routeHandler: (request: unknown) => Promise<unknown>,
+        ) => {
+          handler = routeHandler;
+        },
+      } as never,
+      database as never,
+      async () => ({ user: { email: 'owner@example.com', id: 'user-a' } }),
+    );
+
+    await expect(
+      handler?.({
+        body: { confirmed: true, providerReference: 'payphone-123' },
+        params: { appointmentId },
+      }),
+    ).rejects.toMatchObject({ code: 'CASH_REGISTER_CLOSED' });
+    expect(cashRegisterSession.findFirst).toHaveBeenCalledWith({
+      where: {
+        locationId,
+        organizationId,
+        status: 'OPEN',
+      },
+    });
   });
 });

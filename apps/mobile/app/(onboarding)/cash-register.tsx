@@ -34,6 +34,7 @@ import {
 } from '../../src/components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { requireApiClient } from '../../src/lib/api';
+import { cashRegisterQueryOptions } from '../../src/lib/cash-register-query-keys';
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
@@ -198,7 +199,11 @@ export default function CashRegisterScreen() {
       requireApiClient().request<CurrentCashRegisterResponse>(
         `/v1/cash-register/current?locationId=${encodeURIComponent(locationId)}`,
       ),
-    queryKey: tenant.key('cash-register-current'),
+    ...cashRegisterQueryOptions(
+      tenant.scope,
+      'cash-register-current',
+      locationId,
+    ),
   });
   const teamQuery = useQuery({
     enabled: Boolean(session),
@@ -216,7 +221,7 @@ export default function CashRegisterScreen() {
       requireApiClient().request<InventoryResponse>(
         `/v1/inventory?locationId=${encodeURIComponent(locationId)}`,
       ),
-    queryKey: tenant.key('inventory'),
+    ...cashRegisterQueryOptions(tenant.scope, 'inventory', locationId),
   });
   const subscriptionQuery = useQuery({
     enabled: Boolean(session),
@@ -230,7 +235,11 @@ export default function CashRegisterScreen() {
       requireApiClient().request<CashRegisterSummaryResponse>(
         `/v1/cash-register/summary?locationId=${encodeURIComponent(locationId)}`,
       ),
-    queryKey: tenant.key('cash-register-summary'),
+    ...cashRegisterQueryOptions(
+      tenant.scope,
+      'cash-register-summary',
+      locationId,
+    ),
   });
   const openCash = useMutation({
     mutationFn: () => {

@@ -474,6 +474,7 @@ export function registerPayphonePaymentRoutes(
           );
         const session = await transaction.cashRegisterSession.findFirst({
           where: {
+            locationId: appointment.locationId,
             organizationId: appointment.organizationId,
             status: CashRegisterStatus.OPEN,
           },

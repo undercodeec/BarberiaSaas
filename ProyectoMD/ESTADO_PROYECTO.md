@@ -408,6 +408,22 @@ Pendientes específicos antes de ampliar este módulo:
 - [x] Cierre con efectivo esperado, contado, diferencia, historial y auditoría.
 - [x] El método de pago controla si un movimiento afecta efectivo.
 - [x] Venta de producto y movimiento de stock unidos transaccionalmente.
+- [x] Operación por sucursal reforzada el 27 de agosto de 2026: cada sesión de
+      Caja queda ligada a una sucursal y solo existe una caja abierta por cada
+      organización-sucursal. Owner y manager pueden elegir cualquier sucursal
+      activa; receptionist y barber solo pueden operar las que tengan asignadas.
+- [x] Al cambiar de sucursal en Caja Mobile se vuelven a consultar la sesión,
+      los movimientos/resumen y el inventario de esa sucursal. Las consultas
+      usan claves separadas por `locationId` y no reutilizan datos frescos de
+      una selección anterior.
+- [x] La confirmación manual de un pago PayPhone busca exclusivamente una Caja
+      abierta de la sucursal de la cita. Una Caja abierta en otra sucursal no
+      puede recibir ese movimiento.
+- [x] Cobertura de regresión añadida para el cambio y retorno de sucursal en
+      Caja Mobile y para una Caja abierta ajena durante la confirmación
+      PayPhone. Verificación local: API 60 pruebas aprobadas (46 integraciones
+      PostgreSQL omitidas), Mobile 92 pruebas aprobadas y typecheck de ambas
+      aplicaciones correcto.
 - [ ] Una cita exige cobro completo con un solo método; no hay pagos parciales,
       saldos ni división entre varios métodos.
 - [ ] La UI anuncia crear ventas desde la ficha de cliente, pero esa entrada
