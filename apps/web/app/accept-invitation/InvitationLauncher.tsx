@@ -8,6 +8,10 @@ import {
   invitationTokenFromSearch,
   type InvitationStep,
 } from './invitation-flow';
+import {
+  invitationInputStyle,
+  invitationScreenStyle,
+} from './invitation-form-styles';
 
 type ApiBody = {
   readonly code?: string;
@@ -239,6 +243,7 @@ export function InvitationLauncher() {
             <input
               autoComplete="email"
               onChange={(event) => setEmail(event.target.value)}
+              placeholder="correo@ejemplo.com"
               required
               style={styles.input}
               type="email"
@@ -250,6 +255,7 @@ export function InvitationLauncher() {
               autoComplete="current-password"
               minLength={8}
               onChange={(event) => setPassword(event.target.value)}
+              placeholder="Tu contraseña"
               required
               style={styles.input}
               type="password"
@@ -276,6 +282,7 @@ export function InvitationLauncher() {
               autoComplete="name"
               minLength={2}
               onChange={(event) => setFullName(event.target.value)}
+              placeholder="Tu nombre completo"
               required
               style={styles.input}
               value={fullName}
@@ -285,6 +292,7 @@ export function InvitationLauncher() {
             <input
               autoComplete="email"
               onChange={(event) => setEmail(event.target.value)}
+              placeholder="correo@ejemplo.com"
               required
               style={styles.input}
               type="email"
@@ -296,6 +304,7 @@ export function InvitationLauncher() {
               autoComplete="new-password"
               minLength={8}
               onChange={(event) => setPassword(event.target.value)}
+              placeholder="Mínimo 8 caracteres"
               required
               style={styles.input}
               type="password"
@@ -307,6 +316,7 @@ export function InvitationLauncher() {
               autoComplete="new-password"
               minLength={8}
               onChange={(event) => setConfirmPassword(event.target.value)}
+              placeholder="Repite tu contraseña"
               required
               style={styles.input}
               type="password"
@@ -350,6 +360,7 @@ export function InvitationLauncher() {
               maxLength={6}
               onChange={(event) => setVerificationCode(event.target.value)}
               pattern="[0-9]{6}"
+              placeholder="000000"
               required
               style={styles.input}
               value={verificationCode}
@@ -417,10 +428,13 @@ const styles: Record<string, CSSProperties> = {
   field: { display: 'grid', gap: 6 },
   form: { display: 'grid', gap: 16, marginTop: 24 },
   input: {
+    ...invitationInputStyle,
     border: '1px solid #C9C5BC',
     borderRadius: 10,
     fontSize: 16,
+    minHeight: 48,
     padding: '12px 13px',
+    width: '100%',
   },
   label: { color: '#30343A', fontSize: 14, fontWeight: 700 },
   link: {
@@ -453,6 +467,7 @@ const styles: Record<string, CSSProperties> = {
     padding: '15px 22px',
   },
   screen: {
+    ...invitationScreenStyle,
     alignItems: 'center',
     background: '#FAF9F6',
     boxSizing: 'border-box',
