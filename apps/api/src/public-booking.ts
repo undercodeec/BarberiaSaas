@@ -1270,11 +1270,14 @@ export function registerPublicBookingRoutes(
     );
     await notifier?.notify(existing.id, 'created');
     return {
-      booking: publicAppointment({
-        ...existing,
-        clientId: client.id,
-        status: AppointmentStatus.CONFIRMED,
-      }),
+      booking: publicAppointment(
+        {
+          ...existing,
+          clientId: client.id,
+          status: AppointmentStatus.CONFIRMED,
+        },
+        true,
+      ),
       managementToken: token,
       managementUrl: url,
     };

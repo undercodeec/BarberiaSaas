@@ -130,6 +130,8 @@ Usar `deploy/nginx/nava-admin.conf.example` como base, instalarlo en el director
 - Login con operador bootstrap y segundo factor OTP.
 - Alta de un operador de soporte, acceso con su contraseña individual y verificación de que no puede suspender ni cambiar planes.
 - Ficha 360° sin correo completo del propietario ni secretos PayPhone.
+- Sin acceso ordinario a fichas de clientes de barberías; cualquier dato
+  personal visible en listados de plataforma permanece enmascarado.
 - Creación/seguimiento de incidencia, reconocimiento de alerta y reintento de notificación.
 - Exportación CSV de auditoría y aparición de `platform.export.downloaded` en la bitácora.
 - Revisión responsive y Axe en escritorio/móvil.

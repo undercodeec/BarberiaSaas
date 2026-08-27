@@ -10,6 +10,7 @@ import {
 const scope = {
   locationId: 'location-a',
   organizationId: 'organization-a',
+  role: 'owner',
   userId: 'user-a',
 };
 
@@ -21,6 +22,7 @@ describe('factoría de query keys', () => {
       'user-a',
       'organization-a',
       'location-a',
+      'owner',
       'search',
     ]);
     expect(tenantQueryPrefix('clients')).toEqual(['tenant', 'clients']);
@@ -46,6 +48,12 @@ describe('factoría de query keys', () => {
       isForeignTenantQuery(tenantQueryKey(scope, 'team'), {
         ...scope,
         organizationId: 'organization-b',
+      }),
+    ).toBe(true);
+    expect(
+      isForeignTenantQuery(tenantQueryKey(scope, 'clients'), {
+        ...scope,
+        role: 'barber',
       }),
     ).toBe(true);
     expect(

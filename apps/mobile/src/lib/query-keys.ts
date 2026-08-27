@@ -3,6 +3,7 @@ import type { QueryKey } from '@tanstack/react-query';
 export interface TenantQueryScope {
   readonly locationId: string;
   readonly organizationId: string;
+  readonly role: string;
   readonly userId: string;
 }
 
@@ -29,6 +30,7 @@ export function tenantQueryKey(
     scope.userId,
     scope.organizationId,
     scope.locationId,
+    scope.role,
     ...details,
   ];
 }
@@ -45,7 +47,8 @@ export function belongsToTenantScope(
     key[0] === 'tenant' &&
     key[2] === scope.userId &&
     key[3] === scope.organizationId &&
-    key[4] === scope.locationId
+    key[4] === scope.locationId &&
+    key[5] === scope.role
   );
 }
 

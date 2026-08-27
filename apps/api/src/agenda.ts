@@ -31,6 +31,7 @@ import {
   assertCanUseProfessional,
   recordBookingMilestone,
 } from './subscription-policy';
+import { clientScope, maskClientPhone } from './clients';
 
 interface AuthenticatedIdentity {
   readonly user: { readonly email: string; readonly id: string };
@@ -91,6 +92,28 @@ function assertProfessionalScope(
       403,
       'FORBIDDEN',
       'Solo puedes consultar y gestionar tu propia agenda.',
+    );
+  }
+}
+
+function assertLocationScope(
+  current: {
+    readonly memberLocations: ReadonlyArray<{ readonly locationId: string }>;
+    readonly role: MembershipRole;
+  },
+  locationId: string,
+) {
+  if (
+    current.role !== MembershipRole.OWNER &&
+    current.role !== MembershipRole.MANAGER &&
+    !current.memberLocations.some(
+      (location) => location.locationId === locationId,
+    )
+  ) {
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      'Solo puedes consultar y gestionar tus sucursales asignadas.',
     );
   }
 }
@@ -405,33 +428,38 @@ export function isAppointmentConflict(error: unknown): boolean {
   );
 }
 
-export function publicAppointment(appointment: {
-  clientId?: string | null;
-  clientEmail: string | null;
-  clientName: string;
-  clientPhone: string | null;
-  endsAt: Date;
-  id: string;
-  locationId: string;
-  notes: string | null;
-  professionalMembershipId: string;
-  paymentStatus: AppointmentPaymentStatus;
-  startsAt: Date;
-  status: AppointmentStatus;
-  source?: AppointmentSource;
-  services?: ReadonlyArray<{
-    durationMinutes: number;
+export function publicAppointment(
+  appointment: {
+    clientId?: string | null;
+    clientEmail: string | null;
+    clientName: string;
+    clientPhone: string | null;
+    endsAt: Date;
     id: string;
-    priceCents: number;
-    serviceId: string;
-    serviceName: string;
-  }>;
-}) {
+    locationId: string;
+    notes: string | null;
+    professionalMembershipId: string;
+    paymentStatus: AppointmentPaymentStatus;
+    startsAt: Date;
+    status: AppointmentStatus;
+    source?: AppointmentSource;
+    services?: ReadonlyArray<{
+      durationMinutes: number;
+      id: string;
+      priceCents: number;
+      serviceId: string;
+      serviceName: string;
+    }>;
+  },
+  exposeClientContact = false,
+) {
   return {
-    clientEmail: appointment.clientEmail,
+    clientEmail: exposeClientContact ? appointment.clientEmail : null,
     clientId: appointment.clientId ?? null,
     clientName: appointment.clientName,
-    clientPhone: appointment.clientPhone,
+    clientPhone: exposeClientContact
+      ? appointment.clientPhone
+      : maskClientPhone(appointment.clientPhone),
     endsAt: appointment.endsAt.toISOString(),
     id: appointment.id,
     locationId: appointment.locationId,
@@ -443,6 +471,10 @@ export function publicAppointment(appointment: {
     source: appointment.source?.toLowerCase() ?? 'manual',
     status: appointment.status.toLowerCase(),
   };
+}
+
+function canReadFullClientContact(role: MembershipRole): boolean {
+  return hasPermission(permissionRole(role), 'client.contact.read_full');
 }
 
 export function registerAgendaRoutes(
@@ -458,6 +490,7 @@ export function registerAgendaRoutes(
       'appointment.read',
     );
     const input = availabilityQuerySchema.parse(request.query);
+    assertLocationScope(current, input.locationId);
     assertProfessionalScope(current, input.membershipId);
     const context = await loadBookingContext(
       database,
@@ -596,6 +629,7 @@ export function registerAgendaRoutes(
       'appointment.read',
     );
     const input = dailyAppointmentsQuerySchema.parse(request.query);
+    assertLocationScope(current, input.locationId);
     const location = await database.location.findFirst({
       where: {
         id: input.locationId,
@@ -633,7 +667,11 @@ export function registerAgendaRoutes(
           : {}),
       },
     });
-    return { appointments: appointments.map(publicAppointment) };
+    return {
+      appointments: appointments.map((appointment) =>
+        publicAppointment(appointment, canReadFullClientContact(current.role)),
+      ),
+    };
   });
 
   app.post('/v1/appointments', async (request, reply) => {
@@ -644,13 +682,21 @@ export function registerAgendaRoutes(
       'appointment.manage',
     );
     const input = createAppointmentSchema.parse(request.body);
+    assertLocationScope(current, input.locationId);
     assertProfessionalScope(current, input.professionalMembershipId);
     const selectedClient = input.clientId
       ? await database.client.findFirst({
           where: {
-            deletedAt: null,
             id: input.clientId,
-            organizationId: current.organizationId,
+            ...clientScope({
+              locationIds: current.memberLocations.map(
+                ({ locationId }) => locationId,
+              ),
+              membershipId: current.id,
+              organizationId: current.organizationId,
+              role: current.role,
+              userId: user.id,
+            }),
           },
         })
       : null;
@@ -765,9 +811,12 @@ export function registerAgendaRoutes(
         await recordBookingMilestone(transaction, current.organizationId);
         return created;
       });
-      return reply
-        .code(201)
-        .send({ appointment: publicAppointment(appointment) });
+      return reply.code(201).send({
+        appointment: publicAppointment(
+          appointment,
+          canReadFullClientContact(current.role),
+        ),
+      });
     } catch (error) {
       if (isAppointmentConflict(error)) {
         throw new ApiError(
@@ -796,6 +845,7 @@ export function registerAgendaRoutes(
     if (!existing) {
       throw new ApiError(404, 'APPOINTMENT_NOT_FOUND', 'La cita no existe.');
     }
+    assertLocationScope(current, existing.locationId);
     assertProfessionalScope(current, existing.professionalMembershipId);
     if (!existing.reservesSlot) {
       throw new ApiError(
@@ -873,7 +923,12 @@ export function registerAgendaRoutes(
         });
         return appointment;
       });
-      return { appointment: publicAppointment(updated) };
+      return {
+        appointment: publicAppointment(
+          updated,
+          canReadFullClientContact(current.role),
+        ),
+      };
     } catch (error) {
       if (isAppointmentConflict(error)) {
         throw new ApiError(
@@ -900,6 +955,7 @@ export function registerAgendaRoutes(
     });
     if (!existing)
       throw new ApiError(404, 'APPOINTMENT_NOT_FOUND', 'La cita no existe.');
+    assertLocationScope(current, existing.locationId);
     assertProfessionalScope(current, existing.professionalMembershipId);
     const updated = await database.$transaction(async (transaction) => {
       await assertCanUseProfessional(
@@ -942,7 +998,12 @@ export function registerAgendaRoutes(
       });
       return appointment;
     });
-    return { appointment: publicAppointment(updated) };
+    return {
+      appointment: publicAppointment(
+        updated,
+        canReadFullClientContact(current.role),
+      ),
+    };
   });
 
   app.patch('/v1/appointments/:appointmentId/status', async (request) => {
@@ -959,6 +1020,7 @@ export function registerAgendaRoutes(
     });
     if (!existing)
       throw new ApiError(404, 'APPOINTMENT_NOT_FOUND', 'La cita no existe.');
+    assertLocationScope(current, existing.locationId);
     assertProfessionalScope(current, existing.professionalMembershipId);
     await assertCanUseProfessional(
       database,
@@ -992,7 +1054,12 @@ export function registerAgendaRoutes(
       await reconcileAppointmentCommissions(transaction, appointment.id);
       return appointment;
     });
-    return { appointment: publicAppointment(updated) };
+    return {
+      appointment: publicAppointment(
+        updated,
+        canReadFullClientContact(current.role),
+      ),
+    };
   });
 
   app.get('/v1/appointment-events', async (request) => {
@@ -1011,7 +1078,15 @@ export function registerAgendaRoutes(
         organizationId: current.organizationId,
         ...(current.role === MembershipRole.BARBER
           ? { appointment: { professionalMembershipId: current.id } }
-          : {}),
+          : current.role === MembershipRole.RECEPTIONIST
+            ? {
+                locationId: {
+                  in: current.memberLocations.map(
+                    ({ locationId }) => locationId,
+                  ),
+                },
+              }
+            : {}),
       },
     });
     return {

@@ -463,11 +463,16 @@ Puede realizar casi todas las operaciones del propietario, excepto:
 - acceder a información de facturación del SaaS;
 - convertir a otro usuario en propietario.
 
+En clientes puede consultar y gestionar la ficha completa, incluido teléfono.
+La exportación masiva de clientes permanece exclusiva del propietario.
+
 ### 6.3 Recepcionista
 
 Puede:
 
-- gestionar clientes;
+- consultar únicamente clientes relacionados con citas de sus sucursales
+  asignadas;
+- ver el teléfono enmascarado;
 - crear citas;
 - reprogramar;
 - cancelar;
@@ -482,14 +487,18 @@ No puede:
 - cambiar planes;
 - modificar reglas de comisión;
 - liquidar comisiones.
+- ver o modificar la ficha personal completa del cliente;
+- importar, exportar o eliminar clientes;
+- consultar notas privadas de clientes.
 
 ### 6.4 Barbero
 
 Puede:
 
 - ver su agenda;
-- ver los datos mínimos de sus clientes;
-- registrar notas del servicio;
+- ver únicamente clientes relacionados con sus propias citas;
+- ver el teléfono enmascarado;
+- registrar y consultar únicamente sus propias notas del servicio;
 - cambiar estados operativos de sus citas;
 - bloquear horarios permitidos;
 - consultar sus propias comisiones;
@@ -502,6 +511,8 @@ No puede:
 - ver clientes de otra organización;
 - modificar precios generales;
 - modificar reglas de comisión.
+- ver o modificar la ficha personal completa del cliente;
+- importar, exportar o eliminar clientes.
 
 ### 6.5 Administrador de plataforma
 
@@ -1205,7 +1216,11 @@ contexto explícito y seguro.
   - sus clientes relacionados;
   - sus notas;
   - sus comisiones.
-- Un recepcionista puede administrar citas y clientes de sus sucursales.
+- Un recepcionista puede administrar citas de sus sucursales y consultar los
+  clientes relacionados con teléfono enmascarado, sin exportar ni modificar su
+  ficha personal.
+- Un manager puede gestionar fichas completas de clientes, pero no exportarlas
+  de forma masiva.
 - Un manager puede consultar operaciones de su organización.
 - Un owner puede administrar configuración y usuarios.
 - Un `platform_admin` no se obtiene mediante metadatos editables del usuario.
@@ -1228,7 +1243,8 @@ contexto explícito y seguro.
 - Separar buckets públicos y privados.
 - Usar URLs firmadas o endpoints autenticados para fotografías privadas.
 - Implementar eliminación lógica para clientes y organizaciones.
-- Implementar exportación básica de clientes en CSV para el propietario.
+- Implementar exportación básica de clientes en CSV exclusivamente para el
+  propietario.
 
 ---
 

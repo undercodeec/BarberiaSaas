@@ -758,6 +758,12 @@ export interface ClientsResponse {
   readonly clients: readonly ClientRecord[];
 }
 
+export interface ClientExportResponse {
+  readonly contents: string;
+  readonly filename: string;
+  readonly mimeType: string;
+}
+
 export interface ClientDetailResponse {
   readonly client: ClientRecord;
   readonly history: ReadonlyArray<{

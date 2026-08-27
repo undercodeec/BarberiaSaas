@@ -702,6 +702,23 @@ Cuando Nava recoge datos para crear cuentas, gestionar suscripciones, enviar fac
 
 Cuando una barbería registra clientes, reservas, historial, servicios o datos operativos, la barbería actúa como responsable del tratamiento y Nava actúa como encargado tecnológico, salvo los tratamientos que Nava realice para sus propias obligaciones legales o de seguridad.
 
+## 23.3. Acceso interno por roles
+
+La aplicación aplicará minimización de datos y acceso por rol:
+
+- propietario y administrador del negocio pueden gestionar la ficha completa;
+- recepción solo consulta clientes relacionados con sus sucursales y recibe el
+  teléfono enmascarado;
+- cada barbero solo consulta clientes de sus citas, recibe el teléfono
+  enmascarado y accede únicamente a sus propias notas;
+- los operadores de plataforma reciben PII enmascarada y no tienen acceso
+  ordinario a fichas completas de clientes;
+- la exportación ordinaria de clientes está reservada al propietario y queda
+  auditada.
+
+Estas reglas deben aplicarse en la API; ocultar elementos de interfaz no se
+considera una medida de autorización suficiente.
+
 ---
 
 # 24. Fuente de verdad para futuras modificaciones

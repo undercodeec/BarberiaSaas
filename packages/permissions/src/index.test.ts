@@ -30,4 +30,18 @@ describe('hasPermission', () => {
     expect(hasPermission('barber', 'appointment.read')).toBe(true);
     expect(hasPermission('barber', 'membership.read')).toBe(false);
   });
+
+  it('protege los datos personales de clientes por rol', () => {
+    expect(hasPermission('owner', 'client.contact.read_full')).toBe(true);
+    expect(hasPermission('owner', 'client.export')).toBe(true);
+    expect(hasPermission('manager', 'client.contact.read_full')).toBe(true);
+    expect(hasPermission('manager', 'client.export')).toBe(false);
+    expect(hasPermission('receptionist', 'client.contact.read_masked')).toBe(
+      true,
+    );
+    expect(hasPermission('receptionist', 'client.update')).toBe(false);
+    expect(hasPermission('barber', 'client.contact.read_masked')).toBe(true);
+    expect(hasPermission('barber', 'client.note.create')).toBe(true);
+    expect(hasPermission('barber', 'client.contact.read_full')).toBe(false);
+  });
 });

@@ -111,18 +111,18 @@ el código actual y tiene evidencia proporcional a su riesgo.
 
 ## Resumen ejecutivo
 
-| Área                         | Estado            | Situación actual                                                                                                                                                            |
-| ---------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Arquitectura y monorepo      | Completo          | pnpm/Turborepo, TypeScript estricto, CI, cuatro aplicaciones y paquetes compartidos.                                                                                        |
-| Autenticación y multi-tenant | Funcional         | Registro y OTP, sesiones opacas, recuperación, onboarding, roles y aislamiento por organización implementados. Las integraciones PostgreSQL no se ejecutaron en este corte. |
-| Operación de barbería        | Funcional         | Equipo, servicios, horarios, agenda, clientes, Caja, comisiones, inventario, reportes y notificaciones tienen API y UI móvil.                                               |
-| Reserva pública              | Funcional         | Catálogo, disponibilidad, OTP, política, idempotencia, gestión por token, reseñas y recordatorios implementados.                                                            |
-| Comercio de productos        | Parcial           | Catálogo, carrito, pedidos, reserva de stock, PayPhone y gestión operativa existen; faltan endurecimiento público y pruebas específicas.                                    |
-| Planes y suscripciones       | Funcional en TEST | Trial, plan Free, límites, feature flags y checkout WEB Prepare/Confirm están validados en sandbox. Producción requiere credenciales WEB y aceptación separadas.            |
+| Área                         | Estado                | Situación actual                                                                                                                                                                                                                          |
+| ---------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Arquitectura y monorepo      | Completo              | pnpm/Turborepo, TypeScript estricto, CI, cuatro aplicaciones y paquetes compartidos.                                                                                                                                                      |
+| Autenticación y multi-tenant | Funcional             | Registro y OTP, sesiones opacas, recuperación, onboarding, roles y aislamiento por organización implementados. Las integraciones PostgreSQL no se ejecutaron en este corte.                                                               |
+| Operación de barbería        | Funcional             | Equipo, servicios, horarios, agenda, clientes, Caja, comisiones, inventario, reportes y notificaciones tienen API y UI móvil.                                                                                                             |
+| Reserva pública              | Funcional             | Catálogo, disponibilidad, OTP, política, idempotencia, gestión por token, reseñas y recordatorios implementados.                                                                                                                          |
+| Comercio de productos        | Parcial               | Catálogo, carrito, pedidos, reserva de stock, PayPhone y gestión operativa existen; faltan endurecimiento público y pruebas específicas.                                                                                                  |
+| Planes y suscripciones       | Funcional en TEST     | Trial, plan Free, límites, feature flags y checkout WEB Prepare/Confirm están validados en sandbox. Producción requiere credenciales WEB y aceptación separadas.                                                                          |
 | Panel interno                | Funcional, desplegado | Admin está publicado con login/OTP, servicio y HTTPS. El árbol actual añade navegación Usuario↔Organización y administración de Memberships posteriores al commit desplegado; faltan validación autenticada y despliegue de esos avances. |
-| Calidad                      | Bloqueada         | Esquema, tipos, pruebas, E2E básico y builds pasan; lint y formato global fallan. Se omitieron 28 pruebas PostgreSQL.                                                       |
-| Producción                   | Piloto            | Hay evidencia histórica de API/Web en VPS, Neon, TLS, FCM y Maps. No se revalidaron hoy servicios, migraciones productivas ni recorrido completo.                           |
-| Android                      | Preparado         | `0.1.12` / code `34` está compilado y archivado; falta registrar su publicación y comprobar la versión recibida desde Play.                                                 |
+| Calidad                      | Bloqueada             | Esquema, tipos, pruebas, E2E básico y builds pasan; lint y formato global fallan. Se omitieron 28 pruebas PostgreSQL.                                                                                                                     |
+| Producción                   | Piloto                | Hay evidencia histórica de API/Web en VPS, Neon, TLS, FCM y Maps. No se revalidaron hoy servicios, migraciones productivas ni recorrido completo.                                                                                         |
+| Android                      | Preparado             | `0.1.12` / code `34` está compilado y archivado; falta registrar su publicación y comprobar la versión recibida desde Play.                                                                                                               |
 
 ## Estado del repositorio auditado
 
@@ -266,6 +266,14 @@ Mobile / Web pública / Admin
       clínico y biometría. Es una salvaguarda de interfaz, no sustituye la
       prohibición contractual ni una revisión humana de contenido sensible.
 - [x] Exportación y eliminación múltiple desde Mobile.
+- [x] Autorización de clientes por rol aplicada en API y Mobile: `owner` y
+      `manager` gestionan ficha completa; recepción se limita a clientes de sus
+      sucursales y barberos a clientes de citas propias; ambos reciben teléfono
+      enmascarado. Los barberos solo consultan y crean notas propias.
+- [x] Exportación ordinaria movida al backend, exclusiva del `owner` y con
+      evento de auditoría sin PII; `manager` no recibe la acción de exportar.
+- [x] La caché tenant de Mobile incorpora el rol, por lo que un cambio de rol
+      descarta respuestas obtenidas con capacidades anteriores.
 - [x] Tras cerrar un negocio, la persona propietaria puede descargar durante
       30 días desde Ajustes un CSV de datos o un ZIP con datos e imágenes
       disponibles; el acceso no reactiva el negocio cerrado.
@@ -467,9 +475,9 @@ Mobile / Web pública / Admin
 
 - [x] Acceso limitado por `PLATFORM_ADMIN_EMAILS`, login y segundo factor OTP.
 - [x] El 21 de agosto de 2026 se desplegó `https://admin.navacloud.app` con
-  `nava-admin.service` en el puerto local `3001`, Nginx/Certbot y el commit
-  `0ead479`. La base registraba 58 migraciones aplicadas. Esta es evidencia
-  histórica de despliegue, no una comprobación realizada el 26 de agosto.
+      `nava-admin.service` en el puerto local `3001`, Nginx/Certbot y el commit
+      `0ead479`. La base registraba 58 migraciones aplicadas. Esta es evidencia
+      histórica de despliegue, no una comprobación realizada el 26 de agosto.
 - [~] Continuación Super Admin (código local al 26 de agosto de 2026): Usuarios
   Nava incluye listado global paginado,
   búsqueda/filtros en backend, PII enmascarada, ficha 360°, consulta de
@@ -486,13 +494,13 @@ Mobile / Web pública / Admin
 - [x] Acciones de cambio de plan, suspensión y reactivación auditadas.
 - [x] Filtros por búsqueda, estado, plan y vencimiento de prueba.
 - [~] Billing de plataforma (desplegado y validado operativamente el 26 de
-      agosto de 2026): existe una sección global de Suscripciones exclusiva para
-      Billing/Super Admin. Consulta datos reales en tiempo real de
-      la suscripción, la última factura, el último intento de pago y los tres
-      cambios más recientes, con filtros backend; no expone URLs, referencias ni
-      secretos de PayPhone, y no simula cobros. La vista distingue el inicio y
-      vencimiento del período activo; falta completar un historial transaccional
-      íntegro por organización.
+  agosto de 2026): existe una sección global de Suscripciones exclusiva para
+  Billing/Super Admin. Consulta datos reales en tiempo real de
+  la suscripción, la última factura, el último intento de pago y los tres
+  cambios más recientes, con filtros backend; no expone URLs, referencias ni
+  secretos de PayPhone, y no simula cobros. La vista distingue el inicio y
+  vencimiento del período activo; falta completar un historial transaccional
+  íntegro por organización.
 - [x] Rediseño responsive “Nava Control Center”, partículas con Anime.js y
       actualización manual de datos.
 - [ ] Completar revisión visual autenticada en escritorio/móvil, Axe y los

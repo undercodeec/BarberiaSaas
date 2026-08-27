@@ -7,6 +7,7 @@ import {
 } from 'expo-contacts';
 import type {
   ClientLabelsResponse,
+  ClientExportResponse,
   ClientRecord,
   ClientsResponse,
   SubscriptionResponse,
@@ -35,8 +36,8 @@ import {
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../../src/lib/api';
+import { clientAccessForRole } from '../../src/lib/client-access';
 import { normalizeClientsResponse } from '../../src/lib/client-record';
-import { createCsv } from '../../src/lib/csv-export';
 import { phoneNumberToE164 } from '../../src/lib/phone-number';
 import { ensurePermissionAccess } from '../../src/lib/permission-access';
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
@@ -174,8 +175,11 @@ export default function ClientsScreen() {
     [],
   );
   const organizationQuery = useCurrentOrganization();
+  const clientAccess = clientAccessForRole(
+    organizationQuery.data?.membership.role,
+  );
   const subscriptionQuery = useQuery({
-    enabled: Boolean(session),
+    enabled: Boolean(session && clientAccess.canManage),
     queryFn: () =>
       requireApiClient().request<SubscriptionResponse>('/v1/subscription'),
     queryKey: tenant.key('subscription'),
@@ -187,6 +191,7 @@ export default function ClientsScreen() {
       : Math.max(0, clientLimit - (subscriptionQuery.data?.usage.clients ?? 0));
   const isClientLimitReached = remainingClientSlots === 0;
   const importContacts = useCallback(async () => {
+    if (!clientAccess.canManage) return;
     if (isClientLimitReached) {
       openDialog(
         'Límite de clientes alcanzado',
@@ -305,6 +310,7 @@ export default function ClientsScreen() {
     }
   }, [
     clientLimit,
+    clientAccess.canManage,
     isClientLimitReached,
     openDialog,
     organizationQuery,
@@ -393,7 +399,7 @@ export default function ClientsScreen() {
     select: normalizeClientsResponse,
   });
   const labelsQuery = useQuery({
-    enabled: Boolean(session),
+    enabled: Boolean(session && clientAccess.canManageLabels),
     queryFn: () =>
       requireApiClient().request<ClientLabelsResponse>('/v1/clients/labels'),
     queryKey: tenant.key('client-labels'),
@@ -418,7 +424,8 @@ export default function ClientsScreen() {
       selectedIds.has(client.id),
     );
   }, [clientsQuery.data?.clients, selectedClientIds]);
-  const isSelectingClients = selectedClients.length > 0;
+  const isSelectingClients =
+    clientAccess.canManage && selectedClients.length > 0;
   const areAllVisibleClientsSelected =
     visibleClients.length > 0 &&
     visibleClients.every((client) => selectedClientIds.includes(client.id));
@@ -451,37 +458,20 @@ export default function ClientsScreen() {
     async (includeSensitiveDetails: boolean) => {
       if (!selectedClients.length) return;
       try {
-        const headers = includeSensitiveDetails
-          ? [
-              'Nombre',
-              'Apellido',
-              'Teléfono',
-              'Correo',
-              'Dirección',
-              'Documento',
-              'Notas',
-            ]
-          : ['Nombre', 'Apellido', 'Teléfono', 'Correo'];
-        const rows = selectedClients.map((client) => {
-          const minimum = [
-            client.fullName,
-            client.lastName ?? '',
-            client.phone ?? '',
-            client.email ?? '',
-          ];
-          return includeSensitiveDetails
-            ? [
-                ...minimum,
-                client.addressLine ?? '',
-                client.documentNumber ?? '',
-                client.notes ?? '',
-              ]
-            : minimum;
-        });
+        const exported = await requireApiClient().request<ClientExportResponse>(
+          '/v1/clients/export',
+          {
+            body: {
+              clientIds: selectedClients.map(({ id }) => id),
+              detailLevel: includeSensitiveDetails ? 'complete' : 'minimum',
+            },
+            method: 'POST',
+          },
+        );
         await shareTemporaryExport({
-          contents: createCsv(headers, rows),
-          filename: `clientes-nava-${new Date().toISOString().slice(0, 10)}.csv`,
-          mimeType: 'text/csv;charset=utf-8',
+          contents: exported.contents,
+          filename: exported.filename,
+          mimeType: exported.mimeType,
         });
       } catch (error) {
         openDialog(
@@ -627,14 +617,16 @@ export default function ClientsScreen() {
         </Text>
         {isSelectingClients ? (
           <View style={styles.selectionActions}>
-            <Pressable
-              accessibilityLabel="Exportar clientes seleccionados"
-              accessibilityRole="button"
-              onPress={() => void exportSelectedClients()}
-              style={styles.selectionAction}
-            >
-              <Ionicons color="#101c2d" name="share-outline" size={22} />
-            </Pressable>
+            {clientAccess.canExport ? (
+              <Pressable
+                accessibilityLabel="Exportar clientes seleccionados"
+                accessibilityRole="button"
+                onPress={() => void exportSelectedClients()}
+                style={styles.selectionAction}
+              >
+                <Ionicons color="#101c2d" name="share-outline" size={22} />
+              </Pressable>
+            ) : null}
             <Pressable
               accessibilityLabel="Eliminar clientes seleccionados"
               accessibilityRole="button"
@@ -656,7 +648,7 @@ export default function ClientsScreen() {
               <Ionicons color="#101c2d" name="close" size={24} />
             </Pressable>
           </View>
-        ) : (
+        ) : clientAccess.canManage ? (
           <Pressable
             accessibilityLabel="Sincronizar contactos del teléfono"
             accessibilityRole="button"
@@ -669,7 +661,7 @@ export default function ClientsScreen() {
           >
             <Ionicons color="#101c2d" name="sync-outline" size={23} />
           </Pressable>
-        )}
+        ) : null}
       </View>
 
       {isDeletingSelected && deletionProgress ? (
@@ -729,7 +721,7 @@ export default function ClientsScreen() {
             value={search}
           />
         </View>
-        {visibleClients.length ? (
+        {visibleClients.length && clientAccess.canManage ? (
           <Pressable
             accessibilityLabel={
               areAllVisibleClientsSelected
@@ -805,10 +797,14 @@ export default function ClientsScreen() {
                   }}
                   delayLongPress={350}
                   disabled={isDeletingSelected}
-                  onLongPress={() => {
-                    didLongPressClient.current = true;
-                    toggleClientSelection(client.id);
-                  }}
+                  onLongPress={
+                    clientAccess.canManage
+                      ? () => {
+                          didLongPressClient.current = true;
+                          toggleClientSelection(client.id);
+                        }
+                      : undefined
+                  }
                   onPress={() => {
                     if (didLongPressClient.current) {
                       didLongPressClient.current = false;
@@ -891,7 +887,7 @@ export default function ClientsScreen() {
                 ? 'Prueba con otro nombre o teléfono.'
                 : 'Agrega tu primer cliente para guardar sus datos y agilizar las próximas reservas.'}
             </Text>
-            {!search ? (
+            {!search && clientAccess.canManage ? (
               <Pressable
                 accessibilityRole="button"
                 disabled={isImporting || isClientLimitReached}
@@ -910,55 +906,61 @@ export default function ClientsScreen() {
         )}
       </ScrollView>
 
-      <Animated.View
-        {...floatingClientPanResponder.panHandlers}
-        style={[
-          styles.floatingAdd,
-          { bottom: layout.bottomInset + 84 },
-          { transform: floatingClientOffset.getTranslateTransform() },
-        ]}
-      >
-        <Pressable
-          accessibilityLabel="Agregar cliente"
-          accessibilityRole="button"
-          accessibilityState={{ disabled: isClientLimitReached }}
-          disabled={isClientLimitReached}
-          onPress={() => setIsCreateOpen(true)}
+      {clientAccess.canManage ? (
+        <Animated.View
+          {...floatingClientPanResponder.panHandlers}
           style={[
-            styles.floatingAddContent,
-            isClientLimitReached && { opacity: 0.42 },
+            styles.floatingAdd,
+            { bottom: layout.bottomInset + 84 },
+            { transform: floatingClientOffset.getTranslateTransform() },
           ]}
         >
-          <Ionicons color="#ffffff" name="add" size={29} />
-        </Pressable>
-      </Animated.View>
+          <Pressable
+            accessibilityLabel="Agregar cliente"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isClientLimitReached }}
+            disabled={isClientLimitReached}
+            onPress={() => setIsCreateOpen(true)}
+            style={[
+              styles.floatingAddContent,
+              isClientLimitReached && { opacity: 0.42 },
+            ]}
+          >
+            <Ionicons color="#ffffff" name="add" size={29} />
+          </Pressable>
+        </Animated.View>
+      ) : null}
 
       <BottomNavigation active="clients" />
-      <ClientFormSheet
-        onClose={() => setIsCreateOpen(false)}
-        onCreated={async () => {
-          await queryClient.invalidateQueries({
-            queryKey: tenant.key('subscription'),
-          });
-        }}
-        visible={isCreateOpen}
-        onError={(title, message) => openDialog(title, message)}
-      />
-      <ContactImportSheet
-        contacts={importCandidates}
-        importing={isImporting}
-        onClose={() => {
-          if (isImporting) return;
-          setIsContactImportOpen(false);
-          setImportCandidates([]);
-          setSelectedImportContactIds([]);
-        }}
-        onConfirm={() => void importSelectedContacts()}
-        onToggleAll={toggleAllImportContacts}
-        onToggleContact={toggleImportContact}
-        selectedContactIds={selectedImportContactIds}
-        visible={isContactImportOpen}
-      />
+      {clientAccess.canManage ? (
+        <>
+          <ClientFormSheet
+            onClose={() => setIsCreateOpen(false)}
+            onCreated={async () => {
+              await queryClient.invalidateQueries({
+                queryKey: tenant.key('subscription'),
+              });
+            }}
+            visible={isCreateOpen}
+            onError={(title, message) => openDialog(title, message)}
+          />
+          <ContactImportSheet
+            contacts={importCandidates}
+            importing={isImporting}
+            onClose={() => {
+              if (isImporting) return;
+              setIsContactImportOpen(false);
+              setImportCandidates([]);
+              setSelectedImportContactIds([]);
+            }}
+            onConfirm={() => void importSelectedContacts()}
+            onToggleAll={toggleAllImportContacts}
+            onToggleContact={toggleImportContact}
+            selectedContactIds={selectedImportContactIds}
+            visible={isContactImportOpen}
+          />
+        </>
+      ) : null}
       <ContactsDialog dialog={dialog} onClose={() => setDialog(null)} />
     </SafeAreaView>
   );

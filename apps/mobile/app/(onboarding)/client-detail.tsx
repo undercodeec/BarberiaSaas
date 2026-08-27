@@ -27,12 +27,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requireApiClient } from '../../src/lib/api';
+import { clientAccessForRole } from '../../src/lib/client-access';
 import { normalizeClientRecord } from '../../src/lib/client-record';
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 import { useNativeLayoutMetrics } from '../../src/components/BottomNavigation';
+import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 
 import { InfoRow } from '../../src/features/screens/client-detail-components';
 import {
@@ -48,6 +50,10 @@ import {
 export default function ClientDetailScreen() {
   const tenant = useTenantScope();
   const { session } = useAuth();
+  const organizationQuery = useCurrentOrganization();
+  const clientAccess = clientAccessForRole(
+    organizationQuery.data?.membership.role,
+  );
   const layout = useNativeLayoutMetrics();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -129,7 +135,7 @@ export default function ClientDetailScreen() {
       });
   }, [detailQuery.data, historyOrder, historyStatus]);
   const notesQuery = useQuery({
-    enabled: Boolean(session && clientId),
+    enabled: Boolean(session && clientId && clientAccess.canReadNotes),
     queryFn: () =>
       requireApiClient().request<ClientNotesResponse>(
         `/v1/clients/${clientId}/notes`,
@@ -427,14 +433,16 @@ export default function ClientDetailScreen() {
           Detalle del cliente
         </Text>
         <View style={styles.headerActions}>
-          <Pressable
-            accessibilityLabel="Editar cliente"
-            accessibilityRole="button"
-            onPress={() => setIsEditing(true)}
-            style={styles.editButton}
-          >
-            <Ionicons color="#101c2d" name="create-outline" size={21} />
-          </Pressable>
+          {clientAccess.canManage ? (
+            <Pressable
+              accessibilityLabel="Editar cliente"
+              accessibilityRole="button"
+              onPress={() => setIsEditing(true)}
+              style={styles.editButton}
+            >
+              <Ionicons color="#101c2d" name="create-outline" size={21} />
+            </Pressable>
+          ) : null}
           <Pressable
             accessibilityLabel="Más opciones"
             accessibilityRole="button"
@@ -493,49 +501,55 @@ export default function ClientDetailScreen() {
             <Text style={styles.metricLabel}>Última visita</Text>
           </View>
         </View>
-        <Text style={styles.sectionTitle}>Acciones rápidas</Text>
-        <View style={styles.quickActions}>
-          <Pressable
-            accessibilityLabel="Llamar al cliente"
-            accessibilityRole="button"
-            onPress={() => void openContact('call')}
-            style={styles.quickAction}
-          >
-            <View style={styles.quickIcon}>
-              <Ionicons color="#101c2d" name="call-outline" size={23} />
+        {clientAccess.canCommunicate ? (
+          <>
+            <Text style={styles.sectionTitle}>Acciones rápidas</Text>
+            <View style={styles.quickActions}>
+              <Pressable
+                accessibilityLabel="Llamar al cliente"
+                accessibilityRole="button"
+                onPress={() => void openContact('call')}
+                style={styles.quickAction}
+              >
+                <View style={styles.quickIcon}>
+                  <Ionicons color="#101c2d" name="call-outline" size={23} />
+                </View>
+                <Text style={styles.quickLabel}>Llamar</Text>
+              </Pressable>
+              <Pressable
+                accessibilityLabel="Abrir WhatsApp"
+                accessibilityRole="button"
+                onPress={() => void openContact('whatsapp')}
+                style={styles.quickAction}
+              >
+                <View style={styles.quickIcon}>
+                  <Ionicons color="#25A866" name="logo-whatsapp" size={24} />
+                </View>
+                <Text style={styles.quickLabel}>WhatsApp</Text>
+              </Pressable>
+              <View
+                accessibilityLabel="Notificaciones próximamente"
+                style={styles.quickAction}
+              >
+                <View style={styles.quickIcon}>
+                  <Ionicons
+                    color="#101c2d"
+                    name="notifications-outline"
+                    size={24}
+                  />
+                </View>
+                <Text style={styles.quickLabel}>Notificar</Text>
+              </View>
             </View>
-            <Text style={styles.quickLabel}>Llamar</Text>
-          </Pressable>
-          <Pressable
-            accessibilityLabel="Abrir WhatsApp"
-            accessibilityRole="button"
-            onPress={() => void openContact('whatsapp')}
-            style={styles.quickAction}
-          >
-            <View style={styles.quickIcon}>
-              <Ionicons color="#25A866" name="logo-whatsapp" size={24} />
-            </View>
-            <Text style={styles.quickLabel}>WhatsApp</Text>
-          </Pressable>
-          <View
-            accessibilityLabel="Notificaciones próximamente"
-            style={styles.quickAction}
-          >
-            <View style={styles.quickIcon}>
-              <Ionicons
-                color="#101c2d"
-                name="notifications-outline"
-                size={24}
-              />
-            </View>
-            <Text style={styles.quickLabel}>Notificar</Text>
-          </View>
-        </View>
+          </>
+        ) : null}
         <View style={styles.tabs}>
           {(
             [
               ['information', 'Información'],
-              ['notes', 'Notas'],
+              ...(clientAccess.canReadNotes
+                ? ([['notes', 'Notas']] as const)
+                : []),
               ['history', 'Historial'],
               ['comments', 'Comentarios'],
             ] as const
@@ -564,65 +578,77 @@ export default function ClientDetailScreen() {
               label="Teléfono"
               value={client.phone}
             />
-            <InfoRow icon="mail-outline" label="Correo" value={client.email} />
-            <InfoRow
-              icon="calendar-outline"
-              label="Fecha de nacimiento"
-              value={client.birthDate ? formatDate(client.birthDate) : null}
-            />
-            <InfoRow
-              icon="location-outline"
-              label="Dirección"
-              value={client.addressLine}
-            />
-            <InfoRow
-              icon="card-outline"
-              label="Documento"
-              value={client.documentNumber}
-            />
-            <View style={styles.labelsRow}>
-              <View style={styles.labelsCopy}>
-                <Text style={styles.infoLabel}>Etiquetas</Text>
-                <View style={styles.labelList}>
-                  {client.labels.map((label) => (
-                    <View
-                      key={label.id}
-                      style={[
-                        styles.labelChip,
-                        { backgroundColor: label.color },
-                      ]}
-                    >
-                      <Text style={styles.labelChipText}>{label.name}</Text>
-                    </View>
-                  ))}
-                  {!client.labels.length ? (
-                    <Text style={styles.emptyLabel}>Sin etiquetas</Text>
-                  ) : null}
+            {clientAccess.canManage ? (
+              <>
+                <InfoRow
+                  icon="mail-outline"
+                  label="Correo"
+                  value={client.email}
+                />
+                <InfoRow
+                  icon="calendar-outline"
+                  label="Fecha de nacimiento"
+                  value={client.birthDate ? formatDate(client.birthDate) : null}
+                />
+                <InfoRow
+                  icon="location-outline"
+                  label="Dirección"
+                  value={client.addressLine}
+                />
+                <InfoRow
+                  icon="card-outline"
+                  label="Documento"
+                  value={client.documentNumber}
+                />
+              </>
+            ) : null}
+            {clientAccess.canManageLabels ? (
+              <View style={styles.labelsRow}>
+                <View style={styles.labelsCopy}>
+                  <Text style={styles.infoLabel}>Etiquetas</Text>
+                  <View style={styles.labelList}>
+                    {client.labels.map((label) => (
+                      <View
+                        key={label.id}
+                        style={[
+                          styles.labelChip,
+                          { backgroundColor: label.color },
+                        ]}
+                      >
+                        <Text style={styles.labelChipText}>{label.name}</Text>
+                      </View>
+                    ))}
+                    {!client.labels.length ? (
+                      <Text style={styles.emptyLabel}>Sin etiquetas</Text>
+                    ) : null}
+                  </View>
                 </View>
+                <Pressable
+                  accessibilityLabel="Agregar etiqueta"
+                  accessibilityRole="button"
+                  onPress={() => setIsLabelOpen(true)}
+                  style={styles.addLabelButton}
+                >
+                  <Ionicons color="#101c2d" name="add" size={22} />
+                </Pressable>
               </View>
-              <Pressable
-                accessibilityLabel="Agregar etiqueta"
-                accessibilityRole="button"
-                onPress={() => setIsLabelOpen(true)}
-                style={styles.addLabelButton}
-              >
-                <Ionicons color="#101c2d" name="add" size={22} />
-              </Pressable>
-            </View>
+            ) : null}
           </View>
         ) : null}
         {activeTab === 'notes' ? (
           <View>
             <View style={styles.notesHeader}>
               <Text style={styles.sectionTitle}>Notas</Text>
-              <Pressable
-                accessibilityLabel="Agregar nota"
-                accessibilityRole="button"
-                onPress={() => setIsNoteOpen(true)}
-                style={styles.addLabelButton}
-              >
-                <Ionicons color="#101c2d" name="add" size={22} />
-              </Pressable>
+              {clientAccess.canWriteNotes ? (
+                <Pressable
+                  accessibilityLabel="Agregar nota"
+                  accessibilityRole="button"
+                  onPress={() => setIsNoteOpen(true)}
+                  style={styles.addLabelButton}
+                >
+                  <Ionicons color="#101c2d" name="add" size={22} />
+                </Pressable>
+              ) : null}
             </View>
             {client.notes ? (
               <View style={styles.notesCard}>
@@ -823,47 +849,55 @@ export default function ClientDetailScreen() {
               <Text style={styles.optionLabel}>Crear una cita</Text>
               <Ionicons color="#69717d" name="chevron-forward" size={20} />
             </Pressable>
-            <Pressable
-              onPress={() => {
-                setIsOptionsOpen(false);
-                Alert.alert(
-                  'Próximamente',
-                  'El bloqueo de clientes estará disponible próximamente.',
-                );
-              }}
-              style={styles.optionRow}
-            >
-              <View style={styles.optionIcon}>
-                <Ionicons color="#101c2d" name="ban-outline" size={21} />
-              </View>
-              <Text style={styles.optionLabel}>Bloquear cliente</Text>
-              <Ionicons color="#69717d" name="chevron-forward" size={20} />
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                setIsOptionsOpen(false);
-                Alert.alert(
-                  'Próximamente',
-                  'La creación de ventas estará disponible próximamente.',
-                );
-              }}
-              style={styles.optionRow}
-            >
-              <View style={styles.optionIcon}>
-                <Ionicons color="#101c2d" name="receipt-outline" size={21} />
-              </View>
-              <Text style={styles.optionLabel}>Crear una venta</Text>
-              <Ionicons color="#69717d" name="chevron-forward" size={20} />
-            </Pressable>
-            <Pressable
-              onPress={confirmDelete}
-              style={[styles.optionRow, styles.deleteOption]}
-            >
-              <View style={[styles.optionIcon, styles.deleteOptionIcon]}>
-                <Ionicons color="#B42318" name="trash-outline" size={21} />
-              </View>
-              <Text style={styles.deleteOptionLabel}>Eliminar cliente</Text>
-            </Pressable>
+            {clientAccess.canManage ? (
+              <>
+                <Pressable
+                  onPress={() => {
+                    setIsOptionsOpen(false);
+                    Alert.alert(
+                      'Próximamente',
+                      'El bloqueo de clientes estará disponible próximamente.',
+                    );
+                  }}
+                  style={styles.optionRow}
+                >
+                  <View style={styles.optionIcon}>
+                    <Ionicons color="#101c2d" name="ban-outline" size={21} />
+                  </View>
+                  <Text style={styles.optionLabel}>Bloquear cliente</Text>
+                  <Ionicons color="#69717d" name="chevron-forward" size={20} />
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setIsOptionsOpen(false);
+                    Alert.alert(
+                      'Próximamente',
+                      'La creación de ventas estará disponible próximamente.',
+                    );
+                  }}
+                  style={styles.optionRow}
+                >
+                  <View style={styles.optionIcon}>
+                    <Ionicons
+                      color="#101c2d"
+                      name="receipt-outline"
+                      size={21}
+                    />
+                  </View>
+                  <Text style={styles.optionLabel}>Crear una venta</Text>
+                  <Ionicons color="#69717d" name="chevron-forward" size={20} />
+                </Pressable>
+                <Pressable
+                  onPress={confirmDelete}
+                  style={[styles.optionRow, styles.deleteOption]}
+                >
+                  <View style={[styles.optionIcon, styles.deleteOptionIcon]}>
+                    <Ionicons color="#B42318" name="trash-outline" size={21} />
+                  </View>
+                  <Text style={styles.deleteOptionLabel}>Eliminar cliente</Text>
+                </Pressable>
+              </>
+            ) : null}
           </View>
         </View>
       </Modal>
@@ -873,7 +907,7 @@ export default function ClientDetailScreen() {
         onRequestClose={closeNoteSheet}
         statusBarTranslucent
         transparent
-        visible={isNoteOpen}
+        visible={isNoteOpen && clientAccess.canWriteNotes}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -954,7 +988,7 @@ export default function ClientDetailScreen() {
         onRequestClose={() => setIsLabelOpen(false)}
         statusBarTranslucent
         transparent
-        visible={isLabelOpen}
+        visible={isLabelOpen && clientAccess.canManageLabels}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1031,7 +1065,7 @@ export default function ClientDetailScreen() {
         onRequestClose={() => setIsEditing(false)}
         statusBarTranslucent
         transparent
-        visible={isEditing}
+        visible={isEditing && clientAccess.canManage}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

@@ -39,12 +39,16 @@ export function TenantScopeProvider({ children }: PropsWithChildren) {
       organizationId: isResolved
         ? (organizationQuery.data?.organization.id ?? 'none')
         : 'resolving',
+      role: isResolved
+        ? (organizationQuery.data?.membership.role ?? 'none')
+        : 'resolving',
       userId: user?.id ?? 'anonymous',
     }),
     [
       isResolved,
       organizationQuery.data?.location?.id,
       organizationQuery.data?.organization.id,
+      organizationQuery.data?.membership.role,
       user?.id,
     ],
   );

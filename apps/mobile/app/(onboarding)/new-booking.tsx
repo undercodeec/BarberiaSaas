@@ -7,7 +7,9 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requireApiClient } from '../../src/lib/api';
+import { clientAccessForRole } from '../../src/lib/client-access';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
+import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 import {
@@ -20,6 +22,10 @@ export default function NewBookingScreen() {
   const { session } = useAuth();
   const tenant = useTenantScope();
   const router = useRouter();
+  const organizationQuery = useCurrentOrganization();
+  const clientAccess = clientAccessForRole(
+    organizationQuery.data?.membership.role,
+  );
   const [isCreateClientOpen, setIsCreateClientOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
@@ -76,18 +82,20 @@ export default function NewBookingScreen() {
           Selecciona un cliente guardado para completar su reserva o continúa
           sin cliente.
         </Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setIsCreateClientOpen(true)}
-          style={styles.addClientButton}
-        >
-          <Ionicons
-            color={appTheme.colors.white}
-            name="person-add-outline"
-            size={20}
-          />
-          <Text style={styles.addClientLabel}>Añadir cliente</Text>
-        </Pressable>
+        {clientAccess.canManage ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setIsCreateClientOpen(true)}
+            style={styles.addClientButton}
+          >
+            <Ionicons
+              color={appTheme.colors.white}
+              name="person-add-outline"
+              size={20}
+            />
+            <Text style={styles.addClientLabel}>Añadir cliente</Text>
+          </Pressable>
+        ) : null}
         <View style={styles.searchBox}>
           <Ionicons
             color={appTheme.colors.textMuted}
@@ -97,7 +105,11 @@ export default function NewBookingScreen() {
           <TextInput
             accessibilityLabel="Buscar cliente"
             onChangeText={setSearch}
-            placeholder="Buscar por nombre, teléfono o correo"
+            placeholder={
+              clientAccess.canManage
+                ? 'Buscar por nombre, teléfono o correo'
+                : 'Buscar por nombre'
+            }
             placeholderTextColor="#8B96A5"
             style={styles.searchInput}
             value={search}
@@ -144,11 +156,13 @@ export default function NewBookingScreen() {
           </Text>
         ) : null}
       </ScrollView>
-      <ClientFormSheet
-        onClose={() => setIsCreateClientOpen(false)}
-        onCreated={(client) => setSelectedClientId(client.id)}
-        visible={isCreateClientOpen}
-      />
+      {clientAccess.canManage ? (
+        <ClientFormSheet
+          onClose={() => setIsCreateClientOpen(false)}
+          onCreated={(client) => setSelectedClientId(client.id)}
+          visible={isCreateClientOpen}
+        />
+      ) : null}
       <View style={styles.footer}>
         <View style={styles.progressTrack}>
           <View style={styles.progressValue} />

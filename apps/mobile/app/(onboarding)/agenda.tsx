@@ -40,6 +40,7 @@ import {
   type AgendaView,
 } from '../../src/lib/agenda-range';
 import { requireApiClient } from '../../src/lib/api';
+import { clientAccessForRole } from '../../src/lib/client-access';
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
@@ -148,6 +149,9 @@ export default function AgendaScreen() {
     }),
   ).current;
   const organizationQuery = useCurrentOrganization();
+  const clientAccess = clientAccessForRole(
+    organizationQuery.data?.membership.role,
+  );
   const schedulesQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -1386,46 +1390,48 @@ export default function AgendaScreen() {
                 </Text>
               </Pressable>
             ) : null} */}
-            <Pressable
-              onPress={() => {
-                if (!selectedAppointment?.clientPhone) {
-                  Alert.alert(
-                    'WhatsApp no disponible',
-                    'Esta cita no tiene un teléfono de cliente.',
+            {clientAccess.canCommunicate ? (
+              <Pressable
+                onPress={() => {
+                  if (!selectedAppointment?.clientPhone) {
+                    Alert.alert(
+                      'WhatsApp no disponible',
+                      'Esta cita no tiene un teléfono de cliente.',
+                    );
+                    return;
+                  }
+                  const phone = selectedAppointment.clientPhone.replace(
+                    /\D/gu,
+                    '',
                   );
-                  return;
-                }
-                const phone = selectedAppointment.clientPhone.replace(
-                  /\D/gu,
-                  '',
-                );
-                const businessName =
-                  organizationQuery.data?.organization?.name ??
-                  organizationQuery.data?.location?.name ??
-                  'nuestro negocio';
-                const professionalName =
-                  teamQuery.data?.members.find(
-                    (member) =>
-                      member.id ===
-                      selectedAppointment.professionalMembershipId,
-                  )?.user.fullName ?? 'tu profesional';
-                const appointmentDate = new Intl.DateTimeFormat('es-EC', {
-                  dateStyle: 'full',
-                  timeStyle: 'short',
-                  timeZone,
-                }).format(new Date(selectedAppointment.startsAt));
-                const message = `Hola ${selectedAppointment.clientName}. Te recordamos tu cita en ${businessName} con ${professionalName}, el ${appointmentDate}. ¡Te esperamos!`;
-                void Linking.openURL(
-                  `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
-                );
-              }}
-              style={styles.modalWhatsAppAction}
-            >
-              <Ionicons color="#176B3A" name="logo-whatsapp" size={20} />
-              <Text style={styles.modalWhatsAppText}>
-                Enviar recordatorio por WhatsApp
-              </Text>
-            </Pressable>
+                  const businessName =
+                    organizationQuery.data?.organization?.name ??
+                    organizationQuery.data?.location?.name ??
+                    'nuestro negocio';
+                  const professionalName =
+                    teamQuery.data?.members.find(
+                      (member) =>
+                        member.id ===
+                        selectedAppointment.professionalMembershipId,
+                    )?.user.fullName ?? 'tu profesional';
+                  const appointmentDate = new Intl.DateTimeFormat('es-EC', {
+                    dateStyle: 'full',
+                    timeStyle: 'short',
+                    timeZone,
+                  }).format(new Date(selectedAppointment.startsAt));
+                  const message = `Hola ${selectedAppointment.clientName}. Te recordamos tu cita en ${businessName} con ${professionalName}, el ${appointmentDate}. ¡Te esperamos!`;
+                  void Linking.openURL(
+                    `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+                  );
+                }}
+                style={styles.modalWhatsAppAction}
+              >
+                <Ionicons color="#176B3A" name="logo-whatsapp" size={20} />
+                <Text style={styles.modalWhatsAppText}>
+                  Enviar recordatorio por WhatsApp
+                </Text>
+              </Pressable>
+            ) : null}
             <Pressable
               accessibilityState={{
                 disabled: !canRescheduleSelectedAppointment,
