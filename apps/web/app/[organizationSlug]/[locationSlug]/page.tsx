@@ -1,12 +1,10 @@
 import type { PublicBookingCatalog } from '@barber-saas/api-client';
 import { notFound } from 'next/navigation';
 
+import { getWebApiBaseUrl } from '../../api-url';
 import { BookingExperience } from '../../components/BookingExperience';
 
-const API_URL =
-  process.env.API_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  'http://localhost:4000';
+const API_URL = getWebApiBaseUrl();
 
 export default async function PublicBookingPage({
   params,

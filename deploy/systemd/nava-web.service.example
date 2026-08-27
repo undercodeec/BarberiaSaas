@@ -1,5 +1,5 @@
 [Unit]
-Description=Nava platform administration console
+Description=Nava public booking website
 After=network-online.target nava-api.service
 Wants=network-online.target
 
@@ -7,19 +7,18 @@ Wants=network-online.target
 Type=simple
 User=nava
 Group=nava
-WorkingDirectory=/opt/nava/app/apps/admin
+WorkingDirectory=/opt/nava/app/apps/web
 Environment=NODE_ENV=production
-Environment=PORT=3001
+Environment=PORT=3000
 EnvironmentFile=/etc/nava/frontend.env
-# Evita Corepack/pnpm al arrancar: ProtectHome bloquea su caché bajo /home/nava.
-ExecStart=/usr/bin/node /opt/nava/app/apps/admin/node_modules/next/dist/bin/next start
+ExecStart=/usr/bin/node /opt/nava/app/apps/web/node_modules/next/dist/bin/next start
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/nava/app/apps/admin/.next
+ReadWritePaths=/opt/nava/app/apps/web/.next
 
 [Install]
 WantedBy=multi-user.target

@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/u, '') ??
-  'http://localhost:4000';
+import { getWebApiBaseUrl } from '../api-url';
+
+const API_URL = getWebApiBaseUrl();
 
 interface ManagedAppointment {
   attendanceConfirmedAt: string | null;

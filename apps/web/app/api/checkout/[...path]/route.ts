@@ -2,10 +2,9 @@ import { randomUUID } from 'node:crypto';
 
 import { NextResponse, type NextRequest } from 'next/server';
 
-const API_URL =
-  process.env.API_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  'http://localhost:4000';
+import { getWebApiBaseUrl } from '../../../api-url';
+
+const API_URL = getWebApiBaseUrl();
 const SESSION_COOKIE = 'nava_checkout_session';
 
 const routes = {

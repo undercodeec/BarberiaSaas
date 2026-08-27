@@ -18,6 +18,9 @@ del plan de pagos está en
 Las invitaciones de equipo y la recuperación de contraseña usan SMTP. En local
 puede utilizarse Mailpit; en producción debe configurarse un proveedor real.
 
+Consulta el [procedimiento de despliegue de producción](./docs/deployment/production.md)
+para configurar Web y Admin en la VPS sin guardar variables reales en Git.
+
 ## Requisitos
 
 - Node.js 24 LTS.

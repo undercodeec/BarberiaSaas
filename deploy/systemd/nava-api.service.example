@@ -1,0 +1,22 @@
+[Unit]
+Description=Nava API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nava
+Group=nava
+WorkingDirectory=/opt/nava/app/apps/api
+EnvironmentFile=/etc/nava/api.env
+ExecStart=/usr/bin/node /opt/nava/app/apps/api/dist/index.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/nava/app
+
+[Install]
+WantedBy=multi-user.target

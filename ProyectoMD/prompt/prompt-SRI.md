@@ -1,365 +1,419 @@
-Revisa y corrige únicamente el código del proyecto Nava relacionado con la URL que utiliza el panel Admin para conectarse a la API.
+Necesito corregir definitivamente el sistema de configuración y despliegue de producción del proyecto Nava.
 
-Codex NO tiene acceso a la VPS, por lo tanto:
+Actualmente el proyecto funciona, pero los despliegues en VPS están fallando debido a configuración inconsistente de variables de entorno.
 
-* no ejecutes `systemctl`;
-* no modifiques Nginx;
-* no edites `/etc/nava/api.env`;
-* no intentes conectarte por SSH;
-* no hagas cambios de infraestructura;
-* no ejecutes comandos sobre producción.
+## Contexto de producción
 
-## Error observado en producción
-
-El navegador muestra:
+La arquitectura real es:
 
 ```text
-Connecting to 'http://127.0.0.1:4000/v1/platform/login' violates the following Content Security Policy directive:
-"connect-src 'self' https://api.navacloud.app".
+https://admin.navacloud.app
+    -> Nginx
+    -> http://127.0.0.1:3001
+    -> apps/admin
 
-Fetch API cannot load http://127.0.0.1:4000/v1/platform/login.
-Refused to connect because it violates the document's Content Security Policy.
-```
-
-El comportamiento correcto en producción es que el panel Admin utilice:
-
-```text
 https://api.navacloud.app
+    -> Nginx
+    -> http://127.0.0.1:4000
+    -> apps/api
+
+https://reservas.navacloud.app
+    -> Nginx
+    -> http://127.0.0.1:3000
+    -> apps/web
 ```
 
-y nunca:
+Por lo tanto, la URL pública que deben utilizar los frontends para comunicarse con la API es:
 
-```text
-http://127.0.0.1:4000
-```
-
-desde el navegador.
-
-## Objetivo
-
-Determina por qué el código del Admin puede terminar generando solicitudes hacia:
-
-```text
-http://127.0.0.1:4000
-```
-
-y corrige el código para que esto no pueda ocurrir silenciosamente en producción.
-
-## Revisión obligatoria
-
-Busca en todo el repositorio referencias a:
-
-```text
-127.0.0.1:4000
-localhost:4000
-NEXT_PUBLIC_API_URL
-API_URL
-BASE_URL
-apiBaseUrl
-platform/login
-```
-
-Presta especial atención a:
-
-```text
-apps/admin
-packages
-clientes HTTP compartidos
-configuración de Next.js
-variables públicas
-CSP
-.env.example
-turbo.json
-package.json
-```
-
-Identifica cualquier lógica equivalente a:
-
-```ts
-process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:4000'
-```
-
-o:
-
-```ts
-process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
-```
-
-o cualquier URL local hardcodeada que pueda terminar incluida en el bundle del navegador.
-
-## Regla esperada
-
-### Desarrollo
-
-Se puede mantener localhost para desarrollo local si actualmente es necesario.
-
-Por ejemplo:
-
-```text
-http://127.0.0.1:4000
-```
-
-### Producción
-
-En producción, el Admin debe depender explícitamente de:
-
-```text
-NEXT_PUBLIC_API_URL
-```
-
-y utilizar:
-
-```text
-https://api.navacloud.app
-```
-
-cuando esa variable sea proporcionada durante el build.
-
-Lo importante es que producción NO tenga un fallback silencioso a localhost.
-
-Si:
-
-```ts
-process.env.NODE_ENV === 'production'
-```
-
-y `NEXT_PUBLIC_API_URL` está ausente, inválida o apunta a localhost, la aplicación debe fallar de forma explícita durante build/inicialización.
-
-Implementa esta validación dentro de la arquitectura existente del proyecto.
-
-Conceptualmente puede ser similar a:
-
-```ts
-const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL;
-
-if (process.env.NODE_ENV === 'production') {
-  if (!configuredApiUrl) {
-    throw new Error(
-      'NEXT_PUBLIC_API_URL is required for the Admin production build',
-    );
-  }
-
-  const url = new URL(configuredApiUrl);
-
-  if (
-    url.hostname === 'localhost' ||
-    url.hostname === '127.0.0.1'
-  ) {
-    throw new Error(
-      'NEXT_PUBLIC_API_URL cannot point to localhost in production',
-    );
-  }
-}
-```
-
-No copies necesariamente esta implementación si existe una capa de configuración centralizada mejor.
-
-## Centralizar configuración
-
-Si actualmente la URL de la API se calcula en varios sitios, centralízala.
-
-Quiero una única fuente de verdad para el Admin.
-
-Por ejemplo, conceptualmente:
-
-```ts
-getAdminApiBaseUrl()
-```
-
-o la abstracción que mejor encaje con la arquitectura actual.
-
-El login del Admin:
-
-```text
-POST /v1/platform/login
-```
-
-debe construir su destino a partir de esa configuración central.
-
-No quiero URLs repetidas en componentes.
-
-## No modificar CSP para ocultar el error
-
-La CSP actual:
-
-```text
-connect-src 'self' https://api.navacloud.app
-```
-
-es coherente con producción.
-
-NO agregues:
-
-```text
-http://127.0.0.1:4000
-```
-
-ni:
-
-```text
-http://localhost:4000
-```
-
-a la CSP de producción.
-
-No elimines ni debilites CSP.
-
-El error debe solucionarse corrigiendo la URL utilizada por el frontend.
-
-## No modificar autenticación
-
-No alteres:
-
-* contraseña del Admin;
-* contraseña Mobile;
-* `PLATFORM_ADMIN_EMAILS`;
-* operadores;
-* OTP;
-* autorización del endpoint;
-* lógica funcional de `/v1/platform/login`;
-* sesiones;
-* Neon;
-* Prisma;
-* migraciones.
-
-Este trabajo es exclusivamente sobre configuración de URL de API en el código del frontend Admin y sus utilidades compartidas.
-
-## Pruebas requeridas
-
-Agrega pruebas que eviten que este error vuelva a ocurrir.
-
-Como mínimo valida:
-
-1. Desarrollo puede usar localhost si corresponde.
-2. Producción con `NEXT_PUBLIC_API_URL=https://api.navacloud.app` funciona.
-3. Producción sin `NEXT_PUBLIC_API_URL` falla explícitamente.
-4. Producción con:
-
-```text
-http://127.0.0.1:4000
-```
-
-falla explícitamente.
-5. Producción con:
-
-```text
-http://localhost:4000
-```
-
-falla explícitamente.
-6. El cliente utilizado por `/v1/platform/login` usa la URL configurada.
-7. Ningún componente del Admin tiene `127.0.0.1:4000` hardcodeado para producción.
-
-## Validación de build local
-
-Haz un build local equivalente al de producción:
-
-```bash
-rm -rf apps/admin/.next
-
-NEXT_PUBLIC_API_URL=https://api.navacloud.app \
-pnpm --filter @barber-saas/admin build
-```
-
-Después inspecciona el bundle:
-
-```bash
-grep -R -n --binary-files=without-match \
-'http://127.0.0.1:4000' \
-apps/admin/.next/static 2>/dev/null
-```
-
-y:
-
-```bash
-grep -R -n --binary-files=without-match \
-'http://localhost:4000' \
-apps/admin/.next/static 2>/dev/null
-```
-
-No deberían aparecer referencias utilizadas por código de producción del Admin.
-
-Comprueba también:
-
-```bash
-grep -R -l --binary-files=without-match \
-'https://api.navacloud.app' \
-apps/admin/.next/static 2>/dev/null | head
-```
-
-## Revisa también valores por defecto
-
-Si existe alguna configuración del tipo:
-
-```ts
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  'http://127.0.0.1:4000';
-```
-
-no necesariamente elimines localhost por completo.
-
-Puedes hacer que el fallback sea válido exclusivamente en desarrollo:
-
-```ts
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  (process.env.NODE_ENV === 'development'
-    ? 'http://127.0.0.1:4000'
-    : undefined);
-```
-
-y luego validar el valor.
-
-La implementación final debe ser limpia, tipada y acorde con el estilo existente.
-
-## Documentación del repositorio
-
-Si existe `.env.example` o documentación de desarrollo del Admin, actualízala para dejar claro que:
-
-```text
-NEXT_PUBLIC_API_URL
-```
-
-es obligatoria para builds de producción.
-
-No agregues secretos.
-
-Puedes documentar un ejemplo como:
-
-```text
+```env
 NEXT_PUBLIC_API_URL=https://api.navacloud.app
 ```
 
-## Comprobaciones finales
+NO debe utilizarse en producción:
 
-Ejecuta únicamente verificaciones locales relevantes, por ejemplo:
-
-```bash
-pnpm --filter @barber-saas/admin typecheck
-pnpm --filter @barber-saas/admin test
-NEXT_PUBLIC_API_URL=https://api.navacloud.app pnpm --filter @barber-saas/admin build
+```env
+NEXT_PUBLIC_API_URL=http://127.0.0.1:4000
 ```
 
-Adapta los comandos si el paquete usa scripts diferentes.
+porque `NEXT_PUBLIC_*` puede ejecutarse en el navegador y `127.0.0.1` representaría el equipo del usuario.
 
-No hagas deploy.
+## Problema actual
 
-## Entrega final
+El build del Admin falla:
 
-Al terminar dime exactamente:
+```text
+Error: NEXT_PUBLIC_API_URL is required for the Admin production build.
+```
 
-1. cuál era la causa raíz en el código;
-2. qué archivo generaba o permitía `127.0.0.1:4000`;
-3. todos los archivos modificados;
-4. cómo quedó centralizada la URL;
-5. qué validación evita localhost en producción;
-6. qué pruebas agregaste;
-7. resultados de typecheck/tests/build;
-8. resultado de buscar `127.0.0.1:4000` y `localhost:4000` en `.next/static`;
-9. si todavía existe alguna referencia local legítima exclusivamente para desarrollo;
-10. commit sugerido.
+El código actual de:
 
-No realices cambios fuera del repositorio.
-No intentes acceder a la VPS.
-No modifiques infraestructura.
+```text
+apps/admin/app/api-url.ts
+```
+
+correctamente exige:
+
+* que exista `NEXT_PUBLIC_API_URL`
+* que sea una URL absoluta
+* HTTPS en producción
+* que no sea localhost en producción
+
+NO elimines ni debilites estas validaciones.
+
+El problema es que el procedimiento de despliegue no garantiza que la variable esté disponible cuando se ejecuta:
+
+```bash
+pnpm build
+```
+
+También se detectó:
+
+```text
+apps/web/.env.production
+```
+
+con un valor incorrecto:
+
+```env
+NEXT_PUBLIC_API_URL=https://api.navaclouda.app
+```
+
+cuando debería ser:
+
+```env
+NEXT_PUBLIC_API_URL=https://api.navacloud.app
+```
+
+Además, en el `.env` raíz existe o existió:
+
+```env
+NEXT_PUBLIC_API_URL=http://127.0.0.1:4000
+```
+
+lo cual puede provocar confusión entre desarrollo y producción.
+
+---
+
+# Objetivo
+
+Quiero que prepares el proyecto para que los despliegues de producción sean repetibles y no requieran recordar manualmente dónde crear variables cada vez que hago:
+
+```bash
+git pull
+pnpm install --frozen-lockfile
+pnpm db:migrate:deploy
+pnpm build
+```
+
+Debes investigar primero cómo están cargando variables:
+
+* workspace raíz
+* `apps/api`
+* `apps/web`
+* `apps/admin`
+* scripts de build
+* scripts de start
+* systemd si existe documentación/configuración versionada
+* Next.js
+* pnpm workspace
+
+No asumas una solución antes de revisar el proyecto.
+
+---
+
+# Requisitos
+
+## 1. Separar correctamente desarrollo y producción
+
+Desarrollo puede utilizar:
+
+```env
+NEXT_PUBLIC_API_URL=http://127.0.0.1:4000
+```
+
+Producción debe utilizar:
+
+```env
+NEXT_PUBLIC_API_URL=https://api.navacloud.app
+```
+
+No hardcodees la URL de producción dentro del código TypeScript/React.
+
+La URL debe seguir siendo una variable de entorno.
+
+---
+
+## 2. No depender de `.env.production` sin documentarlo
+
+Determina cuál es la estrategia más correcta para este monorepo.
+
+Quiero evitar tener que crear manualmente después de cada despliegue:
+
+```text
+apps/admin/.env.production
+apps/web/.env.production
+```
+
+si existe una forma más robusta de centralizar la configuración de producción.
+
+Si Next.js requiere que las variables estén disponibles dentro de cada aplicación durante `next build`, crea una solución explícita y mantenible.
+
+Por ejemplo, evalúa si conviene:
+
+* un script de build que cargue `/etc/nava/frontend.env`
+* variables exportadas por un script de despliegue
+* un archivo de entorno de producción externo al repositorio
+* variables compartidas correctamente entre los workspaces
+
+Elige la solución más segura y sencilla para producción.
+
+---
+
+## 3. Los secretos y configuración VPS no deben entrar a Git
+
+No quiero subir secretos reales al repositorio.
+
+Los archivos versionados pueden contener únicamente ejemplos:
+
+```text
+.env.example
+.env.production.example
+```
+
+Los valores reales de producción deben mantenerse fuera de Git.
+
+`NEXT_PUBLIC_API_URL` no es secreto, pero quiero mantener un procedimiento coherente con el resto de la configuración.
+
+---
+
+## 4. Crear validación previa al despliegue
+
+Quiero que exista un comando, por ejemplo:
+
+```bash
+pnpm env:check:production
+```
+
+o equivalente.
+
+Debe comprobar antes del build:
+
+```text
+NEXT_PUBLIC_API_URL existe
+NEXT_PUBLIC_API_URL es URL válida
+usa https
+no utiliza localhost
+no utiliza 127.0.0.1
+no contiene errores evidentes de dominio
+```
+
+Para este proyecto debería aceptar:
+
+```text
+https://api.navacloud.app
+```
+
+No quiero que el build avance hasta varios minutos después para descubrir que falta una variable.
+
+Debe fallar inmediatamente con un mensaje claro.
+
+---
+
+## 5. Crear un comando de build de producción robusto
+
+Evalúa crear algo como:
+
+```bash
+pnpm build:production
+```
+
+que realice en orden:
+
+```text
+validación de entorno
+build API
+build Web
+build Admin
+```
+
+y que todos los workspaces reciban correctamente las variables necesarias.
+
+No dupliques innecesariamente scripts.
+
+---
+
+## 6. Revisar todos los usos de NEXT_PUBLIC_API_URL
+
+Busca:
+
+```bash
+rg "NEXT_PUBLIC_API_URL"
+```
+
+en todo el repositorio.
+
+Revisa especialmente:
+
+```text
+apps/web
+apps/admin
+packages
+scripts
+```
+
+Comprueba que:
+
+* Admin usa `https://api.navacloud.app` en producción
+* Web usa `https://api.navacloud.app` en producción
+* ningún frontend utiliza localhost en producción
+* ninguna URL tenga el typo `navaclouda.app`
+* los tests sigan pudiendo utilizar localhost cuando corresponda
+
+Los tests pueden utilizar:
+
+```text
+http://127.0.0.1:4000
+```
+
+porque no son producción.
+
+---
+
+## 7. No modificar la arquitectura de Nginx
+
+No cambies conceptualmente:
+
+```text
+admin.navacloud.app -> 127.0.0.1:3001
+api.navacloud.app -> 127.0.0.1:4000
+reservas.navacloud.app -> 127.0.0.1:3000
+```
+
+Esto es correcto.
+
+Recuerda la diferencia:
+
+```text
+127.0.0.1:4000
+```
+
+es comunicación interna VPS/Nginx.
+
+Mientras:
+
+```text
+https://api.navacloud.app
+```
+
+es la API pública utilizada por los navegadores.
+
+---
+
+## 8. Actualizar documentación
+
+Crea o actualiza documentación de despliegue indicando exactamente qué debe existir en el VPS.
+
+Quiero que después de un:
+
+```bash
+git pull --ff-only origin main
+```
+
+pueda seguir un procedimiento claro.
+
+Documenta:
+
+* dónde viven las variables reales de producción;
+* qué variables requiere Admin;
+* qué variables requiere Web;
+* cuál es la URL pública de la API;
+* cómo validar la configuración;
+* cómo compilar;
+* cómo reiniciar los servicios;
+* cómo comprobar que API, Web y Admin funcionan.
+
+---
+
+# Importante
+
+NO hagas estas soluciones:
+
+```text
+❌ quitar la validación de api-url.ts
+❌ permitir localhost en producción
+❌ fallback silencioso a localhost
+❌ hardcodear https://api.navacloud.app en TypeScript
+❌ guardar secretos reales en Git
+❌ ignorar la variable si falta
+```
+
+Quiero conservar el comportamiento seguro actual.
+
+---
+
+# Tests
+
+Añade o actualiza tests para comprobar al menos:
+
+```text
+producción sin NEXT_PUBLIC_API_URL -> falla
+producción con localhost -> falla
+producción con 127.0.0.1 -> falla
+producción con http -> falla
+producción con https://api.navacloud.app -> funciona
+desarrollo con localhost -> funciona cuando corresponda
+URL inválida -> falla
+```
+
+No rompas los tests existentes.
+
+---
+
+# Validación final
+
+Ejecuta:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm db:generate
+pnpm test
+pnpm build
+```
+
+o los tests equivalentes apropiados del monorepo.
+
+Para simular producción puedes proporcionar temporalmente:
+
+```env
+NEXT_PUBLIC_API_URL=https://api.navacloud.app
+```
+
+mediante variables de proceso.
+
+Revisa también:
+
+```bash
+git diff
+git status
+```
+
+antes de finalizar.
+
+---
+
+# Entrega final
+
+Cuando termines explícame:
+
+1. cuál era la causa exacta;
+2. por qué el código del Admin no era el problema principal;
+3. qué cambiaste para hacer el despliegue repetible;
+4. dónde deben almacenarse ahora las variables de producción;
+5. qué archivos modificaste;
+6. qué tests agregaste;
+7. cómo evitaste que producción pueda utilizar localhost;
+8. los comandos exactos que debo ejecutar en el VPS después de hacer `git pull`;
+9. si debo eliminar los antiguos `.env.production` manuales del VPS;
+10. si debo modificar `/etc/nava/api.env` o crear un archivo independiente para las variables públicas de Web/Admin.
+
+No tienes acceso al VPS. Solo debes modificar, probar y documentar el proyecto local.
