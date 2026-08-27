@@ -21,14 +21,19 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, {
   Defs,
+  Ellipse,
   LinearGradient as SvgLinearGradient,
   Path,
+  RadialGradient as SvgRadialGradient,
   Rect,
   Stop,
 } from 'react-native-svg';
 import { KeyboardAwareScrollView as ScrollView } from '../../components/KeyboardAwareScrollView';
 
-import { useNativeLayoutMetrics } from '../../components/BottomNavigation';
+import {
+  appTheme,
+  useNativeLayoutMetrics,
+} from '../../components/BottomNavigation';
 
 import {
   WELCOME_SURVEY_OPTIONS,
@@ -92,6 +97,212 @@ export function LiquidGradient() {
   );
 }
 
+export const AMBIENT_SCREEN_GLOW_DURATION_MS = 2_000;
+
+export function AmbientScreenGlow({
+  animated = true,
+  duration = AMBIENT_SCREEN_GLOW_DURATION_MS,
+  intensity = 1,
+  visible,
+}: {
+  readonly animated?: boolean;
+  readonly duration?: number;
+  readonly intensity?: number;
+  readonly visible: boolean;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const [isRendered, setIsRendered] = useState(visible);
+  const normalizedIntensity = Math.max(0, Math.min(1, intensity));
+
+  useEffect(() => {
+    if (!visible) {
+      opacity.stopAnimation();
+      setIsRendered(false);
+      return;
+    }
+
+    setIsRendered(true);
+    opacity.setValue(0);
+
+    if (!animated) {
+      opacity.setValue(normalizedIntensity);
+      return;
+    }
+
+    const entryDuration = Math.round(duration * 0.28);
+    const peakDuration = Math.round(duration * 0.16);
+    const fadeDuration = Math.round(duration * 0.3);
+    const settleDuration = Math.max(
+      0,
+      duration - entryDuration - peakDuration - fadeDuration,
+    );
+    const animation = Animated.sequence([
+      Animated.timing(opacity, {
+        duration: entryDuration,
+        easing: Easing.out(Easing.cubic),
+        toValue: normalizedIntensity * 0.72,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        duration: peakDuration,
+        easing: Easing.inOut(Easing.sin),
+        toValue: normalizedIntensity,
+        useNativeDriver: true,
+      }),
+      Animated.delay(settleDuration),
+      Animated.timing(opacity, {
+        duration: fadeDuration,
+        easing: Easing.inOut(Easing.cubic),
+        toValue: 0,
+        useNativeDriver: true,
+      }),
+    ]);
+
+    animation.start(({ finished }) => {
+      if (finished) setIsRendered(false);
+    });
+
+    return () => animation.stop();
+  }, [animated, duration, normalizedIntensity, opacity, visible]);
+
+  if (!isRendered) return null;
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[ambientScreenGlowStyles.layer, { opacity }]}
+      testID="ambient-screen-glow"
+    >
+      <Svg
+        height="100%"
+        preserveAspectRatio="none"
+        viewBox="0 0 100 100"
+        width="100%"
+      >
+        <Defs>
+          <SvgLinearGradient id="ambient-glow-top" x1="0" x2="0" y1="0" y2="1">
+            <Stop
+              offset="0"
+              stopColor={appTheme.colors.accentLight}
+              stopOpacity={0.32}
+            />
+            <Stop
+              offset="1"
+              stopColor={appTheme.colors.accentLight}
+              stopOpacity={0}
+            />
+          </SvgLinearGradient>
+          <SvgLinearGradient id="ambient-glow-left" x1="0" x2="1" y1="0" y2="0">
+            <Stop
+              offset="0"
+              stopColor={appTheme.colors.accent}
+              stopOpacity={0.22}
+            />
+            <Stop
+              offset="1"
+              stopColor={appTheme.colors.accent}
+              stopOpacity={0}
+            />
+          </SvgLinearGradient>
+          <SvgLinearGradient
+            id="ambient-glow-right"
+            x1="1"
+            x2="0"
+            y1="0"
+            y2="0"
+          >
+            <Stop
+              offset="0"
+              stopColor={appTheme.colors.accent}
+              stopOpacity={0.22}
+            />
+            <Stop
+              offset="1"
+              stopColor={appTheme.colors.accent}
+              stopOpacity={0}
+            />
+          </SvgLinearGradient>
+          <SvgLinearGradient
+            id="ambient-glow-bottom"
+            x1="0"
+            x2="0"
+            y1="1"
+            y2="0"
+          >
+            <Stop
+              offset="0"
+              stopColor={appTheme.colors.accentLight}
+              stopOpacity={0.34}
+            />
+            <Stop
+              offset="1"
+              stopColor={appTheme.colors.accentLight}
+              stopOpacity={0}
+            />
+          </SvgLinearGradient>
+          <SvgRadialGradient
+            id="ambient-glow-corner"
+            cx="50%"
+            cy="50%"
+            rx="50%"
+            ry="50%"
+          >
+            <Stop
+              offset="0"
+              stopColor={appTheme.colors.accentLight}
+              stopOpacity={0.3}
+            />
+            <Stop
+              offset="1"
+              stopColor={appTheme.colors.accentLight}
+              stopOpacity={0}
+            />
+          </SvgRadialGradient>
+        </Defs>
+        <Rect
+          fill="url(#ambient-glow-top)"
+          height="17"
+          width="100"
+          x="0"
+          y="0"
+        />
+        <Rect
+          fill="url(#ambient-glow-left)"
+          height="100"
+          width="8"
+          x="0"
+          y="0"
+        />
+        <Rect
+          fill="url(#ambient-glow-right)"
+          height="100"
+          width="8"
+          x="92"
+          y="0"
+        />
+        <Rect
+          fill="url(#ambient-glow-bottom)"
+          height="20"
+          width="100"
+          x="0"
+          y="80"
+        />
+        <Ellipse
+          cx="92"
+          cy="8"
+          fill="url(#ambient-glow-corner)"
+          rx="14"
+          ry="13"
+        />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+const ambientScreenGlowStyles = StyleSheet.create({
+  layer: { ...StyleSheet.absoluteFill },
+});
+
 export function SubscriptionActivationCelebration({
   onComplete,
   planName,
@@ -102,7 +313,6 @@ export function SubscriptionActivationCelebration({
   readonly visible: boolean;
 }) {
   const insets = useSafeAreaInsets();
-  const glowOpacity = useRef(new Animated.Value(0)).current;
   const bannerProgress = useRef(new Animated.Value(0)).current;
   const [isRendered, setIsRendered] = useState(visible);
 
@@ -113,22 +323,10 @@ export function SubscriptionActivationCelebration({
     }
 
     setIsRendered(true);
-    glowOpacity.setValue(0);
     bannerProgress.setValue(0);
 
     const animation = Animated.sequence([
-      Animated.timing(glowOpacity, {
-        duration: 420,
-        easing: Easing.out(Easing.cubic),
-        toValue: 1,
-        useNativeDriver: true,
-      }),
-      Animated.timing(glowOpacity, {
-        duration: 1_120,
-        easing: Easing.inOut(Easing.sin),
-        toValue: 0,
-        useNativeDriver: true,
-      }),
+      Animated.delay(AMBIENT_SCREEN_GLOW_DURATION_MS),
       Animated.sequence([
         Animated.timing(bannerProgress, {
           duration: 360,
@@ -154,7 +352,7 @@ export function SubscriptionActivationCelebration({
     });
 
     return () => animation.stop();
-  }, [bannerProgress, glowOpacity, onComplete, visible]);
+  }, [bannerProgress, onComplete, visible]);
 
   const bannerTranslateY = bannerProgress.interpolate({
     inputRange: [0, 1],
@@ -165,63 +363,7 @@ export function SubscriptionActivationCelebration({
 
   return (
     <View pointerEvents="none" style={subscriptionCelebrationStyles.overlay}>
-      <Animated.View
-        style={[subscriptionCelebrationStyles.glow, { opacity: glowOpacity }]}
-      >
-        <Svg
-          height="100%"
-          preserveAspectRatio="none"
-          viewBox="0 0 100 100"
-          width="100%"
-        >
-          <Defs>
-            <SvgLinearGradient
-              id="subscription-activation-gold"
-              x1="0"
-              x2="1"
-              y1="0"
-              y2="1"
-            >
-              <Stop offset="0" stopColor="#B47D17" />
-              <Stop offset="0.48" stopColor="#FFF0B5" />
-              <Stop offset="0.7" stopColor="#E1B85B" />
-              <Stop offset="1" stopColor="#B47D17" />
-            </SvgLinearGradient>
-          </Defs>
-          <Rect
-            fill="none"
-            height="94"
-            rx="3"
-            stroke="url(#subscription-activation-gold)"
-            strokeOpacity={0.2}
-            strokeWidth="4"
-            width="94"
-            x="3"
-            y="3"
-          />
-          <Rect
-            fill="none"
-            height="97"
-            rx="2"
-            stroke="url(#subscription-activation-gold)"
-            strokeOpacity={0.52}
-            strokeWidth="1.7"
-            width="97"
-            x="1.5"
-            y="1.5"
-          />
-          <Rect
-            fill="none"
-            height="99"
-            rx="1"
-            stroke="url(#subscription-activation-gold)"
-            strokeWidth="0.65"
-            width="99"
-            x="0.5"
-            y="0.5"
-          />
-        </Svg>
-      </Animated.View>
+      <AmbientScreenGlow intensity={0.9} visible={visible} />
 
       <Animated.View
         accessibilityLiveRegion="polite"
@@ -298,7 +440,6 @@ const subscriptionCelebrationStyles = StyleSheet.create({
     right: 18,
     top: 0,
   },
-  glow: { ...StyleSheet.absoluteFill },
   overlay: { ...StyleSheet.absoluteFill, zIndex: 100 },
 });
 

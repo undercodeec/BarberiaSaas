@@ -163,8 +163,6 @@ export default function DashboardScreen() {
   ] = useState(false);
   const [subscriptionCelebrationPlanName, setSubscriptionCelebrationPlanName] =
     useState('Nava Premium');
-  const [subscriptionCelebrationRunKey, setSubscriptionCelebrationRunKey] =
-    useState(0);
   const subscriptionCelebrationStateRef = useRef<{
     readonly state: {
       readonly planCode: SubscriptionResponse['current']['planCode'];
@@ -240,7 +238,6 @@ export default function DashboardScreen() {
 
   const showSubscriptionCelebration = useCallback((planName: string) => {
     setSubscriptionCelebrationPlanName(planName);
-    setSubscriptionCelebrationRunKey((current) => current + 1);
     setIsSubscriptionCelebrationVisible(true);
   }, []);
   const finishSubscriptionCelebration = useCallback(() => {
@@ -581,19 +578,6 @@ export default function DashboardScreen() {
             </Text>
           </View>
         </View>
-        <Pressable
-          accessibilityHint="Reproduce el efecto de suscripción Premium."
-          accessibilityLabel="Previsualizar celebración de suscripción"
-          accessibilityRole="button"
-          onPress={() =>
-            showSubscriptionCelebration(currentSubscriptionPlanName)
-          }
-          style={styles.subscriptionPreviewButton}
-        >
-          <Ionicons color="#9A6A17" name="sparkles-outline" size={15} />
-          <Text style={styles.subscriptionPreviewLabel}>Vista Premium</Text>
-        </Pressable>
-
         <View style={styles.salesCard}>
           <View style={styles.salesHeader}>
             <View style={styles.salesTitleColumn}>
@@ -812,7 +796,6 @@ export default function DashboardScreen() {
 
       <BottomNavigation active="dashboard" />
       <SubscriptionActivationCelebration
-        key={subscriptionCelebrationRunKey}
         onComplete={finishSubscriptionCelebration}
         planName={subscriptionCelebrationPlanName}
         visible={isSubscriptionCelebrationVisible}

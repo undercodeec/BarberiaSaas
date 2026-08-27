@@ -3,6 +3,7 @@ import { Animated } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import {
+  AmbientScreenGlow,
   OpenButtonFlare,
   SubscriptionActivationCelebration,
 } from './dashboard-components';
@@ -50,5 +51,15 @@ describe('SubscriptionActivationCelebration', () => {
 
     view.unmount();
     sequence.mockRestore();
+  });
+});
+
+describe('AmbientScreenGlow', () => {
+  it('renderiza una capa ambiental que no captura toques', async () => {
+    const view = await render(<AmbientScreenGlow animated={false} visible />);
+
+    expect(view.getByTestId('ambient-screen-glow').props.pointerEvents).toBe(
+      'none',
+    );
   });
 });
