@@ -44,6 +44,9 @@ import {
   storeWelcomeSurveyResponse,
   markWelcomeSurveyDismissed,
   shouldShowWelcomeSurvey,
+  getSubscriptionCelebrationState,
+  storeSubscriptionCelebrationState,
+  shouldCelebrateSubscriptionActivation,
   syncPushToken,
   greeting,
   subscriptionProgress,
@@ -58,6 +61,7 @@ import {
   ExtraQuickActionsSheet,
   OpenButtonFlare,
   NotificationPermissionSheet,
+  SubscriptionActivationCelebration,
   WelcomeSurveySheet,
 } from '../../src/features/screens/dashboard-components';
 
@@ -153,6 +157,22 @@ export default function DashboardScreen() {
   >([]);
   const [isQuickActionsPickerOpen, setIsQuickActionsPickerOpen] =
     useState(false);
+  const [
+    isSubscriptionCelebrationVisible,
+    setIsSubscriptionCelebrationVisible,
+  ] = useState(false);
+  const [subscriptionCelebrationPlanName, setSubscriptionCelebrationPlanName] =
+    useState('Nava Premium');
+  const [subscriptionCelebrationRunKey, setSubscriptionCelebrationRunKey] =
+    useState(0);
+  const subscriptionCelebrationStateRef = useRef<{
+    readonly state: {
+      readonly planCode: SubscriptionResponse['current']['planCode'];
+      readonly status: SubscriptionResponse['current']['status'];
+    } | null;
+    readonly userId: string;
+  } | null>(null);
+  const subscriptionCelebrationQueueRef = useRef(Promise.resolve());
   const rawBookingUrl = accountQuery.data?.bookingUrl?.trim() ?? '';
   const isSolo = accountQuery.data?.accountType === 'professional';
   const bookingUrl = /^https?:\/\/\S+$/i.test(rawBookingUrl)
@@ -174,6 +194,12 @@ export default function DashboardScreen() {
     planProgress,
     subscriptionQuery.data,
   );
+  const currentSubscriptionPlanCode = subscriptionQuery.data?.current.planCode;
+  const currentSubscriptionStatus = subscriptionQuery.data?.current.status;
+  const currentSubscriptionPlanName =
+    subscriptionQuery.data?.plans.find(
+      ({ code }) => code === currentSubscriptionPlanCode,
+    )?.name ?? 'Nava Premium';
   const operations = useMemo(
     () =>
       dashboardOperations({
@@ -211,6 +237,67 @@ export default function DashboardScreen() {
       return () => setIsDashboardFocused(false);
     }, []),
   );
+
+  const showSubscriptionCelebration = useCallback((planName: string) => {
+    setSubscriptionCelebrationPlanName(planName);
+    setSubscriptionCelebrationRunKey((current) => current + 1);
+    setIsSubscriptionCelebrationVisible(true);
+  }, []);
+  const finishSubscriptionCelebration = useCallback(() => {
+    setIsSubscriptionCelebrationVisible(false);
+  }, []);
+
+  useEffect(() => {
+    if (!user || !currentSubscriptionPlanCode || !currentSubscriptionStatus)
+      return;
+
+    let isMounted = true;
+    const nextState = {
+      planCode: currentSubscriptionPlanCode,
+      status: currentSubscriptionStatus,
+    };
+    const userId = user.id;
+    const planName = currentSubscriptionPlanName;
+
+    subscriptionCelebrationQueueRef.current =
+      subscriptionCelebrationQueueRef.current.then(async () => {
+        const inMemoryState = subscriptionCelebrationStateRef.current;
+        let previousState =
+          inMemoryState?.userId === userId ? inMemoryState.state : null;
+
+        if (previousState === null) {
+          try {
+            previousState = await getSubscriptionCelebrationState(userId);
+          } catch {
+            // Si el almacenamiento no está disponible, la sesión actual sigue funcionando.
+          }
+        }
+
+        const shouldCelebrate = shouldCelebrateSubscriptionActivation(
+          previousState,
+          nextState,
+        );
+        subscriptionCelebrationStateRef.current = { state: nextState, userId };
+
+        try {
+          await storeSubscriptionCelebrationState(userId, nextState);
+        } catch {
+          // El efecto no depende de que el almacenamiento persista en este dispositivo.
+        }
+
+        if (isMounted && shouldCelebrate) showSubscriptionCelebration(planName);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    currentSubscriptionPlanName,
+    currentSubscriptionPlanCode,
+    currentSubscriptionStatus,
+    showSubscriptionCelebration,
+    user,
+  ]);
 
   useEffect(() => {
     let isMounted = true;
@@ -494,6 +581,18 @@ export default function DashboardScreen() {
             </Text>
           </View>
         </View>
+        <Pressable
+          accessibilityHint="Reproduce el efecto de suscripción Premium."
+          accessibilityLabel="Previsualizar celebración de suscripción"
+          accessibilityRole="button"
+          onPress={() =>
+            showSubscriptionCelebration(currentSubscriptionPlanName)
+          }
+          style={styles.subscriptionPreviewButton}
+        >
+          <Ionicons color="#9A6A17" name="sparkles-outline" size={15} />
+          <Text style={styles.subscriptionPreviewLabel}>Vista Premium</Text>
+        </Pressable>
 
         <View style={styles.salesCard}>
           <View style={styles.salesHeader}>
@@ -712,6 +811,12 @@ export default function DashboardScreen() {
       </ScrollView>
 
       <BottomNavigation active="dashboard" />
+      <SubscriptionActivationCelebration
+        key={subscriptionCelebrationRunKey}
+        onComplete={finishSubscriptionCelebration}
+        planName={subscriptionCelebrationPlanName}
+        visible={isSubscriptionCelebrationVisible}
+      />
       <BookingLinkSheet
         onClose={() => setIsBookingSheetOpen(false)}
         url={bookingUrl}

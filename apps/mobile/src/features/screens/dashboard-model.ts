@@ -20,6 +20,8 @@ export const WELCOME_SURVEY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 export const WELCOME_SURVEY_RESPONSE_KEY =
   'barber-saas.welcome-survey-response';
 export const QUICK_ACTIONS_STORAGE_KEY = 'barber-saas.dashboard-quick-actions';
+export const SUBSCRIPTION_CELEBRATION_STORAGE_KEY =
+  'barber-saas.subscription-celebration';
 export const WELCOME_SURVEY_OPTIONS = [
   'Publicidad',
   'Redes sociales de Nava (Facebook o Instagram)',
@@ -29,6 +31,10 @@ export const WELCOME_SURVEY_OPTIONS = [
 ] as const;
 
 export type WelcomeSurveyOption = (typeof WELCOME_SURVEY_OPTIONS)[number];
+export type SubscriptionCelebrationState = Pick<
+  SubscriptionResponse['current'],
+  'planCode' | 'status'
+>;
 export type ExtraQuickActionId =
   | 'agenda'
   | 'booking-settings'
@@ -96,6 +102,63 @@ export function welcomeSurveyStorageKey(userId: string) {
 
 export function quickActionsStorageKey(userId: string) {
   return `${QUICK_ACTIONS_STORAGE_KEY}.${userId}`;
+}
+
+export function subscriptionCelebrationStorageKey(userId: string) {
+  return `${SUBSCRIPTION_CELEBRATION_STORAGE_KEY}.${userId}`;
+}
+
+export function shouldCelebrateSubscriptionActivation(
+  previous: SubscriptionCelebrationState | null,
+  current: SubscriptionCelebrationState | null,
+) {
+  if (!previous || !current) return false;
+  if (current.status !== 'active' || current.planCode === 'free') return false;
+
+  return previous.status !== 'active' || previous.planCode !== current.planCode;
+}
+
+export async function getSubscriptionCelebrationState(userId: string) {
+  const key = subscriptionCelebrationStorageKey(userId);
+  const value =
+    Platform.OS === 'web'
+      ? globalThis.localStorage.getItem(key)
+      : await SecureStore.getItemAsync(key);
+  if (!value) return null;
+
+  try {
+    const parsed = JSON.parse(value) as Partial<SubscriptionCelebrationState>;
+    const isPlanCode =
+      parsed.planCode === 'essential' ||
+      parsed.planCode === 'free' ||
+      parsed.planCode === 'local' ||
+      parsed.planCode === 'multi';
+    const isStatus =
+      parsed.status === 'active' ||
+      parsed.status === 'cancelled' ||
+      parsed.status === 'free' ||
+      parsed.status === 'past_due' ||
+      parsed.status === 'suspended' ||
+      parsed.status === 'trial';
+    return isPlanCode && isStatus
+      ? { planCode: parsed.planCode, status: parsed.status }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function storeSubscriptionCelebrationState(
+  userId: string,
+  state: SubscriptionCelebrationState,
+) {
+  const key = subscriptionCelebrationStorageKey(userId);
+  const value = JSON.stringify(state);
+  if (Platform.OS === 'web') {
+    globalThis.localStorage.setItem(key, value);
+    return;
+  }
+  await SecureStore.setItemAsync(key, value);
 }
 
 export async function getExtraQuickActionIds(userId: string) {

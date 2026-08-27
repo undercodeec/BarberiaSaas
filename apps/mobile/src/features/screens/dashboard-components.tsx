@@ -7,6 +7,7 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
+  Image,
   KeyboardAvoidingView,
   Modal,
   PanResponder,
@@ -90,6 +91,216 @@ export function LiquidGradient() {
     </Svg>
   );
 }
+
+export function SubscriptionActivationCelebration({
+  onComplete,
+  planName,
+  visible,
+}: {
+  readonly onComplete?: () => void;
+  readonly planName: string;
+  readonly visible: boolean;
+}) {
+  const insets = useSafeAreaInsets();
+  const glowOpacity = useRef(new Animated.Value(0)).current;
+  const bannerProgress = useRef(new Animated.Value(0)).current;
+  const [isRendered, setIsRendered] = useState(visible);
+
+  useEffect(() => {
+    if (!visible) {
+      setIsRendered(false);
+      return;
+    }
+
+    setIsRendered(true);
+    glowOpacity.setValue(0);
+    bannerProgress.setValue(0);
+
+    const animation = Animated.sequence([
+      Animated.timing(glowOpacity, {
+        duration: 420,
+        easing: Easing.out(Easing.cubic),
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.timing(glowOpacity, {
+        duration: 1_120,
+        easing: Easing.inOut(Easing.sin),
+        toValue: 0,
+        useNativeDriver: true,
+      }),
+      Animated.sequence([
+        Animated.timing(bannerProgress, {
+          duration: 360,
+          easing: Easing.out(Easing.cubic),
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+        Animated.delay(3_000),
+        Animated.timing(bannerProgress, {
+          duration: 320,
+          easing: Easing.in(Easing.cubic),
+          toValue: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]);
+
+    animation.start(({ finished }) => {
+      if (finished) {
+        setIsRendered(false);
+        onComplete?.();
+      }
+    });
+
+    return () => animation.stop();
+  }, [bannerProgress, glowOpacity, onComplete, visible]);
+
+  const bannerTranslateY = bannerProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-148, 0],
+  });
+
+  if (!isRendered) return null;
+
+  return (
+    <View pointerEvents="none" style={subscriptionCelebrationStyles.overlay}>
+      <Animated.View
+        style={[subscriptionCelebrationStyles.glow, { opacity: glowOpacity }]}
+      >
+        <Svg
+          height="100%"
+          preserveAspectRatio="none"
+          viewBox="0 0 100 100"
+          width="100%"
+        >
+          <Defs>
+            <SvgLinearGradient
+              id="subscription-activation-gold"
+              x1="0"
+              x2="1"
+              y1="0"
+              y2="1"
+            >
+              <Stop offset="0" stopColor="#B47D17" />
+              <Stop offset="0.48" stopColor="#FFF0B5" />
+              <Stop offset="0.7" stopColor="#E1B85B" />
+              <Stop offset="1" stopColor="#B47D17" />
+            </SvgLinearGradient>
+          </Defs>
+          <Rect
+            fill="none"
+            height="94"
+            rx="3"
+            stroke="url(#subscription-activation-gold)"
+            strokeOpacity={0.2}
+            strokeWidth="4"
+            width="94"
+            x="3"
+            y="3"
+          />
+          <Rect
+            fill="none"
+            height="97"
+            rx="2"
+            stroke="url(#subscription-activation-gold)"
+            strokeOpacity={0.52}
+            strokeWidth="1.7"
+            width="97"
+            x="1.5"
+            y="1.5"
+          />
+          <Rect
+            fill="none"
+            height="99"
+            rx="1"
+            stroke="url(#subscription-activation-gold)"
+            strokeWidth="0.65"
+            width="99"
+            x="0.5"
+            y="0.5"
+          />
+        </Svg>
+      </Animated.View>
+
+      <Animated.View
+        accessibilityLiveRegion="polite"
+        style={[
+          subscriptionCelebrationStyles.bannerWrap,
+          {
+            opacity: bannerProgress,
+            paddingTop: insets.top + 8,
+            transform: [{ translateY: bannerTranslateY }],
+          },
+        ]}
+      >
+        <View style={subscriptionCelebrationStyles.banner}>
+          <View style={subscriptionCelebrationStyles.bannerImageWrap}>
+            <Image
+              accessibilityLabel="Corona dorada de suscripción"
+              resizeMode="contain"
+              // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
+              source={require('../../../assets/suscripcion.png')}
+              style={subscriptionCelebrationStyles.bannerImage}
+            />
+          </View>
+          <View style={subscriptionCelebrationStyles.bannerCopy}>
+            <View style={subscriptionCelebrationStyles.bannerHeading}>
+              <Ionicons color="#B47D17" name="sparkles" size={18} />
+              <Text style={subscriptionCelebrationStyles.bannerEyebrow}>
+                Ahora eres miembro de Nava Premium
+              </Text>
+            </View>
+            <Text style={subscriptionCelebrationStyles.bannerTitle}>
+              Tu plan {planName} ya está activo.
+            </Text>
+          </View>
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
+const subscriptionCelebrationStyles = StyleSheet.create({
+  banner: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(225, 184, 91, 0.58)',
+    borderRadius: 22,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    minHeight: 76,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    shadowColor: '#B47D17',
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+  },
+  bannerCopy: { flex: 1, gap: 5 },
+  bannerEyebrow: { color: '#9A6A17', flex: 1, fontSize: 12, fontWeight: '900' },
+  bannerHeading: { alignItems: 'center', flexDirection: 'row', gap: 5 },
+  bannerImage: { height: 48, width: 58 },
+  bannerImageWrap: {
+    alignItems: 'center',
+    backgroundColor: '#FFF9EB',
+    borderRadius: 17,
+    height: 54,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    width: 58,
+  },
+  bannerTitle: { color: '#1C1C1C', fontSize: 15, fontWeight: '900' },
+  bannerWrap: {
+    left: 18,
+    position: 'absolute',
+    right: 18,
+    top: 0,
+  },
+  glow: { ...StyleSheet.absoluteFill },
+  overlay: { ...StyleSheet.absoluteFill, zIndex: 100 },
+});
 
 export function LiquidWaveSurface({
   copy,
