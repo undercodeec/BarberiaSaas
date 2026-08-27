@@ -5,26 +5,36 @@
 
 ## Registro de ejecución
 
-* Commit desplegado: `0ead479`.
-* Base Neon: 58 migraciones aplicadas; la última fue
+- Commit desplegado: `0ead479`.
+- Base Neon: 58 migraciones aplicadas; la última fue
   `20260821100000_subscription_billing_period_days`.
-* Servicio: `nava-admin.service` activo y atendiendo localmente en el puerto
+- Servicio: `nava-admin.service` activo y atendiendo localmente en el puerto
   `3001`.
-* Publicación: Nginx y Certbot entregan `https://admin.navacloud.app` con
+- Publicación: Nginx y Certbot entregan `https://admin.navacloud.app` con
   respuesta `HTTP/2 200`.
-* Acceso: bootstrap protegido con contraseña derivada mediante scrypt y OTP por
+- Acceso: bootstrap protegido con contraseña derivada mediante scrypt y OTP por
   correo. `PLATFORM_ADMIN_PASSWORD_HASH` debe comenzar por
-  `scrypt$16384$8$1$`; no admite hashes bcrypt ni se pega en el formulario.
+  `scrypt$32768$8$1$`; no admite hashes bcrypt ni se pega en el formulario.
 
 La plantilla systemd inicia el binario local de Next directamente. Así conserva
 `ProtectHome=true` sin depender de la caché de Corepack/pnpm en `/home/nava`.
 
 ## Requisitos
 
-* DNS y TLS para el dominio elegido, por ejemplo `admin.navacloud.app`.
-* API y migraciones actualizadas, incluida `20260820190000_platform_operations_center`.
-* `PLATFORM_ADMIN_EMAILS`, `PLATFORM_ADMIN_PASSWORD_HASH` y SMTP configurados en la API.
-* `NEXT_PUBLIC_API_URL` con la URL pública HTTPS de la API durante el build del Admin.
+- DNS y TLS para el dominio elegido, por ejemplo `admin.navacloud.app`.
+- API y migraciones actualizadas, incluida `20260820190000_platform_operations_center`.
+- `PLATFORM_ADMIN_EMAILS`, `PLATFORM_ADMIN_PASSWORD_HASH` y SMTP configurados en la API.
+- `NEXT_PUBLIC_API_URL` con la URL pública HTTPS de la API durante el build del Admin.
+
+Genere el hash bootstrap en una terminal interactiva y copie únicamente la salida
+en el gestor de secretos:
+
+```bash
+pnpm --filter @barber-saas/api password:hash
+```
+
+El comando no muestra ni guarda la contraseña y genera el formato
+`scrypt$32768$8$1$` exigido en producción.
 
 ## Preparación
 
@@ -61,13 +71,13 @@ Usar `deploy/nginx/nava-admin.conf.example` como base, instalarlo en el director
 
 ## Aceptación obligatoria
 
-* Login con operador bootstrap y segundo factor OTP.
-* Alta de un operador de soporte, acceso con su contraseña individual y verificación de que no puede suspender ni cambiar planes.
-* Ficha 360° sin correo completo del propietario ni secretos PayPhone.
-* Creación/seguimiento de incidencia, reconocimiento de alerta y reintento de notificación.
-* Exportación CSV de auditoría y aparición de `platform.export.downloaded` en la bitácora.
-* Revisión responsive y Axe en escritorio/móvil.
-* Revisión de logs de API/Admin sin contraseñas, OTP, tokens ni secretos.
+- Login con operador bootstrap y segundo factor OTP.
+- Alta de un operador de soporte, acceso con su contraseña individual y verificación de que no puede suspender ni cambiar planes.
+- Ficha 360° sin correo completo del propietario ni secretos PayPhone.
+- Creación/seguimiento de incidencia, reconocimiento de alerta y reintento de notificación.
+- Exportación CSV de auditoría y aparición de `platform.export.downloaded` en la bitácora.
+- Revisión responsive y Axe en escritorio/móvil.
+- Revisión de logs de API/Admin sin contraseñas, OTP, tokens ni secretos.
 
 El despliegue quedó completado con URL, commit, migraciones, servicio y HTTPS
 verificados. La aceptación funcional restante se limita a las comprobaciones de
@@ -94,25 +104,25 @@ Antes de implementar cualquier funcionalidad:
 
 1. Leer completamente:
 
-   * `ESTADO_PROYECTO.md`
-   * `DESPLIEGUE_PANEL_ADMIN.md`
-   * `packages/database/prisma/schema.prisma`
-   * rutas existentes de `apps/api`
-   * estructura actual de `apps/admin`
-   * paquetes compartidos de autenticación, permisos, validación y cliente HTTP.
+   - `ESTADO_PROYECTO.md`
+   - `DESPLIEGUE_PANEL_ADMIN.md`
+   - `packages/database/prisma/schema.prisma`
+   - rutas existentes de `apps/api`
+   - estructura actual de `apps/admin`
+   - paquetes compartidos de autenticación, permisos, validación y cliente HTTP.
 
 2. Inspeccionar primero qué funcionalidades ya existen.
 
 3. No duplicar:
 
-   * modelos;
-   * endpoints;
-   * componentes;
-   * permisos;
-   * tipos;
-   * validadores;
-   * servicios;
-   * eventos de auditoría.
+   - modelos;
+   - endpoints;
+   - componentes;
+   - permisos;
+   - tipos;
+   - validadores;
+   - servicios;
+   - eventos de auditoría.
 
 4. Reutilizar la arquitectura y convenciones existentes.
 
@@ -124,17 +134,17 @@ Antes de implementar cualquier funcionalidad:
 
 7. Mantener:
 
-   * TypeScript estricto;
-   * Prisma;
-   * PostgreSQL;
-   * Fastify;
-   * Next.js;
-   * API propia como única frontera de datos;
-   * aislamiento multi-tenant;
-   * sesiones existentes;
-   * OTP administrativo;
-   * esquema actual de auditoría;
-   * diseño visual existente de `Nava Control Center`.
+   - TypeScript estricto;
+   - Prisma;
+   - PostgreSQL;
+   - Fastify;
+   - Next.js;
+   - API propia como única frontera de datos;
+   - aislamiento multi-tenant;
+   - sesiones existentes;
+   - OTP administrativo;
+   - esquema actual de auditoría;
+   - diseño visual existente de `Nava Control Center`.
 
 8. No introducir Supabase Auth, Firebase Auth u otro proveedor de autenticación.
 
@@ -153,17 +163,17 @@ Antes de implementar cualquier funcionalidad:
 
 El panel actualmente administra principalmente:
 
-* organizaciones;
-* planes;
-* trial;
-* uso;
-* suspensión/reactivación;
-* operadores administrativos;
-* incidencias;
-* alertas;
-* notificaciones;
-* soporte;
-* auditoría.
+- organizaciones;
+- planes;
+- trial;
+- uso;
+- suspensión/reactivación;
+- operadores administrativos;
+- incidencias;
+- alertas;
+- notificaciones;
+- soporte;
+- auditoría.
 
 El siguiente objetivo es agregar una verdadera capa de administración de
 plataforma que permita gestionar:
@@ -216,9 +226,9 @@ autenticado a Nava.
 
 No confundir:
 
-* `User`: cuenta de acceso a Nava.
-* `Membership`: relación del usuario con una organización.
-* `Client`: cliente de una barbería.
+- `User`: cuenta de acceso a Nava.
+- `Membership`: relación del usuario con una organización.
+- `Client`: cliente de una barbería.
 
 El Super Admin debe trabajar principalmente con `User` y `Membership`.
 
@@ -249,26 +259,26 @@ Crear una vista global paginada y segura.
 
 Debe permitir visualizar como mínimo:
 
-* nombre;
-* email enmascarado;
-* teléfono enmascarado;
-* estado de cuenta;
-* estado de verificación;
-* fecha de registro;
-* último acceso si existe información fiable;
-* número de organizaciones asociadas;
-* roles principales;
-* estado de seguridad relevante;
-* cantidad de sesiones activas si el modelo actual permite obtenerla.
+- nombre;
+- email enmascarado;
+- teléfono enmascarado;
+- estado de cuenta;
+- estado de verificación;
+- fecha de registro;
+- último acceso si existe información fiable;
+- número de organizaciones asociadas;
+- roles principales;
+- estado de seguridad relevante;
+- cantidad de sesiones activas si el modelo actual permite obtenerla.
 
 ### Búsqueda
 
 Permitir búsqueda por:
 
-* nombre;
-* email;
-* teléfono;
-* identificador interno.
+- nombre;
+- email;
+- teléfono;
+- identificador interno.
 
 La búsqueda debe resolverse en backend.
 
@@ -278,13 +288,13 @@ No descargar todos los usuarios y filtrar únicamente en frontend.
 
 Implementar cuando los datos existentes lo permitan:
 
-* activo;
-* suspendido;
-* eliminado/baja lógica;
-* verificado/no verificado;
-* rol;
-* organización;
-* fecha de registro.
+- activo;
+- suspendido;
+- eliminado/baja lógica;
+- verificado/no verificado;
+- rol;
+- organización;
+- fecha de registro.
 
 Los filtros deben poder combinarse.
 
@@ -314,26 +324,26 @@ sin exponer secretos.
 
 Mostrar:
 
-* identificador;
-* nombre;
-* estado;
-* fecha de registro;
-* última actividad disponible;
-* número de organizaciones;
-* número de sesiones;
-* estado de verificación.
+- identificador;
+- nombre;
+- estado;
+- fecha de registro;
+- última actividad disponible;
+- número de organizaciones;
+- número de sesiones;
+- estado de verificación.
 
 ### Cuenta
 
 Mostrar información administrativa sobre:
 
-* correo;
-* teléfono;
-* verificación;
-* estado de cuenta;
-* fecha de creación;
-* fecha de actualización;
-* baja lógica si existe.
+- correo;
+- teléfono;
+- verificación;
+- estado de cuenta;
+- fecha de creación;
+- fecha de actualización;
+- baja lógica si existe.
 
 Los datos sensibles deben seguir las reglas de enmascaramiento del panel.
 
@@ -345,12 +355,12 @@ Mostrar todos los `Membership` asociados al usuario.
 
 Por cada organización:
 
-* nombre;
-* ID;
-* rol;
-* estado del Membership;
-* sede/al alcance si aplica;
-* fecha de asociación.
+- nombre;
+- ID;
+- rol;
+- estado del Membership;
+- sede/al alcance si aplica;
+- fecha de asociación.
 
 Debe existir navegación:
 
@@ -376,9 +386,9 @@ Permitir al rol autorizado suspender el acceso de un usuario.
 
 Antes de ejecutar:
 
-* mostrar confirmación;
-* exigir motivo;
-* identificar consecuencias.
+- mostrar confirmación;
+- exigir motivo;
+- identificar consecuencias.
 
 Registrar auditoría.
 
@@ -436,10 +446,10 @@ No devolver hashes de tokens al Admin.
 
 El Super Admin NO debe:
 
-* conocer la contraseña;
-* visualizar la contraseña;
-* escribir directamente una contraseña nueva;
-* recibir hashes de contraseña.
+- conocer la contraseña;
+- visualizar la contraseña;
+- escribir directamente una contraseña nueva;
+- recibir hashes de contraseña.
 
 Debe existir una acción:
 
@@ -490,20 +500,20 @@ Usuario
 
 Evaluar e implementar, únicamente si son coherentes con las reglas actuales:
 
-* visualizar Membership;
-* cambiar rol;
-* desactivar Membership;
-* reactivar Membership;
-* retirar al usuario de una organización.
+- visualizar Membership;
+- cambiar rol;
+- desactivar Membership;
+- reactivar Membership;
+- retirar al usuario de una organización.
 
 Todas las acciones deben respetar invariantes existentes.
 
 No introducir una vía administrativa que permita:
 
-* dejar una organización activa sin propietario válido;
-* romper el onboarding;
-* violar restricciones de roles;
-* saltarse reglas multi-tenant.
+- dejar una organización activa sin propietario válido;
+- romper el onboarding;
+- violar restricciones de roles;
+- saltarse reglas multi-tenant.
 
 ---
 
@@ -558,12 +568,12 @@ Reutilizar la baja lógica y reglas existentes de cierre de cuenta.
 
 Una operación destructiva debe mostrar antes:
 
-* cuenta afectada;
-* organizaciones;
-* Memberships;
-* posibles consecuencias;
-* motivo;
-* confirmación adicional.
+- cuenta afectada;
+- organizaciones;
+- Memberships;
+- posibles consecuencias;
+- motivo;
+- confirmación adicional.
 
 Registrar auditoría.
 
@@ -577,20 +587,20 @@ Agregar en la ficha 360°, si existen datos fiables:
 
 Mostrar:
 
-* cantidad;
-* creación;
-* última actividad;
-* dispositivo aproximado si actualmente se registra;
-* estado.
+- cantidad;
+- creación;
+- última actividad;
+- dispositivo aproximado si actualmente se registra;
+- estado.
 
 No introducir fingerprinting invasivo exclusivamente para esta pantalla.
 
 No mostrar:
 
-* token;
-* token hash;
-* refresh token;
-* secretos.
+- token;
+- token hash;
+- refresh token;
+- secretos.
 
 ## Dispositivos / FCM
 
@@ -633,41 +643,41 @@ repositorio.
 
 Puede:
 
-* administrar operadores;
-* gestionar usuarios;
-* gestionar organizaciones;
-* suspender/reactivar;
-* cambiar planes;
-* realizar acciones sensibles;
-* acceder a auditoría;
-* acceder a diagnóstico.
+- administrar operadores;
+- gestionar usuarios;
+- gestionar organizaciones;
+- suspender/reactivar;
+- cambiar planes;
+- realizar acciones sensibles;
+- acceder a auditoría;
+- acceder a diagnóstico.
 
 ### Operations Admin
 
 Puede administrar operación general pero no necesariamente:
 
-* operadores Super Admin;
-* configuración crítica;
-* secretos;
-* cambios de máxima sensibilidad.
+- operadores Super Admin;
+- configuración crítica;
+- secretos;
+- cambios de máxima sensibilidad.
 
 ### Support
 
 Debe poder:
 
-* consultar usuarios;
-* consultar organizaciones;
-* abrir incidencias;
-* revisar diagnóstico;
-* reintentar acciones operativas permitidas.
+- consultar usuarios;
+- consultar organizaciones;
+- abrir incidencias;
+- revisar diagnóstico;
+- reintentar acciones operativas permitidas.
 
 No debe:
 
-* suspender organización si la política actual lo impide;
-* cambiar plan;
-* realizar transferencias de propiedad;
-* administrar operadores;
-* visualizar secretos.
+- suspender organización si la política actual lo impide;
+- cambiar plan;
+- realizar transferencias de propiedad;
+- administrar operadores;
+- visualizar secretos.
 
 ### Auditor
 
@@ -705,26 +715,26 @@ evaluar primero la convención actual del proyecto.
 
 Para mutaciones registrar cuando sea compatible con el modelo:
 
-* operador;
-* acción;
-* recurso;
-* resourceId;
-* timestamp;
-* resultado;
-* motivo;
-* metadatos estrictamente necesarios.
+- operador;
+- acción;
+- recurso;
+- resourceId;
+- timestamp;
+- resultado;
+- motivo;
+- metadatos estrictamente necesarios.
 
 Nunca guardar en auditoría:
 
-* contraseñas;
-* hashes de contraseña;
-* OTP;
-* tokens;
-* PayPhone secrets;
-* credenciales SMTP;
-* claves FCM;
-* `DATABASE_URL`;
-* otros secretos.
+- contraseñas;
+- hashes de contraseña;
+- OTP;
+- tokens;
+- PayPhone secrets;
+- credenciales SMTP;
+- claves FCM;
+- `DATABASE_URL`;
+- otros secretos.
 
 ---
 
@@ -738,56 +748,56 @@ La ficha debería permitir consultar:
 
 ## Identidad
 
-* ID;
-* nombre;
-* fecha de creación;
-* estado.
+- ID;
+- nombre;
+- fecha de creación;
+- estado.
 
 ## Propiedad
 
-* owner actual;
-* enlace a ficha del usuario.
+- owner actual;
+- enlace a ficha del usuario.
 
 ## Equipo
 
-* cantidad de Members;
-* roles;
-* usuarios relacionados.
+- cantidad de Members;
+- roles;
+- usuarios relacionados.
 
 ## Sedes
 
-* cantidad;
-* estado.
+- cantidad;
+- estado.
 
 ## Suscripción
 
-* plan;
-* estado;
-* trial;
-* fecha de inicio;
-* fecha de expiración;
-* periodo;
-* límites.
+- plan;
+- estado;
+- trial;
+- fecha de inicio;
+- fecha de expiración;
+- periodo;
+- límites.
 
 ## Uso
 
 Según métricas disponibles:
 
-* profesionales;
-* clientes;
-* reservas;
-* sedes;
-* otros límites del plan.
+- profesionales;
+- clientes;
+- reservas;
+- sedes;
+- otros límites del plan.
 
 ## Operación
 
 Información resumida de:
 
-* agenda;
-* Caja;
-* inventario;
-* pedidos;
-* notificaciones.
+- agenda;
+- Caja;
+- inventario;
+- pedidos;
+- notificaciones.
 
 Evitar convertir la ficha Super Admin en una réplica completa de la aplicación
 de la barbería.
@@ -797,6 +807,15 @@ Debe ser una herramienta de operación y diagnóstico.
 ---
 
 # Fase SA-11 — Billing y suscripciones
+
+## Avance local — 26 de agosto de 2026
+
+Se implementó una primera sección global de **Suscripciones**, restringida a
+los roles Billing y Super Admin. Obtiene de la API la suscripción vigente, la
+última factura, el último intento de pago y hasta tres cambios recientes por
+organización, con filtros backend. No expone URLs, referencias de proveedor ni
+secretos, y no genera cobros simulados. La vista sigue pendiente de despliegue
+y del historial transaccional íntegro por organización.
 
 No implementar un sistema de pagos nuevo hasta revisar el estado real de la
 integración de suscripciones Nava.
@@ -809,17 +828,17 @@ Suscripciones
 
 Cuando existan datos fiables, mostrar:
 
-* organización;
-* plan;
-* estado;
-* inicio;
-* trial;
-* periodo;
-* próxima renovación;
-* proveedor;
-* último pago;
-* estado del último pago;
-* historial.
+- organización;
+- plan;
+- estado;
+- inicio;
+- trial;
+- periodo;
+- próxima renovación;
+- proveedor;
+- último pago;
+- estado del último pago;
+- historial.
 
 Separar:
 
@@ -840,13 +859,13 @@ plan.
 
 Evaluar:
 
-* cambiar plan;
-* extender trial;
-* conceder días;
-* suspender;
-* reactivar;
-* cancelar renovación;
-* registrar ajuste administrativo.
+- cambiar plan;
+- extender trial;
+- conceder días;
+- suspender;
+- reactivar;
+- cancelar renovación;
+- registrar ajuste administrativo.
 
 Toda modificación debe quedar auditada.
 
@@ -887,17 +906,17 @@ Un servicio solo debe aparecer saludable si existe una comprobación real.
 
 Añadir progresivamente:
 
-* errores recientes;
-* notificaciones fallidas;
-* reintentos agotados;
-* tamaño de colas;
-* pagos fallidos cuando exista billing real;
-* pedidos expirados;
-* incidencias abiertas;
-* reservas recientes;
-* usuarios registrados;
-* organizaciones activas;
-* trials próximos a vencer.
+- errores recientes;
+- notificaciones fallidas;
+- reintentos agotados;
+- tamaño de colas;
+- pagos fallidos cuando exista billing real;
+- pedidos expirados;
+- incidencias abiertas;
+- reservas recientes;
+- usuarios registrados;
+- organizaciones activas;
+- trials próximos a vencer.
 
 No convertir consultas costosas en peticiones ejecutadas constantemente.
 
@@ -985,16 +1004,16 @@ el rol tenga permiso.
 
 Nunca mostrar en UI:
 
-* contraseña;
-* hash de contraseña;
-* OTP;
-* session token;
-* refresh token;
-* API secrets;
-* PayPhone secrets;
-* claves SMTP;
-* claves FCM;
-* claves de cifrado.
+- contraseña;
+- hash de contraseña;
+- OTP;
+- session token;
+- refresh token;
+- API secrets;
+- PayPhone secrets;
+- claves SMTP;
+- claves FCM;
+- claves de cifrado.
 
 Tampoco registrar estos valores en logs del navegador o servidor.
 
@@ -1050,10 +1069,10 @@ Las nuevas operaciones administrativas deben pasar por endpoints de API.
 
 Separar claramente rutas internas de plataforma de:
 
-* rutas públicas;
-* rutas de barbería;
-* rutas de reservas;
-* rutas de clientes.
+- rutas públicas;
+- rutas de barbería;
+- rutas de reservas;
+- rutas de clientes.
 
 Reutilizar el sistema actual de autorización administrativa.
 
@@ -1068,13 +1087,13 @@ más cuidado.
 
 Obligatorio:
 
-* paginación;
-* límites máximos;
-* filtros backend;
-* índices cuando estén justificados;
-* seleccionar solo campos necesarios;
-* evitar N+1;
-* evitar devolver relaciones completas innecesariamente.
+- paginación;
+- límites máximos;
+- filtros backend;
+- índices cuando estén justificados;
+- seleccionar solo campos necesarios;
+- evitar N+1;
+- evitar devolver relaciones completas innecesariamente.
 
 Revisar `EXPLAIN` o comportamiento equivalente cuando una consulta nueva pueda
 crecer significativamente.
@@ -1112,16 +1131,16 @@ Cada funcionalidad nueva debe tener evidencia proporcional al riesgo.
 
 Agregar pruebas para:
 
-* autorización;
-* roles;
-* paginación;
-* búsqueda;
-* filtros;
-* suspensión;
-* reactivación;
-* revocación de sesiones;
-* Membership;
-* auditoría.
+- autorización;
+- roles;
+- paginación;
+- búsqueda;
+- filtros;
+- suspensión;
+- reactivación;
+- revocación de sesiones;
+- Membership;
+- auditoría.
 
 ## Multi-tenant
 
@@ -1167,29 +1186,29 @@ botones ocultos.
 
 No marcar `Usuarios` como completado hasta verificar:
 
-* [ ] Existe listado global.
-* [ ] Existe búsqueda backend.
-* [ ] Existe paginación backend.
-* [ ] Existen filtros principales.
-* [ ] Email/teléfono se muestran según política de PII.
-* [ ] Existe ficha 360°.
-* [ ] Se visualizan Memberships.
-* [ ] Se puede navegar entre usuario y organización.
-* [ ] Suspensión funciona realmente.
-* [ ] Reactivación funciona realmente.
-* [ ] Revocación de sesiones funciona realmente.
-* [ ] Recuperación utiliza el flujo seguro existente.
-* [ ] No se muestra contraseña.
-* [ ] No se muestra hash de contraseña.
-* [ ] No se muestran OTP.
-* [ ] No se muestran tokens.
-* [ ] Acciones sensibles requieren permiso backend.
-* [ ] Acciones sensibles quedan auditadas.
-* [ ] Support no puede ejecutar operaciones reservadas.
-* [ ] Super Admin sí puede ejecutar las operaciones correspondientes.
-* [ ] No existen errores TypeScript nuevos.
-* [ ] Pruebas relevantes pasan.
-* [ ] Vista responsive validada.
+- [ ] Existe listado global.
+- [ ] Existe búsqueda backend.
+- [ ] Existe paginación backend.
+- [ ] Existen filtros principales.
+- [ ] Email/teléfono se muestran según política de PII.
+- [ ] Existe ficha 360°.
+- [ ] Se visualizan Memberships.
+- [ ] Se puede navegar entre usuario y organización.
+- [ ] Suspensión funciona realmente.
+- [ ] Reactivación funciona realmente.
+- [ ] Revocación de sesiones funciona realmente.
+- [ ] Recuperación utiliza el flujo seguro existente.
+- [ ] No se muestra contraseña.
+- [ ] No se muestra hash de contraseña.
+- [ ] No se muestran OTP.
+- [ ] No se muestran tokens.
+- [ ] Acciones sensibles requieren permiso backend.
+- [ ] Acciones sensibles quedan auditadas.
+- [ ] Support no puede ejecutar operaciones reservadas.
+- [ ] Super Admin sí puede ejecutar las operaciones correspondientes.
+- [ ] No existen errores TypeScript nuevos.
+- [ ] Pruebas relevantes pasan.
+- [ ] Vista responsive validada.
 
 ---
 
@@ -1198,25 +1217,25 @@ No marcar `Usuarios` como completado hasta verificar:
 Antes de considerar el panel administrativo terminado para producción debe
 existir cobertura operacional de:
 
-* [ ] Dashboard.
-* [ ] Organizaciones.
-* [ ] Usuarios.
-* [ ] Memberships.
-* [ ] Operadores.
-* [ ] Planes.
-* [ ] Trials.
-* [ ] Incidencias.
-* [ ] Alertas.
-* [ ] Auditoría.
-* [ ] Sistema/diagnóstico.
-* [ ] Sesiones.
-* [ ] Seguridad.
-* [ ] PII.
-* [ ] RBAC administrativo.
-* [ ] E2E crítico.
-* [ ] Responsive.
-* [ ] Accesibilidad.
-* [ ] Logs sin secretos.
+- [ ] Dashboard.
+- [ ] Organizaciones.
+- [ ] Usuarios.
+- [ ] Memberships.
+- [ ] Operadores.
+- [ ] Planes.
+- [ ] Trials.
+- [ ] Incidencias.
+- [ ] Alertas.
+- [ ] Auditoría.
+- [ ] Sistema/diagnóstico.
+- [ ] Sesiones.
+- [ ] Seguridad.
+- [ ] PII.
+- [ ] RBAC administrativo.
+- [ ] E2E crítico.
+- [ ] Responsive.
+- [ ] Accesibilidad.
+- [ ] Logs sin secretos.
 
 Billing se considerará completo únicamente cuando exista el ciclo transaccional
 real de suscripciones Nava.
@@ -1289,11 +1308,11 @@ No afirmar que algo funciona únicamente porque compila.
 
 Cuando una función cambie datos:
 
-* verificar backend;
-* verificar autorización;
-* verificar persistencia;
-* verificar auditoría;
-* verificar UI.
+- verificar backend;
+- verificar autorización;
+- verificar persistencia;
+- verificar auditoría;
+- verificar UI.
 
 ---
 
@@ -1301,20 +1320,20 @@ Cuando una función cambie datos:
 
 No hacer durante estas fases:
 
-* impersonation/suplantación de usuarios;
-* visualizar contraseñas;
-* visualizar OTP;
-* visualizar tokens;
-* exponer secretos PayPhone;
-* editar Neon manualmente;
-* eliminar restricciones multi-tenant;
-* confiar en permisos frontend;
-* crear APIs administrativas públicas;
-* introducir datos ficticios en métricas productivas;
-* introducir pagos simulados como billing real;
-* sustituir arquitectura existente sin necesidad;
-* eliminar auditoría existente;
-* desplegar automáticamente a producción.
+- impersonation/suplantación de usuarios;
+- visualizar contraseñas;
+- visualizar OTP;
+- visualizar tokens;
+- exponer secretos PayPhone;
+- editar Neon manualmente;
+- eliminar restricciones multi-tenant;
+- confiar en permisos frontend;
+- crear APIs administrativas públicas;
+- introducir datos ficticios en métricas productivas;
+- introducir pagos simulados como billing real;
+- sustituir arquitectura existente sin necesidad;
+- eliminar auditoría existente;
+- desplegar automáticamente a producción.
 
 ---
 
@@ -1343,13 +1362,13 @@ pueda responder desde una sola consola:
 
 Todo ello sin:
 
-* acceder directamente a la base de datos;
-* conocer contraseñas;
-* conocer OTP;
-* conocer tokens;
-* revelar secretos;
-* romper el aislamiento multi-tenant;
-* utilizar impersonation.
+- acceder directamente a la base de datos;
+- conocer contraseñas;
+- conocer OTP;
+- conocer tokens;
+- revelar secretos;
+- romper el aislamiento multi-tenant;
+- utilizar impersonation.
 
 ---
 

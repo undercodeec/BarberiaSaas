@@ -142,11 +142,9 @@ export default function AccountTypeScreen() {
                 pressed ? styles.pressed : null,
               ]}
             >
-              <View
-                style={[styles.iconBox, selected && styles.iconBoxSelected]}
-              >
+              <View style={styles.iconBox}>
                 <Ionicons
-                  color={selected ? appTheme.colors.accentDark : '#101c2d'}
+                  color={appTheme.colors.accentDark}
                   name={option.icon}
                   size={27}
                 />
@@ -156,9 +154,9 @@ export default function AccountTypeScreen() {
                 <Text style={styles.optionCopy}>{option.description}</Text>
               </View>
               <Ionicons
-                color={selected ? '#287247' : appTheme.colors.textMuted}
-                name={selected ? 'checkmark-circle' : 'ellipse-outline'}
-                size={25}
+                color={selected ? '#4B8B65' : appTheme.colors.accentDark}
+                name={selected ? 'checkmark-circle-outline' : 'chevron-forward'}
+                size={23}
               />
             </Pressable>
           );
@@ -199,13 +197,13 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   iconBox: {
     alignItems: 'center',
-    backgroundColor: appTheme.colors.surfaceMuted,
-    borderRadius: 18,
-    height: 60,
+    backgroundColor: appTheme.colors.border,
+    borderRadius: 16,
+    height: 52,
     justifyContent: 'center',
-    width: 60,
+    marginRight: 13,
+    width: 52,
   },
-  iconBoxSelected: { backgroundColor: appTheme.colors.accentWash },
   notice: {
     alignItems: 'flex-start',
     backgroundColor: appTheme.colors.surface,
@@ -226,11 +224,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: appTheme.colors.surface,
     borderRadius: 20,
-    borderColor: 'transparent',
-    borderWidth: 1,
+    borderWidth: 0,
     flexDirection: 'row',
-    gap: 13,
-    minHeight: 92,
+    minHeight: 88,
     padding: 16,
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
@@ -242,8 +238,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   optionSelected: {
-    backgroundColor: appTheme.colors.accentWash,
-    borderColor: appTheme.colors.accentDark,
+    backgroundColor: appTheme.colors.surface,
+    borderColor: '#D9E7DE',
+    borderWidth: 1,
   },
   optionTitle: { color: appTheme.colors.text, fontSize: 17, fontWeight: '900' },
   pressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },

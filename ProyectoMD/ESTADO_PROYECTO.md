@@ -28,6 +28,12 @@
 > localmente y requieren desplegar sus migraciones y configuración productiva
 > antes de declararlos operativos.
 
+> Actualización de privacidad de clientes: **26 de agosto de 2026**. El commit
+> `8c0eeec` implementa y valida la restricción de datos de clientes por rol en
+> API y Mobile. No requiere migración de base de datos; sí requiere desplegar
+> API y Mobile conjuntamente para que los controles de servidor y la interfaz
+> correspondan al mismo modelo de acceso.
+
 ### Cierre de PayPhone Botón WEB en suscripciones (25 de agosto de 2026)
 
 - [x] La web comercial está publicada en `https://navacloud.app`, con TLS
@@ -115,7 +121,7 @@ el código actual y tiene evidencia proporcional a su riesgo.
 | ---------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Arquitectura y monorepo      | Completo              | pnpm/Turborepo, TypeScript estricto, CI, cuatro aplicaciones y paquetes compartidos.                                                                                                                                                      |
 | Autenticación y multi-tenant | Funcional             | Registro y OTP, sesiones opacas, recuperación, onboarding, roles y aislamiento por organización implementados. Las integraciones PostgreSQL no se ejecutaron en este corte.                                                               |
-| Operación de barbería        | Funcional             | Equipo, servicios, horarios, agenda, clientes, Caja, comisiones, inventario, reportes y notificaciones tienen API y UI móvil.                                                                                                             |
+| Operación de barbería        | Funcional             | Equipo, servicios, horarios, agenda, Caja, comisiones, inventario, reportes y notificaciones tienen API y UI móvil. Clientes aplica acceso mínimo por rol: ficha completa solo para owner/manager; teléfono enmascarado para recepción/barbero. |
 | Reserva pública              | Funcional             | Catálogo, disponibilidad, OTP, política, idempotencia, gestión por token, reseñas y recordatorios implementados.                                                                                                                          |
 | Comercio de productos        | Parcial               | Catálogo, carrito, pedidos, reserva de stock, PayPhone y gestión operativa existen; faltan endurecimiento público y pruebas específicas.                                                                                                  |
 | Planes y suscripciones       | Funcional en TEST     | Trial, plan Free, límites, feature flags y checkout WEB Prepare/Confirm están validados en sandbox. Producción requiere credenciales WEB y aceptación separadas.                                                                          |
@@ -266,14 +272,76 @@ Mobile / Web pública / Admin
       clínico y biometría. Es una salvaguarda de interfaz, no sustituye la
       prohibición contractual ni una revisión humana de contenido sensible.
 - [x] Exportación y eliminación múltiple desde Mobile.
-- [x] Autorización de clientes por rol aplicada en API y Mobile: `owner` y
-      `manager` gestionan ficha completa; recepción se limita a clientes de sus
-      sucursales y barberos a clientes de citas propias; ambos reciben teléfono
-      enmascarado. Los barberos solo consultan y crean notas propias.
-- [x] Exportación ordinaria movida al backend, exclusiva del `owner` y con
-      evento de auditoría sin PII; `manager` no recibe la acción de exportar.
-- [x] La caché tenant de Mobile incorpora el rol, por lo que un cambio de rol
-      descarta respuestas obtenidas con capacidades anteriores.
+
+#### Actualización: protección de datos de clientes por rol — completa en código (26 de agosto de 2026)
+
+La decisión aprobada distingue los roles operativos de una barbería del
+`platform_admin` de Nava. El principio aplicado es **mínimo privilegio**: la
+interfaz no ofrece una acción cuando el rol no la necesita, y la API vuelve a
+validar permiso, organización y alcance antes de devolver o modificar datos.
+
+| Rol | Alcance de clientes | Datos de contacto | Acciones permitidas |
+| --- | --- | --- | --- |
+| `owner` | Todos los clientes de su organización | Ficha completa, incluido teléfono | CRUD, etiquetas, notas, importación, comunicación y exportación CSV. |
+| `manager` | Todos los clientes de su organización | Ficha completa, incluido teléfono | CRUD, etiquetas, notas, importación y comunicación. No exporta. |
+| `receptionist` | Solo clientes con citas en sus sucursales asignadas | Teléfono enmascarado; correo, dirección, documento, fecha de nacimiento, notas y etiquetas no se entregan | Consulta limitada. No crea, edita, elimina, importa, exporta, etiqueta, comunica ni consulta/gestiona notas. |
+| `barber` | Solo clientes de citas asignadas a su propia membresía | Teléfono enmascarado; el resto de PII sensible no se entrega | Consulta limitada y lectura/creación de sus propias notas. No puede editar ni eliminar notas de terceros, ni gestionar clientes, etiquetas, importaciones, comunicaciones o exportaciones. |
+| `platform_admin` | Operación interna de plataforma; no es rol normal de una organización | PII enmascarada en el panel | No recibe acceso ordinario a fichas completas de clientes de las barberías. |
+
+Controles implementados:
+
+- [x] Catálogo compartido de permisos `client.*` en `@barber-saas/permissions`.
+  Se separan consulta de directorio/ficha, contacto completo o enmascarado,
+  PII, CRUD, notas, etiquetas, importación, exportación y comunicación.
+- [x] Contexto de acceso de clientes calculado en API a partir de la sesión y
+  membresía activa: organización, rol, membresía y sedes asignadas. No se
+  acepta un `organizationId` o alcance arbitrario desde Mobile.
+- [x] Filtro de datos en servidor para listado y detalle. Las respuestas de
+  recepción y barbero no contienen el teléfono original ni PII no autorizada;
+  el teléfono queda limitado a sus últimos cuatro dígitos.
+- [x] Restricción de búsquedas: los roles con contacto enmascarado no pueden
+  usar teléfono como criterio de búsqueda.
+- [x] Alcance relacional en servidor: recepción queda limitada a citas de sus
+  sedes y barbero a citas con su propia `membershipId`. La misma regla se
+  aplica al seleccionar un cliente existente durante la creación de una cita.
+- [x] Agenda endurecida con el alcance de sede/membresía y serialización de
+  clientes sin contacto completo para roles restringidos. El flujo público de
+  reservas conserva explícitamente la respuesta de gestión necesaria para su
+  titular, sin convertirlo en acceso de colaboradores.
+- [x] Notas protegidas en API: barbero solo puede leer y crear sus notas sobre
+  clientes que le correspondan; owner y manager mantienen la gestión completa.
+- [x] Exportación trasladada al endpoint autenticado
+  `POST /v1/clients/export`. Solo `owner` puede exportar hasta 500 clientes;
+  el CSV se construye en backend, protege contra inyección de fórmulas y deja
+  el evento `client.export.created` sin valores PII en la auditoría.
+- [x] Mobile adapta menú, acciones masivas, formularios, etiquetas, detalle,
+  notas, alta rápida desde nueva cita y recordatorios de WhatsApp según la
+  capacidad del rol. La exportación cliente-side fue eliminada.
+- [x] La clave de caché de Mobile incluye el rol activo y el cambio de rol
+  invalida las respuestas previas, evitando mostrar datos cargados con una
+  capacidad superior.
+
+Evidencia local del cambio `8c0eeec`:
+
+| Validación | Resultado |
+| --- | --- |
+| Pruebas API | 59 aprobadas; 32 omitidas por no configurar `TEST_DATABASE_URL`. Incluye enmascaramiento, respuestas de agenda y alcance de recepción/barbero. |
+| Pruebas Mobile | 28 suites y 84 pruebas aprobadas. |
+| Pruebas de permisos | 6 aprobadas. |
+| Cliente API | 2 pruebas aprobadas. |
+| Typecheck | API, Mobile, permisos y cliente API aprobados. |
+| Calidad específica | ESLint de los archivos modificados, build de API y `git diff --check` aprobados. |
+
+Pendientes específicos antes de ampliar este módulo:
+
+- [ ] Ejecutar las pruebas de integración de autorización contra una base
+      PostgreSQL aislada en CI o en el corte de despliegue.
+- [ ] Añadir paginación, límites de frecuencia y métricas de seguridad a las
+      consultas y exportación de clientes si el volumen del piloto lo exige.
+- [ ] Mantener cualquier acceso excepcional de soporte como flujo explícito,
+      temporal y auditado; no conceder fichas completas a `platform_admin` por
+      defecto.
+
 - [x] Tras cerrar un negocio, la persona propietaria puede descargar durante
       30 días desde Ajustes un CSV de datos o un ZIP con datos e imágenes
       disponibles; el acceso no reactiva el negocio cerrado.
