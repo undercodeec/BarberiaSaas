@@ -18,6 +18,7 @@ import {
   replaceBusinessScheduleSchema,
   signUpSchema,
   updateBookingSettingsSchema,
+  updateTeamMemberSchema,
   verifyEmailSchema,
   weeklyScheduleIntervalSchema,
 } from './index';
@@ -244,6 +245,25 @@ describe('equipo', () => {
         role: 'barber',
       }).success,
     ).toBe(false);
+  });
+
+  it('acepta las sucursales seleccionadas al actualizar un receptionist', () => {
+    expect(
+      updateTeamMemberSchema.parse({
+        commissionPercentage: null,
+        fullName: 'Recepcionista Norte',
+        locationIds: [
+          'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        ],
+        role: 'receptionist',
+      }),
+    ).toMatchObject({
+      locationIds: [
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      ],
+    });
   });
 });
 

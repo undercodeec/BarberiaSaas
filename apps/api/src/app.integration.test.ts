@@ -2005,6 +2005,597 @@ describeWithDatabase('API con PostgreSQL', () => {
     );
   });
 
+  it('reasigna las sucursales de un receptionist activo', async () => {
+    const ownerToken = await register('reassignment-owner@example.com');
+    const organization = await onboard(ownerToken, 'reasignacion-recepcion');
+    const receptionistToken = await register(
+      'reassignment-receptionist@example.com',
+    );
+    const secondLocation = await database.location.create({
+      data: {
+        city: 'Quito',
+        countryCode: 'EC',
+        currencyCode: 'USD',
+        name: 'Sucursal Norte',
+        organizationId: organization.organizationId,
+        phone: '0999999998',
+        slug: 'reasignacion-recepcion-norte',
+        timezone: 'America/Guayaquil',
+        whatsappPhone: '0999999998',
+      },
+    });
+    const invitationResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        email: 'reassignment-receptionist@example.com',
+        fullName: 'Recepcionista reasignada',
+        locationId: organization.locationId,
+        role: 'receptionist',
+      },
+      url: '/v1/team/invitations',
+    });
+    expect(invitationResponse.statusCode).toBe(201);
+    const membershipId = invitationResponse.json<{ member: { id: string } }>()
+      .member.id;
+    const acceptanceResponse = await app.inject({
+      headers: { authorization: `Bearer ${receptionistToken}` },
+      method: 'POST',
+      payload: { token: lastInvitationToken() },
+      url: '/v1/team/invitations/accept',
+    });
+    expect(acceptanceResponse.statusCode).toBe(200);
+
+    const locationsResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      url: '/v1/team/locations',
+    });
+    expect(locationsResponse.statusCode).toBe(200);
+    expect(
+      locationsResponse.json<{ locations: Array<{ id: string }> }>(),
+    ).toMatchObject({
+      locations: [{ id: organization.locationId }, { id: secondLocation.id }],
+    });
+
+    const reassignmentResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'PATCH',
+      payload: {
+        commissionPercentage: null,
+        fullName: 'Recepcionista reasignada',
+        locationIds: [secondLocation.id],
+        role: 'receptionist',
+      },
+      url: `/v1/team/members/${membershipId}`,
+    });
+
+    expect(reassignmentResponse.statusCode).toBe(200);
+    expect(
+      await database.memberLocation.findMany({
+        orderBy: { locationId: 'asc' },
+        where: { membershipId },
+      }),
+    ).toEqual([expect.objectContaining({ locationId: secondLocation.id })]);
+  });
+
+  it('guarda asignaciones informativas para un administrador', async () => {
+    const ownerToken = await register('manager-location-owner@example.com');
+    const organization = await onboard(ownerToken, 'manager-location');
+    const secondLocation = await database.location.create({
+      data: {
+        city: 'Quito',
+        countryCode: 'EC',
+        currencyCode: 'USD',
+        name: 'Sucursal Norte',
+        organizationId: organization.organizationId,
+        phone: '0999999998',
+        slug: 'manager-location-norte',
+        timezone: 'America/Guayaquil',
+        whatsappPhone: '0999999998',
+      },
+    });
+    const manager = await database.user.create({
+      data: {
+        email: 'manager-location@example.com',
+        fullName: 'Administradora de sucursal',
+      },
+    });
+    const membership = await database.membership.create({
+      data: {
+        organizationId: organization.organizationId,
+        role: 'MANAGER',
+        userId: manager.id,
+      },
+    });
+    await database.memberLocation.create({
+      data: {
+        locationId: organization.locationId,
+        membershipId: membership.id,
+      },
+    });
+
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'PATCH',
+      payload: {
+        commissionPercentage: null,
+        fullName: 'Administradora de sucursal',
+        locationIds: [secondLocation.id],
+        role: 'manager',
+      },
+      url: `/v1/team/members/${membership.id}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(
+      await database.memberLocation.findMany({
+        where: { membershipId: membership.id },
+      }),
+    ).toEqual([expect.objectContaining({ locationId: secondLocation.id })]);
+  });
+
+  it('rechaza asignaciones directas cuando el negocio queda en Free', async () => {
+    const ownerToken = await register('free-location-owner@example.com');
+    const organization = await onboard(ownerToken, 'free-location');
+    const receptionist = await database.user.create({
+      data: {
+        email: 'free-location-receptionist@example.com',
+        fullName: 'Recepcionista Free',
+      },
+    });
+    const membership = await database.membership.create({
+      data: {
+        organizationId: organization.organizationId,
+        role: 'RECEPTIONIST',
+        userId: receptionist.id,
+      },
+    });
+    await database.memberLocation.create({
+      data: {
+        locationId: organization.locationId,
+        membershipId: membership.id,
+      },
+    });
+    const freePlan = await database.plan.findUniqueOrThrow({
+      where: { code: 'free' },
+    });
+    await database.subscription.update({
+      data: {
+        planId: freePlan.id,
+        status: 'FREE',
+        trialEndsAt: null,
+      },
+      where: { organizationId: organization.organizationId },
+    });
+
+    const teamResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      url: '/v1/team',
+    });
+    expect(teamResponse.statusCode).toBe(200);
+    expect(
+      teamResponse.json<{
+        assignmentCapabilities: {
+          canEditAssignments: boolean;
+          reason: string | null;
+        };
+      }>().assignmentCapabilities,
+    ).toEqual({
+      canEditAssignments: false,
+      maxActiveLocations: 1,
+      reason: 'plan_team_not_available',
+    });
+
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'PATCH',
+      payload: {
+        commissionPercentage: null,
+        fullName: 'Recepcionista Free',
+        locationIds: [organization.locationId],
+        role: 'receptionist',
+      },
+      url: `/v1/team/members/${membership.id}`,
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json<{ code: string }>().code).toBe(
+      'PLAN_TEAM_NOT_AVAILABLE',
+    );
+  });
+
+  it('asigna servicios activos al agregar una sucursal a un profesional', async () => {
+    const ownerToken = await register('barber-location-owner@example.com');
+    const organization = await onboard(ownerToken, 'barber-location');
+    const secondLocation = await database.location.create({
+      data: {
+        city: 'Quito',
+        countryCode: 'EC',
+        currencyCode: 'USD',
+        name: 'Sucursal Norte',
+        organizationId: organization.organizationId,
+        phone: '0999999998',
+        slug: 'barber-location-norte',
+        timezone: 'America/Guayaquil',
+        whatsappPhone: '0999999998',
+      },
+    });
+    const barber = await database.user.create({
+      data: {
+        email: 'barber-location@example.com',
+        fullName: 'Profesional Norte',
+      },
+    });
+    const membership = await database.membership.create({
+      data: {
+        organizationId: organization.organizationId,
+        role: 'BARBER',
+        userId: barber.id,
+      },
+    });
+    await database.memberLocation.create({
+      data: {
+        locationId: organization.locationId,
+        membershipId: membership.id,
+      },
+    });
+    const service = await database.service.create({
+      data: {
+        durationMinutes: 30,
+        name: 'Corte Norte',
+        organizationId: organization.organizationId,
+        priceCents: 1200,
+      },
+    });
+
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'PATCH',
+      payload: {
+        commissionPercentage: 40,
+        fullName: 'Profesional Norte',
+        locationIds: [organization.locationId, secondLocation.id],
+        role: 'barber',
+      },
+      url: `/v1/team/members/${membership.id}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(
+      await database.professionalService.findUnique({
+        where: {
+          membershipId_serviceId_locationId: {
+            locationId: secondLocation.id,
+            membershipId: membership.id,
+            serviceId: service.id,
+          },
+        },
+      }),
+    ).not.toBeNull();
+    expect(
+      await database.weeklySchedule.count({
+        where: { locationId: secondLocation.id, membershipId: membership.id },
+      }),
+    ).toBe(0);
+  });
+
+  it('permite retirar manualmente un servicio de un profesional en una sucursal', async () => {
+    const ownerToken = await register(
+      'barber-service-removal-owner@example.com',
+    );
+    const organization = await onboard(ownerToken, 'barber-service-removal');
+    const barber = await database.user.create({
+      data: {
+        email: 'barber-service-removal@example.com',
+        fullName: 'Profesional de prueba',
+      },
+    });
+    const membership = await database.membership.create({
+      data: {
+        organizationId: organization.organizationId,
+        role: 'BARBER',
+        userId: barber.id,
+      },
+    });
+    await database.memberLocation.create({
+      data: {
+        locationId: organization.locationId,
+        membershipId: membership.id,
+      },
+    });
+    const service = await database.service.create({
+      data: {
+        durationMinutes: 30,
+        name: 'Coloración',
+        organizationId: organization.organizationId,
+        priceCents: 2500,
+      },
+    });
+    await database.professionalService.create({
+      data: {
+        locationId: organization.locationId,
+        membershipId: membership.id,
+        serviceId: service.id,
+      },
+    });
+
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'DELETE',
+      payload: {
+        locationId: organization.locationId,
+        membershipId: membership.id,
+        serviceId: service.id,
+      },
+      url: '/v1/services/assignments',
+    });
+
+    expect(response.statusCode).toBe(204);
+    expect(
+      await database.professionalService.findUnique({
+        where: {
+          membershipId_serviceId_locationId: {
+            locationId: organization.locationId,
+            membershipId: membership.id,
+            serviceId: service.id,
+          },
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it('impide retirar una sucursal de un profesional con citas futuras', async () => {
+    const ownerToken = await register('barber-removal-owner@example.com');
+    const organization = await onboard(ownerToken, 'barber-removal');
+    const secondLocation = await database.location.create({
+      data: {
+        city: 'Quito',
+        countryCode: 'EC',
+        currencyCode: 'USD',
+        name: 'Sucursal Norte',
+        organizationId: organization.organizationId,
+        phone: '0999999997',
+        slug: 'barber-removal-norte',
+        timezone: 'America/Guayaquil',
+        whatsappPhone: '0999999997',
+      },
+    });
+    const barber = await database.user.create({
+      data: {
+        email: 'barber-removal@example.com',
+        fullName: 'Profesional Norte',
+      },
+    });
+    const membership = await database.membership.create({
+      data: {
+        organizationId: organization.organizationId,
+        role: 'BARBER',
+        userId: barber.id,
+      },
+    });
+    await database.memberLocation.createMany({
+      data: [
+        {
+          locationId: organization.locationId,
+          membershipId: membership.id,
+        },
+        { locationId: secondLocation.id, membershipId: membership.id },
+      ],
+    });
+    await database.appointment.create({
+      data: {
+        clientName: 'Cliente con reserva',
+        endsAt: new Date('2031-01-14T16:30:00.000Z'),
+        locationId: secondLocation.id,
+        organizationId: organization.organizationId,
+        professionalMembershipId: membership.id,
+        startsAt: new Date('2031-01-14T16:00:00.000Z'),
+      },
+    });
+
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'PATCH',
+      payload: {
+        commissionPercentage: 40,
+        fullName: 'Profesional Norte',
+        locationIds: [organization.locationId],
+        role: 'barber',
+      },
+      url: `/v1/team/members/${membership.id}`,
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({
+      code: 'MEMBER_LOCATION_HAS_FUTURE_APPOINTMENTS',
+    });
+    expect(
+      await database.memberLocation.findUnique({
+        where: {
+          membershipId_locationId: {
+            locationId: secondLocation.id,
+            membershipId: membership.id,
+          },
+        },
+      }),
+    ).not.toBeNull();
+  });
+
+  it('archiva una sucursal sin borrar sus citas históricas', async () => {
+    const ownerToken = await register('location-archive-owner@example.com');
+    const organization = await onboard(ownerToken, 'location-archive');
+    const secondLocation = await database.location.create({
+      data: {
+        city: 'Quito',
+        countryCode: 'EC',
+        currencyCode: 'USD',
+        name: 'Sucursal Norte',
+        organizationId: organization.organizationId,
+        phone: '0999999996',
+        slug: 'location-archive-norte',
+        timezone: 'America/Guayaquil',
+        whatsappPhone: '0999999996',
+      },
+    });
+    const ownerMembership = await database.membership.findFirstOrThrow({
+      where: {
+        organizationId: organization.organizationId,
+        role: 'OWNER',
+      },
+    });
+    await database.appointment.create({
+      data: {
+        clientName: 'Cliente histórico',
+        endsAt: new Date('2025-01-14T16:30:00.000Z'),
+        locationId: secondLocation.id,
+        organizationId: organization.organizationId,
+        professionalMembershipId: ownerMembership.id,
+        startsAt: new Date('2025-01-14T16:00:00.000Z'),
+        status: 'COMPLETED',
+      },
+    });
+
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      url: `/v1/locations/${secondLocation.id}/archive`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(
+      await database.location.findUnique({ where: { id: secondLocation.id } }),
+    ).toMatchObject({ isActive: false });
+    expect(
+      await database.appointment.count({
+        where: { locationId: secondLocation.id },
+      }),
+    ).toBe(1);
+  });
+
+  it.each([
+    ['la última sucursal activa', 'LAST_ACTIVE_LOCATION'],
+    ['una caja abierta', 'LOCATION_CASH_REGISTER_OPEN'],
+    ['citas futuras', 'LOCATION_HAS_FUTURE_APPOINTMENTS'],
+  ])('rechaza archivar %s', async (blocker, expectedCode) => {
+    const testSlug = expectedCode.toLowerCase().replace(/_/gu, '-');
+    const ownerToken = await register(
+      `location-archive-blocker-${expectedCode.toLowerCase()}@example.com`,
+    );
+    const organization = await onboard(
+      ownerToken,
+      `location-archive-blocker-${testSlug}`,
+    );
+    const ownerMembership = await database.membership.findFirstOrThrow({
+      where: {
+        organizationId: organization.organizationId,
+        role: 'OWNER',
+      },
+    });
+    const targetLocation =
+      blocker === 'la última sucursal activa'
+        ? { id: organization.locationId }
+        : await database.location.create({
+            data: {
+              city: 'Quito',
+              countryCode: 'EC',
+              currencyCode: 'USD',
+              name: 'Sucursal Norte',
+              organizationId: organization.organizationId,
+              phone: '0999999995',
+              slug: `location-blocker-${testSlug}`,
+              timezone: 'America/Guayaquil',
+              whatsappPhone: '0999999995',
+            },
+          });
+    if (blocker === 'una caja abierta') {
+      await database.cashRegisterSession.create({
+        data: {
+          locationId: targetLocation.id,
+          openingAmountCents: 0,
+          organizationId: organization.organizationId,
+          ownerUserId: ownerMembership.userId,
+          responsibleMembershipId: ownerMembership.id,
+          responsibleName: 'Propietario',
+        },
+      });
+    }
+    if (blocker === 'citas futuras') {
+      await database.appointment.create({
+        data: {
+          clientName: 'Cliente con reserva',
+          endsAt: new Date('2031-01-14T16:30:00.000Z'),
+          locationId: targetLocation.id,
+          organizationId: organization.organizationId,
+          professionalMembershipId: ownerMembership.id,
+          startsAt: new Date('2031-01-14T16:00:00.000Z'),
+        },
+      });
+    }
+
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      url: `/v1/locations/${targetLocation.id}/archive`,
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({ code: expectedCode });
+    expect(
+      await database.location.findUnique({ where: { id: targetLocation.id } }),
+    ).toMatchObject({ isActive: true });
+  });
+
+  it('restaura una sucursal archivada y conserva sus asignaciones', async () => {
+    const ownerToken = await register('location-restore-owner@example.com');
+    const organization = await onboard(ownerToken, 'location-restore');
+    const secondLocation = await database.location.create({
+      data: {
+        city: 'Quito',
+        countryCode: 'EC',
+        currencyCode: 'USD',
+        isActive: false,
+        name: 'Sucursal Norte',
+        organizationId: organization.organizationId,
+        phone: '0999999994',
+        slug: 'location-restore-norte',
+        timezone: 'America/Guayaquil',
+        whatsappPhone: '0999999994',
+      },
+    });
+    const ownerMembership = await database.membership.findFirstOrThrow({
+      where: {
+        organizationId: organization.organizationId,
+        role: 'OWNER',
+      },
+    });
+    await database.memberLocation.create({
+      data: { locationId: secondLocation.id, membershipId: ownerMembership.id },
+    });
+
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      url: `/v1/locations/${secondLocation.id}/restore`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(
+      await database.location.findUnique({ where: { id: secondLocation.id } }),
+    ).toMatchObject({ isActive: true });
+    expect(
+      await database.memberLocation.findUnique({
+        where: {
+          membershipId_locationId: {
+            locationId: secondLocation.id,
+            membershipId: ownerMembership.id,
+          },
+        },
+      }),
+    ).not.toBeNull();
+  });
+
   it('administra el horario general y lo aplica a la disponibilidad', async () => {
     const agenda = await setupAgenda('horario-negocio');
     const initialResponse = await app.inject({

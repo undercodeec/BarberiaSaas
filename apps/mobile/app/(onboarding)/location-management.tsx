@@ -28,6 +28,7 @@ import {
 } from '../../src/components/BottomNavigation';
 import { InlineMessage } from '../../src/components/InlineMessage';
 import { requireApiClient } from '../../src/lib/api';
+import { partitionManagedLocations } from '../../src/lib/managed-locations';
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
@@ -155,6 +156,51 @@ export default function LocationManagementScreen() {
     },
   });
 
+  const changeLocationStatus = useMutation({
+    mutationFn: ({
+      action,
+      locationId,
+    }: {
+      readonly action: 'archive' | 'restore';
+      readonly locationId: string;
+    }) =>
+      requireApiClient().request(`/v1/locations/${locationId}/${action}`, {
+        method: 'POST',
+      }),
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos actualizar la sucursal',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('managed-locations'),
+      });
+    },
+  });
+
+  const requestArchive = (location: ManagedLocation) => {
+    Alert.alert(
+      'Archivar sucursal',
+      `“${location.name}” dejará de recibir reservas nuevas. Su historial, configuraciones y enlace se conservarán para poder restaurarla después.`,
+      [
+        { style: 'cancel', text: 'Cancelar' },
+        {
+          onPress: () =>
+            changeLocationStatus.mutate({
+              action: 'archive',
+              locationId: location.id,
+            }),
+          style: 'destructive',
+          text: 'Archivar',
+        },
+      ],
+    );
+  };
+
+  const { active: activeLocations, archived: archivedLocations } =
+    partitionManagedLocations(locationsQuery.data?.locations ?? []);
+
   const planCopy = useMemo(() => {
     const data = locationsQuery.data;
     if (!data) return 'Consultando límite del plan…';
@@ -269,7 +315,7 @@ export default function LocationManagementScreen() {
         </Pressable>
 
         <View style={styles.list}>
-          {locationsQuery.data?.locations.map((location, index) => (
+          {activeLocations.map((location, index) => (
             <View key={location.id} style={styles.locationCard}>
               <View style={styles.locationTopRow}>
                 <View style={styles.locationIcon}>
@@ -325,10 +371,61 @@ export default function LocationManagementScreen() {
                   />
                   <Text style={styles.secondaryLabel}>Mapa</Text>
                 </Pressable>
+                <Pressable
+                  accessibilityLabel={`Archivar ${location.name}`}
+                  accessibilityRole="button"
+                  disabled={changeLocationStatus.isPending}
+                  onPress={() => requestArchive(location)}
+                  style={styles.archiveButton}
+                >
+                  <Ionicons color="#B42318" name="archive-outline" size={17} />
+                  <Text style={styles.archiveLabel}>Archivar</Text>
+                </Pressable>
               </View>
             </View>
           ))}
         </View>
+        {archivedLocations.length > 0 ? (
+          <View style={styles.archivedSection}>
+            <Text style={styles.archivedTitle}>Archivadas</Text>
+            <Text style={styles.archivedHint}>
+              Estas sucursales no reciben reservas nuevas. Puedes restaurarlas
+              cuando tu plan tenga capacidad disponible.
+            </Text>
+            {archivedLocations.map((location) => (
+              <View key={location.id} style={styles.archivedCard}>
+                <View style={styles.locationCopy}>
+                  <Text style={styles.locationName}>{location.name}</Text>
+                  <Text style={styles.locationAddress}>
+                    {location.formattedAddress ||
+                      location.addressLine ||
+                      location.city ||
+                      'Ubicación pendiente'}
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityLabel={`Restaurar ${location.name}`}
+                  accessibilityRole="button"
+                  disabled={changeLocationStatus.isPending}
+                  onPress={() =>
+                    changeLocationStatus.mutate({
+                      action: 'restore',
+                      locationId: location.id,
+                    })
+                  }
+                  style={styles.restoreButton}
+                >
+                  <Ionicons
+                    color={appTheme.colors.accentDark}
+                    name="refresh-outline"
+                    size={17}
+                  />
+                  <Text style={styles.secondaryLabel}>Restaurar</Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </ScrollView>
 
       <Modal
@@ -538,6 +635,40 @@ function Field({
 
 const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  archiveButton: {
+    alignItems: 'center',
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    minHeight: 42,
+    paddingHorizontal: 12,
+  },
+  archiveLabel: { color: '#B42318', fontSize: 13, fontWeight: '800' },
+  archivedCard: {
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderColor: appTheme.colors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  archivedHint: {
+    color: appTheme.colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  archivedSection: { gap: 12, marginTop: 28 },
+  archivedTitle: {
+    color: appTheme.colors.text,
+    fontSize: 17,
+    fontWeight: '900',
+  },
   addButton: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surface,
@@ -560,6 +691,18 @@ const styles = StyleSheet.create({
     color: appTheme.colors.accentDark,
     fontSize: 15,
     fontWeight: '900',
+  },
+  restoreButton: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    minHeight: 42,
+    paddingHorizontal: 12,
   },
   backButton: {
     alignItems: 'center',

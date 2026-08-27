@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
   OnboardingAccountDetailsResponse,
+  ServicesResponse,
   TeamMember,
+  TeamLocationsResponse,
   TeamResponse,
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -72,8 +74,14 @@ export default function TeamManagementScreen() {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<InvitationRole>('barber');
   const [commissionPercentage, setCommissionPercentage] = useState('');
+  const [selectedLocationIds, setSelectedLocationIds] = useState<
+    readonly string[]
+  >([]);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [isInviting, setIsInviting] = useState(false);
+  const canManageTeam =
+    current?.membership.role === 'owner' ||
+    current?.membership.role === 'manager';
 
   const accountQuery = useQuery({
     enabled: Boolean(session),
@@ -87,6 +95,29 @@ export default function TeamManagementScreen() {
     enabled: Boolean(session && current),
     queryFn: () => requireApiClient().request<TeamResponse>('/v1/team'),
     queryKey: tenant.key('team'),
+  });
+  const teamLocationsQuery = useQuery({
+    enabled: Boolean(
+      session &&
+      current &&
+      canManageTeam &&
+      teamQuery.data?.assignmentCapabilities.canEditAssignments,
+    ),
+    queryFn: () =>
+      requireApiClient().request<TeamLocationsResponse>('/v1/team/locations'),
+    queryKey: tenant.key('team-locations'),
+  });
+  const servicesQuery = useQuery({
+    enabled: Boolean(
+      session &&
+      current &&
+      canManageTeam &&
+      editingMember?.id &&
+      role === 'barber' &&
+      teamQuery.data?.assignmentCapabilities.canEditAssignments,
+    ),
+    queryFn: () => requireApiClient().request<ServicesResponse>('/v1/services'),
+    queryKey: tenant.key('services'),
   });
   const updateOnlineBooking = useMutation({
     mutationFn: (input: {
@@ -115,15 +146,43 @@ export default function TeamManagementScreen() {
       });
     },
   });
+  const updateProfessionalService = useMutation({
+    mutationFn: ({
+      assigned,
+      locationId,
+      membershipId,
+      serviceId,
+    }: {
+      readonly assigned: boolean;
+      readonly locationId: string;
+      readonly membershipId: string;
+      readonly serviceId: string;
+    }) =>
+      requireApiClient().request('/v1/services/assignments', {
+        body: { locationId, membershipId, serviceId },
+        method: assigned ? 'DELETE' : 'POST',
+      }),
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos actualizar el servicio',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('services'),
+      });
+    },
+  });
   if (!session) return <Redirect href="/(auth)/login" />;
   if (accountQuery.data?.accountType === 'professional') {
     return <Redirect href="/business-settings" />;
   }
 
-  const canManageTeam =
-    current?.membership.role === 'owner' ||
-    current?.membership.role === 'manager';
   const teamEnabled = teamQuery.data?.teamEnabled ?? true;
+  const assignmentCapabilities = teamQuery.data?.assignmentCapabilities;
+  const canEditAssignments = Boolean(
+    editingMember && assignmentCapabilities?.canEditAssignments,
+  );
   const canToggleOnlineBooking = (member: TeamMember) =>
     (member.role === 'barber' || member.role === 'owner') &&
     (canManageTeam || member.user.id === user?.id);
@@ -164,6 +223,7 @@ export default function TeamManagementScreen() {
     setEmail('');
     setRole('barber');
     setCommissionPercentage('');
+    setSelectedLocationIds([]);
     setInviteError(null);
     setInviteOpen(true);
   };
@@ -177,6 +237,7 @@ export default function TeamManagementScreen() {
         ? ''
         : String(member.commissionPercentage),
     );
+    setSelectedLocationIds(member.locations.map(({ id }) => id));
     setInviteError(null);
     setInviteOpen(true);
   };
@@ -201,6 +262,15 @@ export default function TeamManagementScreen() {
       setInviteError('Indica una comisión entera entre 0% y 100%.');
       return;
     }
+    if (
+      editingMember &&
+      canEditAssignments &&
+      (role === 'barber' || role === 'receptionist') &&
+      selectedLocationIds.length === 0
+    ) {
+      setInviteError('Selecciona al menos una sucursal para este colaborador.');
+      return;
+    }
     setInviteError(null);
     setIsInviting(true);
     try {
@@ -212,6 +282,9 @@ export default function TeamManagementScreen() {
             body: {
               commissionPercentage: commission,
               fullName: normalizedName,
+              ...(canEditAssignments
+                ? { locationIds: selectedLocationIds }
+                : {}),
               role,
             },
             method: 'PATCH',
@@ -641,6 +714,157 @@ export default function TeamManagementScreen() {
                   </Pressable>
                 ))}
               </View>
+              {canEditAssignments ? (
+                <>
+                  <Text style={styles.inputLabel}>Sucursales asignadas</Text>
+                  <Text style={styles.commissionHint}>
+                    {role === 'barber'
+                      ? 'Los servicios activos se asignarán automáticamente en las sucursales nuevas. Configura sus horarios antes de publicar disponibilidad.'
+                      : role === 'manager'
+                        ? 'Esta asignación es informativa; el administrador conserva su acceso actual a toda la organización.'
+                        : 'Recepción solo podrá consultar y gestionar clientes y citas de estas sucursales.'}
+                  </Text>
+                  <View style={styles.locationOptions}>
+                    {teamLocationsQuery.isLoading ? (
+                      <Text style={styles.locationHint}>
+                        Cargando sucursales…
+                      </Text>
+                    ) : null}
+                    {teamLocationsQuery.isError ? (
+                      <Text style={styles.locationHint}>
+                        No pudimos cargar las sucursales.
+                      </Text>
+                    ) : null}
+                    {teamLocationsQuery.data?.locations.map((location) => {
+                      const selected = selectedLocationIds.includes(
+                        location.id,
+                      );
+                      return (
+                        <Pressable
+                          key={location.id}
+                          accessibilityLabel={`Asignar ${location.name}`}
+                          accessibilityRole="checkbox"
+                          accessibilityState={{ checked: selected }}
+                          onPress={() =>
+                            setSelectedLocationIds((currentIds) =>
+                              selected
+                                ? currentIds.filter((id) => id !== location.id)
+                                : [...currentIds, location.id],
+                            )
+                          }
+                          style={[
+                            styles.locationOption,
+                            selected ? styles.locationOptionSelected : null,
+                          ]}
+                        >
+                          <Ionicons
+                            color={
+                              selected
+                                ? appTheme.colors.accentDark
+                                : COLORS.muted
+                            }
+                            name={selected ? 'checkbox' : 'square-outline'}
+                            size={20}
+                          />
+                          <Text
+                            style={[
+                              styles.locationOptionLabel,
+                              selected
+                                ? styles.locationOptionLabelSelected
+                                : null,
+                            ]}
+                          >
+                            {location.name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </>
+              ) : null}
+              {editingMember && !canEditAssignments ? (
+                <Text style={styles.commissionHint}>
+                  {assignmentCapabilities?.reason === 'plan_team_not_available'
+                    ? 'Tu plan actual no incluye equipo. Las asignaciones existentes se conservan, pero no se pueden modificar.'
+                    : 'Las asignaciones por sucursal no están disponibles en tu plan actual.'}
+                </Text>
+              ) : null}
+              {editingMember && role === 'barber' && canEditAssignments ? (
+                <View style={styles.serviceAssignmentSection}>
+                  <Text style={styles.inputLabel}>Servicios por sucursal</Text>
+                  <Text style={styles.commissionHint}>
+                    Ajusta los servicios después de guardar una sucursal nueva.
+                    Quitar un servicio no modifica las citas ya agendadas.
+                  </Text>
+                  {selectedLocationIds
+                    .filter((locationId) =>
+                      editingMember.locations.some(
+                        (location) => location.id === locationId,
+                      ),
+                    )
+                    .map((locationId) => {
+                      const location = teamLocationsQuery.data?.locations.find(
+                        (item) => item.id === locationId,
+                      );
+                      if (!location) return null;
+                      return (
+                        <View key={locationId} style={styles.serviceLocation}>
+                          <Text style={styles.serviceLocationTitle}>
+                            {location.name}
+                          </Text>
+                          {servicesQuery.data?.services.map((service) => {
+                            const assigned = service.assignments.some(
+                              (assignment) =>
+                                assignment.locationId === locationId &&
+                                assignment.membershipId === editingMember.id,
+                            );
+                            return (
+                              <Pressable
+                                key={service.id}
+                                accessibilityLabel={`${assigned ? 'Quitar' : 'Asignar'} ${service.name} en ${location.name}`}
+                                accessibilityRole="checkbox"
+                                accessibilityState={{
+                                  checked: assigned,
+                                  disabled: updateProfessionalService.isPending,
+                                }}
+                                disabled={updateProfessionalService.isPending}
+                                onPress={() =>
+                                  updateProfessionalService.mutate({
+                                    assigned,
+                                    locationId,
+                                    membershipId: editingMember.id,
+                                    serviceId: service.id,
+                                  })
+                                }
+                                style={styles.serviceAssignmentOption}
+                              >
+                                <Ionicons
+                                  color={
+                                    assigned
+                                      ? appTheme.colors.accentDark
+                                      : COLORS.muted
+                                  }
+                                  name={
+                                    assigned ? 'checkbox' : 'square-outline'
+                                  }
+                                  size={20}
+                                />
+                                <Text style={styles.locationOptionLabel}>
+                                  {service.name}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                          {servicesQuery.isLoading ? (
+                            <Text style={styles.locationHint}>
+                              Cargando servicios…
+                            </Text>
+                          ) : null}
+                        </View>
+                      );
+                    })}
+                </View>
+              ) : null}
               {role === 'barber' ? (
                 <>
                   <Text style={styles.inputLabel}>
@@ -930,6 +1154,29 @@ const styles = StyleSheet.create({
     borderColor: appTheme.colors.accentWash,
   },
   roleOptions: { flexDirection: 'row', gap: 7, marginBottom: 16 },
+  locationHint: { color: COLORS.muted, fontSize: 13, marginTop: 8 },
+  locationOption: {
+    alignItems: 'center',
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    minHeight: 46,
+    paddingHorizontal: 12,
+  },
+  locationOptionLabel: {
+    color: COLORS.text,
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  locationOptionLabelSelected: { fontWeight: '900' },
+  locationOptionSelected: {
+    backgroundColor: appTheme.colors.accentWash,
+    borderColor: appTheme.colors.accentWash,
+  },
+  locationOptions: { gap: 8, marginBottom: 16, marginTop: 10 },
   screen: appStyles.screen,
   section: {
     backgroundColor: appTheme.colors.surface,
@@ -952,6 +1199,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionTitle: { color: COLORS.text, fontSize: 20, fontWeight: '900' },
+  serviceAssignmentOption: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    minHeight: 32,
+  },
+  serviceAssignmentSection: { gap: 10, marginTop: 6 },
+  serviceLocation: {
+    backgroundColor: '#FFFDF8',
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 7,
+    padding: 12,
+  },
+  serviceLocationTitle: { color: COLORS.text, fontSize: 14, fontWeight: '800' },
   sendButton: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surface,

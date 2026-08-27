@@ -575,6 +575,7 @@ export interface ManagedLocation {
   readonly formattedAddress: string | null;
   readonly googlePlaceId: string | null;
   readonly id: string;
+  readonly isActive: boolean;
   readonly latitude: number | null;
   readonly longitude: number | null;
   readonly name: string;
@@ -623,6 +624,12 @@ export interface TeamMember {
 }
 
 export interface TeamResponse {
+  readonly assignmentCapabilities: {
+    readonly canEditAssignments: boolean;
+    readonly maxActiveLocations: number;
+    readonly reason:
+      'plan_multi_location_not_available' | 'plan_team_not_available' | null;
+  };
   readonly members: readonly TeamMember[];
   readonly teamEnabled: boolean;
   readonly pendingInvitations: ReadonlyArray<{
@@ -632,6 +639,13 @@ export interface TeamResponse {
     readonly expiresAt: string;
     readonly id: string;
     readonly role: 'barber' | 'manager' | 'receptionist';
+  }>;
+}
+
+export interface TeamLocationsResponse {
+  readonly locations: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
   }>;
 }
 

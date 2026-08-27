@@ -337,6 +337,14 @@ export const updateTeamMemberSchema = z
       .trim()
       .min(2, 'Ingresa el nombre del colaborador.')
       .max(120),
+    locationIds: z
+      .array(uuidSchema)
+      .min(1, 'Selecciona al menos una sucursal.')
+      .refine(
+        (locationIds) => new Set(locationIds).size === locationIds.length,
+        'No repitas sucursales.',
+      )
+      .optional(),
     role: z.enum(['manager', 'receptionist', 'barber']),
   })
   .superRefine((input, context) => {

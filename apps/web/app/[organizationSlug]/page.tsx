@@ -1,5 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 
+import { LocationSelector } from '../components/LocationSelector';
+
 const API_URL =
   process.env.API_URL ??
   process.env.NEXT_PUBLIC_API_URL ??
@@ -18,6 +20,22 @@ export default async function OrganizationBookingPage({
     { cache: 'no-store' },
   );
   if (!response.ok) notFound();
-  const result = (await response.json()) as { redirectPath: string };
-  redirect(result.redirectPath);
+  const result = (await response.json()) as
+    | { kind: 'redirect'; redirectPath: string }
+    | {
+        kind: 'locations';
+        locations: ReadonlyArray<{
+          formattedAddress: string | null;
+          name: string;
+          slug: string;
+        }>;
+        organization: { name: string; slug: string };
+      };
+  if (result.kind === 'redirect') redirect(result.redirectPath);
+  return (
+    <LocationSelector
+      locations={result.locations}
+      organization={result.organization}
+    />
+  );
 }

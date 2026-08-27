@@ -507,4 +507,36 @@ integrationDescribe('reservas públicas', () => {
     });
     expect(newBooking.statusCode).toBe(404);
   });
+
+  it('permite elegir una sucursal cuando el negocio tiene varias activas', async () => {
+    await database.location.create({
+      data: {
+        city: 'Quito',
+        countryCode: 'EC',
+        currencyCode: 'USD',
+        formattedAddress: 'Av. del Parque, Quito, Ecuador',
+        name: 'Sucursal Norte',
+        organizationId,
+        phone: '+593988888888',
+        slug: 'norte',
+        timezone: 'UTC',
+        whatsappPhone: '+593988888888',
+      },
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/v1/public/${organizationSlug}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      kind: 'locations',
+      locations: [
+        { slug: 'principal' },
+        { formattedAddress: 'Av. del Parque, Quito, Ecuador', slug: 'norte' },
+      ],
+      organization: { slug: organizationSlug },
+    });
+  });
 });

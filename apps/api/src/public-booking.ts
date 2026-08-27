@@ -882,7 +882,7 @@ export function registerPublicBookingRoutes(
     enforceRateLimit(request, 'catalog', 120, 60_000);
     const { organizationSlug } = organizationPathSchema.parse(request.params);
     const organization = await database.organization.findFirst({
-      select: { id: true },
+      select: { id: true, name: true },
       where: {
         deletedAt: null,
         OR: [
@@ -898,23 +898,36 @@ export function registerPublicBookingRoutes(
         'Este enlace de reservas no está disponible.',
       );
     }
-    const location = await database.location.findFirst({
+    const locations = await database.location.findMany({
       orderBy: { createdAt: 'asc' },
       where: {
         isActive: true,
         organizationId: organization.id,
       },
     });
-    if (!location) {
+    if (locations.length === 0) {
       throw new ApiError(
         404,
         'PUBLIC_ORGANIZATION_NOT_FOUND',
         'Este enlace de reservas no está disponible.',
       );
     }
+    if (locations.length === 1) {
+      const location = locations[0]!;
+      return {
+        kind: 'redirect' as const,
+        locationSlug: location.slug,
+        redirectPath: `/${organizationSlug}/${location.slug}`,
+      };
+    }
     return {
-      locationSlug: location.slug,
-      redirectPath: `/${organizationSlug}/${location.slug}`,
+      kind: 'locations' as const,
+      locations: locations.map((location) => ({
+        formattedAddress: location.formattedAddress,
+        name: location.name,
+        slug: location.slug,
+      })),
+      organization: { name: organization.name, slug: organizationSlug },
     };
   });
 

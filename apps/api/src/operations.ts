@@ -4969,13 +4969,11 @@ export function registerOperationsRoutes(
     const input = createLocationSchema.parse(request.body);
     try {
       const location = await database.$transaction(async (transaction) => {
-        const { plans, subscription } = await ensureOrganizationSubscription(
+        const entitlements = await getEntitlements(
           transaction,
           current.organizationId,
         );
-        const plan = plans.find(({ id }) => id === subscription.planId);
-        const definition = plan ? planDefinition(plan.code) : null;
-        const maximumLocations = definition?.limits.locations ?? 1;
+        const maximumLocations = entitlements.limits.locations;
         const usedLocations = await transaction.location.count({
           where: {
             isActive: true,
@@ -4986,7 +4984,7 @@ export function registerOperationsRoutes(
           throw new ApiError(
             409,
             'PLAN_LIMIT_REACHED',
-            `El plan ${definition?.name ?? 'actual'} permite ${maximumLocations} sucursal${maximumLocations === 1 ? '' : 'es'}.`,
+            `Tu plan actual permite ${maximumLocations} sucursal${maximumLocations === 1 ? '' : 'es'}.`,
           );
         const created = await transaction.location.create({
           data: {
@@ -5031,7 +5029,6 @@ export function registerOperationsRoutes(
             action: 'location.created',
             actorUserId: user.id,
             afterData: {
-              planCode: plan?.code,
               usedLocations: usedLocations + 1,
             },
             entityId: created.id,
@@ -5074,10 +5071,13 @@ export function registerOperationsRoutes(
     );
     const locations = await database.location.findMany({
       orderBy: { createdAt: 'asc' },
-      where: { isActive: true, organizationId: current.organizationId },
+      where: { organizationId: current.organizationId },
     });
+    const activeLocationCount = locations.filter(
+      (location) => location.isActive,
+    ).length;
     return {
-      canAdd: locations.length < subscriptionUsage.limits.locations,
+      canAdd: activeLocationCount < subscriptionUsage.limits.locations,
       limit: subscriptionUsage.limits.locations,
       locations: locations.map((location) => ({
         addressLine: location.addressLine,
@@ -5087,6 +5087,7 @@ export function registerOperationsRoutes(
         formattedAddress: location.formattedAddress,
         googlePlaceId: location.googlePlaceId,
         id: location.id,
+        isActive: location.isActive,
         latitude: location.latitude,
         longitude: location.longitude,
         name: location.name,
@@ -5094,8 +5095,168 @@ export function registerOperationsRoutes(
         slug: location.slug,
         timezone: location.timezone,
       })),
-      used: locations.length,
+      used: activeLocationCount,
     };
+  });
+
+  app.post('/v1/locations/:locationId/archive', async (request) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(database, user.id);
+    if (current.role !== MembershipRole.OWNER) {
+      throw new ApiError(
+        403,
+        'FORBIDDEN',
+        'Solo el propietario puede archivar sucursales.',
+      );
+    }
+    const { locationId } = z
+      .object({ locationId: z.uuid() })
+      .parse(request.params);
+    const archived = await database.$transaction(async (transaction) => {
+      const location = await transaction.location.findFirst({
+        where: {
+          id: locationId,
+          isActive: true,
+          organizationId: current.organizationId,
+        },
+      });
+      if (!location) {
+        throw new ApiError(
+          404,
+          'LOCATION_NOT_FOUND',
+          'La sucursal no existe o ya está archivada.',
+        );
+      }
+      const now = new Date();
+      const [activeLocationCount, openCashRegisters, futureAppointments] =
+        await Promise.all([
+          transaction.location.count({
+            where: { isActive: true, organizationId: current.organizationId },
+          }),
+          transaction.cashRegisterSession.count({
+            where: {
+              locationId: location.id,
+              status: CashRegisterStatus.OPEN,
+            },
+          }),
+          transaction.appointment.count({
+            where: {
+              locationId: location.id,
+              startsAt: { gt: now },
+              status: { not: AppointmentStatus.CANCELLED },
+            },
+          }),
+        ]);
+      if (activeLocationCount <= 1) {
+        throw new ApiError(
+          409,
+          'LAST_ACTIVE_LOCATION',
+          'Debes conservar al menos una sucursal activa.',
+        );
+      }
+      if (openCashRegisters > 0) {
+        throw new ApiError(
+          409,
+          'LOCATION_CASH_REGISTER_OPEN',
+          'Cierra la caja antes de archivar la sucursal.',
+        );
+      }
+      if (futureAppointments > 0) {
+        throw new ApiError(
+          409,
+          'LOCATION_HAS_FUTURE_APPOINTMENTS',
+          'Reagenda o cancela las citas futuras antes de archivar la sucursal.',
+        );
+      }
+      await transaction.teamInvitation.updateMany({
+        data: { status: InvitationStatus.REVOKED },
+        where: {
+          locationId: location.id,
+          organizationId: current.organizationId,
+          status: InvitationStatus.PENDING,
+        },
+      });
+      const updated = await transaction.location.update({
+        data: { isActive: false },
+        where: { id: location.id },
+      });
+      await transaction.auditLog.create({
+        data: {
+          action: 'location.archived',
+          actorUserId: user.id,
+          afterData: { isActive: false },
+          beforeData: { isActive: true },
+          entityId: location.id,
+          entityType: 'location',
+          locationId: location.id,
+          organizationId: current.organizationId,
+        },
+      });
+      return updated;
+    });
+    return { location: archived };
+  });
+
+  app.post('/v1/locations/:locationId/restore', async (request) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(database, user.id);
+    if (current.role !== MembershipRole.OWNER) {
+      throw new ApiError(
+        403,
+        'FORBIDDEN',
+        'Solo el propietario puede restaurar sucursales.',
+      );
+    }
+    const { locationId } = z
+      .object({ locationId: z.uuid() })
+      .parse(request.params);
+    const restored = await database.$transaction(async (transaction) => {
+      const location = await transaction.location.findFirst({
+        where: {
+          id: locationId,
+          isActive: false,
+          organizationId: current.organizationId,
+        },
+      });
+      if (!location) {
+        throw new ApiError(
+          404,
+          'LOCATION_NOT_FOUND',
+          'La sucursal no existe o ya está activa.',
+        );
+      }
+      const [entitlements, activeLocationCount] = await Promise.all([
+        getEntitlements(transaction, current.organizationId),
+        transaction.location.count({
+          where: { isActive: true, organizationId: current.organizationId },
+        }),
+      ]);
+      if (activeLocationCount >= entitlements.limits.locations) {
+        throw new ApiError(
+          409,
+          'PLAN_LIMIT_REACHED',
+          'Restaura una sucursal solo si tu plan tiene capacidad disponible.',
+        );
+      }
+      const updated = await transaction.location.update({
+        data: { isActive: true },
+        where: { id: location.id },
+      });
+      await transaction.auditLog.create({
+        data: {
+          action: 'location.restored',
+          actorUserId: user.id,
+          afterData: { isActive: true },
+          beforeData: { isActive: false },
+          entityId: location.id,
+          entityType: 'location',
+          locationId: location.id,
+          organizationId: current.organizationId,
+        },
+      });
+      return updated;
+    });
+    return { location: restored };
   });
 
   app.patch('/v1/locations/:locationId', async (request) => {
@@ -5264,6 +5425,15 @@ export function registerOperationsRoutes(
       }
     }
     return {
+      assignmentCapabilities: {
+        canEditAssignments: entitlements.featureFlags.team,
+        maxActiveLocations: entitlements.limits.locations,
+        reason: !entitlements.featureFlags.team
+          ? 'plan_team_not_available'
+          : !entitlements.featureFlags.multiLocation
+            ? 'plan_multi_location_not_available'
+            : null,
+      },
       teamEnabled: entitlements.featureFlags.team,
       members: members.map((member) => ({
         commissionPercentage: commissionByMembership.get(member.id) ?? null,
@@ -5298,6 +5468,32 @@ export function registerOperationsRoutes(
         role: invitation.role.toLowerCase(),
       })),
     };
+  });
+
+  app.get('/v1/team/locations', async (request) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(
+      database,
+      user.id,
+      'membership.manage',
+    );
+    const entitlements = await getEntitlements(
+      database,
+      current.organizationId,
+    );
+    if (!entitlements.featureFlags.team) {
+      throw new ApiError(
+        409,
+        'PLAN_TEAM_NOT_AVAILABLE',
+        'Tu plan actual no incluye equipo.',
+      );
+    }
+    const locations = await database.location.findMany({
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, name: true },
+      where: { isActive: true, organizationId: current.organizationId },
+    });
+    return { locations };
   });
 
   app.patch('/v1/team/members/:id/online-booking', async (request) => {
@@ -5391,7 +5587,10 @@ export function registerOperationsRoutes(
     const { id } = teamRecordParamsSchema.parse(request.params);
     const input = updateTeamMemberSchema.parse(request.body);
     const member = await database.membership.findFirst({
-      include: { user: true },
+      include: {
+        memberLocations: { select: { locationId: true } },
+        user: true,
+      },
       where: {
         id,
         organizationId: current.organizationId,
@@ -5412,14 +5611,96 @@ export function registerOperationsRoutes(
         'No puedes modificar al propietario ni tu propia membresía desde esta pantalla.',
       );
     }
-    if (member.role === MembershipRole.BARBER) {
+    const role = input.role.toUpperCase() as MembershipRole;
+    if (
+      member.role === MembershipRole.BARBER ||
+      role === MembershipRole.BARBER
+    ) {
       await assertCanUseProfessional(
         database,
         current.organizationId,
         member.id,
       );
     }
-    const role = input.role.toUpperCase() as MembershipRole;
+    const previousLocationIds = member.memberLocations.map(
+      ({ locationId }) => locationId,
+    );
+    const selectedLocationIds = input.locationIds ?? [];
+    const addedLocationIds =
+      input.locationIds === undefined
+        ? []
+        : selectedLocationIds.filter(
+            (locationId) => !previousLocationIds.includes(locationId),
+          );
+    const removedLocationIds =
+      input.locationIds === undefined
+        ? []
+        : previousLocationIds.filter(
+            (locationId) => !selectedLocationIds.includes(locationId),
+          );
+    const serviceAssignmentLocationIds =
+      role !== MembershipRole.BARBER
+        ? []
+        : member.role === MembershipRole.BARBER
+          ? addedLocationIds
+          : (input.locationIds ?? previousLocationIds);
+    const resultingLocationIds = input.locationIds ?? previousLocationIds;
+    if (
+      (role === MembershipRole.BARBER ||
+        role === MembershipRole.RECEPTIONIST) &&
+      resultingLocationIds.length === 0
+    ) {
+      throw new ApiError(
+        400,
+        'MEMBER_LOCATION_REQUIRED',
+        'El profesional y recepción deben tener al menos una sucursal asignada.',
+      );
+    }
+    if (input.locationIds !== undefined) {
+      const entitlements = await getEntitlements(
+        database,
+        current.organizationId,
+      );
+      if (!entitlements.featureFlags.team) {
+        throw new ApiError(
+          409,
+          'PLAN_TEAM_NOT_AVAILABLE',
+          'Tu plan actual no incluye equipo.',
+        );
+      }
+      if (
+        input.locationIds.length > 1 &&
+        !entitlements.featureFlags.multiLocation
+      ) {
+        throw new ApiError(
+          409,
+          'PLAN_MULTI_LOCATION_NOT_AVAILABLE',
+          'Tu plan actual no incluye varias sucursales.',
+        );
+      }
+      if (input.locationIds.length > entitlements.limits.locations) {
+        throw new ApiError(
+          409,
+          'PLAN_LOCATION_LIMIT_REACHED',
+          'La asignación supera el límite de sucursales de tu plan.',
+        );
+      }
+      const locations = await database.location.findMany({
+        select: { id: true },
+        where: {
+          id: { in: input.locationIds },
+          isActive: true,
+          organizationId: current.organizationId,
+        },
+      });
+      if (locations.length !== input.locationIds.length) {
+        throw new ApiError(
+          404,
+          'LOCATION_NOT_FOUND',
+          'Una de las sucursales no existe o no pertenece a tu negocio.',
+        );
+      }
+    }
     const updated = await database.$transaction(async (transaction) => {
       const now = new Date();
       const updatedMembership = await transaction.membership.update({
@@ -5463,6 +5744,62 @@ export function registerOperationsRoutes(
           },
         });
       }
+      if (input.locationIds !== undefined) {
+        if (
+          member.role === MembershipRole.BARBER &&
+          removedLocationIds.length > 0
+        ) {
+          const futureAppointments = await transaction.appointment.count({
+            where: {
+              locationId: { in: removedLocationIds },
+              professionalMembershipId: member.id,
+              startsAt: { gt: now },
+              status: { not: AppointmentStatus.CANCELLED },
+            },
+          });
+          if (futureAppointments > 0) {
+            throw new ApiError(
+              409,
+              'MEMBER_LOCATION_HAS_FUTURE_APPOINTMENTS',
+              'Reagenda o cancela las citas futuras antes de retirar esta sucursal.',
+            );
+          }
+        }
+        await transaction.memberLocation.deleteMany({
+          where: {
+            locationId: { in: removedLocationIds },
+            membershipId: member.id,
+          },
+        });
+        await transaction.memberLocation.createMany({
+          data: input.locationIds.map((locationId) => ({
+            locationId,
+            membershipId: member.id,
+          })),
+          skipDuplicates: true,
+        });
+      }
+      if (
+        role === MembershipRole.BARBER &&
+        serviceAssignmentLocationIds.length > 0
+      ) {
+        const activeServices = await transaction.service.findMany({
+          select: { id: true },
+          where: { isActive: true, organizationId: current.organizationId },
+        });
+        if (activeServices.length > 0) {
+          await transaction.professionalService.createMany({
+            data: serviceAssignmentLocationIds.flatMap((locationId) =>
+              activeServices.map((service) => ({
+                locationId,
+                membershipId: member.id,
+                serviceId: service.id,
+              })),
+            ),
+            skipDuplicates: true,
+          });
+        }
+      }
       await transaction.auditLog.create({
         data: {
           action: 'team.member.updated',
@@ -5470,10 +5807,20 @@ export function registerOperationsRoutes(
           afterData: {
             commissionPercentage,
             fullName: updatedUser.fullName,
+            ...(input.locationIds === undefined
+              ? {}
+              : {
+                  autoAssignedLocationIds: serviceAssignmentLocationIds,
+                  locationIds: input.locationIds,
+                  removedLocationIds,
+                }),
             role: input.role,
           },
           beforeData: {
             fullName: member.user.fullName,
+            locationIds: member.memberLocations.map(
+              ({ locationId }) => locationId,
+            ),
             role: member.role.toLowerCase(),
           },
           entityId: member.id,
@@ -6280,6 +6627,64 @@ export function registerOperationsRoutes(
       },
     });
     return reply.code(201).send({ assignment });
+  });
+
+  app.delete('/v1/services/assignments', async (request, reply) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(
+      database,
+      user.id,
+      'service.manage',
+    );
+    const input = assignProfessionalServiceSchema.parse(request.body);
+    await requireLocation(database, current.organizationId, input.locationId);
+    await requireProfessional(
+      database,
+      current.organizationId,
+      input.membershipId,
+    );
+    await assertCanUseProfessional(
+      database,
+      current.organizationId,
+      input.membershipId,
+    );
+    const service = await database.service.findFirst({
+      where: {
+        id: input.serviceId,
+        isActive: true,
+        organizationId: current.organizationId,
+      },
+    });
+    if (!service) {
+      throw new ApiError(404, 'SERVICE_NOT_FOUND', 'El servicio no existe.');
+    }
+    await database.$transaction(async (transaction) => {
+      const removed = await transaction.professionalService.deleteMany({
+        where: {
+          locationId: input.locationId,
+          membershipId: input.membershipId,
+          serviceId: input.serviceId,
+        },
+      });
+      if (removed.count > 0) {
+        await transaction.auditLog.create({
+          data: {
+            action: 'professional_service.unassigned',
+            actorUserId: user.id,
+            beforeData: {
+              locationId: input.locationId,
+              membershipId: input.membershipId,
+              serviceId: input.serviceId,
+            },
+            entityId: input.serviceId,
+            entityType: 'professional_service',
+            locationId: input.locationId,
+            organizationId: current.organizationId,
+          },
+        });
+      }
+    });
+    return reply.code(204).send();
   });
 
   app.get('/v1/schedules', async (request) => {
