@@ -46,3 +46,4 @@ packages/database/src/generated/
 Thumbs.db
 *.log
 logs.md
+*.md

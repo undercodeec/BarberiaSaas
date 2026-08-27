@@ -119,11 +119,6 @@ export default function PoliciesPage() {
             </div>
           </section>
 
-          <p className="policies-disclaimer">
-            Esta página resume las decisiones operativas vigentes de Nava. Los
-            documentos legales definitivos deben contar con revisión profesional
-            antes de una publicación comercial final.
-          </p>
         </article>
       </div>
     </main>
