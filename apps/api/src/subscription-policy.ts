@@ -111,7 +111,7 @@ export const SUBSCRIPTION_PLANS = [
     },
     features: [
       'Hasta 3 sucursales',
-      'Profesionales ilimitados sin cobro por usuario',
+      'Hasta 12 profesionales en total para toda la organizacion',
       'Reservas y clientes ilimitados',
       'Caja, POS y comisiones',
       'Inventario, reportes completos, roles y permisos',
@@ -121,7 +121,7 @@ export const SUBSCRIPTION_PLANS = [
       clients: null,
       locations: 3,
       rolling30DayBookings: null,
-      teamMembers: null,
+      teamMembers: 12,
     },
     monthlyPriceCents: 2983,
     name: 'Nava Local',
@@ -142,7 +142,7 @@ export const SUBSCRIPTION_PLANS = [
     },
     features: [
       'Hasta 6 sucursales',
-      'Profesionales ilimitados sin cobro por usuario',
+      'Hasta 40 profesionales en total para toda la organizacion',
       'Reservas y clientes ilimitados',
       'Caja, POS, comisiones e inventario por sucursal',
       'Reportes completos, roles y permisos',
@@ -152,7 +152,7 @@ export const SUBSCRIPTION_PLANS = [
       clients: null,
       locations: 6,
       rolling30DayBookings: null,
-      teamMembers: null,
+      teamMembers: 40,
     },
     monthlyPriceCents: 4883,
     name: 'Nava Multi',
@@ -621,7 +621,9 @@ export async function assertCanCreateTeamMember(
     throw new ApiError(
       409,
       'PLAN_PROFESSIONAL_LIMIT_REACHED',
-      'Nava Free y Nava Esencial permiten un profesional activo. Actualiza a Nava Local para trabajar con un equipo.',
+      result.limits.teamMembers === 1
+        ? 'Nava Free y Nava Esencial permiten un profesional activo. Actualiza a Nava Local para trabajar con un equipo.'
+        : `Alcanzaste el límite de ${result.limits.teamMembers} profesionales activos de ${result.plan.name}. El límite es total para toda la organización, independientemente de sus sucursales.`,
     );
   }
   return result;

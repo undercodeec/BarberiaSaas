@@ -1,5 +1,6 @@
 import {
   effectiveLocationLimit,
+  effectiveProfessionalLimit,
   hasLockedSubscriptionFeature,
   minimumPlanForFeatures,
 } from './subscription-entitlements';
@@ -40,5 +41,23 @@ describe('entitlements de suscripción en Mobile', () => {
     } as const;
 
     expect(effectiveLocationLimit(subscription)).toBe(3);
+  });
+
+  it('prioriza el límite efectivo global de profesionales sobre el plan', () => {
+    const subscription = {
+      current: { limits: { teamMembers: 12 }, planCode: 'local' },
+      plans: [{ code: 'local', limits: { teamMembers: 40 } }],
+    } as const;
+
+    expect(effectiveProfessionalLimit(subscription)).toBe(12);
+  });
+
+  it('recupera el límite global de profesionales del plan para respuestas antiguas', () => {
+    const subscription = {
+      current: { planCode: 'multi' },
+      plans: [{ code: 'multi', limits: { teamMembers: 40 } }],
+    } as const;
+
+    expect(effectiveProfessionalLimit(subscription)).toBe(40);
   });
 });

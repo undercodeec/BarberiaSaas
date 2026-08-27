@@ -59,7 +59,7 @@ const plans = [
   },
   {
     benefits: [
-      ['Profesionales', 'Ilimitados, sin cobro por usuario'],
+      ['Profesionales', 'Hasta 12 en total por organización'],
       ['Sucursales', 'Hasta 3 sucursales'],
       ['Reservas y clientes', 'Ilimitados'],
       ['Cobros', 'Caja, POS y comisiones'],
@@ -74,7 +74,7 @@ const plans = [
   },
   {
     benefits: [
-      ['Profesionales', 'Ilimitados, sin cobro por usuario'],
+      ['Profesionales', 'Hasta 40 en total por organización'],
       ['Sucursales', 'Hasta 6 sucursales'],
       ['Reservas y clientes', 'Ilimitados'],
       ['Cobros', 'Caja, POS, comisiones e inventario por sede'],

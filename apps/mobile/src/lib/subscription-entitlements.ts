@@ -40,3 +40,22 @@ export function effectiveLocationLimit(subscription: {
     null
   );
 }
+
+export function effectiveProfessionalLimit(subscription: {
+  readonly current: {
+    readonly limits?: { readonly teamMembers: number | null };
+    readonly planCode: SubscriptionResponse['current']['planCode'];
+  };
+  readonly plans: ReadonlyArray<{
+    readonly code: SubscriptionResponse['current']['planCode'];
+    readonly limits: { readonly teamMembers: number | null };
+  }>;
+}): number | null {
+  return (
+    subscription.current.limits?.teamMembers ??
+    subscription.plans.find(
+      ({ code }) => code === subscription.current.planCode,
+    )?.limits.teamMembers ??
+    null
+  );
+}

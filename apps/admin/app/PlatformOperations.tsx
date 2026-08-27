@@ -77,6 +77,12 @@ function titleCase(value: string) {
     .replace(/^./u, (letter) => letter.toUpperCase());
 }
 
+function subscriptionMetricLabel(value: string) {
+  return value === 'teamMembers'
+    ? 'Profesionales totales de la organización'
+    : titleCase(value);
+}
+
 function Empty({ children }: { readonly children: React.ReactNode }) {
   return <div className="empty-state">{children}</div>;
 }
@@ -994,7 +1000,7 @@ function OverridesView({
           <select onChange={(event) => setKey(event.target.value)} value={key}>
             {(kind === 'feature' ? featureKeys : limitKeys).map((item) => (
               <option key={item} value={item}>
-                {titleCase(item)}
+                {subscriptionMetricLabel(item)}
               </option>
             ))}
           </select>
@@ -1059,7 +1065,7 @@ function OverridesView({
               <article className="event-row" key={override.id}>
                 <span className="event-icon">±</span>
                 <div className="event-main">
-                  <strong>{titleCase(override.key)}</strong>
+                  <strong>{subscriptionMetricLabel(override.key)}</strong>
                   <span>{override.organization.name}</span>
                   <small>{override.reason}</small>
                 </div>
@@ -1962,7 +1968,7 @@ export function OrganizationDetailModal({
                   {Object.entries(detail.subscription.usage).map(
                     ([key, value]) => (
                       <span key={key}>
-                        <b>{titleCase(key)}</b>
+                        <b>{subscriptionMetricLabel(key)}</b>
                         <strong>
                           {value} / {detail.subscription.limits[key] ?? '∞'}
                         </strong>

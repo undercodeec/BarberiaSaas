@@ -13,7 +13,10 @@ import {
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
 import { accountQueryKey, accountQueryPrefix } from '../../src/lib/query-keys';
-import { effectiveLocationLimit } from '../../src/lib/subscription-entitlements';
+import {
+  effectiveLocationLimit,
+  effectiveProfessionalLimit,
+} from '../../src/lib/subscription-entitlements';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const STATUS_LABELS: Record<SubscriptionResponse['current']['status'], string> =
@@ -139,15 +142,18 @@ export default function SubscriptionScreen() {
     : null;
   const usageNotice = bookingUsageNotice(subscription);
   const bookingLimit = displayedBookingLimit(subscription);
+  const professionalLimit = subscription
+    ? effectiveProfessionalLimit(subscription)
+    : null;
   const historicalTeamMembers =
     subscription !== undefined &&
     subscription.current.planCode === 'free' &&
-    subscription.usage.teamMemberLimit !== null &&
-    subscription.usage.teamMembers > subscription.usage.teamMemberLimit;
+    professionalLimit !== null &&
+    subscription.usage.teamMembers > professionalLimit;
   const teamUsageValue = subscription
     ? historicalTeamMembers
-      ? `${subscription.usage.teamMembers} guardados · ${subscription.usage.teamMemberLimit} operativo`
-      : `${subscription.usage.teamMembers} / ${subscription.usage.teamMemberLimit ?? 'Ilimitados'}`
+      ? `${subscription.usage.teamMembers} guardados · ${professionalLimit} operativo`
+      : `${subscription.usage.teamMembers} / ${professionalLimit ?? 'Sin límite temporal'}`
     : '-';
   const locationLimit = subscription
     ? effectiveLocationLimit(subscription)
@@ -254,6 +260,10 @@ export default function SubscriptionScreen() {
               }
             />
           </View>
+          <Text style={styles.periodCopy}>
+            El límite de profesionales es total para toda la organización;
+            distribuirlos entre sucursales no consume cupos adicionales.
+          </Text>
           <View style={styles.hiddenUsage}>
             <View style={styles.usageItem}>
               <Text style={styles.usageValue}>
@@ -265,9 +275,12 @@ export default function SubscriptionScreen() {
             <View style={styles.usageDivider} />
             <View style={styles.usageItem}>
               <Text style={styles.usageValue}>
-                {subscription?.usage.teamMembers ?? '—'}
+                {subscription?.usage.teamMembers ?? '—'} /{' '}
+                {professionalLimit ?? '—'}
               </Text>
-              <Text style={styles.usageLabel}>Integrantes · sin límite</Text>
+              <Text style={styles.usageLabel}>
+                Profesionales totales de la organización
+              </Text>
             </View>
           </View>
         </View>

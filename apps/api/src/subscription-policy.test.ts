@@ -5,6 +5,7 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  assertCanCreateTeamMember,
   ensureOrganizationSubscription,
   getEntitlements,
   GRACE_DAYS,
@@ -54,6 +55,10 @@ function subscriptionTransaction(initial: StoredSubscription) {
       ),
       findUnique: vi.fn(async () => null),
     },
+    appointment: { count: vi.fn(async () => 0) },
+    client: { count: vi.fn(async () => 0) },
+    location: { count: vi.fn(async () => 1) },
+    membership: { count: vi.fn(async () => 12) },
     platformFeatureOverride: {
       findMany: findOverrides,
     },
@@ -252,7 +257,7 @@ describe('política de suscripciones', () => {
         clients: null,
         locations: 3,
         rolling30DayBookings: null,
-        teamMembers: null,
+        teamMembers: 12,
       },
       monthlyPriceCents: 2983,
       name: 'Nava Local',
@@ -269,7 +274,7 @@ describe('política de suscripciones', () => {
         clients: null,
         locations: 6,
         rolling30DayBookings: null,
-        teamMembers: null,
+        teamMembers: 40,
       },
       monthlyPriceCents: 4883,
       name: 'Nava Multi',
@@ -317,5 +322,19 @@ describe('política de suscripciones', () => {
     expect(result.featureFlags.inventory).toBe(true);
     expect(result.limits.clients).toBe(250);
     expect(result.activeOverrides).toHaveLength(2);
+  });
+
+  it('rechaza el profesional decimotercero de Nava Local con un límite global', async () => {
+    const original = storedSubscription();
+    const context = subscriptionTransaction(original);
+
+    await expect(
+      assertCanCreateTeamMember(context.transaction, original.organizationId),
+    ).rejects.toMatchObject({
+      code: 'PLAN_PROFESSIONAL_LIMIT_REACHED',
+      message:
+        'Alcanzaste el límite de 12 profesionales activos de Nava Local. El límite es total para toda la organización, independientemente de sus sucursales.',
+      statusCode: 409,
+    });
   });
 });

@@ -1,6 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from 'react';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -98,10 +104,19 @@ const comparisonGroups = [
   {
     label: 'Operación diaria',
     features: [
-      { label: 'Profesionales', values: ['1', '1', 'Ilimitados', 'Ilimitados'] },
+      {
+        label: 'Profesionales totales por organización',
+        values: ['1', '1', 'Hasta 12', 'Hasta 40'],
+      },
       { label: 'Sucursales', values: ['1', '1', 'Hasta 3', 'Hasta 6'] },
-      { label: 'Reservas', values: ['25 / 30 días', 'Ilimitadas', 'Ilimitadas', 'Ilimitadas'] },
-      { label: 'Clientes activos', values: ['100', 'Ilimitados', 'Ilimitados', 'Ilimitados'] },
+      {
+        label: 'Reservas',
+        values: ['25 / 30 días', 'Ilimitadas', 'Ilimitadas', 'Ilimitadas'],
+      },
+      {
+        label: 'Clientes activos',
+        values: ['100', 'Ilimitados', 'Ilimitados', 'Ilimitados'],
+      },
     ],
   },
   {
@@ -110,7 +125,10 @@ const comparisonGroups = [
       { label: 'Agenda y reservas online', values: [true, true, true, true] },
       { label: 'Historial de clientes', values: [true, true, true, true] },
       { label: 'Servicios y horarios', values: [true, true, true, true] },
-      { label: 'Reservas directas sin comisión', values: [false, false, true, true] },
+      {
+        label: 'Reservas directas sin comisión',
+        values: [false, false, true, true],
+      },
     ],
   },
   {
@@ -330,7 +348,10 @@ export default function CheckoutExperience() {
     setError(null);
     try {
       await requestJson('auth/verify-email', {
-        body: JSON.stringify({ code: verificationCode, email: verificationEmail }),
+        body: JSON.stringify({
+          code: verificationCode,
+          email: verificationEmail,
+        }),
         method: 'POST',
       });
       await loadSession();
@@ -481,7 +502,10 @@ export default function CheckoutExperience() {
           <span>Renovación manual</span>
           <span>Sin cargos inesperados</span>
         </div>
-        <section className="subscription-comparison" aria-labelledby="comparison-title">
+        <section
+          className="subscription-comparison"
+          aria-labelledby="comparison-title"
+        >
           <div className="subscription-comparison-heading">
             <div>
               <p>Planes Nava</p>
@@ -501,7 +525,11 @@ export default function CheckoutExperience() {
           <div className="subscription-matrix" role="table">
             <div className="subscription-matrix-brand" role="columnheader">
               <span>N</span>
-              <p>Planes para<br />cada etapa</p>
+              <p>
+                Planes para
+                <br />
+                cada etapa
+              </p>
             </div>
             {commercialPlans.map((plan) => (
               <div
@@ -515,16 +543,25 @@ export default function CheckoutExperience() {
               >
                 {plan.featured ? <b>Recomendado</b> : null}
                 <h3>{plan.name}</h3>
-                <strong>{plan.price}<em>{plan.price === 'USD 0' ? '' : ' / mes'}</em></strong>
+                <strong>
+                  {plan.price}
+                  <em>{plan.price === 'USD 0' ? '' : ' / mes'}</em>
+                </strong>
                 <p>{plan.description}</p>
                 <a
-                  href={plan.code === 'free' ? '#registrarme' : `/checkout?plan=${plan.code}`}
+                  href={
+                    plan.code === 'free'
+                      ? '#registrarme'
+                      : `/checkout?plan=${plan.code}`
+                  }
                   onClick={(event) => {
                     event.preventDefault();
                     selectPlan(plan.code);
                   }}
                 >
-                  {plan.price === 'USD 0' ? 'Empezar gratis' : 'Elegir ' + plan.name}
+                  {plan.price === 'USD 0'
+                    ? 'Empezar gratis'
+                    : 'Elegir ' + plan.name}
                 </a>
               </div>
             ))}
@@ -540,7 +577,11 @@ export default function CheckoutExperience() {
                   />
                 ))}
                 {group.features.map((feature) => (
-                  <div className="subscription-matrix-row" key={feature.label} role="row">
+                  <div
+                    className="subscription-matrix-row"
+                    key={feature.label}
+                    role="row"
+                  >
                     <div role="rowheader">{feature.label}</div>
                     {feature.values.map((value, index) => (
                       <div
@@ -559,15 +600,24 @@ export default function CheckoutExperience() {
             <div className="subscription-matrix-actions">
               <span aria-hidden="true" />
               {commercialPlans.map((plan) => (
-                <div className={plan.featured ? 'is-highlighted' : undefined} key={plan.name}>
+                <div
+                  className={plan.featured ? 'is-highlighted' : undefined}
+                  key={plan.name}
+                >
                   <a
-                    href={plan.code === 'free' ? '#registrarme' : `/checkout?plan=${plan.code}`}
+                    href={
+                      plan.code === 'free'
+                        ? '#registrarme'
+                        : `/checkout?plan=${plan.code}`
+                    }
                     onClick={(event) => {
                       event.preventDefault();
                       selectPlan(plan.code);
                     }}
                   >
-                    {plan.price === 'USD 0' ? 'Elegir Free' : 'Elegir ' + plan.name.replace('Nava ', '')}
+                    {plan.price === 'USD 0'
+                      ? 'Elegir Free'
+                      : 'Elegir ' + plan.name.replace('Nava ', '')}
                   </a>
                 </div>
               ))}
@@ -575,52 +625,67 @@ export default function CheckoutExperience() {
           </div>
 
           <div className="subscription-mobile-plans">
-            {[commercialPlans[2], commercialPlans[0], commercialPlans[1], commercialPlans[3]].map(
-              (plan) => {
-                const planIndex = commercialPlans.indexOf(plan);
-                return (
-                  <article
-                    className={plan.featured ? 'is-highlighted' : undefined}
-                    key={plan.name}
+            {[
+              commercialPlans[2],
+              commercialPlans[0],
+              commercialPlans[1],
+              commercialPlans[3],
+            ].map((plan) => {
+              const planIndex = commercialPlans.indexOf(plan);
+              return (
+                <article
+                  className={plan.featured ? 'is-highlighted' : undefined}
+                  key={plan.name}
+                >
+                  {plan.featured ? <b>Recomendado</b> : null}
+                  <h3>{plan.name}</h3>
+                  <strong>
+                    {plan.price}
+                    <em>{plan.price === 'USD 0' ? '' : ' / mes'}</em>
+                  </strong>
+                  <p>{plan.description}</p>
+                  <a
+                    href={
+                      plan.code === 'free'
+                        ? '#registrarme'
+                        : `/checkout?plan=${plan.code}`
+                    }
+                    onClick={(event) => {
+                      event.preventDefault();
+                      selectPlan(plan.code);
+                    }}
                   >
-                    {plan.featured ? <b>Recomendado</b> : null}
-                    <h3>{plan.name}</h3>
-                    <strong>{plan.price}<em>{plan.price === 'USD 0' ? '' : ' / mes'}</em></strong>
-                    <p>{plan.description}</p>
-                    <a
-                      href={plan.code === 'free' ? '#registrarme' : `/checkout?plan=${plan.code}`}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        selectPlan(plan.code);
-                      }}
-                    >
-                      {plan.price === 'USD 0' ? 'Empezar gratis' : 'Elegir ' + plan.name}
-                    </a>
-                    {comparisonGroups.map((group) => (
-                      <section key={group.label}>
-                        <h4>{group.label}</h4>
-                        <dl>
-                          {group.features.map((feature) => (
-                            <div key={feature.label}>
-                              <dt>{feature.label}</dt>
-                              <dd>
-                                <FeatureValue
-                                  dark={plan.featured}
-                                  value={feature.values[planIndex]!}
-                                />
-                              </dd>
-                            </div>
-                          ))}
-                        </dl>
-                      </section>
-                    ))}
-                  </article>
-                );
-              },
-            )}
+                    {plan.price === 'USD 0'
+                      ? 'Empezar gratis'
+                      : 'Elegir ' + plan.name}
+                  </a>
+                  {comparisonGroups.map((group) => (
+                    <section key={group.label}>
+                      <h4>{group.label}</h4>
+                      <dl>
+                        {group.features.map((feature) => (
+                          <div key={feature.label}>
+                            <dt>{feature.label}</dt>
+                            <dd>
+                              <FeatureValue
+                                dark={plan.featured}
+                                value={feature.values[planIndex]!}
+                              />
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </section>
+                  ))}
+                </article>
+              );
+            })}
           </div>
           <p className="subscription-comparison-note">
-            Todos los planes comienzan con 10 días de prueba. No hay renovación automática.
+            Todos los planes comienzan con 10 días de prueba. No hay renovación
+            automática. El máximo de profesionales se cuenta por organización,
+            no por sucursal; puedes distribuirlos entre tus sucursales sin
+            duplicar el conteo.
           </p>
         </section>
 
@@ -669,498 +734,536 @@ export default function CheckoutExperience() {
                 </small>
               </div>
               <div className="subscription-access-content">
-
-        {!session && accessView !== 'verify' ? (
-          <div className="subscription-access-tabs">
-            <button
-              className={accessView === 'login' ? 'is-active' : undefined}
-              onClick={() => {
-                setError(null);
-                setAccessView('login');
-              }}
-              type="button"
-            >
-              Iniciar sesión
-            </button>
-            <button
-              className={accessView === 'register' ? 'is-active' : undefined}
-              onClick={() => {
-                setError(null);
-                setAccessView('register');
-              }}
-              type="button"
-            >
-              Registrarme
-            </button>
-          </div>
-        ) : null}
-
-        {error ? (
-          <p
-            className="mt-6 rounded-xl border border-red-300 bg-red-50 p-4 text-red-800"
-            role="alert"
-          >
-            {error}
-          </p>
-        ) : null}
-
-        {loading ? (
-          <p className="mt-8 text-[var(--muted)]">Cargando checkout…</p>
-        ) : null}
-
-        {!loading && !session && accessView === 'login' ? (
-          <form
-            className="mt-8 max-w-md rounded-2xl border border-black/10 bg-white p-6 shadow-sm"
-            onSubmit={login}
-          >
-            <h2 className="text-xl font-bold">Inicia sesión para continuar</h2>
-            <label className="mt-5 block text-sm font-semibold" htmlFor="email">
-              Correo
-            </label>
-            <input
-              className="mt-1 w-full rounded-lg border border-black/20 px-3 py-2"
-              id="email"
-              onChange={(event) => setEmail(event.target.value)}
-              required
-              type="email"
-              value={email}
-            />
-            <label
-              className="mt-4 block text-sm font-semibold"
-              htmlFor="password"
-            >
-              Contraseña
-            </label>
-            <input
-              className="mt-1 w-full rounded-lg border border-black/20 px-3 py-2"
-              id="password"
-              minLength={8}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              type="password"
-              value={password}
-            />
-            <button
-              className="mt-6 w-full rounded-lg bg-[var(--accent)] px-4 py-3 font-bold text-white disabled:opacity-60"
-              disabled={submitting}
-              type="submit"
-            >
-              {submitting ? 'Ingresando…' : 'Continuar'}
-            </button>
-          </form>
-        ) : null}
-
-        {!loading && !session && accessView === 'register' ? (
-          <form className="subscription-registration-form" onSubmit={register}>
-            <h2>Crea tu cuenta</h2>
-            <p>Todos los campos son necesarios para configurar tu negocio.</p>
-            <div className="subscription-form-grid">
-              <label>
-                Nombre completo
-                <input
-                  onChange={(event) =>
-                    setRegistration((current) => ({
-                      ...current,
-                      fullName: event.target.value,
-                    }))
-                  }
-                  required
-                  value={registration.fullName}
-                />
-              </label>
-              <label>
-                Correo
-                <input
-                  onChange={(event) =>
-                    setRegistration((current) => ({
-                      ...current,
-                      email: event.target.value,
-                    }))
-                  }
-                  required
-                  type="email"
-                  value={registration.email}
-                />
-              </label>
-              <label>
-                País de atención
-                <select
-                  aria-label="País"
-                  onChange={(event) =>
-                    setRegistration((current) => ({
-                      ...current,
-                      countryCode: event.target.value,
-                    }))
-                  }
-                  required
-                  value={registration.countryCode}
-                >
-                  {registrationCountries.map((country) => (
-                    <option key={country.code} value={country.code}>
-                      {country.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Código de país
-                <select
-                  aria-label="Código de país"
-                  onChange={(event) =>
-                    setRegistration((current) => ({
-                      ...current,
-                      phoneCountryCode: event.target.value,
-                    }))
-                  }
-                  required
-                  value={registration.phoneCountryCode}
-                >
-                  {registrationCountries.map((country) => (
-                    <option key={country.code} value={country.code}>
-                      {country.name} ({country.dial})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Teléfono
-                <input
-                  inputMode="tel"
-                  onChange={(event) =>
-                    setRegistration((current) => ({
-                      ...current,
-                      phone: event.target.value,
-                    }))
-                  }
-                  placeholder="Número de teléfono"
-                  required
-                  value={registration.phone}
-                />
-              </label>
-              <label>
-                Ciudad
-                <input
-                  onChange={(event) =>
-                    setRegistration((current) => ({
-                      ...current,
-                      city: event.target.value,
-                    }))
-                  }
-                  required
-                  value={registration.city}
-                />
-              </label>
-              <label>
-                Tipo de cuenta
-                <select
-                  onChange={(event) =>
-                    setRegistration((current) => ({
-                      ...current,
-                      accountType: event.target.value as RegistrationForm['accountType'],
-                    }))
-                  }
-                  value={registration.accountType}
-                >
-                  <option value="business">Negocio</option>
-                  <option value="professional">Profesional independiente</option>
-                </select>
-              </label>
-              <label>
-                Nombre del negocio
-                <input
-                  onChange={(event) =>
-                    setRegistration((current) => ({
-                      ...current,
-                      businessName: event.target.value,
-                    }))
-                  }
-                  required
-                  value={registration.businessName}
-                />
-              </label>
-              <label>
-                Apertura
-                <input
-                  onChange={(event) =>
-                    setRegistration((current) => ({
-                      ...current,
-                      openingTime: event.target.value,
-                    }))
-                  }
-                  required
-                  type="time"
-                  value={registration.openingTime}
-                />
-              </label>
-              <label>
-                Cierre
-                <input
-                  onChange={(event) =>
-                    setRegistration((current) => ({
-                      ...current,
-                      closingTime: event.target.value,
-                    }))
-                  }
-                  required
-                  type="time"
-                  value={registration.closingTime}
-                />
-              </label>
-              <label>
-                Contraseña
-                <input
-                  minLength={8}
-                  onChange={(event) =>
-                    setRegistration((current) => ({
-                      ...current,
-                      password: event.target.value,
-                    }))
-                  }
-                  required
-                  type="password"
-                  value={registration.password}
-                />
-              </label>
-              <label>
-                Repite tu contraseña
-                <input
-                  minLength={8}
-                  onChange={(event) =>
-                    setRegistration((current) => ({
-                      ...current,
-                      confirmPassword: event.target.value,
-                    }))
-                  }
-                  required
-                  type="password"
-                  value={registration.confirmPassword}
-                />
-              </label>
-            </div>
-            <label className="subscription-checkbox">
-              <input
-                checked={registration.privacyPolicyAccepted}
-                onChange={(event) =>
-                  setRegistration((current) => ({
-                    ...current,
-                    privacyPolicyAccepted: event.target.checked,
-                  }))
-                }
-                required
-                type="checkbox"
-              />
-              <span>
-                Acepto la <a href="/tratamiento-de-datos" target="_blank">Política de Privacidad</a> y declaro tener 18 años o capacidad legal para contratar.
-              </span>
-            </label>
-            <label className="subscription-checkbox">
-              <input
-                checked={registration.marketingOptIn}
-                onChange={(event) =>
-                  setRegistration((current) => ({
-                    ...current,
-                    marketingOptIn: event.target.checked,
-                  }))
-                }
-                type="checkbox"
-              />
-              <span>Quiero recibir novedades y ofertas de Nava.</span>
-            </label>
-            <button disabled={submitting} type="submit">
-              {submitting ? 'Preparando…' : 'Crear cuenta'}
-            </button>
-          </form>
-        ) : null}
-
-        {!loading && !session && accessView === 'verify' ? (
-          <form className="subscription-verification-form" onSubmit={verifyEmail}>
-            <h2>Revisa tu correo</h2>
-            <p>
-              Escribe el código enviado a <strong>{verificationEmail}</strong>.
-            </p>
-            <label>
-              Código de verificación
-              <input
-                inputMode="numeric"
-                maxLength={6}
-                onChange={(event) => setVerificationCode(event.target.value)}
-                pattern="[0-9]{6}"
-                required
-                value={verificationCode}
-              />
-            </label>
-            <button disabled={submitting} type="submit">
-              {submitting ? 'Verificando…' : 'Verificar cuenta'}
-            </button>
-            <button
-              className="subscription-text-button"
-              onClick={() => setAccessView('register')}
-              type="button"
-            >
-              Corregir datos de registro
-            </button>
-          </form>
-        ) : null}
-
-        {session && accessView === 'setup' ? (
-          <form
-            className="subscription-verification-form"
-            onSubmit={completeAccountSetup}
-          >
-            <h2>Configura tu primer servicio</h2>
-            <p>
-              Crearemos tu negocio, la sede principal, tus horarios y este
-              primer servicio.
-            </p>
-            <label>
-              Nombre del servicio
-              <input
-                minLength={2}
-                onChange={(event) =>
-                  setFirstService((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))
-                }
-                placeholder="Ej. Corte clásico"
-                required
-                value={firstService.name}
-              />
-            </label>
-            <div className="subscription-form-grid">
-              <label>
-                Duración (minutos)
-                <input
-                  min={5}
-                  onChange={(event) =>
-                    setFirstService((current) => ({
-                      ...current,
-                      durationMinutes: Number(event.target.value),
-                    }))
-                  }
-                  required
-                  step={5}
-                  type="number"
-                  value={firstService.durationMinutes}
-                />
-              </label>
-              <label>
-                Precio (USD)
-                <input
-                  min={0}
-                  onChange={(event) =>
-                    setFirstService((current) => ({
-                      ...current,
-                      price: Number(event.target.value),
-                    }))
-                  }
-                  required
-                  step="0.01"
-                  type="number"
-                  value={firstService.price}
-                />
-              </label>
-            </div>
-            <button disabled={submitting} type="submit">
-              {submitting ? 'Creando negocio…' : 'Crear negocio y continuar'}
-            </button>
-          </form>
-        ) : null}
-
-        {session && accessView !== 'setup' ? (
-          <div className="mt-8">
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-black/10 bg-white p-4">
-              <span>
-                {session.organization
-                  ? `Negocio: ${session.organization.name}`
-                  : 'Cuenta Nava'}
-              </span>
-              <button
-                className="text-sm font-semibold underline"
-                onClick={() => void logout()}
-                type="button"
-              >
-                Cerrar sesión
-              </button>
-            </div>
-            {!session.canCheckout ? (
-              <p className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
-                {sessionMessage(session)}
-              </p>
-            ) : null}
-            <div className="mt-6 max-w-md">
-              <label
-                className="block text-sm font-semibold"
-                htmlFor="discount-code"
-              >
-                Código de descuento
-              </label>
-              <input
-                autoCapitalize="characters"
-                className="mt-1 w-full rounded-lg border border-black/20 px-3 py-2"
-                id="discount-code"
-                maxLength={80}
-                onChange={(event) => setDiscountCode(event.target.value)}
-                placeholder="Opcional"
-                value={discountCode}
-              />
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Si tienes un código fundador, ingrésalo antes de seleccionar
-                Nava Local.
-              </p>
-            </div>
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              {plans
-                .filter(
-                  (plan) =>
-                    plan.monthlyPriceCents && plan.monthlyPriceCents > 0,
-                )
-                .map((plan) => (
-                  <article
-                    className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm"
-                    key={plan.code}
-                  >
-                    <h2 className="text-2xl font-bold">{plan.name}</h2>
-                    <p className="mt-2 text-lg text-[var(--muted)]">
-                      {formatMoney(plan.monthlyPriceCents, plan.currencyCode)} /
-                      mes
-                    </p>
+                {!session && accessView !== 'verify' ? (
+                  <div className="subscription-access-tabs">
                     <button
-                      className="mt-6 w-full rounded-lg bg-[var(--accent)] px-4 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={!session.canCheckout || submitting}
-                      onClick={() => void beginCheckout(plan.code)}
+                      className={
+                        accessView === 'login' ? 'is-active' : undefined
+                      }
+                      onClick={() => {
+                        setError(null);
+                        setAccessView('login');
+                      }}
                       type="button"
                     >
-                      {submitting ? 'Preparando…' : `Elegir ${plan.name}`}
+                      Iniciar sesión
                     </button>
-                  </article>
-                ))}
-            </div>
-          </div>
-        ) : null}
+                    <button
+                      className={
+                        accessView === 'register' ? 'is-active' : undefined
+                      }
+                      onClick={() => {
+                        setError(null);
+                        setAccessView('register');
+                      }}
+                      type="button"
+                    >
+                      Registrarme
+                    </button>
+                  </div>
+                ) : null}
 
-        {attempt ? (
-          <section
-            aria-live="polite"
-            className="mt-8 rounded-2xl border border-black/10 bg-white p-6"
-          >
-            <h2 className="text-xl font-bold">
-              Estado del pago: {attempt.status}
-            </h2>
-            <p className="mt-2 text-[var(--muted)]">
-              {attempt.invoice.planName} ·{' '}
-              {formatMoney(attempt.amountCents, attempt.currencyCode)}.
-              Esperamos la confirmación verificable de PayPhone.
-            </p>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              El enlace vence:{' '}
-              {new Intl.DateTimeFormat('es-EC', {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-              }).format(new Date(attempt.expiresAt))}
-            </p>
-          </section>
-        ) : null}
+                {error ? (
+                  <p
+                    className="mt-6 rounded-xl border border-red-300 bg-red-50 p-4 text-red-800"
+                    role="alert"
+                  >
+                    {error}
+                  </p>
+                ) : null}
+
+                {loading ? (
+                  <p className="mt-8 text-[var(--muted)]">Cargando checkout…</p>
+                ) : null}
+
+                {!loading && !session && accessView === 'login' ? (
+                  <form
+                    className="mt-8 max-w-md rounded-2xl border border-black/10 bg-white p-6 shadow-sm"
+                    onSubmit={login}
+                  >
+                    <h2 className="text-xl font-bold">
+                      Inicia sesión para continuar
+                    </h2>
+                    <label
+                      className="mt-5 block text-sm font-semibold"
+                      htmlFor="email"
+                    >
+                      Correo
+                    </label>
+                    <input
+                      className="mt-1 w-full rounded-lg border border-black/20 px-3 py-2"
+                      id="email"
+                      onChange={(event) => setEmail(event.target.value)}
+                      required
+                      type="email"
+                      value={email}
+                    />
+                    <label
+                      className="mt-4 block text-sm font-semibold"
+                      htmlFor="password"
+                    >
+                      Contraseña
+                    </label>
+                    <input
+                      className="mt-1 w-full rounded-lg border border-black/20 px-3 py-2"
+                      id="password"
+                      minLength={8}
+                      onChange={(event) => setPassword(event.target.value)}
+                      required
+                      type="password"
+                      value={password}
+                    />
+                    <button
+                      className="mt-6 w-full rounded-lg bg-[var(--accent)] px-4 py-3 font-bold text-white disabled:opacity-60"
+                      disabled={submitting}
+                      type="submit"
+                    >
+                      {submitting ? 'Ingresando…' : 'Continuar'}
+                    </button>
+                  </form>
+                ) : null}
+
+                {!loading && !session && accessView === 'register' ? (
+                  <form
+                    className="subscription-registration-form"
+                    onSubmit={register}
+                  >
+                    <h2>Crea tu cuenta</h2>
+                    <p>
+                      Todos los campos son necesarios para configurar tu
+                      negocio.
+                    </p>
+                    <div className="subscription-form-grid">
+                      <label>
+                        Nombre completo
+                        <input
+                          onChange={(event) =>
+                            setRegistration((current) => ({
+                              ...current,
+                              fullName: event.target.value,
+                            }))
+                          }
+                          required
+                          value={registration.fullName}
+                        />
+                      </label>
+                      <label>
+                        Correo
+                        <input
+                          onChange={(event) =>
+                            setRegistration((current) => ({
+                              ...current,
+                              email: event.target.value,
+                            }))
+                          }
+                          required
+                          type="email"
+                          value={registration.email}
+                        />
+                      </label>
+                      <label>
+                        País de atención
+                        <select
+                          aria-label="País"
+                          onChange={(event) =>
+                            setRegistration((current) => ({
+                              ...current,
+                              countryCode: event.target.value,
+                            }))
+                          }
+                          required
+                          value={registration.countryCode}
+                        >
+                          {registrationCountries.map((country) => (
+                            <option key={country.code} value={country.code}>
+                              {country.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Código de país
+                        <select
+                          aria-label="Código de país"
+                          onChange={(event) =>
+                            setRegistration((current) => ({
+                              ...current,
+                              phoneCountryCode: event.target.value,
+                            }))
+                          }
+                          required
+                          value={registration.phoneCountryCode}
+                        >
+                          {registrationCountries.map((country) => (
+                            <option key={country.code} value={country.code}>
+                              {country.name} ({country.dial})
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Teléfono
+                        <input
+                          inputMode="tel"
+                          onChange={(event) =>
+                            setRegistration((current) => ({
+                              ...current,
+                              phone: event.target.value,
+                            }))
+                          }
+                          placeholder="Número de teléfono"
+                          required
+                          value={registration.phone}
+                        />
+                      </label>
+                      <label>
+                        Ciudad
+                        <input
+                          onChange={(event) =>
+                            setRegistration((current) => ({
+                              ...current,
+                              city: event.target.value,
+                            }))
+                          }
+                          required
+                          value={registration.city}
+                        />
+                      </label>
+                      <label>
+                        Tipo de cuenta
+                        <select
+                          onChange={(event) =>
+                            setRegistration((current) => ({
+                              ...current,
+                              accountType: event.target
+                                .value as RegistrationForm['accountType'],
+                            }))
+                          }
+                          value={registration.accountType}
+                        >
+                          <option value="business">Negocio</option>
+                          <option value="professional">
+                            Profesional independiente
+                          </option>
+                        </select>
+                      </label>
+                      <label>
+                        Nombre del negocio
+                        <input
+                          onChange={(event) =>
+                            setRegistration((current) => ({
+                              ...current,
+                              businessName: event.target.value,
+                            }))
+                          }
+                          required
+                          value={registration.businessName}
+                        />
+                      </label>
+                      <label>
+                        Apertura
+                        <input
+                          onChange={(event) =>
+                            setRegistration((current) => ({
+                              ...current,
+                              openingTime: event.target.value,
+                            }))
+                          }
+                          required
+                          type="time"
+                          value={registration.openingTime}
+                        />
+                      </label>
+                      <label>
+                        Cierre
+                        <input
+                          onChange={(event) =>
+                            setRegistration((current) => ({
+                              ...current,
+                              closingTime: event.target.value,
+                            }))
+                          }
+                          required
+                          type="time"
+                          value={registration.closingTime}
+                        />
+                      </label>
+                      <label>
+                        Contraseña
+                        <input
+                          minLength={8}
+                          onChange={(event) =>
+                            setRegistration((current) => ({
+                              ...current,
+                              password: event.target.value,
+                            }))
+                          }
+                          required
+                          type="password"
+                          value={registration.password}
+                        />
+                      </label>
+                      <label>
+                        Repite tu contraseña
+                        <input
+                          minLength={8}
+                          onChange={(event) =>
+                            setRegistration((current) => ({
+                              ...current,
+                              confirmPassword: event.target.value,
+                            }))
+                          }
+                          required
+                          type="password"
+                          value={registration.confirmPassword}
+                        />
+                      </label>
+                    </div>
+                    <label className="subscription-checkbox">
+                      <input
+                        checked={registration.privacyPolicyAccepted}
+                        onChange={(event) =>
+                          setRegistration((current) => ({
+                            ...current,
+                            privacyPolicyAccepted: event.target.checked,
+                          }))
+                        }
+                        required
+                        type="checkbox"
+                      />
+                      <span>
+                        Acepto la{' '}
+                        <a href="/tratamiento-de-datos" target="_blank">
+                          Política de Privacidad
+                        </a>{' '}
+                        y declaro tener 18 años o capacidad legal para
+                        contratar.
+                      </span>
+                    </label>
+                    <label className="subscription-checkbox">
+                      <input
+                        checked={registration.marketingOptIn}
+                        onChange={(event) =>
+                          setRegistration((current) => ({
+                            ...current,
+                            marketingOptIn: event.target.checked,
+                          }))
+                        }
+                        type="checkbox"
+                      />
+                      <span>Quiero recibir novedades y ofertas de Nava.</span>
+                    </label>
+                    <button disabled={submitting} type="submit">
+                      {submitting ? 'Preparando…' : 'Crear cuenta'}
+                    </button>
+                  </form>
+                ) : null}
+
+                {!loading && !session && accessView === 'verify' ? (
+                  <form
+                    className="subscription-verification-form"
+                    onSubmit={verifyEmail}
+                  >
+                    <h2>Revisa tu correo</h2>
+                    <p>
+                      Escribe el código enviado a{' '}
+                      <strong>{verificationEmail}</strong>.
+                    </p>
+                    <label>
+                      Código de verificación
+                      <input
+                        inputMode="numeric"
+                        maxLength={6}
+                        onChange={(event) =>
+                          setVerificationCode(event.target.value)
+                        }
+                        pattern="[0-9]{6}"
+                        required
+                        value={verificationCode}
+                      />
+                    </label>
+                    <button disabled={submitting} type="submit">
+                      {submitting ? 'Verificando…' : 'Verificar cuenta'}
+                    </button>
+                    <button
+                      className="subscription-text-button"
+                      onClick={() => setAccessView('register')}
+                      type="button"
+                    >
+                      Corregir datos de registro
+                    </button>
+                  </form>
+                ) : null}
+
+                {session && accessView === 'setup' ? (
+                  <form
+                    className="subscription-verification-form"
+                    onSubmit={completeAccountSetup}
+                  >
+                    <h2>Configura tu primer servicio</h2>
+                    <p>
+                      Crearemos tu negocio, la sede principal, tus horarios y
+                      este primer servicio.
+                    </p>
+                    <label>
+                      Nombre del servicio
+                      <input
+                        minLength={2}
+                        onChange={(event) =>
+                          setFirstService((current) => ({
+                            ...current,
+                            name: event.target.value,
+                          }))
+                        }
+                        placeholder="Ej. Corte clásico"
+                        required
+                        value={firstService.name}
+                      />
+                    </label>
+                    <div className="subscription-form-grid">
+                      <label>
+                        Duración (minutos)
+                        <input
+                          min={5}
+                          onChange={(event) =>
+                            setFirstService((current) => ({
+                              ...current,
+                              durationMinutes: Number(event.target.value),
+                            }))
+                          }
+                          required
+                          step={5}
+                          type="number"
+                          value={firstService.durationMinutes}
+                        />
+                      </label>
+                      <label>
+                        Precio (USD)
+                        <input
+                          min={0}
+                          onChange={(event) =>
+                            setFirstService((current) => ({
+                              ...current,
+                              price: Number(event.target.value),
+                            }))
+                          }
+                          required
+                          step="0.01"
+                          type="number"
+                          value={firstService.price}
+                        />
+                      </label>
+                    </div>
+                    <button disabled={submitting} type="submit">
+                      {submitting
+                        ? 'Creando negocio…'
+                        : 'Crear negocio y continuar'}
+                    </button>
+                  </form>
+                ) : null}
+
+                {session && accessView !== 'setup' ? (
+                  <div className="mt-8">
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-black/10 bg-white p-4">
+                      <span>
+                        {session.organization
+                          ? `Negocio: ${session.organization.name}`
+                          : 'Cuenta Nava'}
+                      </span>
+                      <button
+                        className="text-sm font-semibold underline"
+                        onClick={() => void logout()}
+                        type="button"
+                      >
+                        Cerrar sesión
+                      </button>
+                    </div>
+                    {!session.canCheckout ? (
+                      <p className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
+                        {sessionMessage(session)}
+                      </p>
+                    ) : null}
+                    <div className="mt-6 max-w-md">
+                      <label
+                        className="block text-sm font-semibold"
+                        htmlFor="discount-code"
+                      >
+                        Código de descuento
+                      </label>
+                      <input
+                        autoCapitalize="characters"
+                        className="mt-1 w-full rounded-lg border border-black/20 px-3 py-2"
+                        id="discount-code"
+                        maxLength={80}
+                        onChange={(event) =>
+                          setDiscountCode(event.target.value)
+                        }
+                        placeholder="Opcional"
+                        value={discountCode}
+                      />
+                      <p className="mt-2 text-sm text-[var(--muted)]">
+                        Si tienes un código fundador, ingrésalo antes de
+                        seleccionar Nava Local.
+                      </p>
+                    </div>
+                    <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                      {plans
+                        .filter(
+                          (plan) =>
+                            plan.monthlyPriceCents &&
+                            plan.monthlyPriceCents > 0,
+                        )
+                        .map((plan) => (
+                          <article
+                            className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm"
+                            key={plan.code}
+                          >
+                            <h2 className="text-2xl font-bold">{plan.name}</h2>
+                            <p className="mt-2 text-lg text-[var(--muted)]">
+                              {formatMoney(
+                                plan.monthlyPriceCents,
+                                plan.currencyCode,
+                              )}{' '}
+                              / mes
+                            </p>
+                            <button
+                              className="mt-6 w-full rounded-lg bg-[var(--accent)] px-4 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                              disabled={!session.canCheckout || submitting}
+                              onClick={() => void beginCheckout(plan.code)}
+                              type="button"
+                            >
+                              {submitting
+                                ? 'Preparando…'
+                                : `Elegir ${plan.name}`}
+                            </button>
+                          </article>
+                        ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {attempt ? (
+                  <section
+                    aria-live="polite"
+                    className="mt-8 rounded-2xl border border-black/10 bg-white p-6"
+                  >
+                    <h2 className="text-xl font-bold">
+                      Estado del pago: {attempt.status}
+                    </h2>
+                    <p className="mt-2 text-[var(--muted)]">
+                      {attempt.invoice.planName} ·{' '}
+                      {formatMoney(attempt.amountCents, attempt.currencyCode)}.
+                      Esperamos la confirmación verificable de PayPhone.
+                    </p>
+                    <p className="mt-2 text-sm text-[var(--muted)]">
+                      El enlace vence:{' '}
+                      {new Intl.DateTimeFormat('es-EC', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                      }).format(new Date(attempt.expiresAt))}
+                    </p>
+                  </section>
+                ) : null}
               </div>
             </section>
           </div>
