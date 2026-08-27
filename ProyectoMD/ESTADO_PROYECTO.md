@@ -34,6 +34,13 @@
 > API y Mobile conjuntamente para que los controles de servidor y la interfaz
 > correspondan al mismo modelo de acceso.
 
+> Actualización de asignaciones y ciclo de vida de sucursales: **27 de agosto
+> de 2026**. La integración quedó completa en código con el commit `5504e7e`:
+> API, Mobile y Web pública aplican las asignaciones por sucursal, el archivo
+> reversible de sucursales y el selector público de sucursal. No requiere una
+> migración nueva, pero API, Mobile y Web deben desplegarse conjuntamente antes
+> de considerarla operativa en producción.
+
 ### Cierre de PayPhone Botón WEB en suscripciones (25 de agosto de 2026)
 
 - [x] La web comercial está publicada en `https://navacloud.app`, con TLS
@@ -121,8 +128,8 @@ el código actual y tiene evidencia proporcional a su riesgo.
 | ---------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Arquitectura y monorepo      | Completo              | pnpm/Turborepo, TypeScript estricto, CI, cuatro aplicaciones y paquetes compartidos.                                                                                                                                                      |
 | Autenticación y multi-tenant | Funcional             | Registro y OTP, sesiones opacas, recuperación, onboarding, roles y aislamiento por organización implementados. Las integraciones PostgreSQL no se ejecutaron en este corte.                                                               |
-| Operación de barbería        | Funcional             | Equipo, servicios, horarios, agenda, Caja, comisiones, inventario, reportes y notificaciones tienen API y UI móvil. Clientes aplica acceso mínimo por rol: ficha completa solo para owner/manager; teléfono enmascarado para recepción/barbero. |
-| Reserva pública              | Funcional             | Catálogo, disponibilidad, OTP, política, idempotencia, gestión por token, reseñas y recordatorios implementados.                                                                                                                          |
+| Operación de barbería        | Funcional             | Equipo, servicios, horarios, agenda, Caja, comisiones, inventario, reportes y notificaciones tienen API y UI móvil. Las asignaciones de equipo por sucursal y el archivo/restauración reversible de sucursales están completos en código. Clientes aplica acceso mínimo por rol: ficha completa solo para owner/manager; teléfono enmascarado para recepción/barbero. |
+| Reserva pública              | Funcional             | Catálogo, disponibilidad, OTP, política, idempotencia, gestión por token, reseñas y recordatorios implementados. La entrada de organizaciones con varias sucursales activas permite elegir sucursal; las archivadas no aceptan reservas. |
 | Comercio de productos        | Parcial               | Catálogo, carrito, pedidos, reserva de stock, PayPhone y gestión operativa existen; faltan endurecimiento público y pruebas específicas.                                                                                                  |
 | Planes y suscripciones       | Funcional en TEST     | Trial, plan Free, límites, feature flags y checkout WEB Prepare/Confirm están validados en sandbox. Producción requiere credenciales WEB y aceptación separadas.                                                                          |
 | Panel interno                | Funcional, desplegado | Admin está publicado con login/OTP, servicio y HTTPS. El árbol actual añade navegación Usuario↔Organización y administración de Memberships posteriores al commit desplegado; faltan validación autenticada y despliegue de esos avances. |
@@ -223,6 +230,47 @@ Mobile / Web pública / Admin
 - [x] Gestión móvil de servicios, equipo, roles base, ubicación y horarios.
 - [ ] Los “permisos personalizados” no existen: la pantalla cambia perfiles
       base y `Membership` no almacena capacidades individuales.
+
+#### Actualización: asignaciones de equipo y ciclo de vida de sucursales — completa en código (27 de agosto de 2026)
+
+La integración del commit `5504e7e` usa `MemberLocation` como fuente de verdad
+de las asignaciones y mantiene la validación en servidor; la interfaz es una
+segunda barrera, no la autoridad de acceso.
+
+- [x] La API consulta y reemplaza las sucursales asignadas de miembros activos
+      de la misma organización, aplicando los entitlements efectivos y los
+      límites de sucursales. Free y Esencial bloquean la edición; Trial, Local,
+      Multi y los overrides efectivos la permiten dentro de sus límites.
+- [x] Owner permanece protegido de edición. Manager conserva acceso a toda la
+      organización: sus asignaciones se guardan y muestran solo como referencia.
+      Receptionist y barber requieren una o más sucursales asignadas.
+- [x] Receptionist queda restringido en servidor a agenda, clientes y eventos
+      de sus sucursales asignadas.
+- [x] Al asignar una sucursal a un barber se crean, sin duplicados, los
+      servicios activos de la organización para esa combinación. No se copian
+      horarios ni bloqueos; al retirar la sucursal se preservan servicios,
+      horarios y bloqueos para una restauración posterior. El retiro se rechaza
+      si existen citas futuras no canceladas.
+- [x] Las sucursales se archivan y restauran con `Location.isActive`; no hay
+      borrado físico. Solo owner puede hacerlo. El archivo exige otra sucursal
+      activa y rechaza caja abierta o citas futuras; también revoca invitaciones
+      pendientes. Restaurar respeta la capacidad del plan y conserva historial
+      y configuraciones.
+- [x] Mobile separa sucursales activas y archivadas, permite archivar/restaurar
+      y muestra los bloqueos; la pantalla de colaboradores permite gestionar
+      las asignaciones disponibles por rol y plan.
+- [x] La reserva pública mantiene las URL de cada sucursal, rechaza las
+      archivadas con `PUBLIC_LOCATION_NOT_FOUND` y valida en servidor la
+      pertenencia del profesional, reservas online y servicios por sucursal.
+      La URL de organización conserva la redirección con una sucursal activa y
+      muestra un selector con dos o más.
+- [x] Las mutaciones relacionadas son transaccionales y auditables. La cobertura
+      de integración incluye recepción, manager, barber, restricciones de plan,
+      archivo/restauración y el comportamiento público de sucursales archivadas.
+
+Pendiente operativo: desplegar API, Mobile y Web pública como una misma
+liberación y ejecutar la aceptación contra el entorno de destino; esta
+documentación no constituye evidencia de despliegue productivo.
 
 ### Fase 3 — Agenda: funcional
 

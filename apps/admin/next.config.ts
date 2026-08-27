@@ -1,6 +1,8 @@
 import type { NextConfig } from 'next';
 import { join } from 'node:path';
 
+import { getAdminApiBaseUrl } from './app/api-url';
+
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['127.0.0.1'],
   poweredByHeader: false,
@@ -10,8 +12,7 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     if (process.env.NODE_ENV !== 'production') return [];
-    const apiOrigin =
-      process.env.NEXT_PUBLIC_API_URL ?? 'https://api.navacloud.app';
+    const apiOrigin = getAdminApiBaseUrl();
     return [
       {
         headers: [
@@ -24,7 +25,10 @@ const nextConfig: NextConfig = {
             value: 'camera=(), geolocation=(), microphone=(), payment=()',
           },
           { key: 'Referrer-Policy', value: 'no-referrer' },
-          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains',
+          },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'DENY' },
         ],
