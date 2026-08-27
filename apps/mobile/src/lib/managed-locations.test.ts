@@ -1,6 +1,6 @@
 import type { ManagedLocation } from '@barber-saas/api-client';
 
-import { partitionManagedLocations } from '../../src/lib/managed-locations';
+import { partitionManagedLocations } from './managed-locations';
 
 const location = (id: string, isActive: boolean): ManagedLocation => ({
   addressLine: null,

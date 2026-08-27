@@ -546,6 +546,40 @@ export default function TeamManagementScreen() {
                     ) : null}
                   </View>
                 ) : null}
+                {member.user.id === user?.id &&
+                (member.role === 'barber' || member.role === 'owner') ? (
+                  <View style={styles.ownScheduleSection}>
+                    <Text style={styles.onlineBookingLabel}>Mi horario</Text>
+                    {member.locations.map((location) => (
+                      <Pressable
+                        accessibilityLabel={`Configurar mi horario en ${location.name}`}
+                        accessibilityRole="button"
+                        key={location.id}
+                        onPress={() =>
+                          router.push({
+                            params: {
+                              locationId: location.id,
+                              locationName: location.name,
+                              membershipId: member.id,
+                              professionalName: member.user.fullName,
+                            },
+                            pathname: '/professional-schedule',
+                          })
+                        }
+                        style={styles.ownScheduleButton}
+                      >
+                        <Ionicons
+                          color={appTheme.colors.accentDark}
+                          name="time-outline"
+                          size={18}
+                        />
+                        <Text style={styles.ownScheduleButtonLabel}>
+                          {location.name}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
               </View>
             );
           })}
@@ -860,6 +894,31 @@ export default function TeamManagementScreen() {
                               Cargando servicios…
                             </Text>
                           ) : null}
+                          <Pressable
+                            accessibilityLabel={`Configurar horario de ${editingMember.user.fullName} en ${location.name}`}
+                            accessibilityRole="button"
+                            onPress={() =>
+                              router.push({
+                                params: {
+                                  locationId,
+                                  locationName: location.name,
+                                  membershipId: editingMember.id,
+                                  professionalName: editingMember.user.fullName,
+                                },
+                                pathname: '/professional-schedule',
+                              })
+                            }
+                            style={styles.scheduleButton}
+                          >
+                            <Ionicons
+                              color={appTheme.colors.accentDark}
+                              name="time-outline"
+                              size={18}
+                            />
+                            <Text style={styles.scheduleButtonLabel}>
+                              Configurar horario en esta sucursal
+                            </Text>
+                          </Pressable>
                         </View>
                       );
                     })}
@@ -1126,6 +1185,26 @@ const styles = StyleSheet.create({
     width: 48,
   },
   onlineBookingSwitchEnabled: { backgroundColor: appTheme.colors.accent },
+  ownScheduleButton: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    minHeight: 34,
+  },
+  ownScheduleButtonLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  ownScheduleSection: {
+    backgroundColor: '#FFFDF8',
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 5,
+    marginTop: 8,
+    padding: 12,
+  },
   modalBackdrop: {
     ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(16, 28, 45, 0.5)',
@@ -1215,6 +1294,18 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   serviceLocationTitle: { color: COLORS.text, fontSize: 14, fontWeight: '800' },
+  scheduleButton: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+    paddingVertical: 8,
+  },
+  scheduleButtonLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   sendButton: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surface,

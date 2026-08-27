@@ -2281,6 +2281,75 @@ describeWithDatabase('API con PostgreSQL', () => {
     ).toBe(0);
   });
 
+  it('sincroniza el catálogo del propietario al crear una sucursal', async () => {
+    const ownerToken = await register('owner-new-location@example.com');
+    const organization = await onboard(ownerToken, 'owner-new-location');
+    const firstService = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        durationMinutes: 30,
+        name: 'Corte inicial',
+        priceCents: 1200,
+      },
+      url: '/v1/services',
+    });
+    expect(firstService.statusCode).toBe(201);
+    const firstServiceId = firstService.json<{ service: { id: string } }>()
+      .service.id;
+
+    const locationResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        city: 'Quito',
+        countryCode: 'EC',
+        currencyCode: 'USD',
+        name: 'Sucursal Centro',
+        phone: '0999999997',
+        slug: 'owner-new-location-centro',
+        timezone: 'America/Guayaquil',
+      },
+      url: '/v1/locations',
+    });
+    expect(locationResponse.statusCode).toBe(201);
+    const locationId = locationResponse.json<{ location: { id: string } }>()
+      .location.id;
+    const owner = await database.membership.findFirstOrThrow({
+      where: { organizationId: organization.organizationId, role: 'OWNER' },
+    });
+    expect(
+      await database.professionalService.findUnique({
+        where: {
+          membershipId_serviceId_locationId: {
+            locationId,
+            membershipId: owner.id,
+            serviceId: firstServiceId,
+          },
+        },
+      }),
+    ).not.toBeNull();
+
+    const secondService = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        durationMinutes: 45,
+        name: 'Barba completa',
+        priceCents: 1500,
+      },
+      url: '/v1/services',
+    });
+    expect(secondService.statusCode).toBe(201);
+    const secondServiceId = secondService.json<{ service: { id: string } }>()
+      .service.id;
+    expect(
+      await database.professionalService.count({
+        where: { membershipId: owner.id, serviceId: secondServiceId },
+      }),
+    ).toBe(2);
+  });
+
   it('permite retirar manualmente un servicio de un profesional en una sucursal', async () => {
     const ownerToken = await register(
       'barber-service-removal-owner@example.com',

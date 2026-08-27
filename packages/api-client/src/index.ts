@@ -96,6 +96,14 @@ export interface BusinessLocation {
   readonly longitude: number | null;
 }
 
+export interface BookingLocationsResponse {
+  readonly locations: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+    readonly timezone: string;
+  }>;
+}
+
 export interface GoogleMapsLocationCandidate {
   readonly city: string | null;
   readonly countryCode: string | null;
@@ -815,6 +823,7 @@ export interface SchedulesResponse {
   readonly schedules: ReadonlyArray<{
     readonly endMinute: number;
     readonly id: string;
+    readonly locationId: string;
     readonly membershipId: string;
     readonly startMinute: number;
     readonly weekday: number;

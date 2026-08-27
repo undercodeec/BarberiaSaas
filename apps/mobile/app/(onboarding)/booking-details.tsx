@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
   AppointmentRecord,
   AvailabilityResponse,
+  BookingLocationsResponse,
   ClientDetailResponse,
   ServicesResponse,
   TeamResponse,
@@ -130,6 +131,9 @@ export default function BookingDetailsScreen() {
   const withoutClient = clientId === 'without-client';
   const [step, setStep] = useState<BookingStep>('professional');
   const [professionalId, setProfessionalId] = useState<string | null>(null);
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(
+    null,
+  );
   const [serviceIds, setServiceIds] = useState<string[]>([]);
   const [selectedDateValue, setSelectedDateValue] = useState<string | null>(
     null,
@@ -154,6 +158,14 @@ export default function BookingDetailsScreen() {
     queryFn: () => requireApiClient().request<ServicesResponse>('/v1/services'),
     queryKey: tenant.key('services'),
   });
+  const bookingLocationsQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<BookingLocationsResponse>(
+        '/v1/locations/booking-context',
+      ),
+    queryKey: tenant.key('booking-locations'),
+  });
   const clientQuery = useQuery({
     enabled: Boolean(session && clientId && !withoutClient),
     queryFn: () =>
@@ -163,8 +175,19 @@ export default function BookingDetailsScreen() {
     queryKey: tenant.key('client-detail', clientId),
   });
 
-  const locationId = organizationQuery.data?.location?.id ?? null;
+  const availableLocations = bookingLocationsQuery.data?.locations ?? [];
+  const defaultLocationId =
+    availableLocations.find(
+      (location) => location.id === organizationQuery.data?.location?.id,
+    )?.id ??
+    availableLocations[0]?.id ??
+    null;
+  const locationId = selectedLocationId ?? defaultLocationId;
+  const selectedLocation = availableLocations.find(
+    (location) => location.id === locationId,
+  );
   const timeZone =
+    selectedLocation?.timezone ??
     organizationQuery.data?.location?.timezone ??
     organizationQuery.data?.organization?.defaultTimezone ??
     Intl.DateTimeFormat().resolvedOptions().timeZone ??
@@ -215,6 +238,7 @@ export default function BookingDetailsScreen() {
     queryKey: tenant.key(
       'availability',
       localDateValue(date),
+      locationId,
       professionalId,
       serviceIds,
     ),
@@ -343,6 +367,13 @@ export default function BookingDetailsScreen() {
     setServiceIds([]);
     setStartsAt(null);
   };
+  const chooseLocation = (id: string) => {
+    setSelectedLocationId(id);
+    setProfessionalId(null);
+    setServiceIds([]);
+    setStartsAt(null);
+    setShowAllSlots(false);
+  };
   const toggleService = (id: string) => {
     setServiceIds((current) =>
       current.includes(id)
@@ -399,6 +430,50 @@ export default function BookingDetailsScreen() {
             <Text style={styles.copy}>
               Sólo aparecen integrantes con servicios asignados en esta sede.
             </Text>
+            {availableLocations.length > 1 ? (
+              <>
+                <Text style={styles.sectionTitle}>Sucursal</Text>
+                <ScrollView
+                  contentContainerStyle={styles.locationRow}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                >
+                  {availableLocations.map((location) => {
+                    const selected = location.id === locationId;
+                    return (
+                      <Pressable
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}
+                        key={location.id}
+                        onPress={() => chooseLocation(location.id)}
+                        style={[
+                          styles.locationOption,
+                          selected && styles.locationOptionSelected,
+                        ]}
+                      >
+                        <Ionicons
+                          color={
+                            selected
+                              ? appTheme.colors.accentDark
+                              : appTheme.colors.textMuted
+                          }
+                          name="location-outline"
+                          size={18}
+                        />
+                        <Text
+                          style={[
+                            styles.locationOptionText,
+                            selected && styles.locationOptionTextSelected,
+                          ]}
+                        >
+                          {location.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            ) : null}
             {professionals.map((professional) => (
               <Pressable
                 accessibilityState={{ disabled: !professional.planAvailable }}
@@ -970,6 +1045,28 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 13,
   },
+  locationOption: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.surface,
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  locationOptionSelected: {
+    backgroundColor: appTheme.colors.accentWash,
+    borderColor: appTheme.colors.accent,
+  },
+  locationOptionText: {
+    color: appTheme.colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  locationOptionTextSelected: { color: appTheme.colors.accentDark },
+  locationRow: { gap: 8, paddingBottom: 3 },
   screen: { backgroundColor: appTheme.colors.background, flex: 1 },
   successCard: {
     alignItems: 'center',

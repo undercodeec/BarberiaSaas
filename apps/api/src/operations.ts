@@ -5014,6 +5014,29 @@ export function registerOperationsRoutes(
             },
           },
         });
+        // The owner may also be a bookable professional.  A newly created
+        // branch must therefore receive the active catalog for that
+        // professional; otherwise its public page is empty until somebody
+        // manually touches the member assignment again.
+        if (
+          current.role === MembershipRole.OWNER ||
+          current.role === MembershipRole.BARBER
+        ) {
+          const activeServices = await transaction.service.findMany({
+            select: { id: true },
+            where: { isActive: true, organizationId: current.organizationId },
+          });
+          if (activeServices.length > 0) {
+            await transaction.professionalService.createMany({
+              data: activeServices.map((service) => ({
+                locationId: created.id,
+                membershipId: current.id,
+                serviceId: service.id,
+              })),
+              skipDuplicates: true,
+            });
+          }
+        }
         await transaction.businessWeeklySchedule.createMany({
           data: Array.from({ length: 7 }, (_, weekday) => ({
             endMinute: 1080,
@@ -5097,6 +5120,26 @@ export function registerOperationsRoutes(
       })),
       used: activeLocationCount,
     };
+  });
+
+  app.get('/v1/locations/booking-context', async (request) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireMembership(database, user.id);
+    const canOperateAllLocations =
+      current.role === MembershipRole.OWNER ||
+      current.role === MembershipRole.MANAGER;
+    const locations = await database.location.findMany({
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, name: true, timezone: true },
+      where: {
+        isActive: true,
+        organizationId: current.organizationId,
+        ...(canOperateAllLocations
+          ? {}
+          : { memberLocations: { some: { membershipId: current.id } } }),
+      },
+    });
+    return { locations };
   });
 
   app.post('/v1/locations/:locationId/archive', async (request) => {
@@ -6386,26 +6429,28 @@ export function registerOperationsRoutes(
               priceCents: input.priceCents,
             },
           });
-      const defaultLocationId = current.memberLocations[0]?.locationId;
-      if (
-        defaultLocationId &&
-        (current.role === MembershipRole.BARBER ||
-          current.role === MembershipRole.OWNER)
-      ) {
-        await transaction.professionalService.upsert({
-          create: {
-            locationId: defaultLocationId,
-            membershipId: current.id,
+      // A service belongs to the organization catalog.  Make it available by
+      // default to every active professional at every branch where they work;
+      // managers can still remove an individual assignment afterwards.
+      const professionalLocations = await transaction.memberLocation.findMany({
+        select: { locationId: true, membershipId: true },
+        where: {
+          membership: {
+            organizationId: current.organizationId,
+            role: { in: [MembershipRole.BARBER, MembershipRole.OWNER] },
+            status: MembershipStatus.ACTIVE,
+          },
+          location: { isActive: true },
+        },
+      });
+      if (professionalLocations.length > 0) {
+        await transaction.professionalService.createMany({
+          data: professionalLocations.map((assignment) => ({
+            locationId: assignment.locationId,
+            membershipId: assignment.membershipId,
             serviceId: record.id,
-          },
-          update: {},
-          where: {
-            membershipId_serviceId_locationId: {
-              locationId: defaultLocationId,
-              membershipId: current.id,
-              serviceId: record.id,
-            },
-          },
+          })),
+          skipDuplicates: true,
         });
       }
       await transaction.auditLog.create({
