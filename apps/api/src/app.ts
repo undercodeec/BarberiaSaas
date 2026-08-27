@@ -2863,7 +2863,13 @@ export async function buildApi({
       }
     },
   );
-  registerAgendaRoutes(app, database, authenticate);
+  registerAgendaRoutes(
+    app,
+    database,
+    authenticate,
+    publicBookingMailer,
+    config.PUBLIC_WEB_URL,
+  );
   registerPublicBookingRoutes(
     app,
     database,

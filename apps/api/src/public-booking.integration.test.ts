@@ -37,9 +37,13 @@ integrationDescribe('reservas públicas', () => {
   let accessToken = '';
   let lastVerificationCode = '';
   let reminderMessages = 0;
+  const reviewMessages: string[] = [];
   const mailer: PublicBookingMailer = {
     async sendCancellation() {},
     async sendConfirmation() {},
+    async sendReviewRequest(message) {
+      reviewMessages.push(message.manageUrl);
+    },
     async sendReminder() {
       reminderMessages += 1;
     },
@@ -388,17 +392,19 @@ integrationDescribe('reservas públicas', () => {
         managementTokenHash: hashOpaqueToken(management.managementToken),
       },
     });
-    await database.appointment.update({
-      data: {
-        reservesSlot: false,
-        status: AppointmentStatus.COMPLETED,
-      },
-      where: { id: access.appointmentId },
+    const completed = await app.inject({
+      headers: { authorization: `Bearer ${accessToken}` },
+      method: 'PATCH',
+      payload: { status: 'completed' },
+      url: `/v1/appointments/${access.appointmentId}/status`,
     });
+    expect(completed.statusCode).toBe(200);
+    expect(reviewMessages).toHaveLength(1);
+    const reviewToken = reviewMessages[0]!.split('/').at(-1)!;
     const reviewResponse = await app.inject({
       method: 'POST',
       payload: { comment: 'Muy buen servicio', rating: 5 },
-      url: `/v1/public/booking/${management.managementToken}/review`,
+      url: `/v1/public/booking/${reviewToken}/review`,
     });
     expect(reviewResponse.statusCode).toBe(201);
     const reviewId = reviewResponse.json().review.id as string;

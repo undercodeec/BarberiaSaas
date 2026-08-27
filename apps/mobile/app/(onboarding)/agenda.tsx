@@ -197,6 +197,24 @@ export default function AgendaScreen() {
       });
     },
   });
+  const completeAppointment = useMutation({
+    mutationFn: (appointmentId: string) =>
+      requireApiClient().request<{ appointment: AppointmentRecord }>(
+        `/v1/appointments/${appointmentId}/status`,
+        { body: { status: 'completed' }, method: 'PATCH' },
+      ),
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos completar la cita',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      setSelectedAppointment(null);
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('agenda-appointments'),
+      });
+    },
+  });
   const manageAppointment = (appointment: AppointmentRecord) => {
     if (
       appointment.status === 'cancelled' ||
@@ -1369,6 +1387,36 @@ export default function AgendaScreen() {
                 {canRescheduleSelectedAppointment
                   ? 'Reprogramar cita'
                   : 'Profesional histórico (Nava Local)'}
+              </Text>
+            </Pressable>
+            <Pressable
+              disabled={completeAppointment.isPending}
+              onPress={() => {
+                if (!selectedAppointment) return;
+                Alert.alert(
+                  'Completar cita',
+                  selectedAppointment.source === 'public_booking'
+                    ? 'La cita se marcará como completada y se enviará al cliente un correo para dejar su reseña.'
+                    : 'La cita se marcará como completada.',
+                  [
+                    { style: 'cancel', text: 'Cancelar' },
+                    {
+                      onPress: () =>
+                        completeAppointment.mutate(selectedAppointment.id),
+                      text: 'Completar',
+                    },
+                  ],
+                );
+              }}
+              style={styles.modalPrimaryAction}
+            >
+              <Ionicons
+                color="#ffffff"
+                name="checkmark-circle-outline"
+                size={20}
+              />
+              <Text style={styles.modalPrimaryText}>
+                Marcar como completada
               </Text>
             </Pressable>
             {/* La confirmación manual PayPhone permanece deshabilitada hasta

@@ -74,6 +74,23 @@ export function createPublicBookingMailer(
         to: message.email,
       });
     },
+    sendReviewRequest(message) {
+      return send({
+        subject: `¿Cómo fue tu cita en ${message.organizationName}?`,
+        text: [
+          'Gracias por visitarnos.',
+          '',
+          `${message.professionalName} · ${formatAppointmentDate(
+            message.startsAt,
+            message.timeZone,
+          )}`,
+          '',
+          'Tu opinión ayuda a otros clientes. Califica tu experiencia desde este enlace privado:',
+          message.manageUrl,
+        ].join('\n'),
+        to: message.email,
+      });
+    },
     sendReminder(message) {
       return send({
         subject: `Confirma tu asistencia a ${message.organizationName}`,

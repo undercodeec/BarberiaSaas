@@ -32,6 +32,8 @@ import {
   recordBookingMilestone,
 } from './subscription-policy';
 import { clientScope, maskClientPhone } from './clients';
+import type { PublicBookingMailer } from './public-booking';
+import { createOpaqueToken, hashOpaqueToken } from './security';
 
 interface AuthenticatedIdentity {
   readonly user: { readonly email: string; readonly id: string };
@@ -481,6 +483,8 @@ export function registerAgendaRoutes(
   app: FastifyInstance,
   database: DatabaseClient,
   authenticate: Authenticate,
+  publicBookingMailer: PublicBookingMailer | null = null,
+  publicBaseUrl = 'https://navacloud.app',
 ) {
   app.get('/v1/availability', async (request) => {
     const { user } = await authenticate(database, request);
@@ -1016,6 +1020,12 @@ export function registerAgendaRoutes(
     const { appointmentId } = request.params as { appointmentId: string };
     const input = updateAppointmentStatusSchema.parse(request.body);
     const existing = await database.appointment.findFirst({
+      include: {
+        location: { select: { timezone: true } },
+        organization: { select: { name: true } },
+        professional: { include: { user: { select: { fullName: true } } } },
+        publicAccess: { select: { id: true } },
+      },
       where: { id: appointmentId, organizationId: current.organizationId },
     });
     if (!existing)
@@ -1054,6 +1064,32 @@ export function registerAgendaRoutes(
       await reconcileAppointmentCommissions(transaction, appointment.id);
       return appointment;
     });
+    if (
+      status === AppointmentStatus.COMPLETED &&
+      existing.status !== AppointmentStatus.COMPLETED &&
+      existing.source === AppointmentSource.PUBLIC_BOOKING &&
+      existing.clientEmail &&
+      existing.publicAccess &&
+      publicBookingMailer
+    ) {
+      const reviewToken = createOpaqueToken();
+      await database.publicBookingAccess.update({
+        data: { reminderTokenHash: hashOpaqueToken(reviewToken) },
+        where: { id: existing.publicAccess.id },
+      });
+      try {
+        await publicBookingMailer.sendReviewRequest({
+          email: existing.clientEmail,
+          manageUrl: `${publicBaseUrl.replace(/\/+$/u, '')}/booking/${encodeURIComponent(reviewToken)}`,
+          organizationName: existing.organization.name,
+          professionalName: existing.professional.user.fullName,
+          startsAt: existing.startsAt,
+          timeZone: existing.location.timezone,
+        });
+      } catch (error) {
+        app.log.error(error, 'No se pudo enviar la invitación de reseña.');
+      }
+    }
     return {
       appointment: publicAppointment(
         updated,

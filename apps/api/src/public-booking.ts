@@ -71,6 +71,7 @@ const reviewPathSchema = z.object({ reviewId: z.uuid() });
 interface PublicBookingMailer {
   sendCancellation(message: BookingMailMessage): Promise<void>;
   sendConfirmation(message: BookingMailMessage): Promise<void>;
+  sendReviewRequest(message: BookingMailMessage): Promise<void>;
   sendReminder(message: BookingMailMessage): Promise<void>;
   sendVerification(message: {
     readonly code: string;
