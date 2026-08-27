@@ -13,6 +13,18 @@ interface KeyboardAwareScrollViewProps extends ScrollViewProps {
 
 let activeKeyboardScroll: symbol | null = null;
 
+export function shouldRevealFocusedInput(
+  focusedInput: unknown,
+  previousInput: unknown,
+) {
+  const focusableInput = focusedInput as { isFocused?: () => boolean } | null;
+  return Boolean(
+    focusableInput &&
+    focusedInput !== previousInput &&
+    focusableInput.isFocused?.() !== false,
+  );
+}
+
 function assignRef(
   ref: ForwardedRef<NativeScrollView>,
   value: NativeScrollView | null,
@@ -50,7 +62,8 @@ export const KeyboardAwareScrollView = forwardRef<
   const revealFocusedInput = () => {
     if (horizontal || activeKeyboardScroll !== instanceId.current) return;
     const focusedInput = TextInput.State.currentlyFocusedInput();
-    if (!focusedInput || focusedInput === focusedInputRef.current) return;
+    if (!shouldRevealFocusedInput(focusedInput, focusedInputRef.current))
+      return;
     focusedInputRef.current = focusedInput;
     scrollRef.current?.scrollResponderScrollNativeHandleToKeyboard?.(
       focusedInput,
@@ -68,14 +81,10 @@ export const KeyboardAwareScrollView = forwardRef<
     const keyboardHide = Keyboard.addListener('keyboardDidHide', () => {
       focusedInputRef.current = null;
     });
-    const focusPoll = setInterval(() => {
-      if (Keyboard.isVisible()) revealFocusedInput();
-    }, 180);
 
     return () => {
       keyboardShow.remove();
       keyboardHide.remove();
-      clearInterval(focusPoll);
       if (delayedScrollRef.current) clearTimeout(delayedScrollRef.current);
       if (activeKeyboardScroll === currentInstanceId)
         activeKeyboardScroll = null;

@@ -20,6 +20,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BusinessLocationSheet } from '../../src/components/BusinessLocationSheet';
+import { LocationRegionalSettingsFields } from '../../src/components/LocationRegionalSettingsFields';
 import {
   appStyles,
   appTheme,
@@ -74,6 +75,9 @@ export default function LocationManagementScreen() {
   const [form, setForm] = useState<LocationForm>(() => formFor());
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [mapLocation, setMapLocation] = useState<ManagedLocation | null>(null);
+  const [isMapPickerOpen, setIsMapPickerOpen] = useState(false);
+  const [selectedMap, setSelectedMap] =
+    useState<GoogleMapsLocationCandidate | null>(null);
   const locationsQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -89,10 +93,17 @@ export default function LocationManagementScreen() {
       if (form.slug.trim().length < 3)
         throw new Error('El enlace debe tener al menos 3 caracteres.');
       const body = {
-        addressLine: form.addressLine.trim() || undefined,
-        city: form.city.trim() || undefined,
+        addressLine:
+          selectedMap?.formattedAddress.slice(0, 240) ||
+          form.addressLine.trim() ||
+          undefined,
+        city: selectedMap?.city || form.city.trim() || undefined,
         countryCode: form.countryCode.trim().toUpperCase(),
         currencyCode: form.currencyCode.trim().toUpperCase(),
+        formattedAddress: selectedMap?.formattedAddress || undefined,
+        googlePlaceId: selectedMap?.placeId || undefined,
+        latitude: selectedMap?.latitude,
+        longitude: selectedMap?.longitude,
         name: form.name.trim(),
         phone: form.phone.trim(),
         slug: form.slug.trim().toLowerCase(),
@@ -160,12 +171,28 @@ export default function LocationManagementScreen() {
     }
     setEditing(null);
     setForm(formFor());
+    setSelectedMap(null);
     setIsFormOpen(true);
   };
 
   const openEdit = (location: ManagedLocation) => {
     setEditing(location);
     setForm(formFor(location));
+    setSelectedMap(
+      location.formattedAddress !== null &&
+        location.latitude !== null &&
+        location.longitude !== null
+        ? {
+            city: location.city,
+            countryCode: location.countryCode,
+            displayName: null,
+            formattedAddress: location.formattedAddress,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            placeId: location.googlePlaceId ?? '',
+          }
+        : null,
+    );
     setIsFormOpen(true);
   };
 
@@ -351,13 +378,37 @@ export default function LocationManagementScreen() {
                 }
                 value={form.phone}
               />
-              <Field
-                label="Dirección escrita"
-                onChangeText={(addressLine) =>
-                  setForm((current) => ({ ...current, addressLine }))
-                }
-                value={form.addressLine}
-              />
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Mapa</Text>
+                <Pressable
+                  accessibilityLabel="Seleccionar ubicación en el mapa"
+                  accessibilityRole="button"
+                  onPress={() => setIsMapPickerOpen(true)}
+                  style={styles.mapButton}
+                >
+                  <Ionicons
+                    color={appTheme.colors.accentDark}
+                    name="map-outline"
+                    size={20}
+                  />
+                  <View style={styles.mapButtonCopy}>
+                    <Text style={styles.mapButtonTitle}>
+                      {selectedMap
+                        ? 'Ubicación seleccionada'
+                        : 'Buscar en el mapa'}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.mapButtonValue}>
+                      {selectedMap?.formattedAddress ??
+                        'Busca una dirección o usa tu ubicación actual'}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    color={appTheme.colors.textMuted}
+                    name="chevron-forward"
+                    size={19}
+                  />
+                </Pressable>
+              </View>
               <Field
                 label="Ciudad"
                 onChangeText={(city) =>
@@ -365,40 +416,23 @@ export default function LocationManagementScreen() {
                 }
                 value={form.city}
               />
-              <View style={styles.rowFields}>
-                <View style={styles.halfField}>
-                  <Field
-                    autoCapitalize="characters"
-                    label="País"
-                    maxLength={2}
-                    onChangeText={(countryCode) =>
-                      setForm((current) => ({ ...current, countryCode }))
-                    }
-                    value={form.countryCode}
-                  />
-                </View>
-                <View style={styles.halfField}>
-                  <Field
-                    autoCapitalize="characters"
-                    label="Moneda"
-                    maxLength={3}
-                    onChangeText={(currencyCode) =>
-                      setForm((current) => ({ ...current, currencyCode }))
-                    }
-                    value={form.currencyCode}
-                  />
-                </View>
-              </View>
-              <Field
-                label="Zona horaria"
-                onChangeText={(timezone) =>
+              <LocationRegionalSettingsFields
+                countryCode={form.countryCode}
+                currencyCode={form.currencyCode}
+                onChangeCountry={(countryCode) =>
+                  setForm((current) => ({ ...current, countryCode }))
+                }
+                onChangeCurrency={(currencyCode) =>
+                  setForm((current) => ({ ...current, currencyCode }))
+                }
+                onChangeTimezone={(timezone) =>
                   setForm((current) => ({ ...current, timezone }))
                 }
-                value={form.timezone}
+                timezone={form.timezone}
               />
               <Text style={styles.formHint}>
-                Después de crearla, usa “Mapa” para seleccionar su ubicación
-                exacta y mostrarla a tus clientes.
+                Selecciona el punto exacto en el mapa para mostrarlo a tus
+                clientes.
               </Text>
               <View style={styles.formActions}>
                 <Pressable
@@ -433,6 +467,32 @@ export default function LocationManagementScreen() {
           onDismiss={() => setMapLocation(null)}
           onSubmit={async (map) => {
             await saveMapLocation.mutateAsync({ location: mapLocation, map });
+          }}
+          visible
+        />
+      ) : null}
+      {isMapPickerOpen ? (
+        <BusinessLocationSheet
+          countryCode={form.countryCode}
+          initialLocation={{
+            addressLine: selectedMap?.formattedAddress ?? null,
+            city: selectedMap?.city ?? (form.city || null),
+            countryCode: selectedMap?.countryCode ?? form.countryCode,
+            formattedAddress: selectedMap?.formattedAddress ?? null,
+            googlePlaceId: selectedMap?.placeId ?? null,
+            latitude: selectedMap?.latitude ?? null,
+            longitude: selectedMap?.longitude ?? null,
+          }}
+          onComplete={() => setIsMapPickerOpen(false)}
+          onDismiss={() => setIsMapPickerOpen(false)}
+          onSubmit={async (map) => {
+            setSelectedMap(map);
+            setForm((current) => ({
+              ...current,
+              addressLine: map.formattedAddress,
+              city: map.city ?? current.city,
+              countryCode: map.countryCode ?? current.countryCode,
+            }));
           }}
           visible
         />
@@ -616,6 +676,24 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginTop: 3,
   },
+  mapButton: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.background,
+    borderColor: appTheme.colors.border,
+    borderRadius: 13,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    minHeight: 58,
+    paddingHorizontal: 13,
+  },
+  mapButtonCopy: { flex: 1, gap: 3 },
+  mapButtonTitle: {
+    color: appTheme.colors.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  mapButtonValue: { color: appTheme.colors.textMuted, fontSize: 12 },
   list: { gap: 14 },
   locationAddress: {
     color: appTheme.colors.textMuted,

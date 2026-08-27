@@ -35,6 +35,7 @@ export type ExtraQuickActionId =
   | 'cash-register'
   | 'clients'
   | 'collaborators'
+  | 'locations'
   | 'notifications'
   | 'reviews-management';
 
@@ -62,6 +63,12 @@ export const EXTRA_QUICK_ACTIONS: ReadonlyArray<{
     id: 'collaborators',
     label: 'Colaboradores',
     route: '/team-management',
+  },
+  {
+    icon: 'business-outline',
+    id: 'locations',
+    label: 'Sucursales',
+    route: '/location-management',
   },
   {
     icon: 'options-outline',
