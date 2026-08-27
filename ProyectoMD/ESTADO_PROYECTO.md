@@ -1,5 +1,25 @@
 # Estado actual del proyecto Nava
 
+## Actualización operativa — 26 de agosto de 2026
+
+- La implementación de ciclo horario de suscripciones está confirmada en los
+  commits `59437b1` a `51a3bc6`: snapshots IANA en factura/eventos, periodo de
+  30 días UTC, gracia de 72 horas auditable cada minuto, confirmación PayPhone
+  servidor-a-servidor y formato administrativo/comunicaciones en la zona del
+  negocio.
+- `DATABASE_URL` local fue cambiada a una base de **pruebas**. No copiar su
+  valor al repositorio ni ejecutar pruebas de integración si apunta a producción.
+  Para pruebas PostgreSQL, exportar también `TEST_DATABASE_URL=$DATABASE_URL`
+  únicamente en la consola de trabajo.
+- Las migraciones `20260826170000_subscription_time_audit`,
+  `20260826180000_registration_timezone` y
+  `20260826190000_ensure_registration_timezone` deben estar aplicadas en cada
+  entorno antes de desplegar esta rama.
+- Verificación reciente: typecheck y builds Web/Admin correctos; las pruebas
+  unitarias enfocadas pasan. Integraciones remotas de Neon exceden el timeout
+  actual de 5 s; aumentar el timeout en un entorno de pruebas aislado, nunca
+  usar producción para compensar esa latencia.
+
 > Corte de auditoría: **19 de agosto de 2026**
 >
 > Rama revisada: `main` (`5a8332c`)
