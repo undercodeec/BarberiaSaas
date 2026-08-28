@@ -1,10 +1,290 @@
 # Estado actual del proyecto Nava
 
+## Recibos temporales de pago — implementación local pendiente de despliegue
+
+Como transición hasta contar con facturación electrónica SRI operativa en
+producción, los pagos de suscripción con estado `APPLIED` generan de forma
+idempotente un **Comprobante temporal de pago**. El documento se conserva como
+PDF con huella SHA-256, se entrega mediante la cola SMTP con reintentos y puede
+ser descargado o reenviado únicamente por el propietario de la organización.
+El PDF y el correo HTML incorporan el logo oficial, detalle de plan, importe,
+vigencia, renovación manual, referencias de pago y el enlace a las políticas.
+
+No sustituye una factura electrónica autorizada: no se etiqueta como factura o
+RIDE, no utiliza numeración fiscal SRI y no se debe ofrecer como soporte de
+crédito tributario. La transición se detiene automáticamente para nuevos pagos
+solo cuando estén activas a la vez `SRI_EMISSION_ENABLED=true`,
+`SRI_ENV=production` y `SRI_PRODUCTION_ENABLED=true`.
+
+La migración `20260827200000_subscription_payment_receipts` crea el registro
+comercial separado de `sri_invoices`. Requiere la validación de migraciones de
+alto riesgo, prueba SMTP real y compra controlada antes del despliegue.
+
+El mismo corte reconcilia `billing_timezone` y `provider_paid_at` ya exigidos
+por el esquema de suscripciones, evitando que un checkout falle al persistir la
+factura comercial y su cambio de plan.
+
+## Estado validado de producción — 27 de agosto de 2026
+
+Esta sección es la fuente de verdad operativa para producción y prevalece sobre
+cualquier corte histórico del resto del documento.
+
+### Topología, servicios y verificación
+
+- `api.navacloud.app` → Nginx → `127.0.0.1:4000` → `nava-api`.
+- `reservas.navacloud.app` → Nginx → `127.0.0.1:3000` → `nava-web`.
+- `admin.navacloud.app` → Nginx → puerto `3001` → `nava-admin`.
+- Los tres servicios están activos y `nginx -t` es válido. Web y Admin deben
+  responder HTTP `200`; que la raíz `/` de la API responda `404` es normal y
+  no representa una falla del servicio.
+
+### Configuración de frontend y servicios
+
+- La única configuración canónica de frontend en producción es
+  `/etc/nava/frontend.env`, con
+  `NEXT_PUBLIC_API_URL=https://api.navacloud.app`.
+- `apps/web/.env.production` y `apps/admin/.env.production` son mecanismos
+  obsoletos para producción; no deben crearse, versionarse ni usarse como
+  fuente de variables productivas.
+- Web usa el override
+  `/etc/systemd/system/nava-web.service.d/override.conf`:
+
+  ```ini
+  [Service]
+  EnvironmentFile=
+  EnvironmentFile=/etc/nava/frontend.env
+  ```
+
+- No se debe modificar Admin solo para que imite a Web: sus `EnvironmentFile`
+  pueden estar vacíos si `nava-admin` continúa funcional con su configuración
+  actual.
+- Para la API, `/etc/nava/api.env` es un archivo dotenv de systemd. No se debe
+  ejecutar `source /etc/nava/api.env` ni `. /etc/nava/api.env` en Bash; los
+  valores deben inspeccionarse o cargarse mediante systemd, sin interpretar
+  caracteres especiales de secretos como sintaxis de shell.
+
+### Base de datos, Prisma y migraciones
+
+- La conexión Prisma/Neon se define únicamente mediante `DATABASE_URL` en
+  `packages/database/prisma.config.ts`; `DIRECT_URL` no forma parte de la
+  configuración vigente.
+- El estado validado posterior a la recuperación del 27 de agosto reporta
+  **76 migraciones** y `Database schema is up to date!`.
+- `P1002` durante el despliegue indica bloqueo de advisory lock: primero se
+  debe ejecutar `pnpm db:status`. Si no hay migraciones pendientes, no se debe
+  reintentar indefinidamente ni ejecutar `pnpm db:migrate:deploy`.
+- `pnpm db:migrate:deploy` se ejecuta solo cuando `pnpm db:status` informa
+  migraciones pendientes. Después se repite `pnpm db:status` para confirmar el
+  resultado.
+
+## REGLAS DE DESPLIEGUE — NO REGRESIONAR
+
+1. Usar exclusivamente `/opt/nava/app` y actualizar con
+   `git pull --ff-only origin main`.
+2. Ejecutar `pnpm install --frozen-lockfile`, comprobar migraciones con
+   `pnpm db:status` y aplicar `pnpm db:migrate:deploy` solo si hay pendientes.
+3. Tras una migración aplicada, repetir `pnpm db:status`; ante `P1002`,
+   comprobar ese estado antes de cualquier nuevo intento.
+4. Validar variables y compilar con `pnpm env:check:production` y
+   `pnpm build:production`. No sustituir estos comandos por builds que lean
+   `.env.production` dentro de las aplicaciones.
+5. Recargar systemd y reiniciar los tres servicios. Verificar estado, puertos,
+   HTTP y Nginx antes de considerar terminado el despliegue.
+
+```bash
+cd /opt/nava/app
+git pull --ff-only origin main
+pnpm install --frozen-lockfile
+pnpm db:status
+# Ejecutar solo si el estado informa migraciones pendientes.
+pnpm db:migrate:deploy
+pnpm db:status
+pnpm env:check:production
+pnpm build:production
+sudo systemctl daemon-reload
+sudo systemctl restart nava-api
+sudo systemctl restart nava-web
+sudo systemctl restart nava-admin
+sudo systemctl status nava-api nava-web nava-admin --no-pager
+sudo ss -ltnp | grep -E ':4000|:3000|:3001'
+curl -fsS https://reservas.navacloud.app/
+curl -fsS https://admin.navacloud.app/
+curl -i https://api.navacloud.app/
+sudo nginx -t
+```
+
+Resultados esperados: Web y Admin devuelven `200`; API puede devolver `404`
+en `/`; los tres servicios deben permanecer `active (running)`.
+
+## SEGURIDAD DE MIGRACIONES PRISMA/POSTGRESQL — NO REGRESIONAR
+
+Esta política es obligatoria para cualquier cambio de `schema.prisma`, tabla,
+índice, relación o SQL de migración. Prevalece sobre una instrucción genérica
+de «crear la migración y dar comandos para VPS». Codex debe leerla antes de
+empezar esa clase de tarea y no debe proponer despliegue hasta completar y
+reportar las pruebas requeridas.
+
+### Incidente resuelto — 27 de agosto de 2026
+
+- `20260827150000_branch_operation_scope` falló inicialmente con PostgreSQL
+  `42P10`, reportado por Prisma como `P3018`: su `UPDATE ... FROM LATERAL`
+  referenciaba el alias objetivo de `organizations` desde una posición no
+  permitida.
+- El commit `798e6c2 fix(database): repair branch operation migration` usa una
+  subconsulta correlacionada y conserva el criterio de primera sede activa por
+  `created_at ASC`, sin sobrescribir una sede primaria ya definida.
+- La inspección evidenció estado parcial: podía existir
+  `organizations.primary_location_id` aunque no se hubieran ejecutado el
+  `UPDATE` ni los índices posteriores. `ADD COLUMN IF NOT EXISTS` se añadió
+  solo para soportar este reintento seguro; no se usa indiscriminadamente.
+- La recuperación física controlada fue seguida por
+  `prisma migrate resolve --rolled-back 20260827150000_branch_operation_scope`
+  y una nueva ejecución correcta. El historial de `_prisma_migrations` debe
+  conservar el primer intento fallido/rolled back, el segundo terminado y la
+  posterior `20260827160000_local_multi_professional_limits`; nunca se borra ni
+  se modifica manualmente.
+- También apareció `P1002`: una sesión idle de PgBouncer en el endpoint pooled
+  de Neon retenía el advisory lock de Prisma. La inspección y recuperación se
+  hicieron temporalmente mediante conexión directa de Neon, sin revelar URL ni
+  credenciales y liberando solo la sesión idle identificada.
+- Resultado verificado: están aplicadas `20260827150000_branch_operation_scope`
+  y `20260827160000_local_multi_professional_limits`; existen
+  `organizations.primary_location_id`,
+  `organizations_primary_location_id_idx` y
+  `cash_register_sessions_open_location_unique`.
+
+### Validación obligatoria antes de commit
+
+1. Una migración SQL no es válida solo porque Prisma la genere, `prisma
+   validate`, typecheck, lint o revisión visual no fallen. Todo SQL manual,
+   DDL no trivial, `UPDATE`, `DELETE`, backfill, constraint, índice parcial,
+   CTE, `LATERAL`, trigger o transformación de datos debe ejecutarse realmente
+   contra PostgreSQL.
+2. Crear una PostgreSQL temporal y aislada y ejecutar la cadena completa desde
+   cero con `pnpm db:migrate:deploy`. Debe terminar sin migraciones fallidas.
+   Esto detecta orden incorrecto, referencias inexistentes e incompatibilidades
+   históricas que `prisma validate` no ejecuta.
+3. Probar también sobre el estado inmediatamente anterior a la nueva migración;
+   una base vacía por sí sola no basta. En migraciones de datos crear fixtures
+   con cero, uno y varios registros; `NULL`; relaciones ausentes; valores ya
+   configurados que no se deban sobrescribir; y duplicados si afecta `UNIQUE`.
+4. Para `UPDATE ... FROM`, `LATERAL`, subconsultas correlacionadas, CTE,
+   `ON CONFLICT`, índices parciales/de expresión, JSONB, casts, ventanas,
+   funciones o locks, ejecutar primero un caso mínimo reproducible en
+   PostgreSQL. Algo válido en `SELECT` no se presume válido en `UPDATE` o
+   `DELETE`: el incidente `42P10` es el antecedente.
+5. Antes de aprobar una migración de varias sentencias, documentar qué objetos
+   o datos podrían quedar aplicados tras cada paso, qué es reintentable, qué
+   produciría `already exists` y qué rollback requiere. Usar `IF NOT EXISTS`
+   solo si preserva la semántica y existe una razón explícita de recuperación.
+6. Analizar si una migración compleja requiere transacción PostgreSQL. No añadir
+   `BEGIN/COMMIT` automáticamente: justificar operaciones, duración, locks,
+   tamaño de tablas e impacto de producción, especialmente en riesgo alto.
+7. Nunca editar una migración aplicada correctamente en un entorno persistente:
+   crear otra. Una migración recién fallida solo se corrige después de revisar
+   `_prisma_migrations`, `finished_at`, `rolled_back_at`, `logs` y el esquema
+   físico; nunca a ciegas.
+
+### Pruebas de transformaciones y clasificación de riesgo
+
+Una migración con selección de primario, relaciones, backfill, deduplicación,
+claves, índices `UNIQUE`, ownership/scope o datos multi-tenant requiere
+aserciones de resultado. Para `branch_operation_scope`: una sede activa,
+varias activas, `primary_location_id` ya establecido y ninguna sede activa.
+
+| Riesgo | Ejemplos | Requisito mínimo |
+| --- | --- | --- |
+| Bajo | índice no `UNIQUE`, columna nullable sin backfill, adición simple | cadena completa en PostgreSQL y validaciones relacionadas |
+| Medio | `UPDATE`/backfill, foreign key, índice parcial, default o relación | pruebas PostgreSQL específicas sobre estado anterior y fixtures |
+| Alto | `UNIQUE` con datos, `DROP`, `NOT NULL`, relación masiva, caja/pagos/suscripciones, multi-tenant o locks importantes | requisitos de medio, rollback documentado y revisión explícita antes de producción |
+
+Para MEDIO y ALTO se exigen pruebas PostgreSQL específicas. Para ALTO, además,
+estrategia de rollback y revisión explícita antes de producción.
+
+### Manejo de P3018, P1002, Neon y secretos
+
+Ante `P3018`, detener el despliegue. No reintentar `migrate deploy`, aplicar
+migraciones posteriores, hacer `DROP` arbitrarios ni modificar manualmente
+`_prisma_migrations`. Primero obtener evidencia:
+
+```sql
+SELECT migration_name, started_at, finished_at, rolled_back_at,
+       applied_steps_count, logs
+FROM "_prisma_migrations"
+ORDER BY started_at DESC;
+```
+
+Después inspeccionar los objetos físicos y datos afectados. Solo entonces se
+define, ensaya en una base aislada y aprueba la recuperación. `migrate resolve`
+es una acción de recuperación, no un atajo: se usa únicamente tras inspección
+del estado físico e historial y con procedimiento aprobado.
+
+Ante `P1002` por advisory lock, no repetir `migrate deploy` indefinidamente.
+Ejecutar `pnpm db:status`, confirmar pendientes, inspeccionar locks y sesiones,
+comprobar pooled/PgBouncer y verificar que no exista una migración legítima en
+curso. Solo liberar una sesión con evidencia de que retiene el lock de Prisma y
+está abandonada/idle; nunca terminar sesiones indiscriminadamente.
+
+`packages/database/prisma.config.ts` usa solo `DATABASE_URL`. No agregar
+`DIRECT_URL` ni cambiar arquitectura sin decisión previa. Una conexión directa
+de Neon puede ser necesaria temporalmente para una recuperación administrativa,
+pero no se imprime URL, usuario, contraseña, token ni secreto. Separar de forma
+permanente runtime pooled y administración directa es una mejora recomendada
+pendiente de análisis arquitectónico, no una implementación autorizada.
+
+Se mantiene la regla: nunca ejecutar `source /etc/nava/api.env` ni
+`. /etc/nava/api.env`; los valores pueden tener caracteres especiales y deben
+leerse puntualmente sin imprimirlos.
+
+### Gate antes de producción y evidencia de entrega
+
+Antes de migrar en VPS: confirmar commit exacto y `git status` limpio; hacer
+backup proporcional al riesgo; ejecutar `pnpm db:status`; revisar SQL y
+evidencia PostgreSQL previa de cada pendiente; aplicar solo las pendientes;
+repetir `pnpm db:status`; verificar objetos críticos; y solo después continuar
+con las **REGLAS DE DESPLIEGUE — NO REGRESIONAR**: `pnpm
+env:check:production`, `pnpm build:production`, reinicios, healthchecks,
+puertos, HTTP y `nginx -t`.
+
+Los comandos reales disponibles para el gate local son:
+
+```bash
+pnpm db:validate
+pnpm db:migrate:deploy
+pnpm db:status
+pnpm --filter @barber-saas/database test
+pnpm --filter @barber-saas/database typecheck
+```
+
+La entrega de Codex para una migración debe incluir: nombre; tablas, columnas e
+índices afectados; motivo; riesgo; datos modificados; tratamiento de existentes,
+`NULL` y reintentos; posibilidad de aplicación parcial; rollback; pruebas
+PostgreSQL y cadena completa; `prisma migrate status`; tests ejecutados; y
+confirmación de que no se tocó producción. Sin evidencia crítica, no está lista
+para producción ni se entregan comandos de VPS.
+
+### Checklist reutilizable para Codex
+
+```text
+[ ] Revisé schema.prisma y migraciones relacionadas.
+[ ] No estoy editando una migración aplicada exitosamente.
+[ ] Ejecuté SQL contra PostgreSQL real y sobre el estado inmediatamente anterior.
+[ ] Probé la cadena completa desde una BD vacía.
+[ ] Probé fixtures, casos límite, NULL y no sobrescritura.
+[ ] Revisé aplicación parcial, reintento y rollback.
+[ ] Ejecuté prisma validate, tests y typecheck relacionados.
+[ ] Confirmé prisma migrate status.
+[ ] No usé producción para probar ni expuse DATABASE_URL o secretos.
+```
+
+Una migración no se marca lista para producción mientras una casilla crítica
+permanezca pendiente.
+
 > Corte de auditoría: **19 de agosto de 2026**
 >
 > Rama revisada: `main` (`5a8332c`)
 >
-> Alcance: código, esquema Prisma, 52 migraciones, configuración, aplicaciones,
+> Alcance: código, esquema Prisma, 71 migraciones, configuración, aplicaciones,
 > pruebas, builds, documentación y estado de Git.
 >
 > Estado global: **MVP funcional para piloto controlado, todavía no listo para
@@ -172,9 +452,8 @@ Mobile / Web pública / Admin
 - PostgreSQL usa restricciones, transacciones y bloqueos para las invariantes
   críticas: doble reserva, Caja abierta, comisiones, stock y pedidos.
 - El cliente Prisma se genera desde `packages/database/prisma/schema.prisma`.
-- El repositorio contiene **52 migraciones** ordenadas entre
-  `20260718190000_initial_identity_and_tenancy` y
-  `20260817210000_assign_services_to_active_barbers`.
+- El repositorio contiene **71 migraciones**; la fuente operativa para conocer
+  si deben aplicarse es `pnpm db:status`, no el listado histórico de archivos.
 - Supabase Auth, RLS, Storage, RPC y Realtime no forman parte de la arquitectura
   actual. La carpeta `supabase` no es la autoridad de ejecución.
 - La sincronización de agenda entre dispositivos usa eventos persistentes y
@@ -711,7 +990,9 @@ con una marca histórica de “lint aprobado”.
   debe trasladarse a un almacén compartido.
 - `apps/api/src/index.ts` carga `../../.env` además del entorno del proceso. En
   producción, systemd debe seguir siendo la autoridad mediante
-  `/etc/nava/api.env`; conviene retirar la ruta relativa para evitar deriva.
+  `/etc/nava/api.env`; este es un archivo dotenv y nunca debe cargarse con
+  `source` o `.` desde Bash. Conviene retirar la ruta relativa para evitar
+  deriva.
 - Las credenciales PayPhone se cifran con AES-256-GCM y AAD por organización.
   La confirmación de pagos de citas es manual e idempotente; no hay webhook de
   confirmación automática en el MVP.
@@ -747,38 +1028,27 @@ revalidados por SSH, Google Cloud, Neon ni Play Console durante esta auditoría*
   contiene los avances actuales de Usuarios Nava/Memberships ni sus
   migraciones hasta confirmar el despliegue.
 
-### Runbook vigente de VPS y Neon
+### Runbook histórico — sustituido (no ejecutar)
 
-Ejecutar en `/opt/nava/app` solo después de publicar y revisar el commit:
-
-```bash
-git pull --ff-only origin main
-corepack enable
-pnpm install --frozen-lockfile
-pnpm db:migrate:deploy
-pnpm db:status
-pnpm db:generate
-pnpm build
-systemctl restart nava-api.service
-systemctl restart nava-web.service
-systemctl restart nava-admin.service
-systemctl status nava-api.service nava-web.service nava-admin.service --no-pager
-curl -fsS https://api.navacloud.app/health
-```
-
-- En producción solo se permite `pnpm db:migrate:deploy`; nunca
-  `pnpm db:migrate:dev`.
-- No hay PostgreSQL, Docker ni PM2 para API/Web en la VPS actual.
-- Antes de desplegar, comprobar sin revelar valores que existen
-  `DATABASE_URL`, SMTP, FCM, Maps y la clave de cifrado PayPhone requeridas.
-- No ejecutar limpieza o truncado de Neon como parte de un despliegue normal.
+> Este procedimiento corresponde a un corte anterior y queda reemplazado por
+> **REGLAS DE DESPLIEGUE — NO REGRESIONAR** al inicio de este documento. No lo
+> ejecute: no aplica la comprobación condicional de migraciones ni los comandos
+> canónicos de entorno y build actualmente requeridos. Los comandos y
+> restricciones de ese corte se retiraron para impedir su reutilización.
 
 ## Android y Google Play
 
 ### Estado actual
 
-- Configuración vigente: `versionName` **0.1.12**, `versionCode` **34**.
+- Candidato local de publicación: `versionName` **0.1.13**, `versionCode`
+  **35**. Se eligió el code 35 porque no hay evidencia concluyente de si el
+  code 34 llegó a cargarse en Play Console; nunca se reutiliza un código que
+  pudo haberse subido.
 - `apps/mobile/app.json` y `apps/mobile/android/app/build.gradle` coinciden.
+- El manifest fusionado del candidato fue regenerado desde limpio y verificado:
+  `com.barbersaas.mobile`, `0.1.13`/`35`, `allowBackup=false`, sin permisos
+  bloqueados y con `compileSdk`/`targetSdk` **36**. No existe todavía AAB
+  firmado ni subida a Play para este candidato.
 - Expo Router y módulos Expo permanecen; EAS Build y Expo Updates/OTA fueron
   retirados. No hay referencias activas a `expo-updates`, `runtimeVersion` o
   canal OTA en la configuración auditada.
@@ -788,6 +1058,11 @@ curl -fsS https://api.navacloud.app/health
   `AA05D6794DE3CA6662D96C754565F05267C53B73381982F919ADE72D306CC9F2`.
 - El historial indica que code 33 fue cargado a Play. Para code 34 no consta
   subida/rollout ni comprobación en teléfono.
+- La pantalla Android de suscripción queda en modo de consumo: muestra el
+  acceso vigente y sus capacidades, pero no compara precios, no promociona
+  planes, no enlaza ni indica cómo comprar fuera de Google Play. Esta medida no
+  sustituye una decisión comercial/fiscal sobre Google Play Billing; evita que
+  el binario dirija al usuario a un cobro externo de software SaaS.
 
 ## Procedimiento obligatorio para AAB Android local
 
@@ -821,6 +1096,24 @@ curl -fsS https://api.navacloud.app/health
 8. Subir solo el archivo archivado al track correcto, iniciar el rollout y
    comprobar desde Play que Ajustes muestre `<version> (build <code>)`.
 
+### Gate de Play Console antes de enviar a revisión
+
+1. Confirmar que la ficha, la categoría y las capturas describen una aplicación
+   de gestión para barberías y no ofrecen compras, precios ni métodos de pago
+   de la suscripción dentro de Android.
+2. Completar o revisar Data safety con los flujos reales: cuenta y datos del
+   negocio, contactos importados, fotos, ubicación al registrar la sede y
+   token de notificaciones. Declarar el uso, la finalidad, cifrado en tránsito
+   y la eliminación de cuenta conforme a la implementación; no copiar una
+   declaración de una versión anterior.
+3. Verificar desde Play Console que la URL de privacidad publicada sea
+   `https://navacloud.app/tratamiento-de-datos`, que abra sin autenticación y
+   que el formulario de acceso de revisores tenga credenciales de prueba o
+   instrucciones válidas.
+4. Confirmar en el track que el `versionCode` 35 no está usado y que el AAB
+   recibido informa target API 36. Registrar track, porcentaje de rollout,
+   SHA-256 y versión instalada tras la prueba física.
+
 ## Decisiones vigentes de alcance
 
 - PostgreSQL + Prisma + API propia continúan como arquitectura oficial.
@@ -844,7 +1137,7 @@ curl -fsS https://api.navacloud.app/health
 1. Corregir los 98 errores/1 advertencia de lint de fuente y ajustar ignores de
    `.tools`, `.eas-archive`, `.kotlin` y artefactos Android.
 2. Recuperar `pnpm format:check` sin formatear artefactos generados.
-3. Crear una base PostgreSQL exclusiva, aplicar las 52 migraciones y ejecutar
+3. Crear una base PostgreSQL exclusiva, aplicar las 71 migraciones y ejecutar
    las 28 integraciones omitidas.
 4. Reconciliar y desplegar migraciones/código en VPS; validar salud, logs y
    recorrido real Web → OTP → gestión → Mobile.
@@ -852,7 +1145,8 @@ curl -fsS https://api.navacloud.app/health
    endurecer su endpoint público con rate limiting/idempotencia.
 6. Ejecutar E2E de los recorridos críticos: autenticación, agenda, reserva,
    Caja, comisiones, inventario/pedidos, suscripción y Admin.
-7. Completar aceptación física Android de `0.1.12`/34 y registrar track,
+7. Generar, firmar y completar aceptación física Android de `0.1.13`/35;
+   registrar track,
    rollout y versión observada.
 8. Ensayar restauración de Neon y documentar RPO/RTO.
 9. Realizar revisión final de autorización multi-tenant, secretos, logs,

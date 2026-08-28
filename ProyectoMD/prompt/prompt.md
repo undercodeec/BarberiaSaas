@@ -174,3 +174,77 @@ Sigue esta lista de verificación usando datos de prueba, no teléfonos reales.
   - Platform admin no accede normalmente a fichas completas.
   - Ningún usuario puede saltarse las restricciones usando una URL o petición directa.
 
+ Realiza estas pruebas en orden:
+
+  ### 1. Salud de servicios
+
+  curl -fsS https://api.navacloud.app/health
+  sudo systemctl is-active nava-api.service nava-web.service nava-admin.service
+
+  Debe responder {"status":"ok"} y los tres servicios active.
+
+  ### 2. Web pública
+
+  - Abrir https://navacloud.app.
+  - Verificar que carguen planes, precios y estilos.
+  - Abrir una organización pública y comprobar catálogo, horarios y disponibilidad.
+  - Probar que una reserva pública llegue hasta OTP.
+  - Cancelar la prueba desde el enlace privado.
+
+  ### 3. Registro y zona horaria
+
+  Usa un correo de prueba controlado.
+
+  - Registrar una cuenta nueva.
+  - Confirmar OTP.
+  - Seleccionar una zona distinta, por ejemplo America/Lima.
+  - Completar onboarding.
+  - Revisar en perfil que la zona se conserve.
+  - Cambiar la zona del negocio y confirmar que la sede principal se actualice.
+  - No usar UTC+5 ni valores inventados.
+
+  ### 4. Suscripción sandbox
+
+  Con credenciales PayPhone sandbox:
+
+  - Crear checkout.
+  - Confirmar que el retorno por URL no active la suscripción por sí solo.
+  - Completar pago sandbox.
+  - Verificar factura PAID, intento APPLIED y suscripción ACTIVE.
+  - Repetir confirmación/recargar la página y comprobar que no duplica factura ni evento.
+  - Revisar que una hora de proveedor ausente se muestre como “No informado por PayPhone”.
+
+  ### 5. Panel Admin
+
+  En https://admin.navacloud.app:
+
+  - Iniciar sesión y completar OTP.
+  - Abrir Suscripciones.
+  - Confirmar que fechas de factura, pago, gracia e historial se muestran en la zona IANA del negocio.
+  - Cambiar la zona de la organización y verificar que los registros históricos mantengan su zona original.
+  - Confirmar que el timestamp del proveedor no se confunda con el de verificación.
+
+  ### 6. Ciclo de vencimiento
+
+  En una organización de prueba:
+
+  - Verificar una suscripción ACTIVE con periodo vigente.
+  - Simular o preparar un periodo vencido en staging/test.
+  - Confirmar transición ACTIVE → PAST_DUE.
+  - Confirmar graceEndsAt = currentPeriodEnd + 72 horas.
+  - Ejecutar nuevamente el reconciliador y comprobar que no cree otro evento.
+  - Después de 72 horas, confirmar PAST_DUE → FREE y un único evento histórico.
+
+  ### 7. Recordatorios
+
+  - Usar una suscripción cuyo vencimiento esté dentro de la ventana de recordatorio.
+  - Confirmar que el correo incluya fecha, hora y nombre IANA, por ejemplo (America/Lima).
+  - Verificar que no use la zona horaria del navegador.
+
+  ### 8. Logs posteriores
+
+  sudo journalctl -u nava-api.service --since "10 minutes ago" --no-pager
+  sudo journalctl -u nava-web.service --since "10 minutes ago" --no-pager
+  sudo journalctl -u nava-admin.service --since "10 minutes ago" --no-pager
+
+  No pruebes pagos reales ni ejecutes reconciliaciones destructivas sobre organizaciones reales.
