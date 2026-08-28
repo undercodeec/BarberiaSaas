@@ -131,6 +131,15 @@ describe('dominio de pagos de suscripción', () => {
         configuredCode: 'NAVA-FOUNDER',
         founderPriceEligible: false,
         founderPriceLostAt: null,
+        planCode: 'local',
+        submittedCode: 'VERANO-25',
+      }),
+    ).toMatchObject({ applied: false, error: null });
+    expect(
+      resolveFounderPromotion({
+        configuredCode: 'NAVA-FOUNDER',
+        founderPriceEligible: false,
+        founderPriceLostAt: null,
         planCode: 'essential',
         submittedCode: 'NAVA-FOUNDER',
       }),

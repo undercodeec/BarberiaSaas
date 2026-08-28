@@ -136,11 +136,7 @@ export function resolveFounderPromotion(input: {
   if (!submittedCode)
     return { applied: false, error: null, promotionCode: null };
   if (submittedCode !== normalizePromotionCode(input.configuredCode))
-    return {
-      applied: false,
-      error: 'DISCOUNT_CODE_INVALID',
-      promotionCode: null,
-    };
+    return { applied: false, error: null, promotionCode: null };
   if (input.founderPriceLostAt)
     return {
       applied: false,
@@ -360,11 +356,16 @@ function publicAttempt(attempt: {
   expiresAt: Date;
   id: string;
   invoice: {
+    discountCouponId: string | null;
+    discountPercentageBasisPoints: number | null;
+    founderPriceApplied: boolean;
     id: string;
     planCode: string;
     planName: string;
     periodEndsAt: Date | null;
     periodStartsAt: Date | null;
+    promotionCode: string | null;
+    promotionDiscountCents: number;
     status: SubscriptionInvoiceStatus;
   };
   paymentUrl: string | null;
@@ -376,6 +377,16 @@ function publicAttempt(attempt: {
     expiresAt: attempt.expiresAt.toISOString(),
     id: attempt.id,
     invoice: {
+      discount:
+        attempt.invoice.discountCouponId &&
+        attempt.invoice.promotionCode &&
+        attempt.invoice.discountPercentageBasisPoints !== null
+          ? {
+              code: attempt.invoice.promotionCode,
+              discountCents: attempt.invoice.promotionDiscountCents,
+              percentage: attempt.invoice.discountPercentageBasisPoints / 100,
+            }
+          : null,
       id: attempt.invoice.id,
       periodEndsAt: attempt.invoice.periodEndsAt?.toISOString() ?? null,
       periodStartsAt: attempt.invoice.periodStartsAt?.toISOString() ?? null,

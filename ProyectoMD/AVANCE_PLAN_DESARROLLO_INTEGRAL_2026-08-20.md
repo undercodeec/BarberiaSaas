@@ -2,7 +2,7 @@
 
 > Corte inicial: 20 de agosto de 2026
 > Actualización operativa: 21 de agosto de 2026
-> Plan base: `PLAN_DESARROLLO_INTEGRAL_NAVA_2026-08-20.md`
+> Plan base histórico: [`_archivo/PLAN_DESARROLLO_INTEGRAL_NAVA_2026-08-20.md`](./_archivo/PLAN_DESARROLLO_INTEGRAL_NAVA_2026-08-20.md)
 > Estado de cobro real: **deshabilitado**
 > Nota de vigencia: las decisiones de trial, gracia y precios de este corte
 > histórico fueron sustituidas el 23 de agosto de 2026 por

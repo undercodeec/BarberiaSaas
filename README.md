@@ -1,6 +1,6 @@
 # Nava — SaaS para barberías
 
-Monorepositorio del MVP descrito en `ProyectoMD/INSTRUCCIONES_CODEX_BARBER_SAAS.md`. La arquitectura vigente es PostgreSQL + Prisma + API Node/Fastify propia desplegada en VPS; consulte [`ADR 0003`](./docs/adr/0003-postgresql-prisma-y-api-en-vps.md).
+Monorepositorio del MVP cuyo estado vigente se documenta en [`ProyectoMD/ESTADO_PROYECTO.md`](./ProyectoMD/ESTADO_PROYECTO.md). La arquitectura actual es PostgreSQL + Prisma + API Node/Fastify propia desplegada en VPS; consulte [`ADR 0003`](./docs/adr/0003-postgresql-prisma-y-api-en-vps.md).
 
 ## Estado
 

@@ -1,250 +1,265 @@
-Sigue esta lista de verificación usando datos de prueba, no teléfonos reales.
+Quiero implementar en **Nava Mobile para Android** un sistema NATIVO de actualización de la aplicación mediante la funcionalidad oficial **Google Play In-App Updates**.
 
-  ## 1. Preparar datos
+Antes de modificar código, analiza la arquitectura actual completa de:
 
-  Crea o identifica:
+* `apps/mobile`
+* `apps/mobile/android`
+* configuración Gradle
+* `MainActivity`
+* `MainApplication`
+* Expo / React Native
+* navegación actual de la app
+* ciclo de vida de la aplicación
 
-  - Una organización con dos sucursales: Sucursal A y Sucursal B.
-  - Un usuario owner.
-  - Un usuario manager.
-  - Un receptionist asignado solo a Sucursal A.
-  - Un barber asignado a citas específicas.
-  - Clientes:
-      - Cliente A con cita en Sucursal A.
-      - Cliente B con cita en Sucursal B.
-      - Cliente C con cita asignada al barbero.
-      - Cliente D sin cita relacionada.
+NO implementes nada basado en suposiciones. Adapta la solución a la arquitectura real existente.
 
-  Usa un teléfono de prueba reconocible, por ejemplo:
+## Objetivo
 
-  0991234567
+Cuando exista en Google Play una versión de Nava con un `versionCode` superior a la versión instalada, quiero que la propia aplicación pueda detectar esa actualización mediante Google Play y ofrecer al usuario actualizarla sin necesidad de implementar un backend propio para comparar versiones.
 
-  ## 2. Verificar owner
+La implementación debe utilizar exclusivamente la API oficial:
 
-  Inicia sesión como owner.
+**Google Play In-App Updates / Play Core**
 
-  En Clientes:
+Dependencia oficial actual:
 
-  - Debe ver todos los clientes de la organización.
-  - Debe visualizar el teléfono completo.
-  - Debe crear, editar y eliminar clientes.
-  - Debe gestionar etiquetas.
-  - Debe crear y editar notas.
-  - Debe importar contactos.
-  - Debe seleccionar clientes y exportar CSV.
+```gradle
+implementation "com.google.android.play:app-update:2.1.0"
+```
 
-  Al abrir el CSV, confirma que contiene los datos esperados.
+Si el proyecto Android utiliza Kotlin, utiliza las APIs Kotlin/Java oficiales apropiadas.
 
-  ## 3. Verificar manager
+No utilizar paquetes React Native de terceros para esta funcionalidad si puede implementarse limpiamente mediante el proyecto Android nativo existente.
 
-  Inicia sesión como manager.
+No implementar Expo Updates, EAS Update, CodePush ni ningún mecanismo OTA.
 
-  Confirma que puede:
+## Comportamiento requerido
 
-  - Ver todos los clientes de la organización.
-  - Ver teléfonos completos.
-  - Crear, editar y eliminar clientes.
-  - Gestionar etiquetas y notas.
-  - Importar contactos.
-  - Comunicarse desde la ficha.
+### 1. Comprobación automática
 
-  Confirma que:
+Cuando Nava inicia y entra en estado activo, comprobar mediante Google Play si existe una actualización disponible.
 
-  - No aparece la opción de exportar.
-  - Si intenta llamar directamente al endpoint de exportación, recibe 403 Forbidden.
+También debe poder volver a comprobarse cuando la aplicación regresa desde segundo plano, pero evita ejecutar comprobaciones innecesarias repetidamente durante la misma sesión.
 
-  ## 4. Verificar receptionist
+La comprobación NO debe:
 
-  Inicia sesión como receptionist.
+* consultar una API propia de Nava;
+* consultar manualmente la página web de Google Play;
+* comparar versiones mediante scraping;
+* contener números de versión hardcodeados.
 
-  Debe poder ver únicamente:
+Google Play debe ser la fuente de verdad.
 
-  - Cliente A, relacionado con Sucursal A.
+### 2. Actualizaciones normales
 
-  No debe ver:
+Implementar inicialmente el flujo:
 
-  - Cliente B de Sucursal B.
-  - Cliente D sin cita en su alcance.
+`AppUpdateType.FLEXIBLE`
 
-  En la ficha de Cliente A:
+Cuando Google Play indique:
 
-  - El teléfono debe aparecer enmascarado, por ejemplo ******4567.
-  - No debe aparecer el correo completo.
-  - No debe aparecer dirección, documento, fecha de nacimiento, etiquetas ni notas.
+`UpdateAvailability.UPDATE_AVAILABLE`
 
-  Confirma que no aparecen acciones para:
+y permita:
 
-  - Crear.
-  - Editar.
-  - Eliminar.
-  - Importar.
-  - Exportar.
-  - Gestionar etiquetas.
-  - Gestionar notas.
-  - Enviar WhatsApp o iniciar llamadas.
+`AppUpdateType.FLEXIBLE`
 
-  ## 5. Verificar barber
+debe iniciar el flujo oficial de actualización de Google Play.
 
-  Inicia sesión como barber.
+El usuario debe poder continuar utilizando Nava mientras Google Play descarga la actualización.
 
-  Debe ver solamente los clientes de sus propias citas.
+### 3. Actualización descargada
 
-  Comprueba que:
+Registrar correctamente `InstallStateUpdatedListener`.
 
-  - No puede ver clientes asignados a otro barbero.
-  - El teléfono aparece enmascarado.
-  - No puede buscar por número telefónico.
-  - No puede editar ni eliminar la ficha.
-  - Puede leer sus propias notas.
-  - Puede crear una nota propia.
-  - No puede editar ni eliminar notas de otros colaboradores.
-  - No puede exportar ni importar clientes.
+Cuando el estado alcance:
 
-  ## 6. Verificar agenda
+`InstallStatus.DOWNLOADED`
 
-  Para receptionist:
+mostrar dentro de Nava una interfaz sencilla indicando:
 
-  - Solo debe consultar disponibilidad y citas de sus sucursales.
-  - No debe poder crear una cita fuera de sus sucursales.
-  - Al seleccionar un cliente, solo debe aceptar clientes dentro de su alcance.
+**“Actualización lista”**
 
-  Para barber:
+Texto aproximado:
 
-  - Solo debe consultar sus citas.
-  - No debe poder acceder a citas de otros barberos.
-  - No debe poder asociar clientes fuera de su alcance.
+**“La nueva versión de Nava ya se descargó. Reinicia la aplicación para completar la actualización.”**
 
-  Revisa que ninguna respuesta de agenda muestre teléfono completo o correo a roles restringidos.
+Botón:
 
-  ## 7. Verificar platform admin
+**“Actualizar ahora”**
 
-  Desde el panel de administración de plataforma:
+Al presionarlo ejecutar:
 
-  - Busca una organización.
-  - Consulta sus usuarios y memberships.
-  - Abre la información relacionada con clientes, si existe acceso operativo.
-  - Confirma que la PII esté enmascarada.
-  - Confirma que no exista acceso normal a fichas completas.
-  - Confirma que no aparezcan teléfonos completos, correos completos ni exportación de clientes.
+`appUpdateManager.completeUpdate()`
 
-  ## 8. Verificar aislamiento entre organizaciones
+No crear un mecanismo de instalación propio.
 
-  Crea un cliente en Organización A e inicia sesión con un usuario de Organización B.
+### 4. Reanudación
 
-  Confirma que:
+Si Nava se cierra o pasa a segundo plano durante el proceso, al regresar comprobar el estado actual.
 
-  - El cliente no aparece en listados.
-  - No puede abrirlo por URL directa.
-  - No puede editarlo ni eliminarlo.
-  - No puede asociarlo a una cita.
-  - La API responde 404 o 403, según la ruta.
+Si existe una actualización flexible ya descargada, volver a ofrecer completar la actualización.
 
-  ## 9. Verificar caché móvil
+Gestionar correctamente también los estados intermedios para evitar iniciar múltiples flujos simultáneamente.
 
-  1. Inicia sesión como owner.
-  2. Abre una ficha con teléfono completo.
-  3. Cambia el rol del usuario a receptionist.
-  4. Cierra y vuelve a abrir la aplicación.
-  5. Revisa la misma ficha.
+### 5. Preparar soporte futuro para actualización crítica
 
-  Debe mostrarse el teléfono enmascarado y no deben permanecer acciones de owner/manager.
+Dejar la arquitectura preparada para que en el futuro podamos utilizar:
 
-  ## 10. Revisar auditoría
+`AppUpdateType.IMMEDIATE`
 
-  En los logs o panel de auditoría confirma eventos como:
+para versiones críticas.
 
-  client.created
-  client.read
-  client.note.created
-  client.note.updated
-  client.note.deleted
-  client.export.created
+NO quiero que todas las actualizaciones sean obligatorias actualmente.
 
-  Verifica que los eventos no contengan teléfonos, correos ni otros valores PII completos.
+El comportamiento por defecto debe ser `FLEXIBLE`.
 
-  ## Criterio de aprobación
+No implementar todavía un backend para decidir prioridades.
 
-  La validación es satisfactoria si:
+Si Google Play proporciona `updatePriority` o `clientVersionStalenessDays`, encapsular la lectura de esos valores para que puedan utilizarse posteriormente, pero no convertirlos ahora en reglas arbitrarias.
 
-  - Owner y manager ven la ficha completa.
-  - Receptionist y barber solo ven datos limitados y teléfono enmascarado.
-  - Barber queda restringido a sus propias citas.
-  - Receptionist queda restringido a sus sucursales.
-  - Solo owner puede exportar.
-  - Platform admin no accede normalmente a fichas completas.
-  - Ningún usuario puede saltarse las restricciones usando una URL o petición directa.
+### 6. React Native / Expo
 
- Realiza estas pruebas en orden:
+Nava utiliza React Native/Expo pero mantiene proyecto Android nativo.
 
-  ### 1. Salud de servicios
+Integra Play In-App Updates de manera compatible con la arquitectura existente.
 
-  curl -fsS https://api.navacloud.app/health
-  sudo systemctl is-active nava-api.service nava-web.service nava-admin.service
+Si es necesario crear un Native Module o puente Kotlin → React Native, créalo siguiendo la arquitectura actual del proyecto.
 
-  Debe responder {"status":"ok"} y los tres servicios active.
+No ejectar ni rehacer innecesariamente el proyecto Android.
 
-  ### 2. Web pública
+No ejecutar `expo prebuild` si pudiera sobrescribir personalizaciones existentes.
 
-  - Abrir https://navacloud.app.
-  - Verificar que carguen planes, precios y estilos.
-  - Abrir una organización pública y comprobar catálogo, horarios y disponibilidad.
-  - Probar que una reserva pública llegue hasta OTP.
-  - Cancelar la prueba desde el enlace privado.
+No introducir Expo Updates.
 
-  ### 3. Registro y zona horaria
+No modificar configuración de Google Play, Firebase, Maps, notificaciones, PayPhone o cualquier otra funcionalidad que no corresponda a esta tarea.
 
-  Usa un correo de prueba controlado.
+### 7. Ciclo de vida
 
-  - Registrar una cuenta nueva.
-  - Confirmar OTP.
-  - Seleccionar una zona distinta, por ejemplo America/Lima.
-  - Completar onboarding.
-  - Revisar en perfil que la zona se conserve.
-  - Cambiar la zona del negocio y confirmar que la sede principal se actualice.
-  - No usar UTC+5 ni valores inventados.
+La implementación debe evitar:
 
-  ### 4. Suscripción sandbox
+* listeners duplicados;
+* memory leaks;
+* lanzar dos ventanas de actualización;
+* ejecutar comprobaciones simultáneas;
+* errores al rotar/recrear Activity;
+* bloquear el inicio de sesión;
+* bloquear navegación normal;
+* crashes si Google Play no devuelve información;
+* crashes si la aplicación fue instalada fuera de Google Play.
 
-  Con credenciales PayPhone sandbox:
+Registrar y eliminar correctamente el listener cuando corresponda.
 
-  - Crear checkout.
-  - Confirmar que el retorno por URL no active la suscripción por sí solo.
-  - Completar pago sandbox.
-  - Verificar factura PAID, intento APPLIED y suscripción ACTIVE.
-  - Repetir confirmación/recargar la página y comprobar que no duplica factura ni evento.
-  - Revisar que una hora de proveedor ausente se muestre como “No informado por PayPhone”.
+### 8. Manejo de errores
 
-  ### 5. Panel Admin
+Si la consulta de Google Play falla:
 
-  En https://admin.navacloud.app:
+* Nava debe continuar funcionando normalmente;
+* no mostrar un error técnico al usuario;
+* registrar únicamente información diagnóstica segura;
+* no hacer crash;
+* permitir comprobar nuevamente posteriormente.
 
-  - Iniciar sesión y completar OTP.
-  - Abrir Suscripciones.
-  - Confirmar que fechas de factura, pago, gracia e historial se muestran en la zona IANA del negocio.
-  - Cambiar la zona de la organización y verificar que los registros históricos mantengan su zona original.
-  - Confirmar que el timestamp del proveedor no se confunda con el de verificación.
+Si la app fue instalada mediante APK/ADB durante desarrollo y Play In-App Updates no está disponible, la aplicación debe seguir funcionando normalmente.
 
-  ### 6. Ciclo de vencimiento
+### 9. Entornos
 
-  En una organización de prueba:
+La funcionalidad debe estar orientada a builds Android distribuidos por Google Play.
 
-  - Verificar una suscripción ACTIVE con periodo vigente.
-  - Simular o preparar un periodo vencido en staging/test.
-  - Confirmar transición ACTIVE → PAST_DUE.
-  - Confirmar graceEndsAt = currentPeriodEnd + 72 horas.
-  - Ejecutar nuevamente el reconciliador y comprobar que no cree otro evento.
-  - Después de 72 horas, confirmar PAST_DUE → FREE y un único evento histórico.
+No asumir que funcionará en:
 
-  ### 7. Recordatorios
+* APK instalado manualmente;
+* ADB;
+* desarrollo local;
+* Expo Go.
 
-  - Usar una suscripción cuyo vencimiento esté dentro de la ventana de recordatorio.
-  - Confirmar que el correo incluya fecha, hora y nombre IANA, por ejemplo (America/Lima).
-  - Verificar que no use la zona horaria del navegador.
+Documentar claramente esta limitación.
 
-  ### 8. Logs posteriores
+### 10. Testing
 
-  sudo journalctl -u nava-api.service --since "10 minutes ago" --no-pager
-  sudo journalctl -u nava-web.service --since "10 minutes ago" --no-pager
-  sudo journalctl -u nava-admin.service --since "10 minutes ago" --no-pager
+Añade las pruebas razonables que permita la arquitectura.
 
-  No pruebes pagos reales ni ejecutes reconciliaciones destructivas sobre organizaciones reales.
+Después verifica como mínimo:
+
+```text
+pnpm --filter @barber-saas/mobile typecheck
+```
+
+y las pruebas Mobile relacionadas.
+
+También ejecuta las verificaciones Gradle necesarias para comprobar que Android continúa compilando.
+
+No generar todavía un AAB de producción si no es necesario para validar la implementación.
+
+## Prueba real con Google Play
+
+Documenta cómo comprobar posteriormente la funcionalidad.
+
+La prueba debe contemplar:
+
+1. Tener instalada desde Google Play una versión anterior de Nava.
+2. Publicar una versión con `versionCode` superior en un track de pruebas.
+3. La cuenta del dispositivo debe tener acceso a ese track.
+4. La nueva versión debe estar disponible para ese usuario.
+5. Abrir la versión anterior.
+6. Nava consulta Play In-App Updates.
+7. Google Play informa que existe la actualización.
+8. Aparece el flujo oficial de actualización.
+9. Descargar actualización.
+10. Nava detecta `DOWNLOADED`.
+11. Pulsar “Actualizar ahora”.
+12. Google Play instala la nueva versión.
+13. Confirmar que la aplicación abre con el nuevo `versionCode`.
+
+Ten presente que el sistema debe probarse mediante una instalación administrada por Google Play; no considerar una instalación ADB como prueba válida del flujo real.
+
+## Seguridad y mantenimiento
+
+No agregues:
+
+* secretos;
+* tokens;
+* APIs externas;
+* servicios cloud;
+* permisos Android innecesarios;
+* comprobadores de versión hechos a mano.
+
+No modificar código no relacionado.
+
+Usar la API oficial de Google Play como autoridad de disponibilidad de actualización.
+
+## Documentación
+
+Una vez terminada y validada la implementación, actualiza:
+
+`ProyectoMD/ESTADO_PROYECTO.md`
+
+Documenta:
+
+* que Android utiliza Google Play In-App Updates;
+* archivos modificados;
+* dependencia utilizada;
+* estrategia `FLEXIBLE`;
+* comportamiento al detectar actualización;
+* comportamiento cuando termina la descarga;
+* manejo al volver del background;
+* pruebas ejecutadas;
+* limitaciones para APK/ADB;
+* procedimiento para validar mediante un track de Google Play.
+
+No reemplaces información vigente ni vuelvas a introducir procedimientos Android antiguos.
+
+## Entrega final
+
+Al finalizar dame un resumen con:
+
+1. diagnóstico de la arquitectura encontrada;
+2. archivos modificados;
+3. implementación realizada;
+4. dependencia Play utilizada;
+5. flujo completo de actualización;
+6. pruebas ejecutadas y resultados;
+7. cualquier limitación encontrada;
+8. pasos exactos que debo realizar yo posteriormente en Google Play Console para probarlo.
+
+No realices cambios en Google Play Console ni despliegues una versión por tu cuenta.

@@ -48,3 +48,7 @@ Thumbs.db
 *.log
 logs.md
 *.md
+
+# Documentación activa e histórica reorganizada en ProyectoMD.
+!ProyectoMD/PLAN_PANEL_SUPER_ADMIN_NAVA.md
+!ProyectoMD/_archivo/*.md

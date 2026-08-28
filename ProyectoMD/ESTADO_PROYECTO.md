@@ -1,5 +1,24 @@
 # Estado actual del proyecto Nava
 
+## Mapa documental
+
+Este archivo es la fuente principal del estado técnico y operativo vigente.
+Los documentos complementarios tienen un alcance específico:
+
+- [`Politicas_y_terminos_Nava.md`](./Politicas_y_terminos_Nava.md): decisiones
+  comerciales, legales, precios, planes, recibos y suscripciones.
+- [`DESPLIEGUE_PANEL_ADMIN.md`](./DESPLIEGUE_PANEL_ADMIN.md): despliegue y
+  operación del panel administrativo.
+- [`PLAN_PANEL_SUPER_ADMIN_NAVA.md`](./PLAN_PANEL_SUPER_ADMIN_NAVA.md): alcance
+  funcional y evolución del panel Super Admin.
+- [`AVANCE_PLAN_DESARROLLO_INTEGRAL_2026-08-20.md`](./AVANCE_PLAN_DESARROLLO_INTEGRAL_2026-08-20.md):
+  registro histórico de ejecución; no sustituye este estado vigente.
+- [`_archivo/README.md`](./_archivo/README.md): documentos retirados de la
+  documentación activa y conservados como trazabilidad.
+
+Los archivos de `prompt/` son entregas temporales. Al completar cada trabajo,
+su resultado debe registrarse aquí antes de archivarlos.
+
 ## Actualización operativa — 26 de agosto de 2026
 
 - El ciclo horario de suscripciones conserva snapshots IANA en facturas y
@@ -479,7 +498,7 @@ el código actual y tiene evidencia proporcional a su riesgo.
 | Panel interno                | Funcional, desplegado | Admin está publicado con login/OTP, servicio y HTTPS. El árbol actual añade navegación Usuario↔Organización y administración de Memberships posteriores al commit desplegado; faltan validación autenticada y despliegue de esos avances. |
 | Calidad                      | Bloqueada             | Esquema, tipos, pruebas, E2E básico y builds pasan; lint y formato global fallan. Se omitieron 28 pruebas PostgreSQL.                                                                                                                     |
 | Producción                   | Piloto                | Hay evidencia histórica de API/Web en VPS, Neon, TLS, FCM y Maps. No se revalidaron hoy servicios, migraciones productivas ni recorrido completo.                                                                                         |
-| Android                      | Preparado             | `0.1.12` / code `34` está compilado y archivado; falta registrar su publicación y comprobar la versión recibida desde Play.                                                                                                               |
+| Android                      | AAB preparado         | `0.1.14` / code `36` está compilado, firmado y archivado; faltan la carga en Play Console, el rollout y la aceptación física desde el track objetivo.                                                                                       |
 
 ## Estado del repositorio auditado
 
@@ -1104,27 +1123,31 @@ revalidados por SSH, Google Cloud, Neon ni Play Console durante esta auditoría*
 
 ### Estado actual
 
-- Candidato local de publicación: `versionName` **0.1.13**, `versionCode`
-  **35**. Se eligió el code 35 porque no hay evidencia concluyente de si el
-  code 34 llegó a cargarse en Play Console; nunca se reutiliza un código que
-  pudo haberse subido.
+- Candidato local de publicación: `versionName` **0.1.14**, `versionCode`
+  **36**. El code 35 ya tenía un artefacto local archivado al iniciar este
+  corte; se incrementó para no sobrescribirlo ni reutilizar un código que pudo
+  haberse cargado en Play Console.
 - `apps/mobile/app.json` y `apps/mobile/android/app/build.gradle` coinciden.
-- El manifest fusionado del candidato fue regenerado desde limpio y verificado:
-  `com.barbersaas.mobile`, `0.1.13`/`35`, `allowBackup=false`, sin permisos
-  bloqueados y con `compileSdk`/`targetSdk` **36**. No existe todavía AAB
-  firmado ni subida a Play para este candidato. El intento de `bundleRelease`
-  se detuvo antes de compilar el artefacto porque la sesión local no tenía las
-  cinco propiedades obligatorias `NAVA_UPLOAD_*`; el guard de Gradle impidió
-  correctamente una firma incompleta o debug.
+- El manifest fusionado del candidato fue verificado:
+  `com.barbersaas.mobile`, `0.1.14`/`36`, `allowBackup=false`, sin permisos
+  bloqueados y con `compileSdk`/`targetSdk` **36**.
+- `bundleRelease` terminó correctamente el 28 de agosto de 2026 usando las
+  cinco propiedades `NAVA_UPLOAD_*`. `signingReport` confirmó la clave de carga
+  Nava y no `debug.keystore`; el guard de Gradle validó además la huella
+  SHA-256 esperada del certificado.
 - Expo Router y módulos Expo permanecen; EAS Build y Expo Updates/OTA fueron
   retirados. No hay referencias activas a `expo-updates`, `runtimeVersion` o
   canal OTA en la configuración auditada.
-- AAB archivado: `apps/mobile/releases/Nava-0.1.12-code34.aab`.
-- Tamaño: 87.182.080 bytes.
+- AAB archivado: `apps/mobile/releases/Nava-0.1.14-code36.aab`.
+- Tamaño: 79.195.017 bytes.
 - SHA-256:
-  `AA05D6794DE3CA6662D96C754565F05267C53B73381982F919ADE72D306CC9F2`.
-- El historial indica que code 33 fue cargado a Play. Para code 34 no consta
-  subida/rollout ni comprobación en teléfono.
+  `E6D7DAFE07601DC3DB4B03AA96A381B927FC36D6E248925CCF88E4C6D23EEAC3`.
+- `jarsigner` verificó la firma; los avisos corresponden al certificado de carga
+  autofirmado y sin timestamp, válido hasta el 20 de diciembre de 2053. El AAB
+  contiene `base/assets/index.android.bundle`, incorpora
+  `https://api.navacloud.app` y no contiene componentes Expo Updates/CodePush.
+- El historial indica que code 33 fue cargado a Play. Para codes 34–36 no consta
+  todavía subida, rollout ni comprobación en teléfono.
 - La pantalla Android de suscripción queda en modo de consumo: muestra el
   acceso vigente y sus capacidades, pero no compara precios, no promociona
   planes, no enlaza ni indica cómo comprar fuera de Google Play. Esta medida no
@@ -1174,9 +1197,9 @@ revalidados por SSH, Google Cloud, Neon ni Play Console durante esta auditoría*
   `apps/mobile/src/lib/play-in-app-updates.test.ts` y
   `apps/mobile/app/_layout.tsx`.
 - Verificaciones locales ejecutadas: `pnpm --filter @barber-saas/mobile
-  typecheck` (correcto), `pnpm --filter @barber-saas/mobile test` (35 suites,
-  103 pruebas correctas) y `:app:compileDebugKotlin` de Gradle (correcto). No
-  se generó AAB de producción.
+  typecheck` (correcto), `pnpm --filter @barber-saas/mobile test` (36 suites,
+  105 pruebas correctas), `:app:signingReport` y `:app:bundleRelease`
+  (correctos). El AAB de producción quedó generado y verificado localmente.
 
 #### Validación posterior mediante un track de Google Play
 
@@ -1246,7 +1269,7 @@ revalidados por SSH, Google Cloud, Neon ni Play Console durante esta auditoría*
    `https://navacloud.app/tratamiento-de-datos`, que abra sin autenticación y
    que el formulario de acceso de revisores tenga credenciales de prueba o
    instrucciones válidas.
-4. Confirmar en el track que el `versionCode` 35 no está usado y que el AAB
+4. Confirmar en el track que el `versionCode` 36 no está usado y que el AAB
    recibido informa target API 36. Registrar track, porcentaje de rollout,
    SHA-256 y versión instalada tras la prueba física.
 
@@ -1281,8 +1304,7 @@ revalidados por SSH, Google Cloud, Neon ni Play Console durante esta auditoría*
    endurecer su endpoint público con rate limiting/idempotencia.
 6. Ejecutar E2E de los recorridos críticos: autenticación, agenda, reserva,
    Caja, comisiones, inventario/pedidos, suscripción y Admin.
-7. Generar, firmar y completar aceptación física Android de `0.1.13`/35;
-   registrar track,
+7. Subir `0.1.14`/36 y completar su aceptación física Android; registrar track,
    rollout y versión observada.
 8. Ensayar restauración de Neon y documentar RPO/RTO.
 9. Realizar revisión final de autorización multi-tenant, secretos, logs,

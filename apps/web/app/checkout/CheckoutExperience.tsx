@@ -36,7 +36,15 @@ interface PaymentAttempt {
   readonly currencyCode: string;
   readonly expiresAt: string;
   readonly id: string;
-  readonly invoice: { readonly planName: string; readonly status: string };
+  readonly invoice: {
+    readonly discount: {
+      readonly code: string;
+      readonly discountCents: number;
+      readonly percentage: number;
+    } | null;
+    readonly planName: string;
+    readonly status: string;
+  };
   readonly paymentUrl: string | null;
   readonly status: string;
 }
@@ -1278,6 +1286,17 @@ export default function CheckoutExperience() {
                       {formatMoney(attempt.amountCents, attempt.currencyCode)}.
                       Esperamos la confirmación verificable de PayPhone.
                     </p>
+                    {attempt.invoice.discount ? (
+                      <p className="mt-3 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-emerald-900">
+                        Cupón <strong>{attempt.invoice.discount.code}</strong>{' '}
+                        aplicado: {attempt.invoice.discount.percentage}% de
+                        descuento ({formatMoney(
+                          attempt.invoice.discount.discountCents,
+                          attempt.currencyCode,
+                        )} de ahorro). El total mostrado ya incluye este
+                        descuento; el canje se confirma al validarse el pago.
+                      </p>
+                    ) : null}
                     <p className="mt-2 text-sm text-[var(--muted)]">
                       El enlace vence:{' '}
                       {new Intl.DateTimeFormat('es-EC', {

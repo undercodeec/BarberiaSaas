@@ -11,6 +11,7 @@ import {
   PlatformSupportCaseStatus,
   ProductOrderStatus,
   SubscriptionInvoiceStatus,
+  SubscriptionDiscountKind,
   SubscriptionStatus,
   type DatabaseClient,
   type PlatformOverrideKind,
@@ -208,6 +209,47 @@ const platformSubscriptionListSchema = z.object({
       'cancelled',
     ])
     .default('all'),
+});
+const platformSubscriptionDiscountListSchema = z.object({
+  search: z.string().trim().max(120).optional(),
+  status: z.enum(['all', 'active', 'inactive']).default('all'),
+});
+const platformSubscriptionDiscountParamsSchema = z.object({ id: z.uuid() });
+const platformSubscriptionDiscountCreateSchema = z
+  .object({
+    code: z.string().trim().min(3).max(80),
+    description: z.string().trim().max(500).nullable().optional(),
+    endsAt: z.coerce.date().nullable().optional(),
+    kind: z.enum(['temporary', 'lifetime_continuity']),
+    name: z.string().trim().min(3).max(120),
+    percentage: z.number().int().min(1).max(99),
+    planIds: z.array(z.uuid()).max(10).default([]),
+    reason: z.string().trim().min(10).max(500),
+    startsAt: z.coerce.date().nullable().optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.kind === 'temporary' && !value.endsAt)
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Los cupones temporales requieren una fecha de finalización.',
+        path: ['endsAt'],
+      });
+    if (value.kind === 'lifetime_continuity' && value.endsAt)
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Los cupones vitalicios no pueden tener fecha de finalización.',
+        path: ['endsAt'],
+      });
+    if (value.startsAt && value.endsAt && value.startsAt >= value.endsAt)
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'La fecha inicial debe ser anterior a la fecha final.',
+        path: ['endsAt'],
+      });
+  });
+const platformSubscriptionDiscountStatusSchema = z.object({
+  isActive: z.boolean(),
+  reason: z.string().trim().min(10).max(500),
 });
 const platformPaymentReceiptListSchema = z.object({
   deliveryStatus: z.enum(['all', 'pending', 'sent', 'failed']).default('all'),
@@ -2208,6 +2250,119 @@ function registerPlatformRoutes(
       ),
       trialsEndingSoon,
     };
+  });
+
+  app.get('/v1/platform/subscription-discounts', async (request) => {
+    const operator = await requirePlatformAdmin(database, authenticate, request, config);
+    requirePlatformPermission(operator.role, 'manage_billing');
+    const query = platformSubscriptionDiscountListSchema.parse(request.query);
+    const coupons = await database.subscriptionDiscountCoupon.findMany({
+      include: {
+        _count: { select: { grants: true } },
+        plans: { include: { plan: { select: { code: true, id: true, name: true } } } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+      where: {
+        ...(query.status === 'all' ? {} : { isActive: query.status === 'active' }),
+        ...(query.search
+          ? {
+              OR: [
+                { displayCode: { contains: query.search, mode: 'insensitive' } },
+                { name: { contains: query.search, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      },
+    });
+    const plans = await database.plan.findMany({
+      orderBy: { sortOrder: 'asc' },
+      select: { code: true, id: true, name: true },
+      where: { isActive: true, isPublic: true, monthlyPriceCents: { gt: 0 } },
+    });
+    return {
+      coupons: coupons.map((coupon) => ({
+        code: coupon.displayCode,
+        createdAt: coupon.createdAt.toISOString(),
+        description: coupon.description,
+        endsAt: coupon.endsAt?.toISOString() ?? null,
+        grantCount: coupon._count.grants,
+        id: coupon.id,
+        isActive: coupon.isActive,
+        kind: coupon.kind.toLowerCase(),
+        name: coupon.name,
+        percentage: coupon.percentageBasisPoints / 100,
+        plans: coupon.plans.map(({ plan }) => plan),
+        startsAt: coupon.startsAt?.toISOString() ?? null,
+      })),
+      plans,
+    };
+  });
+
+  app.post('/v1/platform/subscription-discounts', async (request, reply) => {
+    const operator = await requirePlatformAdmin(database, authenticate, request, config);
+    requirePlatformPermission(operator.role, 'manage_billing');
+    const input = platformSubscriptionDiscountCreateSchema.parse(request.body);
+    const planIds = [...new Set(input.planIds)];
+    if (planIds.length > 0) {
+      const validPlans = await database.plan.count({
+        where: { id: { in: planIds }, isActive: true, isPublic: true, monthlyPriceCents: { gt: 0 } },
+      });
+      if (validPlans !== planIds.length)
+        throw new ApiError(400, 'SUBSCRIPTION_DISCOUNT_PLAN_INVALID', 'Selecciona únicamente planes públicos de pago vigentes.');
+    }
+    const normalizedCode = input.code.toUpperCase();
+    let coupon;
+    try {
+      coupon = await database.subscriptionDiscountCoupon.create({
+        data: {
+          createdByUserId: operator.id,
+          description: input.description || null,
+          displayCode: normalizedCode,
+          endsAt: input.kind === 'temporary' ? input.endsAt ?? null : null,
+          kind: input.kind === 'temporary' ? SubscriptionDiscountKind.TEMPORARY : SubscriptionDiscountKind.LIFETIME_CONTINUITY,
+          name: input.name,
+          normalizedCode,
+          percentageBasisPoints: input.percentage * 100,
+          plans: { create: planIds.map((planId) => ({ plan: { connect: { id: planId } } })) },
+          startsAt: input.startsAt ?? null,
+        },
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error))
+        throw new ApiError(409, 'SUBSCRIPTION_DISCOUNT_CODE_EXISTS', 'Ya existe un cupón con ese código.');
+      throw error;
+    }
+    await createPlatformAudit(database, {
+      action: 'platform.subscription_discount.created',
+      actorUserId: operator.id,
+      afterData: { code: coupon.normalizedCode, kind: coupon.kind, percentageBasisPoints: coupon.percentageBasisPoints, planIds },
+      entityId: coupon.id,
+      entityType: 'subscription_discount_coupon',
+      metadata: { reason: input.reason },
+    });
+    return reply.code(201).send({ id: coupon.id });
+  });
+
+  app.post('/v1/platform/subscription-discounts/:id/status', async (request) => {
+    const operator = await requirePlatformAdmin(database, authenticate, request, config);
+    requirePlatformPermission(operator.role, 'manage_billing');
+    const { id } = platformSubscriptionDiscountParamsSchema.parse(request.params);
+    const input = platformSubscriptionDiscountStatusSchema.parse(request.body);
+    const before = await database.subscriptionDiscountCoupon.findUnique({ where: { id } });
+    if (!before)
+      throw new ApiError(404, 'SUBSCRIPTION_DISCOUNT_NOT_FOUND', 'El cupón no existe.');
+    const coupon = await database.subscriptionDiscountCoupon.update({ data: { isActive: input.isActive }, where: { id } });
+    await createPlatformAudit(database, {
+      action: input.isActive ? 'platform.subscription_discount.activated' : 'platform.subscription_discount.deactivated',
+      actorUserId: operator.id,
+      afterData: { isActive: coupon.isActive },
+      beforeData: { isActive: before.isActive },
+      entityId: coupon.id,
+      entityType: 'subscription_discount_coupon',
+      metadata: { reason: input.reason },
+    });
+    return { id: coupon.id, isActive: coupon.isActive };
   });
 
   app.get('/v1/platform/subscriptions', async (request) => {

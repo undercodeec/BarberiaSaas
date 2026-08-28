@@ -36,6 +36,7 @@ import {
 } from './PlatformOperations';
 import { PlatformUsers } from './PlatformUsers';
 import { PlatformPaymentReceipts } from './PlatformPaymentReceipts';
+import { PlatformSubscriptionDiscounts } from './PlatformSubscriptionDiscounts';
 import { PlatformSubscriptions } from './PlatformSubscriptions';
 
 const dateFormatter = new Intl.DateTimeFormat('es-EC', {
@@ -53,6 +54,7 @@ type View =
   | 'cases'
   | 'content'
   | 'configuration'
+  | 'discounts'
   | 'health'
   | 'notifications'
   | 'operations'
@@ -1236,6 +1238,11 @@ export default function AdminConsole() {
         ? [
             {
               icon: 'dashboard',
+              id: 'discounts' as const,
+              label: 'Cupones',
+            },
+            {
+              icon: 'dashboard',
               id: 'payments' as const,
               label: 'Pagos y recibos',
             },
@@ -1595,6 +1602,9 @@ export default function AdminConsole() {
           ) : null}
           {view === 'payments' && token && operatorPermissions.billing ? (
             <PlatformPaymentReceipts onToast={setToast} token={token} />
+          ) : null}
+          {view === 'discounts' && token && operatorPermissions.billing ? (
+            <PlatformSubscriptionDiscounts onToast={setToast} token={token} />
           ) : null}
           {view === 'notifications' ? (
             <Notifications

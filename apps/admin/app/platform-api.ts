@@ -98,6 +98,24 @@ export interface PlatformSubscriptionList {
   }[];
 }
 
+export interface PlatformSubscriptionDiscountList {
+  readonly coupons: readonly {
+    readonly code: string;
+    readonly createdAt: string;
+    readonly description: string | null;
+    readonly endsAt: string | null;
+    readonly grantCount: number;
+    readonly id: string;
+    readonly isActive: boolean;
+    readonly kind: 'lifetime_continuity' | 'temporary';
+    readonly name: string;
+    readonly percentage: number;
+    readonly plans: readonly { readonly code: string; readonly id: string; readonly name: string }[];
+    readonly startsAt: string | null;
+  }[];
+  readonly plans: readonly { readonly code: string; readonly id: string; readonly name: string }[];
+}
+
 export interface PlatformPaymentReceiptList {
   readonly pagination: OrganizationList['pagination'];
   readonly receipts: readonly {
@@ -679,6 +697,53 @@ export async function getPlatformSubscriptions(
   return request<PlatformSubscriptionList>(
     `/v1/platform/subscriptions?${query.toString()}`,
     {},
+    token,
+  );
+}
+
+export async function getPlatformSubscriptionDiscounts(
+  token: string,
+  input: { readonly search: string; readonly status: string },
+) {
+  const query = new URLSearchParams({ status: input.status });
+  if (input.search) query.set('search', input.search);
+  return request<PlatformSubscriptionDiscountList>(
+    `/v1/platform/subscription-discounts?${query.toString()}`,
+    {},
+    token,
+  );
+}
+
+export async function createPlatformSubscriptionDiscount(
+  token: string,
+  input: {
+    readonly code: string;
+    readonly description: string | null;
+    readonly endsAt: string | null;
+    readonly kind: 'lifetime_continuity' | 'temporary';
+    readonly name: string;
+    readonly percentage: number;
+    readonly planIds: readonly string[];
+    readonly reason: string;
+    readonly startsAt: string | null;
+  },
+) {
+  return request<{ id: string }>(
+    '/v1/platform/subscription-discounts',
+    { body: JSON.stringify(input), method: 'POST' },
+    token,
+  );
+}
+
+export async function setPlatformSubscriptionDiscountStatus(
+  token: string,
+  id: string,
+  isActive: boolean,
+  reason: string,
+) {
+  return request<{ id: string; isActive: boolean }>(
+    `/v1/platform/subscription-discounts/${encodeURIComponent(id)}/status`,
+    { body: JSON.stringify({ isActive, reason }), method: 'POST' },
     token,
   );
 }

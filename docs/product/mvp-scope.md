@@ -1,9 +1,7 @@
 # Alcance activo del MVP
 
-La fuente de verdad del estado es
-[`ProyectoMD/ESTADO_PROYECTO.md`](../../ProyectoMD/ESTADO_PROYECTO.md); el
-alcance de pagos y su secuencia de activación está en
-[`ProyectoMD/PLAN_DESARROLLO_INTEGRAL_NAVA_2026-08-20.md`](../../ProyectoMD/PLAN_DESARROLLO_INTEGRAL_NAVA_2026-08-20.md).
+La fuente de verdad del estado, el alcance de pagos y su secuencia de activación
+es [`ProyectoMD/ESTADO_PROYECTO.md`](../../ProyectoMD/ESTADO_PROYECTO.md).
 
 ## Incluido
 

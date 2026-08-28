@@ -3,16 +3,19 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   API_URL,
   PlatformApiError,
+  createPlatformSubscriptionDiscount,
   downloadAuditExport,
   downloadPlatformPaymentReceipt,
   getOrganizationDetail,
   getOrganizations,
   getPlatformSession,
   getPlatformPaymentReceipts,
+  getPlatformSubscriptionDiscounts,
   getPlatformUsers,
   getWelcomeSurveyResponses,
   requestPlatformAccessCode,
   startPlatformLogin,
+  setPlatformSubscriptionDiscountStatus,
   updatePlatformAlert,
   updatePlatformMembership,
   updatePlatformUser,
@@ -392,6 +395,63 @@ describe('cliente del panel de plataforma', () => {
     );
     expect(new Headers(options.headers).get('authorization')).toBe(
       'Bearer session-token',
+    );
+  });
+
+  it('consulta y administra cupones con sesión autorizada', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ coupons: [], plans: [] }), {
+          headers: { 'content-type': 'application/json' },
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ id: 'coupon-id' }), {
+          headers: { 'content-type': 'application/json' },
+          status: 201,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ id: 'coupon-id', isActive: false }), {
+          headers: { 'content-type': 'application/json' },
+          status: 200,
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await getPlatformSubscriptionDiscounts('session-token', {
+      search: 'VERANO',
+      status: 'active',
+    });
+    await createPlatformSubscriptionDiscount('session-token', {
+      code: 'VERANO-25',
+      description: null,
+      endsAt: '2026-12-31T23:59:59.000Z',
+      kind: 'temporary',
+      name: 'Verano',
+      percentage: 25,
+      planIds: [],
+      reason: 'Campaña comercial de verano.',
+      startsAt: null,
+    });
+    await setPlatformSubscriptionDiscountStatus(
+      'session-token',
+      'coupon-id',
+      false,
+      'La campaña terminó correctamente.',
+    );
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain(
+      '/v1/platform/subscription-discounts?status=active&search=VERANO',
+    );
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      `${API_URL}/v1/platform/subscription-discounts`,
+    );
+    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).method).toBe('POST');
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(
+      `${API_URL}/v1/platform/subscription-discounts/coupon-id/status`,
     );
   });
 });
