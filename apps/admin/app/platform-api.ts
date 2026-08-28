@@ -93,6 +93,59 @@ export interface PlatformSubscriptionList {
   }[];
 }
 
+export interface PlatformPaymentReceiptList {
+  readonly pagination: OrganizationList['pagination'];
+  readonly receipts: readonly {
+    readonly createdAt: string;
+    readonly currencyCode: string;
+    readonly delivery: {
+      readonly attemptCount: number;
+      readonly emailedAt: string | null;
+      readonly lastAttemptAt: string | null;
+      readonly lastErrorCode: string | null;
+      readonly status: 'failed' | 'pending' | 'sent';
+      readonly updatedAt: string;
+    };
+    readonly id: string;
+    readonly pricing: {
+      readonly promotionCode: string | null;
+      readonly promotionDiscountCents: number;
+      readonly subtotalCents: number;
+      readonly taxCents: number;
+    };
+    readonly organization: {
+      readonly defaultTimezone: string;
+      readonly id: string;
+      readonly name: string;
+      readonly slug: string;
+    };
+    readonly organizationName: string;
+    readonly paidAt: string;
+    readonly payment: {
+      readonly amountCents: number;
+      readonly id: string;
+      readonly internalReference: string;
+      readonly provider: string;
+      readonly providerTransactionId: string | null;
+      readonly status: string;
+    };
+    readonly periodEndsAt: string;
+    readonly periodStartsAt: string;
+    readonly planCode: string;
+    readonly planName: string;
+    readonly pdfPath: string;
+    readonly recipient: { readonly email: string; readonly name: string };
+    readonly receiptNumber: string;
+    readonly totalCents: number;
+  }[];
+  readonly summary: {
+    readonly failed: number;
+    readonly pending: number;
+    readonly sent: number;
+    readonly total: number;
+  };
+}
+
 export interface PlatformUser {
   readonly createdAt: string;
   readonly email: string;
@@ -607,6 +660,60 @@ export async function getPlatformSubscriptions(
     {},
     token,
   );
+}
+
+export async function getPlatformPaymentReceipts(
+  token: string,
+  input: {
+    readonly deliveryStatus: string;
+    readonly from: string;
+    readonly page: number;
+    readonly search: string;
+    readonly to: string;
+  },
+) {
+  const query = new URLSearchParams({
+    deliveryStatus: input.deliveryStatus,
+    page: String(input.page),
+    pageSize: '12',
+  });
+  if (input.from) query.set('from', `${input.from}T00:00:00.000Z`);
+  if (input.search) query.set('search', input.search);
+  if (input.to) query.set('to', `${input.to}T23:59:59.999Z`);
+  return request<PlatformPaymentReceiptList>(
+    `/v1/platform/payment-receipts?${query.toString()}`,
+    {},
+    token,
+  );
+}
+
+export async function downloadPlatformPaymentReceipt(
+  token: string,
+  receiptId: string,
+) {
+  const response = await fetch(
+    `${API_URL}/v1/platform/payment-receipts/${encodeURIComponent(receiptId)}/pdf`,
+    { headers: { authorization: `Bearer ${token}` } },
+  );
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      code?: unknown;
+      message?: unknown;
+    } | null;
+    throw new PlatformApiError(
+      response.status,
+      typeof payload?.code === 'string'
+        ? payload.code
+        : 'PLATFORM_RECEIPT_DOWNLOAD_FAILED',
+      typeof payload?.message === 'string'
+        ? payload.message
+        : 'No fue posible descargar el recibo.',
+    );
+  }
+  const disposition = response.headers.get('content-disposition') ?? '';
+  const filename =
+    disposition.match(/filename="([^"]+)"/u)?.[1] ?? 'nava-recibo.pdf';
+  return { blob: await response.blob(), filename };
 }
 
 export async function getPlatformUsers(

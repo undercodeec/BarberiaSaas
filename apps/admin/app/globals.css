@@ -1462,6 +1462,21 @@ textarea:focus {
   background: var(--danger-soft);
 }
 
+.status-badge--sent {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.status-badge--pending {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.status-badge--failed {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
 .organization-row > .icon {
   width: 16px;
   height: 16px;

@@ -35,7 +35,7 @@ import {
   PlatformOperations,
 } from './PlatformOperations';
 import { PlatformUsers } from './PlatformUsers';
-import { PlatformSubscriptions } from './PlatformSubscriptions';
+import { PlatformPaymentReceipts } from './PlatformPaymentReceipts';
 
 const dateFormatter = new Intl.DateTimeFormat('es-EC', {
   dateStyle: 'medium',
@@ -60,7 +60,7 @@ type View =
   | 'overview'
   | 'privacy'
   | 'security'
-  | 'subscriptions'
+  | 'payments'
   | 'users';
 type ModalState = {
   readonly organization: PlatformOrganization;
@@ -1232,8 +1232,8 @@ export default function AdminConsole() {
         ? [
             {
               icon: 'dashboard',
-              id: 'subscriptions' as const,
-              label: 'Suscripciones',
+              id: 'payments' as const,
+              label: 'Pagos y recibos',
             },
             { icon: 'audit', id: 'overrides' as const, label: 'Excepciones' },
           ]
@@ -1589,8 +1589,8 @@ export default function AdminConsole() {
               token={token}
             />
           ) : null}
-          {view === 'subscriptions' && token && operatorPermissions.billing ? (
-            <PlatformSubscriptions onToast={setToast} token={token} />
+          {view === 'payments' && token && operatorPermissions.billing ? (
+            <PlatformPaymentReceipts onToast={setToast} token={token} />
           ) : null}
           {view === 'notifications' ? (
             <Notifications
