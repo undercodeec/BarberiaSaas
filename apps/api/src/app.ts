@@ -2,6 +2,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import {
   AppNotificationType,
+  AppointmentSource,
   AppointmentStatus,
   CashRegisterStatus,
   createDatabaseClient,
@@ -211,6 +212,7 @@ interface QueuedNotificationData {
 function appointmentNotificationCopy(
   kind: AppointmentNotificationKind,
   clientName: string,
+  source: AppointmentSource,
 ) {
   if (kind === 'cancelled')
     return {
@@ -223,6 +225,12 @@ function appointmentNotificationCopy(
       body: `${clientName} reprogramó una reserva online.`,
       title: 'Reserva reprogramada',
       type: AppNotificationType.APPOINTMENT_RESCHEDULED,
+    };
+  if (source !== AppointmentSource.PUBLIC_BOOKING)
+    return {
+      body: `Se agendó una cita para ${clientName}.`,
+      title: 'Nueva cita agendada',
+      type: AppNotificationType.APPOINTMENT_CREATED,
     };
   return {
     body: `${clientName} confirmó una nueva reserva online.`,
@@ -383,6 +391,7 @@ function createQueuedAppointmentNotifier(
         const content = appointmentNotificationCopy(
           kind,
           appointment.clientName,
+          appointment.source,
         );
         const startsAt = new Intl.DateTimeFormat('es-EC', {
           dateStyle: 'full',
@@ -2877,6 +2886,7 @@ export async function buildApi({
     authenticate,
     publicBookingMailer,
     config.PUBLIC_WEB_URL,
+    appointmentNotifier,
   );
   registerPublicBookingRoutes(
     app,

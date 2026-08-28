@@ -32,6 +32,7 @@ import {
   recordBookingMilestone,
 } from './subscription-policy';
 import { clientScope, maskClientPhone } from './clients';
+import type { AppointmentNotifier } from './notifications';
 import type { PublicBookingMailer } from './public-booking';
 import { createOpaqueToken, hashOpaqueToken } from './security';
 
@@ -118,6 +119,52 @@ function assertLocationScope(
       'Solo puedes consultar y gestionar tus sucursales asignadas.',
     );
   }
+}
+
+async function findOrCreateCompletedPublicBookingClient(
+  transaction: Prisma.TransactionClient,
+  appointment: {
+    readonly clientEmail: string | null;
+    readonly clientName: string;
+    readonly clientPhone: string | null;
+    readonly organizationId: string;
+  },
+) {
+  if (!appointment.clientPhone) return null;
+  const normalizedEmail = appointment.clientEmail?.trim().toLowerCase() ?? null;
+  await transaction.$queryRaw`WITH lock AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtext(${appointment.organizationId}))) SELECT 1 AS locked FROM lock`;
+  const clientByPhone = await transaction.client.findFirst({
+    orderBy: { createdAt: 'asc' },
+    where: {
+      deletedAt: null,
+      organizationId: appointment.organizationId,
+      phone: appointment.clientPhone,
+    },
+  });
+  const knownClient =
+    clientByPhone ??
+    (normalizedEmail
+      ? await transaction.client.findFirst({
+          orderBy: { createdAt: 'asc' },
+          where: {
+            deletedAt: null,
+            email: { equals: normalizedEmail, mode: 'insensitive' },
+            organizationId: appointment.organizationId,
+          },
+        })
+      : null);
+  return (
+    knownClient ??
+    transaction.client.create({
+      data: {
+        email: normalizedEmail,
+        fullName: appointment.clientName,
+        organizationId: appointment.organizationId,
+        phone: appointment.clientPhone,
+        source: AppointmentSource.PUBLIC_BOOKING,
+      },
+    })
+  );
 }
 
 function partsInTimeZone(value: Date, timeZone: string) {
@@ -488,6 +535,7 @@ export function registerAgendaRoutes(
   authenticate: Authenticate,
   publicBookingMailer: PublicBookingMailer | null = null,
   publicBaseUrl = 'https://navacloud.app',
+  notifier: AppointmentNotifier | null = null,
 ) {
   app.get('/v1/availability', async (request) => {
     const { user } = await authenticate(database, request);
@@ -804,6 +852,7 @@ export function registerAgendaRoutes(
         await recordBookingMilestone(transaction, current.organizationId);
         return created;
       });
+      await notifier?.notify(appointment.id, 'created');
       return reply.code(201).send({
         appointment: publicAppointment(
           appointment,
@@ -1031,8 +1080,19 @@ export function registerAgendaRoutes(
       status === AppointmentStatus.COMPLETED ||
       status === AppointmentStatus.NO_SHOW;
     const updated = await database.$transaction(async (transaction) => {
+      const completedPublicBookingClient =
+        status === AppointmentStatus.COMPLETED &&
+        existing.status !== AppointmentStatus.COMPLETED &&
+        existing.source === AppointmentSource.PUBLIC_BOOKING &&
+        !existing.clientId
+          ? await findOrCreateCompletedPublicBookingClient(
+              transaction,
+              existing,
+            )
+          : null;
       const appointment = await transaction.appointment.update({
         data: {
+          clientId: completedPublicBookingClient?.id ?? existing.clientId,
           reservesSlot: releasesSlot ? false : existing.reservesSlot,
           status,
           updatedByUserId: user.id,

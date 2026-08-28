@@ -276,6 +276,16 @@ integrationDescribe('reservas públicas', () => {
     };
   }
 
+  async function completeBooking(bookingId: string) {
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${accessToken}` },
+      method: 'PATCH',
+      payload: { status: 'completed' },
+      url: `/v1/appointments/${bookingId}/status`,
+    });
+    expect(response.statusCode).toBe(200);
+  }
+
   it('publica catálogo, evita duplicados y permite gestionar una cita', async () => {
     const catalog = await app.inject({
       method: 'GET',
@@ -339,42 +349,14 @@ integrationDescribe('reservas públicas', () => {
     const firstAppointment = await database.appointment.findUniqueOrThrow({
       where: { id: management.bookingId },
     });
-    expect(firstAppointment.clientId).not.toBeNull();
+    expect(firstAppointment.clientId).toBeNull();
     const ownerClients = await app.inject({
       headers: { authorization: `Bearer ${accessToken}` },
       method: 'GET',
       url: '/v1/clients',
     });
     expect(ownerClients.statusCode).toBe(200);
-    expect(ownerClients.json().clients).toContainEqual(
-      expect.objectContaining({
-        email: `client-${suffix}@example.com`,
-        id: firstAppointment.clientId,
-        phone: clientPhone,
-      }),
-    );
-
-    const duplicateByEmail = await createAndVerifyBooking(
-      `public-booking-email-${randomUUID()}`,
-      futureSlot(3, 11),
-      `CLIENT-${suffix.toUpperCase()}@EXAMPLE.COM`,
-      `+59398${String(Date.now()).slice(-7)}`,
-    );
-    const duplicateAppointment = await database.appointment.findUniqueOrThrow({
-      where: { id: duplicateByEmail.bookingId },
-    });
-    expect(duplicateAppointment.clientId).toBe(firstAppointment.clientId);
-    const duplicateByPhone = await createAndVerifyBooking(
-      `public-booking-phone-${randomUUID()}`,
-      futureSlot(3, 12),
-      `other-client-${suffix}@example.com`,
-    );
-    const phoneDuplicateAppointment =
-      await database.appointment.findUniqueOrThrow({
-        where: { id: duplicateByPhone.bookingId },
-      });
-    expect(phoneDuplicateAppointment.clientId).toBe(firstAppointment.clientId);
-    expect(await database.client.count({ where: { organizationId } })).toBe(1);
+    expect(ownerClients.json().clients).toEqual([]);
     const queuedNotification = await database.appNotification.findFirst({
       orderBy: { createdAt: 'desc' },
       where: { organizationId, type: 'APPOINTMENT_CREATED' },
@@ -422,6 +404,58 @@ integrationDescribe('reservas públicas', () => {
     });
     expect(cannotReactivate.statusCode).toBe(409);
     expect(cannotReactivate.json().code).toBe('PUBLIC_BOOKING_NOT_ACTIVE');
+  });
+
+  it('registra el cliente solo al completar y evita duplicados por teléfono o correo', async () => {
+    const first = await createAndVerifyBooking(
+      `completed-client-${randomUUID()}`,
+      futureSlot(8, 10),
+      `completed-client-${suffix}@example.com`,
+    );
+    expect(
+      (
+        await database.appointment.findUniqueOrThrow({
+          where: { id: first.bookingId },
+        })
+      ).clientId,
+    ).toBeNull();
+    expect(await database.client.count({ where: { organizationId } })).toBe(0);
+
+    await completeBooking(first.bookingId);
+    const completedFirst = await database.appointment.findUniqueOrThrow({
+      where: { id: first.bookingId },
+    });
+    expect(completedFirst.clientId).not.toBeNull();
+
+    const duplicateByEmail = await createAndVerifyBooking(
+      `completed-client-email-${randomUUID()}`,
+      futureSlot(8, 11),
+      `COMPLETED-CLIENT-${suffix.toUpperCase()}@EXAMPLE.COM`,
+      `+59398${String(Date.now()).slice(-7)}`,
+    );
+    await completeBooking(duplicateByEmail.bookingId);
+    expect(
+      (
+        await database.appointment.findUniqueOrThrow({
+          where: { id: duplicateByEmail.bookingId },
+        })
+      ).clientId,
+    ).toBe(completedFirst.clientId);
+
+    const duplicateByPhone = await createAndVerifyBooking(
+      `completed-client-phone-${randomUUID()}`,
+      futureSlot(8, 12),
+      `other-completed-client-${suffix}@example.com`,
+    );
+    await completeBooking(duplicateByPhone.bookingId);
+    expect(
+      (
+        await database.appointment.findUniqueOrThrow({
+          where: { id: duplicateByPhone.bookingId },
+        })
+      ).clientId,
+    ).toBe(completedFirst.clientId);
+    expect(await database.client.count({ where: { organizationId } })).toBe(1);
   });
 
   it('publica una reseña verificada y permite ocultarla', async () => {

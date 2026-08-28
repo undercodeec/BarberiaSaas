@@ -1216,45 +1216,10 @@ export function registerPublicBookingRoutes(
     const managementExpiresAt = new Date(
       existing.endsAt.getTime() + MANAGEMENT_AFTER_END_MS,
     );
-    const client = await database.$transaction(async (transaction) => {
-      const normalizedEmail =
-        existing.clientEmail?.trim().toLowerCase() ?? null;
-      await transaction.$queryRaw`WITH lock AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtext(${existing.organizationId}))) SELECT 1 AS locked FROM lock`;
-      const clientByPhone = await transaction.client.findFirst({
-        where: {
-          deletedAt: null,
-          organizationId: existing.organizationId,
-          phone: existing.clientPhone!,
-        },
-        orderBy: { createdAt: 'asc' },
-      });
-      const knownClient =
-        clientByPhone ??
-        (normalizedEmail
-          ? await transaction.client.findFirst({
-              where: {
-                deletedAt: null,
-                email: { equals: normalizedEmail, mode: 'insensitive' },
-                organizationId: existing.organizationId,
-              },
-              orderBy: { createdAt: 'asc' },
-            })
-          : null);
-      const linkedClient =
-        knownClient ??
-        (await transaction.client.create({
-          data: {
-            email: normalizedEmail,
-            fullName: existing.clientName,
-            organizationId: existing.organizationId,
-            phone: existing.clientPhone!,
-            source: AppointmentSource.PUBLIC_BOOKING,
-          },
-        }));
+    await database.$transaction(async (transaction) => {
       await transaction.appointment.update({
         data: {
           attendanceConfirmedAt: new Date(),
-          clientId: linkedClient.id,
           status: AppointmentStatus.CONFIRMED,
           verificationExpiresAt: null,
         },
@@ -1268,7 +1233,6 @@ export function registerPublicBookingRoutes(
         },
         where: { id: existing.publicAccess!.id },
       });
-      return linkedClient;
     });
     const url = manageUrl(publicBaseUrl, token);
     await sendSafely(
@@ -1289,7 +1253,7 @@ export function registerPublicBookingRoutes(
       booking: publicAppointment(
         {
           ...existing,
-          clientId: client.id,
+          clientId: null,
           status: AppointmentStatus.CONFIRMED,
         },
         true,
