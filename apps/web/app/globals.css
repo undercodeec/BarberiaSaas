@@ -2933,11 +2933,20 @@ a {
   margin-top: 14px;
 }
 .subscription-checkbox input {
+  -webkit-appearance: checkbox;
+  appearance: auto;
   accent-color: var(--gold-deep);
+  background: initial;
+  border: initial;
+  cursor: pointer;
   height: 15px;
   margin: 0;
   min-width: 15px;
+  padding: 0;
   width: 15px;
+}
+.subscription-checkbox:has(input:checked) {
+  color: #3d454c;
 }
 .subscription-checkbox a {
   color: var(--gold-deep);
