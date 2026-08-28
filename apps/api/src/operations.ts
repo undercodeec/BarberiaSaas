@@ -18,6 +18,7 @@ import {
   type PlatformPrivacyRequestType,
   type SubscriptionPaymentStatus,
   type PlatformSupportCasePriority,
+  type SubscriptionPaymentReceiptDeliveryStatus,
 } from '@barber-saas/database';
 import {
   hasPermission,
@@ -63,7 +64,6 @@ import {
   GRACE_DAYS,
   parsePlanFeatureFlags,
   parsePlanLimits,
-  planDefinition,
   SUBSCRIPTION_PLANS,
 } from './subscription-policy';
 
@@ -209,6 +209,15 @@ const platformSubscriptionListSchema = z.object({
     ])
     .default('all'),
 });
+const platformPaymentReceiptListSchema = z.object({
+  deliveryStatus: z.enum(['all', 'pending', 'sent', 'failed']).default('all'),
+  from: z.coerce.date().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  search: z.string().trim().max(120).optional(),
+  to: z.coerce.date().optional(),
+});
+const platformPaymentReceiptParamsSchema = z.object({ id: z.uuid() });
 const platformOrganizationActionSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('suspend'),
@@ -2388,6 +2397,196 @@ function registerPlatformRoutes(
         };
       }),
     };
+  });
+
+  app.get('/v1/platform/payment-receipts', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'manage_billing');
+    const query = platformPaymentReceiptListSchema.parse(request.query);
+    if (query.from && query.to && query.from > query.to)
+      throw new ApiError(
+        400,
+        'PLATFORM_RECEIPT_DATE_RANGE_INVALID',
+        'El rango de recibos no es válido.',
+      );
+    const deliveryStatus =
+      query.deliveryStatus === 'all'
+        ? undefined
+        : (query.deliveryStatus.toUpperCase() as SubscriptionPaymentReceiptDeliveryStatus);
+    const where = {
+      ...(deliveryStatus ? { deliveryStatus } : {}),
+      ...(query.from || query.to
+        ? {
+            paidAt: {
+              ...(query.from ? { gte: query.from } : {}),
+              ...(query.to ? { lte: query.to } : {}),
+            },
+          }
+        : {}),
+      organization: {
+        deletedAt: null,
+        ...(query.search
+          ? {
+              OR: [
+                {
+                  name: {
+                    contains: query.search,
+                    mode: 'insensitive' as const,
+                  },
+                },
+                {
+                  slug: {
+                    contains: query.search,
+                    mode: 'insensitive' as const,
+                  },
+                },
+              ],
+            }
+          : {}),
+      },
+    };
+    const [total, receipts, summaryRows] = await Promise.all([
+      database.subscriptionPaymentReceipt.count({ where }),
+      database.subscriptionPaymentReceipt.findMany({
+        orderBy: { paidAt: 'desc' },
+        select: {
+          attemptCount: true,
+          createdAt: true,
+          currencyCode: true,
+          deliveryStatus: true,
+          emailedAt: true,
+          id: true,
+          internalReference: true,
+          lastAttemptAt: true,
+          lastErrorCode: true,
+          organization: {
+            select: { defaultTimezone: true, id: true, name: true, slug: true },
+          },
+          organizationName: true,
+          paidAt: true,
+          paymentProvider: true,
+          periodEndsAt: true,
+          periodStartsAt: true,
+          planCode: true,
+          planName: true,
+          providerTransactionId: true,
+          recipientEmail: true,
+          recipientName: true,
+          receiptNumber: true,
+          subscriptionInvoice: {
+            select: {
+              promotionCode: true,
+              promotionDiscountCents: true,
+              subtotalCents: true,
+              taxCents: true,
+            },
+          },
+          subscriptionPaymentAttempt: {
+            select: { amountCents: true, id: true, status: true },
+          },
+          totalCents: true,
+          updatedAt: true,
+        },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+      }),
+      database.subscriptionPaymentReceipt.groupBy({
+        _count: { _all: true },
+        by: ['deliveryStatus'],
+        where,
+      }),
+    ]);
+    const summary = { failed: 0, pending: 0, sent: 0, total };
+    for (const row of summaryRows) {
+      summary[
+        row.deliveryStatus.toLowerCase() as 'failed' | 'pending' | 'sent'
+      ] = row._count._all;
+    }
+    return {
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+      },
+      receipts: receipts.map((receipt) => ({
+        createdAt: receipt.createdAt.toISOString(),
+        currencyCode: receipt.currencyCode,
+        delivery: {
+          attemptCount: receipt.attemptCount,
+          emailedAt: receipt.emailedAt?.toISOString() ?? null,
+          lastAttemptAt: receipt.lastAttemptAt?.toISOString() ?? null,
+          lastErrorCode: receipt.lastErrorCode,
+          status: receipt.deliveryStatus.toLowerCase(),
+          updatedAt: receipt.updatedAt.toISOString(),
+        },
+        id: receipt.id,
+        pricing: {
+          promotionCode: receipt.subscriptionInvoice.promotionCode,
+          promotionDiscountCents:
+            receipt.subscriptionInvoice.promotionDiscountCents,
+          subtotalCents: receipt.subscriptionInvoice.subtotalCents,
+          taxCents: receipt.subscriptionInvoice.taxCents,
+        },
+        organization: receipt.organization,
+        organizationName: receipt.organizationName,
+        paidAt: receipt.paidAt.toISOString(),
+        payment: {
+          amountCents: receipt.subscriptionPaymentAttempt.amountCents,
+          id: receipt.subscriptionPaymentAttempt.id,
+          internalReference: receipt.internalReference,
+          provider: receipt.paymentProvider,
+          providerTransactionId: receipt.providerTransactionId,
+          status: receipt.subscriptionPaymentAttempt.status.toLowerCase(),
+        },
+        periodEndsAt: receipt.periodEndsAt.toISOString(),
+        periodStartsAt: receipt.periodStartsAt.toISOString(),
+        planCode: receipt.planCode,
+        planName: receipt.planName,
+        pdfPath: `/v1/platform/payment-receipts/${receipt.id}/pdf`,
+        recipient: {
+          email: receipt.recipientEmail,
+          name: receipt.recipientName,
+        },
+        receiptNumber: receipt.receiptNumber,
+        totalCents: receipt.totalCents,
+      })),
+      summary,
+    };
+  });
+
+  app.get('/v1/platform/payment-receipts/:id/pdf', async (request, reply) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'manage_billing');
+    const { id } = platformPaymentReceiptParamsSchema.parse(request.params);
+    const receipt = await database.subscriptionPaymentReceipt.findFirst({
+      select: { documentPdf: true, receiptNumber: true },
+      where: { id, organization: { deletedAt: null } },
+    });
+    if (!receipt)
+      throw new ApiError(
+        404,
+        'PLATFORM_PAYMENT_RECEIPT_NOT_FOUND',
+        'El recibo de pago no existe.',
+      );
+    return reply
+      .header(
+        'Content-Disposition',
+        `attachment; filename="${receipt.receiptNumber}.pdf"`,
+      )
+      .type('application/pdf')
+      .send(receipt.documentPdf);
   });
 
   app.get('/v1/platform/organizations', async (request) => {

@@ -4,9 +4,11 @@ import {
   API_URL,
   PlatformApiError,
   downloadAuditExport,
+  downloadPlatformPaymentReceipt,
   getOrganizationDetail,
   getOrganizations,
   getPlatformSession,
+  getPlatformPaymentReceipts,
   getPlatformUsers,
   getWelcomeSurveyResponses,
   requestPlatformAccessCode,
@@ -327,6 +329,67 @@ describe('cliente del panel de plataforma', () => {
     expect(url).toContain('/v1/platform/welcome-survey-responses?');
     expect(url).toContain('page=2');
     expect(url).toContain('search=persona%40nava.ec');
+    expect(new Headers(options.headers).get('authorization')).toBe(
+      'Bearer session-token',
+    );
+  });
+
+  it('consulta el historial de recibos con filtros y sesión autorizada', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          pagination: { page: 2, pageSize: 12, total: 3, totalPages: 1 },
+          receipts: [],
+          summary: { failed: 0, pending: 1, sent: 2, total: 3 },
+        }),
+        { headers: { 'content-type': 'application/json' }, status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await getPlatformPaymentReceipts('session-token', {
+      deliveryStatus: 'sent',
+      from: '2026-08-01',
+      page: 2,
+      search: 'Nava Norte',
+      to: '2026-08-31',
+    });
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/v1/platform/payment-receipts?');
+    expect(url).toContain('deliveryStatus=sent');
+    expect(url).toContain('page=2');
+    expect(url).toContain('search=Nava+Norte');
+    expect(url).toContain('from=2026-08-01T00%3A00%3A00.000Z');
+    expect(url).toContain('to=2026-08-31T23%3A59%3A59.999Z');
+    expect(new Headers(options.headers).get('authorization')).toBe(
+      'Bearer session-token',
+    );
+  });
+
+  it('descarga un recibo temporal como PDF y conserva su nombre', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(new Blob(['%PDF-1.7']), {
+        headers: {
+          'content-disposition': 'attachment; filename="nava-recibo-0001.pdf"',
+          'content-type': 'application/pdf',
+        },
+        status: 200,
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await downloadPlatformPaymentReceipt(
+      'session-token',
+      'receipt/id',
+    );
+
+    expect(result.filename).toBe('nava-recibo-0001.pdf');
+    expect(result.blob.size).toBeGreaterThan(0);
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      `${API_URL}/v1/platform/payment-receipts/receipt%2Fid/pdf`,
+    );
     expect(new Headers(options.headers).get('authorization')).toBe(
       'Bearer session-token',
     );

@@ -5,6 +5,8 @@ import {
   MembershipStatus,
   PaymentProviderEventSource,
   PlatformPaymentConfigurationStatus,
+  SubscriptionDiscountGrantStatus,
+  SubscriptionDiscountKind,
   SubscriptionInvoiceStatus,
   SubscriptionPaymentStatus,
   SubscriptionStatus,
@@ -115,6 +117,27 @@ describe('dominio de pagos de suscripción', () => {
       applied: false,
       error: 'FOUNDER_PRICE_CONTINUITY_LOST',
     });
+    expect(
+      resolveFounderPromotion({
+        configuredCode: 'NAVA-FOUNDER',
+        founderPriceEligible: false,
+        founderPriceLostAt: null,
+        planCode: 'essential',
+        submittedCode: 'VERANO-25',
+      }),
+    ).toMatchObject({ applied: false, error: null });
+    expect(
+      resolveFounderPromotion({
+        configuredCode: 'NAVA-FOUNDER',
+        founderPriceEligible: false,
+        founderPriceLostAt: null,
+        planCode: 'essential',
+        submittedCode: 'NAVA-FOUNDER',
+      }),
+    ).toMatchObject({
+      applied: false,
+      error: 'DISCOUNT_CODE_NOT_APPLICABLE',
+    });
   });
 });
 
@@ -128,13 +151,25 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
   const secondToken = `subscription-other-${suffix}`;
   const organizationIds: string[] = [];
   const userIds: string[] = [];
+  const couponIds: string[] = [];
   let app: Awaited<ReturnType<typeof buildApi>>;
   let config: ReturnType<typeof readConfig>;
   let paymentAttemptId = '';
+  let failNextPrepare = false;
 
   afterAll(async () => {
     if (organizationIds.length > 0) {
       await database.subscriptionPaymentReceipt.deleteMany({
+        where: { organizationId: { in: organizationIds } },
+      });
+      await database.subscriptionInvoice.updateMany({
+        data: { discountGrantId: null },
+        where: { organizationId: { in: organizationIds } },
+      });
+      await database.subscriptionDiscountGrant.deleteMany({
+        where: { organizationId: { in: organizationIds } },
+      });
+      await database.subscriptionDiscountReservation.deleteMany({
         where: { organizationId: { in: organizationIds } },
       });
       await database.paymentProviderEvent.deleteMany({
@@ -149,6 +184,14 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
       await database.subscriptionInvoice.deleteMany({
         where: { organizationId: { in: organizationIds } },
       });
+      if (couponIds.length > 0) {
+        await database.subscriptionDiscountCouponPlan.deleteMany({
+          where: { couponId: { in: couponIds } },
+        });
+        await database.subscriptionDiscountCoupon.deleteMany({
+          where: { id: { in: couponIds } },
+        });
+      }
       await database.auditLog.deleteMany({
         where: { organizationId: { in: organizationIds } },
       });
@@ -256,6 +299,14 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
       database,
       platformPaymentProvider: {
         async preparePayment(input) {
+          if (failNextPrepare) {
+            failNextPrepare = false;
+            throw new ApiError(
+              503,
+              'PAYPHONE_PREPARE_UNAVAILABLE',
+              'Fallo simulado de PayPhone.',
+            );
+          }
           return {
             paymentUrl: `https://sandbox.example.test/pay/${input.internalReference}`,
           };
@@ -494,6 +545,193 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
         })
       ).currentPeriodEnd,
     ).toEqual(previousPeriodEnd);
+
+    const essentialPlan = await database.plan.findUniqueOrThrow({
+      where: { code: 'essential' },
+    });
+    const coupon = await database.subscriptionDiscountCoupon.create({
+      data: {
+        createdByUserId: secondUser.id,
+        displayCode: 'VERANO-25',
+        endsAt: new Date('2026-12-31T23:59:59.000Z'),
+        kind: SubscriptionDiscountKind.TEMPORARY,
+        name: 'Descuento de verano',
+        normalizedCode: 'VERANO-25',
+        percentageBasisPoints: 2500,
+      },
+    });
+    couponIds.push(coupon.id);
+    const expectedDiscount = Math.round(
+      (essentialPlan.monthlyPriceCents! * 2500) / 10_000,
+    );
+    const couponCheckout = await app.inject({
+      headers: {
+        authorization: `Bearer ${secondToken}`,
+        'idempotency-key': `coupon-${suffix}`,
+      },
+      method: 'POST',
+      payload: { discountCode: ' verano-25 ', planCode: 'essential' },
+      url: '/v1/subscription/checkout',
+    });
+    expect(couponCheckout.statusCode, couponCheckout.body).toBe(201);
+    const couponAttemptId = couponCheckout.json<{ id: string }>().id;
+    const couponAttempt =
+      await database.subscriptionPaymentAttempt.findUniqueOrThrow({
+        include: { invoice: true },
+        where: { id: couponAttemptId },
+      });
+    expect(couponAttempt.amountCents).toBe(
+      essentialPlan.monthlyPriceCents! - expectedDiscount,
+    );
+    expect(couponAttempt.invoice).toMatchObject({
+      discountCouponId: coupon.id,
+      discountGrantId: null,
+      discountPercentageBasisPoints: 2500,
+      promotionCode: 'VERANO-25',
+      promotionDiscountCents: expectedDiscount,
+      subtotalCents: essentialPlan.monthlyPriceCents! - expectedDiscount,
+      taxCents: 0,
+      totalCents: essentialPlan.monthlyPriceCents! - expectedDiscount,
+    });
+    const couponReservation =
+      await database.subscriptionDiscountReservation.findUniqueOrThrow({
+        where: { paymentAttemptId: couponAttemptId },
+      });
+    expect(couponReservation).toMatchObject({
+      couponId: coupon.id,
+      invoiceId: couponAttempt.invoiceId,
+      paymentAttemptId: couponAttemptId,
+      releasedAt: null,
+    });
+
+    const couponRejected = await app.inject({
+      headers: { authorization: `Bearer ${secondToken}` },
+      method: 'POST',
+      payload: {
+        clientTransactionId: couponAttempt.internalReference,
+        id: 9005,
+      },
+      url: '/v1/subscription/payments/confirm',
+    });
+    expect(couponRejected.statusCode).toBe(200);
+    expect(
+      await database.subscriptionDiscountReservation.findUniqueOrThrow({
+        where: { id: couponReservation.id },
+      }),
+    ).toMatchObject({ releaseReason: 'PAYMENT_REJECTED' });
+
+    const couponRetry = await app.inject({
+      headers: {
+        authorization: `Bearer ${secondToken}`,
+        'idempotency-key': `coupon-retry-${suffix}`,
+      },
+      method: 'POST',
+      payload: { discountCode: 'VERANO-25', planCode: 'essential' },
+      url: '/v1/subscription/checkout',
+    });
+    expect(couponRetry.statusCode, couponRetry.body).toBe(201);
+    const couponRetryAttempt =
+      await database.subscriptionPaymentAttempt.findUniqueOrThrow({
+        where: { id: couponRetry.json<{ id: string }>().id },
+      });
+    const couponConfirmed = await app.inject({
+      headers: { authorization: `Bearer ${secondToken}` },
+      method: 'POST',
+      payload: {
+        clientTransactionId: couponRetryAttempt.internalReference,
+        id: 9010,
+      },
+      url: '/v1/subscription/payments/confirm',
+    });
+    expect(couponConfirmed.statusCode, couponConfirmed.body).toBe(200);
+    const couponGrant =
+      await database.subscriptionDiscountGrant.findUniqueOrThrow({
+        where: { redeemedAttemptId: couponRetryAttempt.id },
+      });
+    expect(couponGrant).toMatchObject({
+      couponId: coupon.id,
+      kindSnapshot: SubscriptionDiscountKind.TEMPORARY,
+      normalizedCodeSnapshot: 'VERANO-25',
+      percentageBasisPointsSnapshot: 2500,
+      status: SubscriptionDiscountGrantStatus.ACTIVE,
+    });
+    const couponRetryInvoice =
+      await database.subscriptionInvoice.findUniqueOrThrow({
+        where: { id: couponRetryAttempt.invoiceId },
+      });
+    expect(couponRetryInvoice.discountGrantId).toBe(couponGrant.id);
+    expect(
+      await database.subscriptionDiscountReservation.findUniqueOrThrow({
+        where: { paymentAttemptId: couponRetryAttempt.id },
+      }),
+    ).toMatchObject({ releaseReason: 'REDEEMED' });
+
+    const expiringCoupon = await database.subscriptionDiscountCoupon.create({
+      data: {
+        createdByUserId: firstUser.id,
+        displayCode: 'EXPIRA-25',
+        endsAt: new Date('2026-12-31T23:59:59.000Z'),
+        kind: SubscriptionDiscountKind.TEMPORARY,
+        name: 'Descuento expirable',
+        normalizedCode: 'EXPIRA-25',
+        percentageBasisPoints: 2500,
+      },
+    });
+    couponIds.push(expiringCoupon.id);
+    const discountExpiringCheckout = await app.inject({
+      headers: {
+        authorization: `Bearer ${firstToken}`,
+        'idempotency-key': `discount-expired-${suffix}`,
+      },
+      method: 'POST',
+      payload: { discountCode: 'EXPIRA-25', planCode: 'essential' },
+      url: '/v1/subscription/checkout',
+    });
+    expect(
+      discountExpiringCheckout.statusCode,
+      discountExpiringCheckout.body,
+    ).toBe(201);
+    const discountExpiringAttemptId = discountExpiringCheckout.json<{
+      id: string;
+    }>().id;
+    await database.subscriptionPaymentAttempt.update({
+      data: { expiresAt: new Date('2026-08-19T00:00:00Z') },
+      where: { id: discountExpiringAttemptId },
+    });
+    await expect(
+      expireStaleSubscriptionPayments(
+        database,
+        new Date('2026-08-20T00:00:00Z'),
+      ),
+    ).resolves.toBe(1);
+    expect(
+      await database.subscriptionDiscountReservation.findUniqueOrThrow({
+        where: { paymentAttemptId: discountExpiringAttemptId },
+      }),
+    ).toMatchObject({ releaseReason: 'PAYMENT_EXPIRED' });
+
+    failNextPrepare = true;
+    const failedProviderCheckout = await app.inject({
+      headers: {
+        authorization: `Bearer ${firstToken}`,
+        'idempotency-key': `discount-provider-failed-${suffix}`,
+      },
+      method: 'POST',
+      payload: { discountCode: 'EXPIRA-25', planCode: 'essential' },
+      url: '/v1/subscription/checkout',
+    });
+    expect(failedProviderCheckout.statusCode).toBe(503);
+    const failedProviderAttempt =
+      await database.subscriptionPaymentAttempt.findFirstOrThrow({
+        orderBy: { createdAt: 'desc' },
+        where: { organizationId: firstOrganization.id },
+      });
+    expect(failedProviderAttempt.status).toBe(SubscriptionPaymentStatus.FAILED);
+    expect(
+      await database.subscriptionDiscountReservation.findUniqueOrThrow({
+        where: { paymentAttemptId: failedProviderAttempt.id },
+      }),
+    ).toMatchObject({ releaseReason: 'PROVIDER_UNAVAILABLE' });
 
     const rejectedCheckout = await app.inject({
       headers: {
