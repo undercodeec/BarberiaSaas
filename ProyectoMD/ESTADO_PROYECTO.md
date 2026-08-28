@@ -1119,6 +1119,75 @@ revalidados por SSH, Google Cloud, Neon ni Play Console durante esta auditoría*
   sustituye una decisión comercial/fiscal sobre Google Play Billing; evita que
   el binario dirija al usuario a un cobro externo de software SaaS.
 
+### Google Play In-App Updates nativo (FLEXIBLE) — implementado localmente
+
+- Android usa exclusivamente **Google Play In-App Updates / Play Core** como
+  autoridad de disponibilidad: no hay API Nava, scraping de Play, comparación
+  manual de versiones, OTA, Expo Updates ni CodePush. La dependencia añadida es
+  `com.google.android.play:app-update:2.1.0` en
+  `apps/mobile/android/app/build.gradle`.
+- La integración conserva Expo SDK 57, React Native 0.86, Expo Router, la New
+  Architecture y el proyecto Android nativo existente. Se registró el paquete
+  manual `PlayInAppUpdatesPackage` desde `MainApplication`; no se ejecutó
+  `expo prebuild` ni se modificaron permisos, Firebase, Maps, notificaciones o
+  pagos.
+- `PlayInAppUpdatesModule.kt` consulta `AppUpdateManager.appUpdateInfo` al
+  entrar en foreground y al regresar desde segundo plano. Desduplica la
+  colisión de arranque entre ciclo de vida nativo y JavaScript, evita consultas
+  simultáneas y solo inicia una ventana de Play por sesión. Google Play sigue
+  pudiendo informar de un estado descargado en cada reanudación.
+- La política actual es únicamente `AppUpdateType.FLEXIBLE`. Si Google Play
+  informa `UPDATE_AVAILABLE` y permite ese tipo, el módulo inicia el flujo
+  oficial. La lectura de `updatePriority` y `clientVersionStalenessDays` queda
+  encapsulada en el estado nativo para una futura política `IMMEDIATE`, sin
+  aplicar reglas de prioridad todavía.
+- El módulo registra un único `InstallStateUpdatedListener`, lo desregistra al
+  invalidarse el contexto React Native y serializa sus cambios en la cola UI.
+  Al recibir `DOWNLOADED`, `PlayInAppUpdatesBanner` muestra en Nava
+  “Actualización lista” y el botón “Actualizar ahora” llama solamente a
+  `appUpdateManager.completeUpdate()` a través del puente nativo. Al reabrir la
+  app, el estado retornado por Play vuelve a mostrar el aviso si la descarga ya
+  terminó.
+- Los fallos de disponibilidad (incluidos APK/ADB, Expo Go, Play Store ausente
+  o una cuenta que no posee la app) se registran de forma diagnóstica segura y
+  no bloquean login, navegación ni el resto de Nava. El flujo real solo es
+  válido para una instalación administrada por Google Play; una instalación
+  manual no es una prueba válida ni se espera que ofrezca la actualización.
+- Archivos de esta integración:
+  `apps/mobile/android/app/build.gradle`,
+  `apps/mobile/android/app/src/main/java/com/barbersaas/mobile/MainApplication.kt`,
+  `PlayInAppUpdatesModule.kt`, `PlayInAppUpdatesPackage.kt`,
+  `apps/mobile/src/lib/play-in-app-updates.ts`,
+  `apps/mobile/src/components/PlayInAppUpdatesBanner.tsx`,
+  `apps/mobile/src/lib/play-in-app-updates.test.ts` y
+  `apps/mobile/app/_layout.tsx`.
+- Verificaciones locales ejecutadas: `pnpm --filter @barber-saas/mobile
+  typecheck` (correcto), `pnpm --filter @barber-saas/mobile test` (35 suites,
+  103 pruebas correctas) y `:app:compileDebugKotlin` de Gradle (correcto). No
+  se generó AAB de producción.
+
+#### Validación posterior mediante un track de Google Play
+
+1. Publicar la versión base de Nava en un track de pruebas y, desde Google
+   Play, instalarla en el dispositivo con la misma cuenta que participa en ese
+   track. Debe ser una versión que ya contiene esta integración.
+2. Preparar un AAB posterior con el mismo `applicationId` y firma de carga, y
+   con un `versionCode` estrictamente superior al instalado. Subirlo al mismo
+   track y publicar/activar su disponibilidad para esa cuenta.
+3. Esperar a que Google Play marque la nueva versión disponible para el
+   dispositivo. No instalar manualmente el APK/AAB nuevo ni usar ADB como
+   sustituto.
+4. Abrir la versión anterior desde el lanzador. Nava consulta Play Core; si
+   informa `UPDATE_AVAILABLE` y permite `FLEXIBLE`, aparece la interfaz oficial
+   de Google Play. Aceptar la descarga y continuar usando Nava.
+5. Al finalizar la descarga, confirmar que Nava muestra “Actualización lista”.
+   Pulsar “Actualizar ahora”, verificar que Google Play instala la actualización
+   y que Nava reinicia con el `versionCode` nuevo.
+6. Repetir durante la descarga cerrando o llevando Nava a segundo plano; al
+   regresar, si Play informa `DOWNLOADED`, el aviso de completar actualización
+   debe reaparecer. Si no hay aviso, confirmar en Play Console elegibilidad de
+   la cuenta, firma, `applicationId`, track y orden creciente de `versionCode`.
+
 ## Procedimiento obligatorio para AAB Android local
 
 1. Revisar `git status` y no compilar desde cambios accidentales.

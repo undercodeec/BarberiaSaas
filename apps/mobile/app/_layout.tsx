@@ -20,6 +20,7 @@ import { GlobalNotificationsBanner } from '../src/components/GlobalNotifications
 import { MobileErrorBoundary } from '../src/components/MobileErrorBoundary';
 import { NavaPreloader } from '../src/components/NavaPreloader';
 import { NetworkStatusBanner } from '../src/components/NetworkStatusBanner';
+import { PlayInAppUpdatesBanner } from '../src/components/PlayInAppUpdatesBanner';
 import { PrivacyShield } from '../src/components/PrivacyShield';
 import { useCurrentOrganization } from '../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../src/lib/api';
@@ -146,6 +147,7 @@ export default function RootLayout() {
         <AppProviders>
           <StatusBar style="dark" />
           <SessionStateGate />
+          <PlayInAppUpdatesBanner />
         </AppProviders>
         {showPreloader ? <NavaPreloader onFinish={finishPreloader} /> : null}
         <PrivacyShield />
