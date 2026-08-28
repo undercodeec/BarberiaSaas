@@ -51,8 +51,10 @@ export async function processSubscriptionRenewalReminders(
     if (!owners.length) continue;
     const endsAt = new Intl.DateTimeFormat('es-EC', {
       dateStyle: 'long',
+      timeStyle: 'short',
       timeZone: subscription.organization.defaultTimezone,
     }).format(subscription.currentPeriodEnd);
+    const commercialTimezone = subscription.organization.defaultTimezone;
     try {
       await Promise.all(
         owners.map(({ user }) =>
@@ -60,7 +62,7 @@ export async function processSubscriptionRenewalReminders(
             from: config.SMTP_FROM!,
             subject: `Tu suscripción Nava vence el ${endsAt}`,
             text: [
-              `Tu plan ${subscription.plan.name} para ${subscription.organization.name} vence el ${endsAt}.`,
+              `Tu plan ${subscription.plan.name} para ${subscription.organization.name} vence el ${endsAt} (${commercialTimezone}).`,
               '',
               'Las renovaciones de Nava son manuales. Renueva antes del vencimiento para mantener las funciones de tu plan.',
               '',

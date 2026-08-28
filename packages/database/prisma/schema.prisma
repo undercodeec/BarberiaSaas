@@ -481,6 +481,7 @@ model PendingRegistration {
   phoneKey        String?                  @unique @map("phone_key") @db.VarChar(24)
   countryCode     String?                  @map("country_code") @db.Char(2)
   city            String?                  @db.VarChar(120)
+  timezone        String?                  @db.VarChar(64)
   openingTime     String?                  @map("opening_time") @db.Char(5)
   closingTime     String?                  @map("closing_time") @db.Char(5)
   marketingOptIn  Boolean                  @default(false) @map("marketing_opt_in")
@@ -523,6 +524,7 @@ model UserRegistrationProfile {
   businessNameKey       String                  @map("business_name_key") @db.VarChar(120)
   countryCode           String                  @map("country_code") @db.Char(2)
   city                  String                  @db.VarChar(120)
+  timezone              String                  @default("America/Guayaquil") @db.VarChar(64)
   addressLine           String?                 @map("address_line") @db.VarChar(240)
   // Las portadas se guardan como data URI comprimida durante el piloto. TEXT
   // evita truncar el contenido base64 y no requiere un proveedor externo.
@@ -1001,8 +1003,8 @@ model SubscriptionInvoice {
   currencyCode           String                       @default("USD") @map("currency_code") @db.Char(3)
   billingPeriodMonths    Int                          @default(1) @map("billing_period_months")
   billingPeriodDays      Int                          @default(30) @map("billing_period_days")
-  commercialTermsVersion String                       @map("commercial_terms_version") @db.VarChar(40)
   billingTimezone        String                       @map("billing_timezone") @db.VarChar(64)
+  commercialTermsVersion String                       @map("commercial_terms_version") @db.VarChar(40)
   periodStartsAt         DateTime?                    @map("period_starts_at") @db.Timestamptz(3)
   periodEndsAt           DateTime?                    @map("period_ends_at") @db.Timestamptz(3)
   status                 SubscriptionInvoiceStatus    @default(OPEN)

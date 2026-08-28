@@ -78,6 +78,7 @@ export interface VerifiedPlatformPayment {
   readonly internalReference: string;
   readonly payload: unknown;
   readonly providerTransactionId: string;
+  readonly providerPaidAt?: Date | null;
   readonly status: 'approved' | 'rejected';
   readonly storeId: string;
   readonly source?: PaymentProviderEventSource;
@@ -692,7 +693,7 @@ export async function applyVerifiedPlatformPayment(
         paidAt: now,
         periodEndsAt,
         periodStartsAt: invoicePeriodStartsAt,
-        providerPaidAt: payment.verifiedAt ?? now,
+        providerPaidAt: payment.providerPaidAt ?? null,
         status: SubscriptionInvoiceStatus.PAID,
       },
       where: { id: attempt.invoice.id },

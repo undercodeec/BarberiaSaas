@@ -1,5 +1,17 @@
 # Estado actual del proyecto Nava
 
+## Actualización operativa — 26 de agosto de 2026
+
+- El ciclo horario de suscripciones conserva snapshots IANA en facturas y
+  eventos, usa períodos de 30 días UTC, una gracia auditable de 72 horas y
+  formato administrativo/comunicaciones en la zona del negocio.
+- Las migraciones `20260826170000_subscription_time_audit`,
+  `20260826180000_registration_timezone` y
+  `20260826190000_ensure_registration_timezone` deben aplicarse antes de
+  desplegar estos cambios.
+- Las integraciones PostgreSQL deben usar únicamente la base local de pruebas;
+  no se debe compensar la latencia remota usando producción.
+
 ## Recibos temporales de pago — implementación local pendiente de despliegue
 
 Como transición hasta contar con facturación electrónica SRI operativa en
