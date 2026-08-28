@@ -77,6 +77,58 @@ cualquier corte histórico del resto del documento.
   migraciones pendientes. Después se repite `pnpm db:status` para confirmar el
   resultado.
 
+### PostgreSQL local exclusivo para pruebas
+
+Las pruebas SQL y las integraciones PostgreSQL deben ejecutarse únicamente
+contra la instancia local de pruebas. Neon es exclusivo de producción y no se
+debe usar para pruebas, migraciones locales ni desarrollo.
+
+- La configuración local se carga desde `D:\Documentos\BarberiaSaas\.env`.
+- `TEST_DATABASE_URL` debe apuntar a `barber_saas_test` en `127.0.0.1:5433`.
+- No copiar secretos del `.env` a este documento, logs ni commits.
+
+Con Docker Desktop, iniciar el servicio local de pruebas:
+
+```powershell
+Set-Location D:\Documentos\BarberiaSaas
+docker compose up -d postgres-test
+pnpm --filter @barber-saas/database db:generate
+```
+
+Antes de migrar, cargar en la sesión el valor existente en el `.env` local,
+sin imprimirlo. Prisma usa `DATABASE_URL`, mientras las integraciones validan
+`TEST_DATABASE_URL`:
+
+```powershell
+$env:TEST_DATABASE_URL = (Get-Content .env |
+  Where-Object { $_ -match '^TEST_DATABASE_URL=' } |
+  ForEach-Object { $_ -replace '^TEST_DATABASE_URL=', '' }).Trim('"')
+$env:DATABASE_URL = $env:TEST_DATABASE_URL
+pnpm db:migrate:deploy
+```
+
+Ejecutar las integraciones PostgreSQL:
+
+```powershell
+pnpm --filter @barber-saas/api test -- app.integration.test.ts
+pnpm --filter @barber-saas/api test -- public-booking.integration.test.ts
+```
+
+Si `TEST_DATABASE_URL` no existe, apunta a Neon, usa un puerto distinto de
+`5433` o no contiene `barber_saas_test`, detenerse y corregir el `.env` local.
+Nunca continuar apuntando a producción.
+
+```powershell
+docker compose ps postgres-test
+pnpm db:status
+```
+
+Al terminar, detener la instancia local si no se necesita:
+
+```powershell
+docker compose stop postgres-test
+```
+
 ## REGLAS DE DESPLIEGUE — NO REGRESIONAR
 
 1. Usar exclusivamente `/opt/nava/app` y actualizar con
