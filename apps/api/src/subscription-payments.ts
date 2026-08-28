@@ -23,6 +23,10 @@ import {
   preparePayphoneWebButton,
 } from './payphone-web-button';
 import { decryptPlatformPaymentCredential } from './security';
+import {
+  calculatePercentageDiscountCents,
+  resolveOrganizationDiscount,
+} from './subscription-discounts';
 import { ensureOrganizationSubscription } from './subscription-policy';
 
 const CHECKOUT_EXPIRATION_MS = 24 * 60 * 60 * 1000;
@@ -118,7 +122,11 @@ export function resolveFounderPromotion(input: {
   if (input.planCode !== 'local') {
     return {
       applied: false,
-      error: submittedCode ? 'DISCOUNT_CODE_NOT_APPLICABLE' : null,
+      error:
+        submittedCode &&
+        submittedCode === normalizePromotionCode(input.configuredCode)
+          ? 'DISCOUNT_CODE_NOT_APPLICABLE'
+          : null,
       promotionCode: null,
     };
   }
@@ -300,6 +308,19 @@ function idempotencyKey(request: FastifyRequest) {
   return createHash('sha256').update(value.trim()).digest('hex');
 }
 
+async function releaseDiscountReservation(
+  transaction: Prisma.TransactionClient,
+  reservationId: string | null,
+  releasedAt: Date,
+  releaseReason: string,
+) {
+  if (!reservationId) return;
+  await transaction.subscriptionDiscountReservation.updateMany({
+    data: { releasedAt, releaseReason },
+    where: { id: reservationId, releasedAt: null },
+  });
+}
+
 async function activeMemberships(database: DatabaseClient, userId: string) {
   return database.membership.findMany({
     include: { organization: true },
@@ -448,7 +469,10 @@ export async function applyVerifiedPlatformPayment(
     }
 
     const attempt = await transaction.subscriptionPaymentAttempt.findUnique({
-      include: { invoice: { include: { plan: true } } },
+      include: {
+        discountReservation: { include: { coupon: true } },
+        invoice: { include: { plan: true } },
+      },
       where: { internalReference: payment.internalReference },
     });
     if (!attempt)
@@ -510,6 +534,12 @@ export async function applyVerifiedPlatformPayment(
         },
         where: { id: attempt.id },
       });
+      await releaseDiscountReservation(
+        transaction,
+        attempt.discountReservation?.id ?? null,
+        now,
+        'PAYMENT_REJECTED',
+      );
       await transaction.paymentProviderEvent.update({
         data: {
           processedAt: now,
@@ -572,6 +602,64 @@ export async function applyVerifiedPlatformPayment(
           ? SubscriptionChangeKind.PLAN_CHANGED
           : SubscriptionChangeKind.STATUS_CHANGED;
 
+    let redeemedDiscountGrantId: string | null = null;
+    if (attempt.invoice.discountCouponId && !attempt.invoice.discountGrantId) {
+      const reservation = attempt.discountReservation;
+      if (
+        !reservation ||
+        reservation.releasedAt ||
+        reservation.expiresAt <= now ||
+        reservation.invoiceId !== attempt.invoice.id
+      ) {
+        throw new Error(
+          'La reserva del descuento no está disponible para confirmar el pago.',
+        );
+      }
+      if (!attempt.initiatedByUserId) {
+        throw new Error(
+          'El intento de pago no tiene usuario para registrar el descuento.',
+        );
+      }
+      const grant = await transaction.subscriptionDiscountGrant.create({
+        data: {
+          couponId: reservation.couponId,
+          expiresAtSnapshot:
+            reservation.coupon.kind === 'TEMPORARY'
+              ? reservation.coupon.endsAt
+              : null,
+          kindSnapshot: reservation.coupon.kind,
+          normalizedCodeSnapshot: attempt.invoice.promotionCode!,
+          organizationId: attempt.organizationId,
+          percentageBasisPointsSnapshot:
+            attempt.invoice.discountPercentageBasisPoints!,
+          redeemedAt: now,
+          redeemedAttemptId: attempt.id,
+          redeemedByUserId: attempt.initiatedByUserId,
+          redeemedInvoiceId: attempt.invoice.id,
+        },
+      });
+      redeemedDiscountGrantId = grant.id;
+      await transaction.subscriptionDiscountReservation.update({
+        data: { releasedAt: now, releaseReason: 'REDEEMED' },
+        where: { id: reservation.id },
+      });
+      await transaction.auditLog.create({
+        data: {
+          action: 'subscription.discount_redeemed',
+          actorUserId: attempt.initiatedByUserId,
+          afterData: {
+            couponId: grant.couponId,
+            grantId: grant.id,
+            invoiceId: attempt.invoice.id,
+            percentageBasisPoints: grant.percentageBasisPointsSnapshot,
+          },
+          entityId: grant.id,
+          entityType: 'subscription_discount_grant',
+          organizationId: attempt.organizationId,
+        },
+      });
+    }
+
     await transaction.subscription.update({
       data: {
         currentPeriodEnd: periodEndsAt,
@@ -598,6 +686,9 @@ export async function applyVerifiedPlatformPayment(
     });
     await transaction.subscriptionInvoice.update({
       data: {
+        ...(redeemedDiscountGrantId
+          ? { discountGrantId: redeemedDiscountGrantId }
+          : {}),
         paidAt: now,
         periodEndsAt,
         periodStartsAt: invoicePeriodStartsAt,
@@ -666,7 +757,12 @@ export async function expireStaleSubscriptionPayments(
 ) {
   return database.$transaction(async (transaction) => {
     const stale = await transaction.subscriptionPaymentAttempt.findMany({
-      select: { id: true, invoiceId: true, organizationId: true },
+      select: {
+        discountReservation: { select: { id: true } },
+        id: true,
+        invoiceId: true,
+        organizationId: true,
+      },
       where: {
         expiresAt: { lte: now },
         status: {
@@ -697,6 +793,17 @@ export async function expireStaleSubscriptionPayments(
         },
       },
     });
+    const reservationIds = stale
+      .map(({ discountReservation }) => discountReservation?.id)
+      .filter((id): id is string => Boolean(id));
+    if (reservationIds.length > 0)
+      await transaction.subscriptionDiscountReservation.updateMany({
+        data: {
+          releasedAt: now,
+          releaseReason: 'PAYMENT_EXPIRED',
+        },
+        where: { id: { in: reservationIds }, releasedAt: null },
+      });
     return stale.length;
   });
 }
@@ -845,7 +952,12 @@ export function registerSubscriptionPaymentRoutes(
           },
         },
       });
-      if (repeated) return { attempt: repeated, created: false };
+      if (repeated)
+        return {
+          attempt: repeated,
+          created: false,
+          discountReservationId: null,
+        };
       const { subscription } = await ensureOrganizationSubscription(
         transaction,
         membership.organizationId,
@@ -885,9 +997,21 @@ export function registerSubscriptionPaymentRoutes(
           messages[founderPromotion.error],
         );
       }
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + CHECKOUT_EXPIRATION_MS);
+      const subscriptionDiscount = founderPromotion.applied
+        ? null
+        : await resolveOrganizationDiscount(transaction, {
+            now,
+            organizationId: membership.organizationId,
+            planId: plan.id,
+            reservationExpiresAt: expiresAt,
+            submittedCode: input.discountCode,
+            userId: user.id,
+          });
       if (
         subscription.status === SubscriptionStatus.ACTIVE &&
-        subscription.currentPeriodEnd > new Date() &&
+        subscription.currentPeriodEnd > now &&
         subscription.planId !== plan.id
       )
         throw new ApiError(
@@ -895,16 +1019,25 @@ export function registerSubscriptionPaymentRoutes(
           'PLAN_CHANGE_POLICY_PENDING',
           'Los cambios entre planes activos se habilitarán al aprobar la política comercial.',
         );
+      const basePriceCents = plan.monthlyPriceCents!;
+      const discountCents = subscriptionDiscount
+        ? calculatePercentageDiscountCents(
+            basePriceCents,
+            subscriptionDiscount.percentageBasisPoints,
+          )
+        : 0;
       const finalPriceCents = founderPromotion.applied
         ? FOUNDER_LOCAL_PRICE_CENTS
-        : plan.monthlyPriceCents!;
+        : basePriceCents - discountCents;
+      const promotionDiscountCents = founderPromotion.applied
+        ? basePriceCents - FOUNDER_LOCAL_PRICE_CENTS
+        : discountCents;
       const taxBasisPoints = config.PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS!;
       const { subtotalCents, taxCents } = inclusiveTaxBreakdown(
         finalPriceCents,
         taxBasisPoints,
       );
       const totalCents = finalPriceCents;
-      const expiresAt = new Date(Date.now() + CHECKOUT_EXPIRATION_MS);
       const invoice = await transaction.subscriptionInvoice.create({
         data: {
           billingPeriodDays: BILLING_PERIOD_DAYS,
@@ -920,16 +1053,21 @@ export function registerSubscriptionPaymentRoutes(
           planCode: plan.code,
           planId: plan.id,
           planName: plan.name,
-          promotionCode: founderPromotion.promotionCode,
-          promotionDiscountCents: founderPromotion.applied
-            ? plan.monthlyPriceCents! - FOUNDER_LOCAL_PRICE_CENTS
-            : 0,
+          promotionCode:
+            founderPromotion.promotionCode ??
+            subscriptionDiscount?.couponCode ??
+            null,
+          promotionDiscountCents,
           requestedByUserId: user.id,
           subtotalCents,
           taxBasisPoints,
           taxCents,
           totalCents,
           founderPriceApplied: founderPromotion.applied,
+          discountCouponId: subscriptionDiscount?.couponId ?? null,
+          discountGrantId: subscriptionDiscount?.grantId ?? null,
+          discountPercentageBasisPoints:
+            subscriptionDiscount?.percentageBasisPoints ?? null,
         },
       });
       const attempt = await transaction.subscriptionPaymentAttempt.create({
@@ -947,6 +1085,11 @@ export function registerSubscriptionPaymentRoutes(
         },
         include: { invoice: true },
       });
+      if (subscriptionDiscount?.reservationId)
+        await transaction.subscriptionDiscountReservation.update({
+          data: { invoiceId: invoice.id, paymentAttemptId: attempt.id },
+          where: { id: subscriptionDiscount.reservationId },
+        });
       await transaction.auditLog.create({
         data: {
           action: 'subscription.checkout_created',
@@ -963,7 +1106,11 @@ export function registerSubscriptionPaymentRoutes(
           organizationId: membership.organizationId,
         },
       });
-      return { attempt, created: true };
+      return {
+        attempt,
+        created: true,
+        discountReservationId: subscriptionDiscount?.reservationId ?? null,
+      };
     });
     if (!created.created) return publicAttempt(created.attempt);
 
@@ -1011,6 +1158,20 @@ export function registerSubscriptionPaymentRoutes(
           data: { status: SubscriptionInvoiceStatus.VOID },
           where: { id: created.attempt.invoiceId },
         }),
+        ...(created.discountReservationId
+          ? [
+              database.subscriptionDiscountReservation.updateMany({
+                data: {
+                  releasedAt: new Date(),
+                  releaseReason: 'PROVIDER_UNAVAILABLE',
+                },
+                where: {
+                  id: created.discountReservationId,
+                  releasedAt: null,
+                },
+              }),
+            ]
+          : []),
       ]);
       throw error;
     }
