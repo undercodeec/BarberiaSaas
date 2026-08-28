@@ -202,6 +202,16 @@ enum SubscriptionChangeKind {
   MANUAL_RECONCILIATION
 }
 
+enum SubscriptionDiscountKind {
+  TEMPORARY
+  LIFETIME_CONTINUITY
+}
+
+enum SubscriptionDiscountGrantStatus {
+  ACTIVE
+  REVOKED
+}
+
 enum CommissionRuleType {
   SERVICE_PERCENTAGE
   SERVICE_FIXED
@@ -395,6 +405,9 @@ model User {
   subscriptionInvoicesRequested        SubscriptionInvoice[]          @relation("SubscriptionInvoiceRequester")
   subscriptionPaymentAttemptsInitiated SubscriptionPaymentAttempt[]   @relation("SubscriptionPaymentInitiator")
   subscriptionChangesActed             SubscriptionChange[]           @relation("SubscriptionChangeActor")
+  subscriptionDiscountCouponsCreated   SubscriptionDiscountCoupon[]   @relation("SubscriptionDiscountCouponCreator")
+  subscriptionDiscountGrantsRedeemed   SubscriptionDiscountGrant[]    @relation("SubscriptionDiscountGrantRedeemer")
+  subscriptionDiscountGrantsRevoked    SubscriptionDiscountGrant[]    @relation("SubscriptionDiscountGrantRevoker")
   marketingConsents                    MarketingConsent[]
   privacyConsents                      PrivacyConsent[]
 
@@ -862,6 +875,8 @@ model Organization {
   subscriptionPaymentReceipts        SubscriptionPaymentReceipt[]
   paymentProviderEvents              PaymentProviderEvent[]
   subscriptionChanges                SubscriptionChange[]
+  subscriptionDiscountGrants          SubscriptionDiscountGrant[]
+  subscriptionDiscountReservations    SubscriptionDiscountReservation[]
   billingProfile                     OrganizationBillingProfile?
   sriInvoices                        SriInvoice[]
 
@@ -902,6 +917,7 @@ model Plan {
   updatedAt            DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
   subscriptions        Subscription[]
   subscriptionInvoices SubscriptionInvoice[]
+  subscriptionDiscountCouponPlans SubscriptionDiscountCouponPlan[]
 
   @@index([isActive, sortOrder])
   @@map("plans")
@@ -967,6 +983,9 @@ model SubscriptionInvoice {
   promotionCode          String?                      @map("promotion_code") @db.VarChar(80)
   promotionDiscountCents Int                          @default(0) @map("promotion_discount_cents")
   founderPriceApplied    Boolean                      @default(false) @map("founder_price_applied")
+  discountCouponId       String?                      @map("discount_coupon_id") @db.Uuid
+  discountGrantId        String?                      @map("discount_grant_id") @db.Uuid
+  discountPercentageBasisPoints Int?                  @map("discount_percentage_basis_points")
   currencyCode           String                       @default("USD") @map("currency_code") @db.Char(3)
   billingPeriodMonths    Int                          @default(1) @map("billing_period_months")
   billingPeriodDays      Int                          @default(30) @map("billing_period_days")
@@ -987,6 +1006,10 @@ model SubscriptionInvoice {
   paymentReceipts        SubscriptionPaymentReceipt[]
   changes                SubscriptionChange[]
   sriInvoices            SriInvoice[]
+  discountCoupon         SubscriptionDiscountCoupon?  @relation("SubscriptionInvoiceDiscountCoupon", fields: [discountCouponId], references: [id], onDelete: Restrict)
+  discountGrant          SubscriptionDiscountGrant?   @relation("SubscriptionInvoiceDiscountGrant", fields: [discountGrantId], references: [id], onDelete: Restrict)
+  redeemedDiscountGrant  SubscriptionDiscountGrant?   @relation("SubscriptionDiscountGrantRedeemedInvoice")
+  discountReservation    SubscriptionDiscountReservation? @relation("SubscriptionDiscountReservationInvoice")
 
   @@index([organizationId, status, dueAt])
   @@index([planId, createdAt])
@@ -1021,11 +1044,99 @@ model SubscriptionPaymentAttempt {
   changes               SubscriptionChange[]
   sriInvoice            SriInvoice?
   paymentReceipt        SubscriptionPaymentReceipt?
+  redeemedDiscountGrant SubscriptionDiscountGrant? @relation("SubscriptionDiscountGrantRedeemedAttempt")
+  discountReservation   SubscriptionDiscountReservation? @relation("SubscriptionDiscountReservationPaymentAttempt")
 
   @@unique([organizationId, idempotencyKeyHash])
   @@index([organizationId, status, expiresAt])
   @@index([invoiceId, createdAt])
   @@map("subscription_payment_attempts")
+}
+
+model SubscriptionDiscountCoupon {
+  id                    String                   @id @default(uuid()) @db.Uuid
+  normalizedCode        String                   @unique @map("normalized_code") @db.VarChar(80)
+  displayCode           String                   @map("display_code") @db.VarChar(80)
+  name                  String                   @db.VarChar(120)
+  description           String?                  @db.VarChar(500)
+  percentageBasisPoints Int                      @map("percentage_basis_points")
+  kind                  SubscriptionDiscountKind
+  isActive              Boolean                  @default(true) @map("is_active")
+  startsAt              DateTime?                @map("starts_at") @db.Timestamptz(3)
+  endsAt                DateTime?                @map("ends_at") @db.Timestamptz(3)
+  createdByUserId       String                   @map("created_by_user_id") @db.Uuid
+  createdAt             DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy             User                     @relation("SubscriptionDiscountCouponCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  plans                 SubscriptionDiscountCouponPlan[]
+  grants                SubscriptionDiscountGrant[]
+  reservations          SubscriptionDiscountReservation[]
+  discountedInvoices    SubscriptionInvoice[]    @relation("SubscriptionInvoiceDiscountCoupon")
+
+  @@index([isActive, startsAt, endsAt])
+  @@map("subscription_discount_coupons")
+}
+
+model SubscriptionDiscountCouponPlan {
+  couponId  String                     @map("coupon_id") @db.Uuid
+  planId    String                     @map("plan_id") @db.Uuid
+  coupon    SubscriptionDiscountCoupon @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  plan      Plan                       @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@id([couponId, planId])
+  @@index([planId])
+  @@map("subscription_discount_coupon_plans")
+}
+
+model SubscriptionDiscountGrant {
+  id                            String                          @id @default(uuid()) @db.Uuid
+  couponId                      String                          @map("coupon_id") @db.Uuid
+  organizationId                String                          @map("organization_id") @db.Uuid
+  status                        SubscriptionDiscountGrantStatus @default(ACTIVE)
+  normalizedCodeSnapshot        String                          @map("normalized_code_snapshot") @db.VarChar(80)
+  percentageBasisPointsSnapshot Int                             @map("percentage_basis_points_snapshot")
+  kindSnapshot                  SubscriptionDiscountKind        @map("kind_snapshot")
+  expiresAtSnapshot             DateTime?                       @map("expires_at_snapshot") @db.Timestamptz(3)
+  redeemedByUserId              String                          @map("redeemed_by_user_id") @db.Uuid
+  redeemedInvoiceId             String                          @unique @map("redeemed_invoice_id") @db.Uuid
+  redeemedAttemptId             String                          @unique @map("redeemed_attempt_id") @db.Uuid
+  redeemedAt                    DateTime                        @map("redeemed_at") @db.Timestamptz(3)
+  revokedAt                     DateTime?                       @map("revoked_at") @db.Timestamptz(3)
+  revokedByUserId               String?                         @map("revoked_by_user_id") @db.Uuid
+  revocationReason              String?                         @map("revocation_reason") @db.VarChar(500)
+  createdAt                     DateTime                        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                     DateTime                        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  coupon                        SubscriptionDiscountCoupon      @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  organization                  Organization                    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  redeemedBy                    User                            @relation("SubscriptionDiscountGrantRedeemer", fields: [redeemedByUserId], references: [id], onDelete: Restrict)
+  redeemedInvoice               SubscriptionInvoice             @relation("SubscriptionDiscountGrantRedeemedInvoice", fields: [redeemedInvoiceId], references: [id], onDelete: Restrict)
+  redeemedAttempt               SubscriptionPaymentAttempt      @relation("SubscriptionDiscountGrantRedeemedAttempt", fields: [redeemedAttemptId], references: [id], onDelete: Restrict)
+  revokedBy                     User?                           @relation("SubscriptionDiscountGrantRevoker", fields: [revokedByUserId], references: [id], onDelete: SetNull)
+  discountedInvoices            SubscriptionInvoice[]           @relation("SubscriptionInvoiceDiscountGrant")
+
+  @@unique([couponId, organizationId])
+  @@index([organizationId, status])
+  @@map("subscription_discount_grants")
+}
+
+model SubscriptionDiscountReservation {
+  id               String                     @id @default(uuid()) @db.Uuid
+  couponId         String                     @map("coupon_id") @db.Uuid
+  organizationId   String                     @map("organization_id") @db.Uuid
+  invoiceId        String?                    @unique @map("invoice_id") @db.Uuid
+  paymentAttemptId String?                    @unique @map("payment_attempt_id") @db.Uuid
+  expiresAt        DateTime                   @map("expires_at") @db.Timestamptz(3)
+  releasedAt       DateTime?                  @map("released_at") @db.Timestamptz(3)
+  releaseReason    String?                    @map("release_reason") @db.VarChar(80)
+  createdAt        DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
+  coupon           SubscriptionDiscountCoupon @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  organization     Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  invoice          SubscriptionInvoice?       @relation("SubscriptionDiscountReservationInvoice", fields: [invoiceId], references: [id], onDelete: Restrict)
+  paymentAttempt   SubscriptionPaymentAttempt? @relation("SubscriptionDiscountReservationPaymentAttempt", fields: [paymentAttemptId], references: [id], onDelete: Restrict)
+
+  @@index([couponId])
+  @@index([organizationId, expiresAt])
+  @@map("subscription_discount_reservations")
 }
 
 // Constancia comercial de un pago de suscripción durante la transición hacia
