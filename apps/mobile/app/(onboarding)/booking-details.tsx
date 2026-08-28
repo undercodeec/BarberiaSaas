@@ -500,7 +500,7 @@ export default function BookingDetailsScreen() {
                       ? 'Propietario'
                       : 'Profesional'}
                     {!professional.planAvailable
-                      ? ' · Guardado: requiere Nava Local'
+                      ? ' · Guardado: no disponible en tu acceso actual'
                       : ''}
                   </Text>
                 </View>

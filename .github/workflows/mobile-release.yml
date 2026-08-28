@@ -52,7 +52,7 @@ jobs:
       - name: Verificar manifest fusionado
         run: >-
           pnpm --filter @barber-saas/mobile verify:android-release
-          android/app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml
+          apps/mobile/android/app/build/intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml
       - name: Verificar firma del AAB
         run: jarsigner -verify -strict apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
       - uses: actions/upload-artifact@v4

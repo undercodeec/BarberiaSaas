@@ -484,7 +484,7 @@ export default function TeamManagementScreen() {
                       {ROLE_LABELS[member.role] ?? member.role} ·{' '}
                       {member.planAvailable
                         ? 'Activo'
-                        : 'Guardado: requiere Nava Local'}
+                        : 'Guardado: no disponible en tu acceso actual'}
                     </Text>
                     {member.commissionPercentage !== null ? (
                       <Text style={styles.memberCommission}>

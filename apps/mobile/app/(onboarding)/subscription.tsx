@@ -30,15 +30,6 @@ const STATUS_LABELS: Record<SubscriptionResponse['current']['status'], string> =
   };
 const FREE_BOOKING_LIMIT = 25;
 
-function formatPrice(cents: number | null, currencyCode: string) {
-  if (cents === null) return 'Consultar';
-  if (cents === 0) return 'Gratis';
-  return `${new Intl.NumberFormat('es-EC', {
-    currency: currencyCode,
-    style: 'currency',
-  }).format(cents / 100)} / mes`;
-}
-
 function displayedBookingLimit(subscription: SubscriptionResponse | undefined) {
   if (!subscription || subscription.current.planCode !== 'free') {
     return subscription?.usage.bookingLimit ?? null;
@@ -60,7 +51,7 @@ function bookingUsageNotice(subscription: SubscriptionResponse | undefined) {
 
   if (usage.graceAvailable && used >= baseLimit)
     return {
-      copy: `Llegaste a ${baseLimit} reservas. Puedes activar una unica cortesia de ${usage.graceBookings} reservas o pasar a un plan sin limite.`,
+      copy: `Llegaste a ${baseLimit} reservas. Puedes activar una unica cortesia de ${usage.graceBookings} reservas.`,
       title: 'Limite mensual alcanzado',
     };
   if (used >= effectiveLimit)
@@ -135,7 +126,7 @@ export default function SubscriptionScreen() {
   const isDemoAccount = subscription?.current.status === 'trial';
   const currentPlan =
     isDemoAccount && subscriptionPlan
-      ? { ...subscriptionPlan, monthlyPriceCents: 0, name: 'Cuenta demo' }
+      ? { ...subscriptionPlan, name: 'Cuenta demo' }
       : subscriptionPlan;
   const trialEnd = subscription?.current.trialEndsAt
     ? new Date(subscription.current.trialEndsAt).toLocaleDateString()
@@ -160,10 +151,10 @@ export default function SubscriptionScreen() {
     : null;
   const advancedModulesCopy =
     subscription?.current.planCode === 'essential'
-      ? 'Nava Esencial incluye inventario y reportes completos para operación individual. El trabajo con equipo, comisiones y varias sucursales requiere Nava Local.'
+      ? 'Estos módulos reflejan las capacidades habilitadas para tu organización.'
       : subscription?.current.planCode === 'free'
-        ? 'Estos módulos no forman parte de Nava Free. Tus datos históricos se conservan y puedes activarlos con Nava Local.'
-        : 'Estos módulos forman parte de la operación ampliada de tu plan y reflejan cualquier habilitación especial vigente.';
+        ? 'Estos módulos no forman parte de tu acceso actual. Tus datos históricos se conservan.'
+        : 'Estos módulos reflejan las capacidades habilitadas para tu organización.';
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -205,7 +196,7 @@ export default function SubscriptionScreen() {
         <View style={styles.currentCard}>
           <View style={styles.currentHeading}>
             <View>
-              <Text style={styles.eyebrow}>PLAN ACTUAL</Text>
+              <Text style={styles.eyebrow}>ACCESO ACTUAL</Text>
               <Text style={styles.currentPlan}>
                 {currentPlan?.name ?? 'Cargando…'}
               </Text>
@@ -218,16 +209,6 @@ export default function SubscriptionScreen() {
               </View>
             ) : null}
           </View>
-          <Text style={styles.priceLabel}>
-            {isDemoAccount
-              ? 'Gratis durante la prueba'
-              : currentPlan
-                ? formatPrice(
-                    currentPlan.monthlyPriceCents,
-                    currentPlan.currencyCode,
-                  )
-                : 'Consultando precio'}
-          </Text>
           {trialEnd ? (
             <Text style={styles.periodCopy}>
               Prueba sin tarjeta hasta el {trialEnd}.
@@ -333,7 +314,7 @@ export default function SubscriptionScreen() {
               </Text>
               <Text style={styles.infoCopy}>
                 {historicalTeamMembers
-                  ? 'Tus profesionales adicionales siguen guardados en modo histórico. No pueden recibir nuevas citas, reservas online ni cambios operativos hasta actualizar a Nava Local.'
+                  ? 'Tus profesionales adicionales siguen guardados en modo histórico. No pueden recibir nuevas citas, reservas online ni cambios operativos mientras tu acceso actual no los habilite.'
                   : 'Si vuelves desde Demo o un plan pagado, Nava conserva tus datos. Los recursos que excedan tu plan quedarán visibles como históricos y sin funciones operativas.'}
               </Text>
             </View>
@@ -433,59 +414,6 @@ export default function SubscriptionScreen() {
           </View>
         ) : null}
 
-        <Text style={styles.sectionTitle}>Comparar planes</Text>
-        {subscription?.plans.map((plan) => (
-          <View key={plan.code} style={styles.planCard}>
-            <View style={styles.planHeading}>
-              <View style={styles.headerCopy}>
-                <Text style={styles.planName}>{plan.name}</Text>
-                <Text style={styles.planPrice}>
-                  {formatPrice(plan.monthlyPriceCents, plan.currencyCode)}
-                </Text>
-              </View>
-              <View
-                style={
-                  plan.available ? styles.availableBadge : styles.soonBadge
-                }
-              >
-                <Text
-                  style={
-                    plan.available ? styles.availableLabel : styles.soonLabel
-                  }
-                >
-                  {plan.available ? 'Disponible' : 'Próximamente'}
-                </Text>
-              </View>
-            </View>
-            {plan.features.map((feature) => (
-              <View key={feature} style={styles.featureRow}>
-                <Ionicons
-                  color={plan.available ? '#287247' : appTheme.colors.textMuted}
-                  name="checkmark-circle-outline"
-                  size={19}
-                />
-                <Text style={styles.featureLabel}>{feature}</Text>
-              </View>
-            ))}
-          </View>
-        ))}
-        <View style={styles.infoCard}>
-          <Ionicons
-            color={appTheme.colors.accentDark}
-            name="globe-outline"
-            size={23}
-          />
-          <View style={styles.headerCopy}>
-            <Text style={styles.infoTitle}>
-              Suscripción administrada fuera de la app
-            </Text>
-            <Text style={styles.infoCopy}>
-              Esta aplicación muestra el estado y las capacidades de tu plan.
-              Cuando una suscripción se active fuera de la aplicación, sus
-              funciones se habilitarán automáticamente al actualizar tu sesión.
-            </Text>
-          </View>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -521,20 +449,13 @@ function Capability({
       />
       <Text style={styles.featureLabel}>{label}</Text>
       <Text style={value ? styles.enabledLabel : styles.soonLabel}>
-        {value ? 'Activo' : 'Requiere Nava Local'}
+        {value ? 'Activo' : 'No incluido'}
       </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  availableBadge: {
-    backgroundColor: '#e8f3ec',
-    borderRadius: 99,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  availableLabel: { color: '#287247', fontSize: 11, fontWeight: '800' },
   backButton: {
     backgroundColor: appTheme.colors.surface,
     alignItems: 'center',
@@ -610,16 +531,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   headerCopy: { flex: 1 },
-  infoCard: {
-    alignItems: 'flex-start',
-    backgroundColor: appTheme.colors.surface,
-    borderRadius: 18,
-    flexDirection: 'row',
-    gap: 12,
-    padding: 16,
-    transform: [{ translateY: -3 }],
-    ...goldButtonShadow,
-  },
   infoCopy: {
     color: appTheme.colors.textMuted,
     fontSize: 13,
@@ -628,23 +539,6 @@ const styles = StyleSheet.create({
   },
   infoTitle: { color: appTheme.colors.text, fontSize: 15, fontWeight: '800' },
   periodCopy: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 8 },
-  planCard: {
-    backgroundColor: appTheme.colors.surface,
-    borderRadius: 20,
-    borderWidth: 0,
-    padding: 17,
-    transform: [{ translateY: -3 }],
-    ...goldButtonShadow,
-  },
-  planHeading: { alignItems: 'flex-start', flexDirection: 'row', gap: 12 },
-  planName: { color: appTheme.colors.text, fontSize: 21, fontWeight: '900' },
-  planPrice: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 3 },
-  priceLabel: {
-    color: appTheme.colors.textMuted,
-    fontSize: 15,
-    fontWeight: '800',
-    marginTop: 16,
-  },
   screen: appStyles.screen,
   primaryButton: {
     backgroundColor: appTheme.colors.accentDark,
@@ -676,12 +570,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 17,
     ...goldButtonShadow,
-  },
-  sectionTitle: {
-    color: appTheme.colors.text,
-    fontSize: 20,
-    fontWeight: '900',
-    marginTop: 8,
   },
   soonBadge: {
     backgroundColor: appTheme.colors.surfaceMuted,

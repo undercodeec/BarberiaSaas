@@ -34,7 +34,9 @@ coincide. Nunca se permite sustituir la firma release por la debug.
 
 1. Ejecute `android/gradlew.bat :app:processReleaseMainManifest` en Windows o
    `android/gradlew :app:processReleaseMainManifest` en Linux/macOS.
-2. Revise el manifest fusionado de release, no solo `app.json`.
+2. Revise el manifest fusionado de release, no solo `app.json`. Con AGP 8.12
+   la ruta generada es
+   `android/app/build/intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml`.
 3. Confirme `com.barbersaas.mobile`, `versionCode`, `versionName`,
    `android:allowBackup="false"`, ausencia de `android:debuggable="true"` y
    ausencia de permisos bloqueados.
