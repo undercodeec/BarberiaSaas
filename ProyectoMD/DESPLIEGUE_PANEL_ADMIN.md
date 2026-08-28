@@ -208,5 +208,6 @@ la prueba controlada SRI y SMTP descrita en este documento.
 
 **Evidencia local (27 de agosto de 2026):** migración completa sobre PostgreSQL
 aislada, `prisma validate`, typecheck, build de API y pruebas de checkout/recibo
-aprobadas. Queda pendiente registrar el commit de integración y efectuar la
-prueba SMTP con Hostinger antes de desplegar.
+aprobadas. La implementación está registrada en el commit `3c39a10`
+(`feat(billing): add temporary subscription payment receipts`). Queda pendiente
+efectuar la prueba SMTP con Hostinger antes de desplegar.
