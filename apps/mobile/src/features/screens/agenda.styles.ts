@@ -313,6 +313,12 @@ export const styles = StyleSheet.create({
     marginTop: 3,
     textTransform: 'capitalize',
   },
+  locationLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 2,
+  },
   dayButton: {
     alignItems: 'center',
     borderRadius: 18,

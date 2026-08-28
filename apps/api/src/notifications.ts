@@ -122,6 +122,7 @@ export function createAppointmentNotifier(
         const data = {
           appointmentId: appointment.id,
           appointmentStartsAt: appointment.startsAt.toISOString(),
+          locationId: appointment.locationId,
           route: '/agenda',
           type: kind,
         };

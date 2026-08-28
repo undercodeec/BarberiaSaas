@@ -4,6 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
   AppointmentRecord,
   AppointmentsResponse,
+  BookingLocationsResponse,
   BusinessScheduleResponse,
   ClientsResponse,
   SchedulesResponse,
@@ -64,7 +65,8 @@ export default function AgendaScreen() {
   const layout = useNativeLayoutMetrics();
   const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const router = useRouter();
-  const { date: notificationDate } = useLocalSearchParams<{ date?: string }>();
+  const { date: notificationDate, locationId: notificationLocationId } =
+    useLocalSearchParams<{ date?: string; locationId?: string }>();
   const queryClient = useQueryClient();
   const floatingBookingOffset = useRef(new Animated.ValueXY()).current;
   const floatingBookingOffsetRef = useRef({ x: 0, y: 0 });
@@ -149,22 +151,63 @@ export default function AgendaScreen() {
     }),
   ).current;
   const organizationQuery = useCurrentOrganization();
+  const agendaLocationsQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<BookingLocationsResponse>(
+        '/v1/locations/booking-context',
+      ),
+    queryKey: tenant.key('agenda-locations'),
+  });
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(
+    null,
+  );
+  const agendaLocations = agendaLocationsQuery.data?.locations ?? [];
+  const defaultLocationId =
+    agendaLocations.find(
+      (location) => location.id === organizationQuery.data?.location?.id,
+    )?.id ??
+    agendaLocations[0]?.id ??
+    organizationQuery.data?.location?.id ??
+    null;
+  const locationId = selectedLocationId ?? defaultLocationId;
+  const selectedLocation = agendaLocations.find(
+    (location) => location.id === locationId,
+  );
+  useEffect(() => {
+    if (
+      !notificationLocationId ||
+      !agendaLocations.some(
+        (location) => location.id === notificationLocationId,
+      )
+    )
+      return;
+    // La sucursal llega de una notificaciÃ³n externa y debe sincronizar la Agenda.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedLocationId(notificationLocationId);
+  }, [agendaLocations, notificationLocationId]);
   const clientAccess = clientAccessForRole(
     organizationQuery.data?.membership.role,
   );
+  const timeZone =
+    selectedLocation?.timezone ??
+    organizationQuery.data?.location?.timezone ??
+    organizationQuery.data?.organization?.defaultTimezone ??
+    Intl.DateTimeFormat().resolvedOptions().timeZone ??
+    'UTC';
   const schedulesQuery = useQuery({
-    enabled: Boolean(session),
+    enabled: Boolean(session && locationId),
     queryFn: () =>
       requireApiClient().request<SchedulesResponse>('/v1/schedules'),
-    queryKey: tenant.key('schedules'),
+    queryKey: tenant.key('schedules', locationId),
   });
   const businessScheduleQuery = useQuery({
-    enabled: Boolean(session),
+    enabled: Boolean(session && locationId),
     queryFn: () =>
       requireApiClient().request<BusinessScheduleResponse>(
-        '/v1/business-schedule',
+        `/v1/business-schedule?locationId=${encodeURIComponent(locationId ?? '')}`,
       ),
-    queryKey: tenant.key('business-schedule'),
+    queryKey: tenant.key('business-schedule', locationId),
   });
   const clientsQuery = useQuery({
     enabled: Boolean(session),
@@ -229,11 +272,6 @@ export default function AgendaScreen() {
     }
     setSelectedAppointment(appointment);
   };
-  const timeZone =
-    organizationQuery.data?.location?.timezone ??
-    organizationQuery.data?.organization?.defaultTimezone ??
-    Intl.DateTimeFormat().resolvedOptions().timeZone ??
-    'UTC';
   const today = useMemo(() => calendarDateForTimeZone(timeZone), [timeZone]);
   const [selectedDay, setSelectedDay] = useState(today);
   const [calendarMonth, setCalendarMonth] = useState(today);
@@ -446,7 +484,6 @@ export default function AgendaScreen() {
       timelineTransitionX,
     ],
   );
-  const locationId = organizationQuery.data?.location?.id;
   const appointmentsQuery = useQuery({
     enabled: Boolean(session && locationId),
     queryFn: async () => {
@@ -471,9 +508,11 @@ export default function AgendaScreen() {
   const selectedDaySchedules = useMemo(
     () =>
       (schedulesQuery.data?.schedules ?? []).filter(
-        (schedule) => schedule.weekday === selectedDay.getDay(),
+        (schedule) =>
+          schedule.locationId === locationId &&
+          schedule.weekday === selectedDay.getDay(),
       ),
-    [schedulesQuery.data?.schedules, selectedDay],
+    [locationId, schedulesQuery.data?.schedules, selectedDay],
   );
   const businessHoursTimeline = useMemo(() => {
     const day = businessScheduleQuery.data?.days.find(
@@ -638,6 +677,11 @@ export default function AgendaScreen() {
           <Text accessibilityRole="header" style={styles.title}>
             Agenda
           </Text>
+          {agendaLocations.length > 1 ? (
+            <Text numberOfLines={1} style={styles.locationLabel}>
+              {selectedLocation?.name ?? 'Selecciona una sucursal'}
+            </Text>
+          ) : null}
           <Text style={styles.date}>{selectedLabel}</Text>
         </View>
         <View style={styles.headerActions}>
@@ -1153,6 +1197,51 @@ export default function AgendaScreen() {
                   <Text style={styles.checkboxLabel}>{label}</Text>
                 </Pressable>
               ))}
+              {agendaLocations.length > 1 ? (
+                <>
+                  <Text style={styles.settingsSection}>Sucursal</Text>
+                  <ScrollView
+                    contentContainerStyle={styles.horizontalOptions}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                  >
+                    {agendaLocations.map((location) => {
+                      const selected = location.id === locationId;
+                      return (
+                        <Pressable
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected }}
+                          key={location.id}
+                          onPress={() => {
+                            setSelectedLocationId(location.id);
+                            setSelectedMemberId(null);
+                          }}
+                          style={({ pressed }) => [
+                            styles.optionTile,
+                            selected && styles.optionTileSelected,
+                            pressed && styles.settingsControlPressed,
+                          ]}
+                        >
+                          <Ionicons
+                            color={appTheme.colors.text}
+                            name="business-outline"
+                            size={23}
+                          />
+                          <Text
+                            numberOfLines={1}
+                            style={[
+                              styles.optionTileLabel,
+                              selected && styles.optionTileLabelSelected,
+                            ]}
+                          >
+                            {location.name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </>
+              ) : null}
               <Text style={styles.settingsSection}>Vista de calendario</Text>
               <ScrollView
                 contentContainerStyle={styles.horizontalOptions}

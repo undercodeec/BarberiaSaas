@@ -2760,6 +2760,86 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(audit).not.toBeNull();
   });
 
+  it('muestra al administrador las citas de la sucursal elegida y limita al barbero a las propias', async () => {
+    const agenda = await setupAgenda('agenda-multi-sucursal-visible');
+    const ownerMembership = await database.membership.findFirstOrThrow({
+      where: {
+        organizationId: agenda.organizationId,
+        role: 'OWNER',
+      },
+    });
+    const secondLocation = await database.location.create({
+      data: {
+        city: 'Quito',
+        countryCode: 'EC',
+        currencyCode: 'USD',
+        name: 'Sucursal agenda norte',
+        organizationId: agenda.organizationId,
+        phone: '0999999922',
+        slug: 'agenda-multi-sucursal-visible-norte',
+        timezone: 'America/Guayaquil',
+        whatsappPhone: '0999999922',
+      },
+    });
+    await database.memberLocation.create({
+      data: {
+        locationId: secondLocation.id,
+        membershipId: agenda.membershipId,
+      },
+    });
+    const [barberAppointment, ownerAppointment] = await Promise.all([
+      database.appointment.create({
+        data: {
+          clientName: 'Cliente reserva web barbero',
+          endsAt: new Date('2030-01-14T16:30:00.000Z'),
+          locationId: secondLocation.id,
+          organizationId: agenda.organizationId,
+          professionalMembershipId: agenda.membershipId,
+          source: 'PUBLIC_BOOKING',
+          startsAt: new Date('2030-01-14T16:00:00.000Z'),
+          status: 'CONFIRMED',
+        },
+      }),
+      database.appointment.create({
+        data: {
+          clientName: 'Cliente reserva web propietario',
+          endsAt: new Date('2030-01-14T17:30:00.000Z'),
+          locationId: secondLocation.id,
+          organizationId: agenda.organizationId,
+          professionalMembershipId: ownerMembership.id,
+          source: 'PUBLIC_BOOKING',
+          startsAt: new Date('2030-01-14T17:00:00.000Z'),
+          status: 'CONFIRMED',
+        },
+      }),
+    ]);
+    const query = `from=2030-01-14&to=2030-01-14&locationId=${secondLocation.id}`;
+
+    const ownerResponse = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'GET',
+      url: `/v1/appointments?${query}`,
+    });
+    expect(ownerResponse.statusCode, ownerResponse.body).toBe(200);
+    expect(
+      ownerResponse
+        .json<{ appointments: { id: string }[] }>()
+        .appointments.map(({ id }) => id),
+    ).toEqual([barberAppointment.id, ownerAppointment.id]);
+
+    const barberResponse = await app.inject({
+      headers: { authorization: `Bearer ${agenda.barberToken}` },
+      method: 'GET',
+      url: `/v1/appointments?${query}&membershipId=${ownerMembership.id}`,
+    });
+    expect(barberResponse.statusCode, barberResponse.body).toBe(200);
+    expect(
+      barberResponse
+        .json<{ appointments: { id: string }[] }>()
+        .appointments.map(({ id }) => id),
+    ).toEqual([barberAppointment.id]);
+  });
+
   it('evita doble reserva bajo concurrencia y publica el evento', async () => {
     const agenda = await setupAgenda('agenda-concurrente');
     const availability = await app.inject({

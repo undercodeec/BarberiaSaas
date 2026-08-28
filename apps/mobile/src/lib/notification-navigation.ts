@@ -1,5 +1,6 @@
 type NotificationData = {
   readonly appointmentStartsAt?: unknown;
+  readonly locationId?: unknown;
   readonly route?: unknown;
   readonly type?: unknown;
 };
@@ -20,6 +21,8 @@ const AGENDA_ROLES = new Set<NotificationRole>([
   'owner',
   'receptionist',
 ]);
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 export function notificationDestination(
   data: NotificationData | undefined,
@@ -33,14 +36,23 @@ export function notificationDestination(
   )
     return null;
 
+  const query = new URLSearchParams();
   const startsAt = data?.appointmentStartsAt;
   if (
     typeof startsAt === 'string' &&
     startsAt.length <= 64 &&
     !Number.isNaN(Date.parse(startsAt))
   )
-    return `/agenda?date=${encodeURIComponent(startsAt)}`;
-  return '/agenda';
+    query.set('date', startsAt);
+
+  if (
+    typeof data?.locationId === 'string' &&
+    UUID_PATTERN.test(data.locationId)
+  )
+    query.set('locationId', data.locationId);
+
+  const search = query.toString();
+  return search ? `/agenda?${search}` : '/agenda';
 }
 
 interface NotificationResponseData {

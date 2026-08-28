@@ -25,6 +25,21 @@ describe('notificationDestination', () => {
     ).toBe('/agenda?date=2026-08-19T20%3A30%3A00.000Z');
   });
 
+  it('abre la sucursal de la cita cuando la notificaciÃ³n la identifica', () => {
+    expect(
+      notificationDestination(
+        {
+          appointmentStartsAt: '2026-08-19T20:30:00.000Z',
+          locationId: '5083ccf2-d7fc-496a-99ca-f2d2d4189f90',
+          type: 'created',
+        },
+        'owner',
+      ),
+    ).toBe(
+      '/agenda?date=2026-08-19T20%3A30%3A00.000Z&locationId=5083ccf2-d7fc-496a-99ca-f2d2d4189f90',
+    );
+  });
+
   it('rechaza tipos desconocidos, datos ausentes y roles no resueltos', () => {
     expect(notificationDestination({ type: 'admin' }, 'owner')).toBeNull();
     expect(notificationDestination({ route: '/settings' }, 'owner')).toBeNull();
