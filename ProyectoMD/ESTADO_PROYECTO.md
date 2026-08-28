@@ -1048,7 +1048,10 @@ revalidados por SSH, Google Cloud, Neon ni Play Console durante esta auditoría*
 - El manifest fusionado del candidato fue regenerado desde limpio y verificado:
   `com.barbersaas.mobile`, `0.1.13`/`35`, `allowBackup=false`, sin permisos
   bloqueados y con `compileSdk`/`targetSdk` **36**. No existe todavía AAB
-  firmado ni subida a Play para este candidato.
+  firmado ni subida a Play para este candidato. El intento de `bundleRelease`
+  se detuvo antes de compilar el artefacto porque la sesión local no tenía las
+  cinco propiedades obligatorias `NAVA_UPLOAD_*`; el guard de Gradle impidió
+  correctamente una firma incompleta o debug.
 - Expo Router y módulos Expo permanecen; EAS Build y Expo Updates/OTA fueron
   retirados. No hay referencias activas a `expo-updates`, `runtimeVersion` o
   canal OTA en la configuración auditada.
