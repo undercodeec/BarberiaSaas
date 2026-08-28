@@ -170,9 +170,24 @@ export default function AgendaScreen() {
     agendaLocations[0]?.id ??
     organizationQuery.data?.location?.id ??
     null;
+  const canViewAllAgendaLocations = ['manager', 'owner'].includes(
+    organizationQuery.data?.membership.role ?? '',
+  );
+  const showingAllLocations =
+    canViewAllAgendaLocations && selectedLocationId === null;
   const locationId = selectedLocationId ?? defaultLocationId;
+  const appointmentLocationIds = showingAllLocations
+    ? agendaLocations.map((location) => location.id)
+    : locationId
+      ? [locationId]
+      : [];
   const selectedLocation = agendaLocations.find(
     (location) => location.id === locationId,
+  );
+  const locationNameById = useMemo(
+    () =>
+      new Map(agendaLocations.map((location) => [location.id, location.name])),
+    [agendaLocations],
   );
   useEffect(() => {
     if (
@@ -485,21 +500,26 @@ export default function AgendaScreen() {
     ],
   );
   const appointmentsQuery = useQuery({
-    enabled: Boolean(session && locationId),
+    enabled: Boolean(session && appointmentLocationIds.length),
     queryFn: async () => {
-      const search = new URLSearchParams({
-        ...agendaRange(calendarView, selectedDay),
-        locationId: locationId ?? '',
-      });
-      const result = await requireApiClient().request<AppointmentsResponse>(
-        `/v1/appointments?${search.toString()}`,
+      const results = await Promise.all(
+        appointmentLocationIds.map((appointmentLocationId) => {
+          const search = new URLSearchParams({
+            ...agendaRange(calendarView, selectedDay),
+            locationId: appointmentLocationId,
+          });
+          return requireApiClient().request<AppointmentsResponse>(
+            `/v1/appointments?${search.toString()}`,
+          );
+        }),
       );
-      return result.appointments;
+      return results.flatMap((result) => result.appointments);
     },
     queryKey: tenant.key(
       'agenda-appointments',
       calendarView,
       localCalendarDate(selectedDay),
+      ...appointmentLocationIds,
     ),
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
@@ -628,9 +648,10 @@ export default function AgendaScreen() {
     teamQuery.data?.members.find(
       (member) => member.id === selectedAppointment.professionalMembershipId,
     )?.planAvailable !== false;
-  const displayedTimeline = showAllHours
-    ? Array.from({ length: 25 }, (_, index) => index * 60)
-    : configuredTimeline;
+  const displayedTimeline =
+    showAllHours || showingAllLocations
+      ? Array.from({ length: 25 }, (_, index) => index * 60)
+      : configuredTimeline;
   const appointmentsForDay = (day: Date) =>
     filteredAppointments.filter((appointment) =>
       sameDate(
@@ -639,7 +660,7 @@ export default function AgendaScreen() {
       ),
     );
   const weekTimeline = useMemo(() => {
-    if (showAllHours)
+    if (showAllHours || showingAllLocations)
       return Array.from({ length: 25 }, (_, index) => index * 60);
     return timelineMinutes(
       weekDays.flatMap((day) => {
@@ -656,7 +677,12 @@ export default function AgendaScreen() {
           : [];
       }),
     );
-  }, [businessScheduleQuery.data?.days, showAllHours, weekDays]);
+  }, [
+    businessScheduleQuery.data?.days,
+    showAllHours,
+    showingAllLocations,
+    weekDays,
+  ]);
   const moveCalendarPeriod = (offset: number) => {
     moveSelectedDay(offset);
   };
@@ -679,7 +705,9 @@ export default function AgendaScreen() {
           </Text>
           {agendaLocations.length > 1 ? (
             <Text numberOfLines={1} style={styles.locationLabel}>
-              {selectedLocation?.name ?? 'Selecciona una sucursal'}
+              {showingAllLocations
+                ? 'Todas las sucursales'
+                : (selectedLocation?.name ?? 'Selecciona una sucursal')}
             </Text>
           ) : null}
           <Text style={styles.date}>{selectedLabel}</Text>
@@ -898,6 +926,13 @@ export default function AgendaScreen() {
                                   .map((service) => service.serviceName)
                                   .join(', ') || 'Sin servicio'}
                               </Text>
+                              {showingAllLocations ? (
+                                <Text style={styles.appointmentMeta}>
+                                  {locationNameById.get(
+                                    appointment.locationId,
+                                  ) ?? 'Sucursal'}
+                                </Text>
+                              ) : null}
                               {appointment.source === 'public_booking' ? (
                                 <Text style={styles.publicBookingBadge}>
                                   Reserva online
@@ -1205,6 +1240,37 @@ export default function AgendaScreen() {
                     horizontal
                     showsHorizontalScrollIndicator={false}
                   >
+                    {canViewAllAgendaLocations ? (
+                      <Pressable
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: showingAllLocations }}
+                        onPress={() => {
+                          setSelectedLocationId(null);
+                          setSelectedMemberId(null);
+                        }}
+                        style={({ pressed }) => [
+                          styles.optionTile,
+                          showingAllLocations && styles.optionTileSelected,
+                          pressed && styles.settingsControlPressed,
+                        ]}
+                      >
+                        <Ionicons
+                          color={appTheme.colors.text}
+                          name="business-outline"
+                          size={23}
+                        />
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.optionTileLabel,
+                            showingAllLocations &&
+                              styles.optionTileLabelSelected,
+                          ]}
+                        >
+                          Todas
+                        </Text>
+                      </Pressable>
+                    ) : null}
                     {agendaLocations.map((location) => {
                       const selected = location.id === locationId;
                       return (
