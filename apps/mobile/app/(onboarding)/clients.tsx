@@ -13,7 +13,7 @@ import type {
   SubscriptionResponse,
 } from '@barber-saas/api-client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 /* eslint-disable react-hooks/refs -- React Native Animated and PanResponder expose stable imperative values used by the floating control. */
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -396,8 +396,14 @@ export default function ClientsScreen() {
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<ClientsResponse>('/v1/clients'),
     queryKey: tenant.key('clients'),
+    refetchInterval: 30_000,
     select: normalizeClientsResponse,
   });
+  useFocusEffect(
+    useCallback(() => {
+      void clientsQuery.refetch();
+    }, [clientsQuery.refetch]),
+  );
   const labelsQuery = useQuery({
     enabled: Boolean(session && clientAccess.canManageLabels),
     queryFn: () =>

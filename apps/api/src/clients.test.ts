@@ -40,7 +40,7 @@ describe('protección de contacto de clientes', () => {
     expect(JSON.stringify(appointment)).not.toContain('+593991234567');
   });
 
-  it('limita recepción por sucursal y al barbero por citas propias', () => {
+  it('da al propietario todos los clientes y restringe a los demás por asignación', () => {
     const base = {
       locationIds: ['location-a'],
       membershipId: 'membership-a',
@@ -65,6 +65,10 @@ describe('protección de contacto de clientes', () => {
       },
     );
     expect(clientScope({ ...base, role: MembershipRole.MANAGER })).toEqual({
+      deletedAt: null,
+      organizationId: 'organization-a',
+    });
+    expect(clientScope({ ...base, role: MembershipRole.OWNER })).toEqual({
       deletedAt: null,
       organizationId: 'organization-a',
     });

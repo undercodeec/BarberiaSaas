@@ -218,6 +218,7 @@ integrationDescribe('reservas públicas', () => {
     idempotencyKey: string,
     startsAt: string,
     email: string,
+    phone = clientPhone,
   ) {
     const createResponse = await app.inject({
       headers: { 'idempotency-key': idempotencyKey },
@@ -226,7 +227,7 @@ integrationDescribe('reservas públicas', () => {
         email,
         fullName: 'Cliente Público',
         membershipId,
-        phone: clientPhone,
+        phone,
         policyAccepted: true,
         serviceIds: [serviceId],
         startsAt,
@@ -248,7 +249,7 @@ integrationDescribe('reservas públicas', () => {
         email,
         fullName: 'Cliente Público',
         membershipId,
-        phone: clientPhone,
+        phone,
         policyAccepted: true,
         serviceIds: [serviceId],
         startsAt,
@@ -266,10 +267,13 @@ integrationDescribe('reservas públicas', () => {
       url: `/v1/public/bookings/${created.bookingId}/verify`,
     });
     expect(verifyResponse.statusCode).toBe(200);
-    return verifyResponse.json<{
-      managementToken: string;
-      managementUrl: string;
-    }>();
+    return {
+      bookingId: created.bookingId,
+      ...verifyResponse.json<{
+        managementToken: string;
+        managementUrl: string;
+      }>(),
+    };
   }
 
   it('publica catálogo, evita duplicados y permite gestionar una cita', async () => {
@@ -332,6 +336,45 @@ integrationDescribe('reservas públicas', () => {
       startsAt,
       `client-${suffix}@example.com`,
     );
+    const firstAppointment = await database.appointment.findUniqueOrThrow({
+      where: { id: management.bookingId },
+    });
+    expect(firstAppointment.clientId).not.toBeNull();
+    const ownerClients = await app.inject({
+      headers: { authorization: `Bearer ${accessToken}` },
+      method: 'GET',
+      url: '/v1/clients',
+    });
+    expect(ownerClients.statusCode).toBe(200);
+    expect(ownerClients.json().clients).toContainEqual(
+      expect.objectContaining({
+        email: `client-${suffix}@example.com`,
+        id: firstAppointment.clientId,
+        phone: clientPhone,
+      }),
+    );
+
+    const duplicateByEmail = await createAndVerifyBooking(
+      `public-booking-email-${randomUUID()}`,
+      futureSlot(3, 11),
+      `CLIENT-${suffix.toUpperCase()}@EXAMPLE.COM`,
+      `+59398${String(Date.now()).slice(-7)}`,
+    );
+    const duplicateAppointment = await database.appointment.findUniqueOrThrow({
+      where: { id: duplicateByEmail.bookingId },
+    });
+    expect(duplicateAppointment.clientId).toBe(firstAppointment.clientId);
+    const duplicateByPhone = await createAndVerifyBooking(
+      `public-booking-phone-${randomUUID()}`,
+      futureSlot(3, 12),
+      `other-client-${suffix}@example.com`,
+    );
+    const phoneDuplicateAppointment =
+      await database.appointment.findUniqueOrThrow({
+        where: { id: duplicateByPhone.bookingId },
+      });
+    expect(phoneDuplicateAppointment.clientId).toBe(firstAppointment.clientId);
+    expect(await database.client.count({ where: { organizationId } })).toBe(1);
     const queuedNotification = await database.appNotification.findFirst({
       orderBy: { createdAt: 'desc' },
       where: { organizationId, type: 'APPOINTMENT_CREATED' },

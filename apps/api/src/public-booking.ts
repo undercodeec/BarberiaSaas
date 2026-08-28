@@ -1217,18 +1217,34 @@ export function registerPublicBookingRoutes(
       existing.endsAt.getTime() + MANAGEMENT_AFTER_END_MS,
     );
     const client = await database.$transaction(async (transaction) => {
-      const knownClient = await transaction.client.findFirst({
+      const normalizedEmail =
+        existing.clientEmail?.trim().toLowerCase() ?? null;
+      await transaction.$queryRaw`WITH lock AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtext(${existing.organizationId}))) SELECT 1 AS locked FROM lock`;
+      const clientByPhone = await transaction.client.findFirst({
         where: {
           deletedAt: null,
           organizationId: existing.organizationId,
           phone: existing.clientPhone!,
         },
+        orderBy: { createdAt: 'asc' },
       });
+      const knownClient =
+        clientByPhone ??
+        (normalizedEmail
+          ? await transaction.client.findFirst({
+              where: {
+                deletedAt: null,
+                email: { equals: normalizedEmail, mode: 'insensitive' },
+                organizationId: existing.organizationId,
+              },
+              orderBy: { createdAt: 'asc' },
+            })
+          : null);
       const linkedClient =
         knownClient ??
         (await transaction.client.create({
           data: {
-            email: existing.clientEmail,
+            email: normalizedEmail,
             fullName: existing.clientName,
             organizationId: existing.organizationId,
             phone: existing.clientPhone!,
