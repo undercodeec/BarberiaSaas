@@ -601,6 +601,7 @@ export async function applyVerifiedPlatformPayment(
         paidAt: now,
         periodEndsAt,
         periodStartsAt: invoicePeriodStartsAt,
+        providerPaidAt: payment.verifiedAt ?? now,
         status: SubscriptionInvoiceStatus.PAID,
       },
       where: { id: attempt.invoice.id },
@@ -624,6 +625,7 @@ export async function applyVerifiedPlatformPayment(
     });
     await transaction.subscriptionChange.create({
       data: {
+        billingTimezone: attempt.invoice.billingTimezone,
         fromPlanCode: previousPlan.code,
         fromStatus: subscription.status,
         invoiceId: attempt.invoice.id,
@@ -713,10 +715,7 @@ export function registerSubscriptionPaymentRoutes(
   );
 
   app.post('/v1/webhooks/payphone/platform', async (request, reply) => {
-    if (
-      webhookAllowedIps.size === 0 ||
-      !webhookAllowedIps.has(request.ip)
-    )
+    if (webhookAllowedIps.size === 0 || !webhookAllowedIps.has(request.ip))
       return reply.code(404).send({ ErrorCode: '777', Response: false });
 
     const parsed = payphonePlatformWebhookSchema.safeParse(request.body);
@@ -910,6 +909,7 @@ export function registerSubscriptionPaymentRoutes(
         data: {
           billingPeriodDays: BILLING_PERIOD_DAYS,
           billingPeriodMonths: 1,
+          billingTimezone: membership.organization.defaultTimezone,
           commercialTermsVersion: config.PLATFORM_SUBSCRIPTION_TERMS_VERSION!,
           currencyCode: plan.currencyCode,
           dueAt: expiresAt,

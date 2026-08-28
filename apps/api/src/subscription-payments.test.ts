@@ -25,6 +25,7 @@ import {
   resolveFounderPromotion,
   sanitizePlatformProviderPayload,
 } from './subscription-payments';
+import { queuePaymentReceiptForPayment } from './subscription-payment-receipts';
 
 describe('dominio de pagos de suscripción', () => {
   it('calcula el período comercial exacto de 30 días', () => {
@@ -128,10 +129,14 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
   const organizationIds: string[] = [];
   const userIds: string[] = [];
   let app: Awaited<ReturnType<typeof buildApi>>;
+  let config: ReturnType<typeof readConfig>;
   let paymentAttemptId = '';
 
   afterAll(async () => {
     if (organizationIds.length > 0) {
+      await database.subscriptionPaymentReceipt.deleteMany({
+        where: { organizationId: { in: organizationIds } },
+      });
       await database.paymentProviderEvent.deleteMany({
         where: { organizationId: { in: organizationIds } },
       });
@@ -233,20 +238,21 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
         webhookAuthorizedAt: new Date(),
       },
     });
+    config = readConfig({
+      APP_ENV: 'local',
+      CORS_ORIGIN: 'http://localhost:3000',
+      DATABASE_URL: testDatabaseUrl!,
+      PLATFORM_PAYMENTS_ENABLED: 'true',
+      PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY: Buffer.alloc(
+        32,
+        13,
+      ).toString('base64'),
+      PLATFORM_PAYPHONE_WEBHOOK_ALLOWED_IPS: '127.0.0.1',
+      PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS: '0',
+      PLATFORM_SUBSCRIPTION_TERMS_VERSION: 'sandbox-2026-08',
+    });
     app = await buildApi({
-      config: readConfig({
-        APP_ENV: 'local',
-        CORS_ORIGIN: 'http://localhost:3000',
-        DATABASE_URL: testDatabaseUrl!,
-        PLATFORM_PAYMENTS_ENABLED: 'true',
-        PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY: Buffer.alloc(
-          32,
-          13,
-        ).toString('base64'),
-        PLATFORM_PAYPHONE_WEBHOOK_ALLOWED_IPS: '127.0.0.1',
-        PLATFORM_SUBSCRIPTION_TAX_BASIS_POINTS: '0',
-        PLATFORM_SUBSCRIPTION_TERMS_VERSION: 'sandbox-2026-08',
-      }),
+      config,
       database,
       platformPaymentProvider: {
         async preparePayment(input) {
@@ -454,6 +460,22 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
     expect(JSON.stringify(attempt.providerPayload)).not.toContain(
       'sensitive-document',
     );
+    const receiptResult = await queuePaymentReceiptForPayment(
+      database,
+      config,
+      paymentAttemptId,
+    );
+    expect(receiptResult).toMatchObject({ created: true });
+    const receipt = await database.subscriptionPaymentReceipt.findUniqueOrThrow(
+      { where: { subscriptionPaymentAttemptId: paymentAttemptId } },
+    );
+    expect(receipt.receiptNumber).toMatch(/^NAVA-R-\d{4}-[A-F0-9]{16}$/u);
+    expect(
+      Buffer.from(receipt.documentPdf).subarray(0, 8).toString('ascii'),
+    ).toBe('%PDF-1.4');
+    await expect(
+      queuePaymentReceiptForPayment(database, config, paymentAttemptId),
+    ).resolves.toMatchObject({ created: false, reason: 'ALREADY_EXISTS' });
     const previousPeriodEnd = subscription.currentPeriodEnd;
     const repeatedConfirmation = await app.inject({
       headers: { authorization: `Bearer ${firstToken}` },

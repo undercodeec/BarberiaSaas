@@ -273,6 +273,24 @@ El sistema debe contemplar:
 - número de comprobante;
 - estado del comprobante.
 
+## 7.1. Transición antes de la emisión SRI operativa
+
+Mientras Nava no tenga habilitada y validada la emisión de facturas electrónicas
+en producción ante el SRI, el sistema enviará por correo un **Comprobante
+temporal de pago** por cada suscripción cuyo pago haya sido verificado.
+
+Este comprobante es una constancia comercial y de atención al cliente: conserva
+el plan, importe, moneda, período, fecha, referencias del pago y una copia PDF
+inmutable del documento entregado. **No es una factura electrónica, no es un
+RIDE, no tiene clave de acceso ni numeración fiscal, y no debe presentarse como
+un comprobante autorizado por el SRI ni como sustento de crédito tributario.**
+
+La habilitación posterior de SRI no modifica ni reemplaza retroactivamente ese
+carácter. Desde la emisión SRI productiva, Nava dejará de generar nuevos
+comprobantes temporales y enviará la factura electrónica autorizada conforme a
+la normativa aplicable. Esta transición debe revisarse con el contador y la
+asesoría jurídica antes de comunicarse públicamente.
+
 ---
 
 # 8. Reembolsos

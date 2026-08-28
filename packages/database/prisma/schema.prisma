@@ -171,6 +171,14 @@ enum SriInvoiceDeliveryStatus {
   FAILED
 }
 
+// Estado de entrega del comprobante comercial temporal. No representa el
+// estado fiscal de una factura SRI.
+enum SubscriptionPaymentReceiptDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
 enum PaymentProviderEventSource {
   WEBHOOK
   POLL
@@ -851,6 +859,7 @@ model Organization {
   platformOrganizationNotes          PlatformOrganizationNote[]
   subscriptionInvoices               SubscriptionInvoice[]
   subscriptionPaymentAttempts        SubscriptionPaymentAttempt[]
+  subscriptionPaymentReceipts        SubscriptionPaymentReceipt[]
   paymentProviderEvents              PaymentProviderEvent[]
   subscriptionChanges                SubscriptionChange[]
   billingProfile                     OrganizationBillingProfile?
@@ -962,17 +971,20 @@ model SubscriptionInvoice {
   billingPeriodMonths    Int                          @default(1) @map("billing_period_months")
   billingPeriodDays      Int                          @default(30) @map("billing_period_days")
   commercialTermsVersion String                       @map("commercial_terms_version") @db.VarChar(40)
+  billingTimezone        String                       @map("billing_timezone") @db.VarChar(64)
   periodStartsAt         DateTime?                    @map("period_starts_at") @db.Timestamptz(3)
   periodEndsAt           DateTime?                    @map("period_ends_at") @db.Timestamptz(3)
   status                 SubscriptionInvoiceStatus    @default(OPEN)
   dueAt                  DateTime                     @map("due_at") @db.Timestamptz(3)
   paidAt                 DateTime?                    @map("paid_at") @db.Timestamptz(3)
+  providerPaidAt         DateTime?                    @map("provider_paid_at") @db.Timestamptz(3)
   createdAt              DateTime                     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(3)
   organization           Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   requestedBy            User?                        @relation("SubscriptionInvoiceRequester", fields: [requestedByUserId], references: [id], onDelete: SetNull)
   plan                   Plan                         @relation(fields: [planId], references: [id], onDelete: Restrict)
   paymentAttempts        SubscriptionPaymentAttempt[]
+  paymentReceipts        SubscriptionPaymentReceipt[]
   changes                SubscriptionChange[]
   sriInvoices            SriInvoice[]
 
@@ -1008,11 +1020,52 @@ model SubscriptionPaymentAttempt {
   providerEvents        PaymentProviderEvent[]
   changes               SubscriptionChange[]
   sriInvoice            SriInvoice?
+  paymentReceipt        SubscriptionPaymentReceipt?
 
   @@unique([organizationId, idempotencyKeyHash])
   @@index([organizationId, status, expiresAt])
   @@index([invoiceId, createdAt])
   @@map("subscription_payment_attempts")
+}
+
+// Constancia comercial de un pago de suscripción durante la transición hacia
+// facturación electrónica SRI. Es independiente de SriInvoice y no se presenta
+// como comprobante tributario ni usa serie/secuencial fiscal.
+model SubscriptionPaymentReceipt {
+  id                           String                                   @id @default(uuid()) @db.Uuid
+  organizationId               String                                   @map("organization_id") @db.Uuid
+  subscriptionInvoiceId        String                                   @map("subscription_invoice_id") @db.Uuid
+  subscriptionPaymentAttemptId String                                   @unique @map("subscription_payment_attempt_id") @db.Uuid
+  receiptNumber                String                                   @unique @map("receipt_number") @db.VarChar(80)
+  deliveryStatus               SubscriptionPaymentReceiptDeliveryStatus @default(PENDING) @map("delivery_status")
+  recipientEmail               String                                   @map("recipient_email") @db.VarChar(320)
+  recipientName                String                                   @map("recipient_name") @db.VarChar(300)
+  organizationName             String                                   @map("organization_name") @db.VarChar(160)
+  planCode                     String                                   @map("plan_code") @db.VarChar(40)
+  planName                     String                                   @map("plan_name") @db.VarChar(80)
+  currencyCode                 String                                   @map("currency_code") @db.Char(3)
+  totalCents                   Int                                      @map("total_cents")
+  paymentProvider              String                                   @map("payment_provider") @db.VarChar(40)
+  providerTransactionId        String?                                  @map("provider_transaction_id") @db.VarChar(80)
+  internalReference            String                                   @map("internal_reference") @db.VarChar(15)
+  periodStartsAt               DateTime                                 @map("period_starts_at") @db.Timestamptz(3)
+  periodEndsAt                 DateTime                                 @map("period_ends_at") @db.Timestamptz(3)
+  paidAt                       DateTime                                 @map("paid_at") @db.Timestamptz(3)
+  documentPdf                  Bytes                                    @map("document_pdf")
+  documentSha256               String                                   @map("document_sha256") @db.Char(64)
+  emailedAt                    DateTime?                                @map("emailed_at") @db.Timestamptz(3)
+  lastAttemptAt                DateTime?                                @map("last_attempt_at") @db.Timestamptz(3)
+  attemptCount                 Int                                      @default(0) @map("attempt_count")
+  lastErrorCode                String?                                  @map("last_error_code") @db.VarChar(80)
+  createdAt                    DateTime                                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                    DateTime                                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization                 Organization                             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  subscriptionInvoice          SubscriptionInvoice                      @relation(fields: [subscriptionInvoiceId], references: [id], onDelete: Restrict)
+  subscriptionPaymentAttempt   SubscriptionPaymentAttempt               @relation(fields: [subscriptionPaymentAttemptId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, paidAt])
+  @@index([deliveryStatus, lastAttemptAt])
+  @@map("subscription_payment_receipts")
 }
 
 // Perfil de facturación del comprador. Pertenece al negocio que contrata Nava,
@@ -1152,6 +1205,7 @@ model SubscriptionChange {
   previousPeriodEnd            DateTime?                   @map("previous_period_end") @db.Timestamptz(3)
   newPeriodStart               DateTime?                   @map("new_period_start") @db.Timestamptz(3)
   newPeriodEnd                 DateTime?                   @map("new_period_end") @db.Timestamptz(3)
+  billingTimezone              String                      @map("billing_timezone") @db.VarChar(64)
   reason                       String                      @db.VarChar(500)
   metadata                     Json                        @default("{}")
   createdAt                    DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)

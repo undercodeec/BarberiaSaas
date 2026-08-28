@@ -102,6 +102,11 @@ import {
 import { registerSriBillingRoutes } from './sri-billing';
 import { deliverSriInvoices } from './sri-mailer';
 import {
+  deliverPaymentReceipts,
+  queuePendingPaymentReceipts,
+  registerSubscriptionPaymentReceiptRoutes,
+} from './subscription-payment-receipts';
+import {
   buildClosedBusinessExport,
   listClosedBusinessExports,
 } from './closed-business-export';
@@ -2914,6 +2919,7 @@ export async function buildApi({
     platformPaymentProvider,
   );
   registerSriBillingRoutes(app, database, authenticate, config);
+  registerSubscriptionPaymentReceiptRoutes(app, database, authenticate, config);
   registerProductOrderRoutes(app, database, authenticate, config);
   registerReportRoutes(app, database, authenticate);
 
@@ -2968,6 +2974,15 @@ export async function buildApi({
     );
   }, 60_000);
   sriInvoiceLifecycleTimer.unref();
+  const paymentReceiptLifecycleTimer = setInterval(() => {
+    void queuePendingPaymentReceipts(database, config).catch((error: unknown) =>
+      app.log.error(error),
+    );
+    void deliverPaymentReceipts(database, config).catch((error: unknown) =>
+      app.log.error(error),
+    );
+  }, 60_000);
+  paymentReceiptLifecycleTimer.unref();
   void reconcileSubscriptionLifecycle(database).catch((error: unknown) =>
     app.log.error(error),
   );
@@ -2983,6 +2998,12 @@ export async function buildApi({
   void deliverSriInvoices(database, config).catch((error: unknown) =>
     app.log.error(error),
   );
+  void queuePendingPaymentReceipts(database, config).catch((error: unknown) =>
+    app.log.error(error),
+  );
+  void deliverPaymentReceipts(database, config).catch((error: unknown) =>
+    app.log.error(error),
+  );
   app.addHook('onClose', async () => {
     clearInterval(publicBookingLifecycleTimer);
     clearInterval(notificationDeliveryTimer);
@@ -2990,6 +3011,7 @@ export async function buildApi({
     clearInterval(subscriptionPaymentLifecycleTimer);
     clearInterval(subscriptionLifecycleTimer);
     clearInterval(sriInvoiceLifecycleTimer);
+    clearInterval(paymentReceiptLifecycleTimer);
   });
 
   app.setErrorHandler((error, _request, reply) => {

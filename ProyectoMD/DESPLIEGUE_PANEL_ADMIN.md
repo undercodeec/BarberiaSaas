@@ -181,3 +181,32 @@ pero no administra ni expone tokens PayPhone. La configuración de plataforma
 el comando interactivo de la API y conserva el token cifrado. A 25 de agosto de
 2026 existe configuración TEST aprovisionada; los cobros siguen deshabilitados
 hasta configurar el origen verificable del webhook y superar una compra sandbox.
+
+## Recibos temporales de suscripciones — transición hacia SRI
+
+Mientras la emisión SRI productiva permanezca deshabilitada, la API genera un
+**Comprobante temporal de pago** por cada intento de suscripción `APPLIED` y lo
+entrega por SMTP al correo de facturación registrado o, en su ausencia, al
+correo del propietario que inició el checkout. El PDF, su SHA-256, el estado de
+entrega y los reintentos quedan persistidos; la descarga y reenvío requieren
+autenticación del propietario mediante:
+
+- `GET /v1/subscription/payment-receipts`
+- `GET /v1/subscription/payment-receipts/:id/pdf`
+- `POST /v1/subscription/payment-receipts/:id/resend`
+
+El PDF y el correo HTML usan el logo oficial de Nava. Ambos detallan plan,
+importe, compra verificada, inicio/fin/duración del período, renovación manual,
+referencias de pago y el enlace a `https://navacloud.app/politicas`.
+
+No es factura electrónica ni RIDE y no usa numeración, claves de acceso o datos
+fiscales SRI. El Admin no debe mostrar el correo completo ni referencias del
+proveedor. Cuando `SRI_EMISSION_ENABLED=true`, `SRI_ENV=production` y
+`SRI_PRODUCTION_ENABLED=true`, no se generan recibos temporales nuevos: el
+flujo fiscal SRI es el que corresponde. Antes de activar ese cambio, completar
+la prueba controlada SRI y SMTP descrita en este documento.
+
+**Evidencia local (27 de agosto de 2026):** migración completa sobre PostgreSQL
+aislada, `prisma validate`, typecheck, build de API y pruebas de checkout/recibo
+aprobadas. Queda pendiente registrar el commit de integración y efectuar la
+prueba SMTP con Hostinger antes de desplegar.
