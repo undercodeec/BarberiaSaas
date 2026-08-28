@@ -9,6 +9,7 @@ import type {
   InventoryResponse,
   OnboardingAccountDetailsResponse,
   SubscriptionResponse,
+  WelcomeSurveyResponseResult,
 } from '@barber-saas/api-client';
 import { useQuery } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
@@ -40,9 +41,6 @@ import {
   EXTRA_QUICK_ACTIONS,
   getExtraQuickActionIds,
   storeExtraQuickActionIds,
-  getWelcomeSurveyResponse,
-  storeWelcomeSurveyResponse,
-  markWelcomeSurveyDismissed,
   shouldShowWelcomeSurvey,
   getSubscriptionCelebrationState,
   storeSubscriptionCelebrationState,
@@ -397,14 +395,15 @@ export default function DashboardScreen() {
     const checkWelcomeSurvey = async () => {
       if (!user) return;
       try {
-        const response = await getWelcomeSurveyResponse(user.id);
-        if (isMounted) {
-          setNeedsWelcomeSurvey(
-            shouldShowWelcomeSurvey(response, session?.expiresAt ?? null),
+        const response =
+          await requireApiClient().request<WelcomeSurveyResponseResult>(
+            '/v1/welcome-survey-response',
           );
+        if (isMounted) {
+          setNeedsWelcomeSurvey(shouldShowWelcomeSurvey(response));
         }
       } catch {
-        if (isMounted) setNeedsWelcomeSurvey(true);
+        if (isMounted) setNeedsWelcomeSurvey(false);
       }
     };
 
@@ -498,16 +497,16 @@ export default function DashboardScreen() {
     selectedOptions: readonly WelcomeSurveyOption[],
   ) => {
     if (!user) return;
-    await storeWelcomeSurveyResponse(user.id, selectedOptions);
+    await requireApiClient().request<WelcomeSurveyResponseResult>(
+      '/v1/welcome-survey-response',
+      { body: { selectedOptions }, method: 'POST' },
+    );
     setNeedsWelcomeSurvey(false);
   };
 
   const dismissWelcomeSurvey = () => {
     setIsWelcomeSurveyOpen(false);
     setNeedsWelcomeSurvey(false);
-    if (user) {
-      void markWelcomeSurveyDismissed(user.id, session?.expiresAt ?? null);
-    }
   };
 
   const dismissLocationBanner = () => {

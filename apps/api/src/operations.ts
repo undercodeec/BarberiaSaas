@@ -121,6 +121,11 @@ const platformUserListSchema = z.object({
   to: z.coerce.date().optional(),
   verification: z.enum(['all', 'verified', 'unverified']).default('all'),
 });
+const platformWelcomeSurveyResponseListSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  search: z.string().trim().max(120).optional(),
+});
 const platformUserActionSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('suspend'),
@@ -1730,6 +1735,63 @@ function registerPlatformRoutes(
               : 'active',
         };
       }),
+    };
+  });
+
+  app.get('/v1/platform/welcome-survey-responses', async (request) => {
+    const operator = await requirePlatformAdmin(
+      database,
+      authenticate,
+      request,
+      config,
+    );
+    requirePlatformPermission(operator.role, 'view');
+    const query = platformWelcomeSurveyResponseListSchema.parse(request.query);
+    const where = query.search
+      ? {
+          user: {
+            OR: [
+              {
+                email: {
+                  contains: query.search,
+                  mode: 'insensitive' as const,
+                },
+              },
+              {
+                fullName: {
+                  contains: query.search,
+                  mode: 'insensitive' as const,
+                },
+              },
+            ],
+          },
+        }
+      : {};
+    const [total, responses] = await Promise.all([
+      database.welcomeSurveyResponse.count({ where }),
+      database.welcomeSurveyResponse.findMany({
+        include: {
+          user: { select: { email: true, fullName: true, id: true } },
+        },
+        orderBy: { submittedAt: 'desc' },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+      }),
+    ]);
+    return {
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+      },
+      responses: responses.map((response) => ({
+        id: response.id,
+        selectedOptions: response.selectedOptions,
+        submittedAt: response.submittedAt.toISOString(),
+        user: response.user,
+      })),
     };
   });
 

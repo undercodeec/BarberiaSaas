@@ -60,6 +60,7 @@ import type {
   AppointmentNotifier,
 } from './notifications';
 import { registerProfileRoutes } from './profile';
+import { registerWelcomeSurveyRoutes } from './welcome-survey';
 import { registerPayphoneRoutes } from './payphone';
 import {
   processProductOrderLifecycle,
@@ -2910,6 +2911,7 @@ export async function buildApi({
   registerCashRegisterRoutes(app, database, authenticate);
   registerCommissionRoutes(app, database, authenticate);
   registerProfileRoutes(app, database, authenticate);
+  registerWelcomeSurveyRoutes(app, database, authenticate);
   registerPayphoneRoutes(app, database, authenticate, config);
   registerSubscriptionPaymentRoutes(
     app,

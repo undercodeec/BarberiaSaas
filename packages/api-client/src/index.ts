@@ -86,6 +86,15 @@ export interface OnboardingAccountDetailsResponse {
   readonly phone: string | null;
 }
 
+export interface WelcomeSurveyResponse {
+  readonly selectedOptions: readonly string[];
+  readonly submittedAt: string;
+}
+
+export interface WelcomeSurveyResponseResult {
+  readonly response: WelcomeSurveyResponse | null;
+}
+
 export interface BusinessLocation {
   readonly addressLine: string | null;
   readonly city: string | null;

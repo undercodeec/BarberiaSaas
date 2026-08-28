@@ -11,6 +11,26 @@ export const publicApiConfigSchema = z.object({
   url: z.url('La URL de la API no es válida.'),
 });
 
+export const WELCOME_SURVEY_OPTIONS = [
+  'Publicidad',
+  'Redes sociales de Nava (Facebook o Instagram)',
+  'Buscador',
+  'Recomendación de una academia, clase u otro negocio',
+  'Evento o feria',
+] as const;
+
+export type WelcomeSurveyOption = (typeof WELCOME_SURVEY_OPTIONS)[number];
+
+export const welcomeSurveyResponseSchema = z.object({
+  selectedOptions: z
+    .array(z.enum(WELCOME_SURVEY_OPTIONS))
+    .min(1, 'Selecciona al menos una opción.')
+    .max(WELCOME_SURVEY_OPTIONS.length)
+    .refine((options) => new Set(options).size === options.length, {
+      message: 'No puedes seleccionar la misma opción más de una vez.',
+    }),
+});
+
 const emailSchema = z.email('Ingresa un correo electrónico válido.').max(254);
 const SENSITIVE_DATA_PATTERN =
   /diagnostic|historial clinico|historia clinica|enfermedad|medicamento|alergia|biometric|huella dactilar|adn|sangre|salud mental|tratamiento medic/u;

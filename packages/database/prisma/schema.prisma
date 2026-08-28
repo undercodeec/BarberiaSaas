@@ -397,10 +397,22 @@ model User {
   subscriptionChangesActed             SubscriptionChange[]           @relation("SubscriptionChangeActor")
   marketingConsents                    MarketingConsent[]
   privacyConsents                      PrivacyConsent[]
+  welcomeSurveyResponse                WelcomeSurveyResponse?
 
   @@index([deletedAt])
   @@index([suspendedAt])
   @@map("users")
+}
+
+model WelcomeSurveyResponse {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @unique @map("user_id") @db.Uuid
+  selectedOptions String[] @map("selected_options") @db.VarChar(120)
+  submittedAt     DateTime @default(now()) @map("submitted_at") @db.Timestamptz(3)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([submittedAt])
+  @@map("welcome_survey_responses")
 }
 
 model AccountDeletionRetention {

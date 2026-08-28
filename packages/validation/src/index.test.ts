@@ -20,6 +20,7 @@ import {
   updateBookingSettingsSchema,
   updateTeamMemberSchema,
   verifyEmailSchema,
+  welcomeSurveyResponseSchema,
   weeklyScheduleIntervalSchema,
 } from './index';
 
@@ -435,5 +436,31 @@ describe('autenticación y onboarding', () => {
 
   it('genera slugs estables sin acentos', () => {
     expect(createSlug(' Barbería El Ñaño ')).toBe('barberia-el-nano');
+  });
+});
+
+describe('encuesta de bienvenida', () => {
+  it('acepta opciones conocidas sin repeticiones', () => {
+    expect(
+      welcomeSurveyResponseSchema.safeParse({
+        selectedOptions: ['Buscador'],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rechaza respuestas vacías, repetidas o desconocidas', () => {
+    expect(
+      welcomeSurveyResponseSchema.safeParse({ selectedOptions: [] }).success,
+    ).toBe(false);
+    expect(
+      welcomeSurveyResponseSchema.safeParse({
+        selectedOptions: ['Publicidad', 'Publicidad'],
+      }).success,
+    ).toBe(false);
+    expect(
+      welcomeSurveyResponseSchema.safeParse({
+        selectedOptions: ['Canal no registrado'],
+      }).success,
+    ).toBe(false);
   });
 });

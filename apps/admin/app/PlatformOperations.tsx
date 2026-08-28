@@ -16,6 +16,7 @@ import {
   getPlatformOperators,
   getPlatformOverrides,
   getPlatformReviews,
+  getWelcomeSurveyResponses,
   getPrivacyRequests,
   getPlatformSessions,
   getSupportCases,
@@ -47,6 +48,7 @@ import {
   type PlatformSession,
   type PlatformSupportCase,
   type PlatformSystemHealth,
+  type PlatformWelcomeSurveyResponse,
 } from './platform-api';
 
 type OperationsView =
@@ -58,7 +60,8 @@ type OperationsView =
   | 'operations'
   | 'overrides'
   | 'privacy'
-  | 'security';
+  | 'security'
+  | 'surveys';
 type PlatformOverrideInput = Parameters<typeof createPlatformOverride>[1];
 
 const dateFormatter = new Intl.DateTimeFormat('es-EC', {
@@ -176,6 +179,88 @@ function AlertsView({
           ))
         )}
       </section>
+    </>
+  );
+}
+
+function WelcomeSurveyResponsesView({
+  onPage,
+  onSearch,
+  page,
+  responses,
+  search,
+  totalPages,
+}: {
+  readonly onPage: (page: number) => void;
+  readonly onSearch: (search: string) => void;
+  readonly page: number;
+  readonly responses: readonly PlatformWelcomeSurveyResponse[];
+  readonly search: string;
+  readonly totalPages: number;
+}) {
+  return (
+    <>
+      <Heading
+        description="Respuestas únicas enviadas desde la encuesta de bienvenida."
+        title="Encuestas de bienvenida"
+      />
+      <div className="filters single-filter">
+        <label>
+          <span>Buscar usuario o correo</span>
+          <input
+            onChange={(event) => onSearch(event.target.value)}
+            placeholder="Nombre o correo"
+            type="search"
+            value={search}
+          />
+        </label>
+      </div>
+      <section className="table-card">
+        {responses.length === 0 ? (
+          <Empty>No hay respuestas registradas.</Empty>
+        ) : (
+          responses.map((response) => (
+            <article className="event-row" key={response.id}>
+              <span className="event-icon">?</span>
+              <div className="event-main">
+                <strong>{response.user.fullName}</strong>
+                <span>{response.user.email}</span>
+                <small>{response.selectedOptions.join(' · ')}</small>
+              </div>
+              <div className="event-meta">
+                <span className="channel-badge">
+                  {response.selectedOptions.length} opción
+                  {response.selectedOptions.length === 1 ? '' : 'es'}
+                </span>
+                <time>{formatDate(response.submittedAt)}</time>
+              </div>
+            </article>
+          ))
+        )}
+      </section>
+      {totalPages > 1 ? (
+        <div className="toolbar-row">
+          <button
+            className="button button--ghost"
+            disabled={page === 1}
+            onClick={() => onPage(page - 1)}
+            type="button"
+          >
+            Anterior
+          </button>
+          <span className="channel-badge">
+            Página {page} de {totalPages}
+          </span>
+          <button
+            className="button button--ghost"
+            disabled={page === totalPages}
+            onClick={() => onPage(page + 1)}
+            type="button"
+          >
+            Siguiente
+          </button>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -1475,6 +1560,12 @@ export function PlatformOperations({
   const [configurations, setConfigurations] = useState<
     readonly PlatformConfigurationVersion[]
   >([]);
+  const [surveyResponses, setSurveyResponses] = useState<
+    readonly PlatformWelcomeSurveyResponse[]
+  >([]);
+  const [surveyPage, setSurveyPage] = useState(1);
+  const [surveySearch, setSurveySearch] = useState('');
+  const [surveyTotalPages, setSurveyTotalPages] = useState(1);
   const [busy, setBusy] = useState(false);
   const [reload, setReload] = useState(0);
 
@@ -1486,55 +1577,67 @@ export function PlatformOperations({
         ? getPlatformAlerts(token).then(
             (result) => active && setAlerts(result.alerts),
           )
-        : view === 'cases'
-          ? getSupportCases(token).then((result) => {
+        : view === 'surveys'
+          ? getWelcomeSurveyResponses(token, {
+              page: surveyPage,
+              search: surveySearch,
+            }).then((result) => {
               if (active) {
-                setCases(result.cases);
-                setCaseOperators(result.operators);
-                setCaseSummary(result.summary);
+                setSurveyResponses(result.responses);
+                setSurveyTotalPages(result.pagination.totalPages);
               }
             })
-          : view === 'privacy'
-            ? getPrivacyRequests(token).then(
-                (result) => active && setPrivacyRequests(result.requests),
-              )
-            : view === 'overrides'
-              ? getPlatformOverrides(token).then(
-                  (result) => active && setOverrides(result.overrides),
+          : view === 'cases'
+            ? getSupportCases(token).then((result) => {
+                if (active) {
+                  setCases(result.cases);
+                  setCaseOperators(result.operators);
+                  setCaseSummary(result.summary);
+                }
+              })
+            : view === 'privacy'
+              ? getPrivacyRequests(token).then(
+                  (result) => active && setPrivacyRequests(result.requests),
                 )
-              : view === 'content'
-                ? Promise.all([
-                    getOnboardingProfiles(token),
-                    getPlatformReviews(token),
-                  ]).then(([profileResult, reviewResult]) => {
-                    if (active) {
-                      setProfiles(profileResult.profiles);
-                      setOnboardingSummary(profileResult.summary);
-                      setPendingRegistrations(
-                        profileResult.pendingRegistrations,
-                      );
-                      setAbandonedAfterHours(profileResult.abandonedAfterHours);
-                      setReviews(reviewResult.reviews);
-                    }
-                  })
-                : view === 'configuration'
-                  ? getPlatformConfigurations(token).then(
-                      (result) =>
-                        active && setConfigurations(result.configurations),
-                    )
-                  : view === 'security'
-                    ? Promise.all([
-                        getPlatformOperators(token),
-                        getPlatformSessions(token),
-                      ]).then(([operatorResult, sessionResult]) => {
-                        if (active) {
-                          setOperators(operatorResult.operators);
-                          setSessions(sessionResult.sessions);
-                        }
-                      })
-                    : getSystemHealth(token).then(
-                        (result) => active && setHealth(result),
-                      );
+              : view === 'overrides'
+                ? getPlatformOverrides(token).then(
+                    (result) => active && setOverrides(result.overrides),
+                  )
+                : view === 'content'
+                  ? Promise.all([
+                      getOnboardingProfiles(token),
+                      getPlatformReviews(token),
+                    ]).then(([profileResult, reviewResult]) => {
+                      if (active) {
+                        setProfiles(profileResult.profiles);
+                        setOnboardingSummary(profileResult.summary);
+                        setPendingRegistrations(
+                          profileResult.pendingRegistrations,
+                        );
+                        setAbandonedAfterHours(
+                          profileResult.abandonedAfterHours,
+                        );
+                        setReviews(reviewResult.reviews);
+                      }
+                    })
+                  : view === 'configuration'
+                    ? getPlatformConfigurations(token).then(
+                        (result) =>
+                          active && setConfigurations(result.configurations),
+                      )
+                    : view === 'security'
+                      ? Promise.all([
+                          getPlatformOperators(token),
+                          getPlatformSessions(token),
+                        ]).then(([operatorResult, sessionResult]) => {
+                          if (active) {
+                            setOperators(operatorResult.operators);
+                            setSessions(sessionResult.sessions);
+                          }
+                        })
+                      : getSystemHealth(token).then(
+                          (result) => active && setHealth(result),
+                        );
     void load.catch((error: unknown) => {
       if (active)
         onToast(
@@ -1546,7 +1649,7 @@ export function PlatformOperations({
     return () => {
       active = false;
     };
-  }, [onToast, reload, token, view]);
+  }, [onToast, reload, surveyPage, surveySearch, token, view]);
 
   async function run(action: () => Promise<unknown>, success: string) {
     setBusy(true);
@@ -1583,6 +1686,20 @@ export function PlatformOperations({
               'Alerta actualizada y auditada.',
             );
         }}
+      />
+    );
+  if (view === 'surveys')
+    return (
+      <WelcomeSurveyResponsesView
+        onPage={setSurveyPage}
+        onSearch={(search) => {
+          setSurveyPage(1);
+          setSurveySearch(search);
+        }}
+        page={surveyPage}
+        responses={surveyResponses}
+        search={surveySearch}
+        totalPages={surveyTotalPages}
       />
     );
   if (view === 'cases')

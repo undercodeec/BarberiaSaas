@@ -1,6 +1,7 @@
 import {
   EXTRA_QUICK_ACTIONS,
   shouldCelebrateSubscriptionActivation,
+  shouldShowWelcomeSurvey,
 } from './dashboard-model';
 
 describe('accesos rápidos del dashboard', () => {
@@ -39,6 +40,20 @@ describe('celebración de suscripción', () => {
         { planCode: 'essential', status: 'active' },
         { planCode: 'essential', status: 'active' },
       ),
+    ).toBe(false);
+  });
+});
+
+describe('encuesta de bienvenida', () => {
+  it('solo se muestra cuando la API confirma que no existe respuesta', () => {
+    expect(shouldShowWelcomeSurvey({ response: null })).toBe(true);
+    expect(
+      shouldShowWelcomeSurvey({
+        response: {
+          selectedOptions: ['Buscador'],
+          submittedAt: '2026-08-28T00:00:00.000Z',
+        },
+      }),
     ).toBe(false);
   });
 });

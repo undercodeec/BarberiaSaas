@@ -5,7 +5,12 @@ import type {
   CurrentCashRegisterResponse,
   InventoryResponse,
   SubscriptionResponse,
+  WelcomeSurveyResponseResult,
 } from '@barber-saas/api-client';
+import {
+  WELCOME_SURVEY_OPTIONS,
+  type WelcomeSurveyOption,
+} from '@barber-saas/validation';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
@@ -16,21 +21,11 @@ export const SUBSCRIPTION_NOTICE_TRIAL_DAYS = 3;
 export const SUBSCRIPTION_NOTICE_ACTIVE_DAYS = 5;
 export const DASHBOARD_BANNER_DELAY_MS = 1_500;
 export const LOCATION_BANNER_DELAY_MS = 500;
-export const WELCOME_SURVEY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
-export const WELCOME_SURVEY_RESPONSE_KEY =
-  'barber-saas.welcome-survey-response';
 export const QUICK_ACTIONS_STORAGE_KEY = 'barber-saas.dashboard-quick-actions';
 export const SUBSCRIPTION_CELEBRATION_STORAGE_KEY =
   'barber-saas.subscription-celebration';
-export const WELCOME_SURVEY_OPTIONS = [
-  'Publicidad',
-  'Redes sociales de Nava (Facebook o Instagram)',
-  'Buscador',
-  'Recomendaci\u00f3n de una academia, clase u otro negocio',
-  'Evento o feria',
-] as const;
-
-export type WelcomeSurveyOption = (typeof WELCOME_SURVEY_OPTIONS)[number];
+export { WELCOME_SURVEY_OPTIONS };
+export type { WelcomeSurveyOption };
 export type SubscriptionCelebrationState = Pick<
   SubscriptionResponse['current'],
   'planCode' | 'status'
@@ -95,10 +90,6 @@ export const EXTRA_QUICK_ACTIONS: ReadonlyArray<{
     route: '/reviews-management',
   },
 ];
-
-export function welcomeSurveyStorageKey(userId: string) {
-  return `${WELCOME_SURVEY_RESPONSE_KEY}.${userId}`;
-}
 
 export function quickActionsStorageKey(userId: string) {
   return `${QUICK_ACTIONS_STORAGE_KEY}.${userId}`;
@@ -193,75 +184,8 @@ export async function storeExtraQuickActionIds(
   await SecureStore.setItemAsync(key, value);
 }
 
-export async function getWelcomeSurveyResponse(
-  userId: string,
-): Promise<string | null> {
-  const key = welcomeSurveyStorageKey(userId);
-  if (Platform.OS === 'web') return globalThis.localStorage.getItem(key);
-  return SecureStore.getItemAsync(key);
-}
-
-export async function storeWelcomeSurveyResponse(
-  userId: string,
-  selectedOptions: readonly WelcomeSurveyOption[],
-) {
-  const key = welcomeSurveyStorageKey(userId);
-  const value = JSON.stringify({
-    selectedOptions,
-    submittedAt: new Date().toISOString(),
-  });
-
-  if (Platform.OS === 'web') {
-    globalThis.localStorage.setItem(key, value);
-    return;
-  }
-  await SecureStore.setItemAsync(key, value);
-}
-
-export async function markWelcomeSurveyDismissed(
-  userId: string,
-  sessionExpiresAt: string | null,
-) {
-  const key = welcomeSurveyStorageKey(userId);
-  const value = JSON.stringify({
-    dismissedAt: new Date().toISOString(),
-    sessionExpiresAt,
-  });
-
-  if (Platform.OS === 'web') {
-    globalThis.localStorage.setItem(key, value);
-    return;
-  }
-  await SecureStore.setItemAsync(key, value);
-}
-
-export function shouldShowWelcomeSurvey(
-  storedResponse: string | null,
-  sessionExpiresAt: string | null,
-) {
-  if (storedResponse === null) return true;
-
-  try {
-    const response = JSON.parse(storedResponse) as {
-      readonly dismissedAt?: unknown;
-      readonly sessionExpiresAt?: unknown;
-      readonly submittedAt?: unknown;
-    };
-
-    if (typeof response.dismissedAt === 'string') {
-      return response.sessionExpiresAt !== sessionExpiresAt;
-    }
-
-    const interactedAt = response.submittedAt ?? response.dismissedAt;
-
-    if (typeof interactedAt !== 'string') return true;
-    const interactedAtMs = Date.parse(interactedAt);
-    if (Number.isNaN(interactedAtMs)) return true;
-
-    return Date.now() - interactedAtMs >= WELCOME_SURVEY_INTERVAL_MS;
-  } catch {
-    return true;
-  }
+export function shouldShowWelcomeSurvey(result: WelcomeSurveyResponseResult) {
+  return result.response === null;
 }
 
 export async function syncPushToken() {

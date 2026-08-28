@@ -61,6 +61,7 @@ type View =
   | 'privacy'
   | 'security'
   | 'subscriptions'
+  | 'surveys'
   | 'users';
 type ModalState = {
   readonly organization: PlatformOrganization;
@@ -1207,6 +1208,7 @@ export default function AdminConsole() {
         label: 'Organizaciones',
       },
       { icon: 'users', id: 'users' as const, label: 'Usuarios' },
+      { icon: 'audit', id: 'surveys' as const, label: 'Encuestas' },
       {
         badge: notificationErrors.length,
         icon: 'bell',
@@ -1613,7 +1615,8 @@ export default function AdminConsole() {
             view === 'operations' ||
             view === 'overrides' ||
             view === 'privacy' ||
-            view === 'security') ? (
+            view === 'security' ||
+            view === 'surveys') ? (
             <PlatformOperations
               currentOperatorId={operator.id}
               currentRole={operator.role}

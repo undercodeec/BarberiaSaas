@@ -8,6 +8,7 @@ import {
   getOrganizations,
   getPlatformSession,
   getPlatformUsers,
+  getWelcomeSurveyResponses,
   requestPlatformAccessCode,
   startPlatformLogin,
   updatePlatformAlert,
@@ -300,6 +301,32 @@ describe('cliente del panel de plataforma', () => {
     const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toContain('/v1/platform/exports/audit.csv?');
     expect(url).toContain('from=2026-08-01T00%3A00%3A00.000Z');
+    expect(new Headers(options.headers).get('authorization')).toBe(
+      'Bearer session-token',
+    );
+  });
+
+  it('consulta respuestas de bienvenida con búsqueda y sesión autorizada', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          pagination: { page: 2, pageSize: 25, total: 0, totalPages: 1 },
+          responses: [],
+        }),
+        { headers: { 'content-type': 'application/json' }, status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await getWelcomeSurveyResponses('session-token', {
+      page: 2,
+      search: 'persona@nava.ec',
+    });
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/v1/platform/welcome-survey-responses?');
+    expect(url).toContain('page=2');
+    expect(url).toContain('search=persona%40nava.ec');
     expect(new Headers(options.headers).get('authorization')).toBe(
       'Bearer session-token',
     );

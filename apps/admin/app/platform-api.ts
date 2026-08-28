@@ -115,6 +115,22 @@ export interface PlatformUserList {
   readonly users: readonly PlatformUser[];
 }
 
+export interface PlatformWelcomeSurveyResponse {
+  readonly id: string;
+  readonly selectedOptions: readonly string[];
+  readonly submittedAt: string;
+  readonly user: {
+    readonly email: string;
+    readonly fullName: string;
+    readonly id: string;
+  };
+}
+
+export interface PlatformWelcomeSurveyResponseList {
+  readonly pagination: OrganizationList['pagination'];
+  readonly responses: readonly PlatformWelcomeSurveyResponse[];
+}
+
 export interface PlatformUserDetail {
   readonly user: {
     readonly account: {
@@ -627,6 +643,22 @@ export async function getPlatformUsers(
   if (input.search) query.set('search', input.search);
   return request<PlatformUserList>(
     `/v1/platform/users?${query.toString()}`,
+    {},
+    token,
+  );
+}
+
+export async function getWelcomeSurveyResponses(
+  token: string,
+  input: { readonly page: number; readonly search: string },
+) {
+  const query = new URLSearchParams({
+    page: String(input.page),
+    pageSize: '25',
+  });
+  if (input.search) query.set('search', input.search);
+  return request<PlatformWelcomeSurveyResponseList>(
+    `/v1/platform/welcome-survey-responses?${query.toString()}`,
     {},
     token,
   );

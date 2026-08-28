@@ -444,6 +444,55 @@ describeWithDatabase('API con PostgreSQL', () => {
     };
   }
 
+  it('persiste una única respuesta de bienvenida por usuario', async () => {
+    const token = await register('welcome-survey@example.com');
+    const headers = { authorization: `Bearer ${token}` };
+
+    const before = await app.inject({
+      headers,
+      method: 'GET',
+      url: '/v1/welcome-survey-response',
+    });
+    expect(before.statusCode).toBe(200);
+    expect(before.json()).toEqual({ response: null });
+
+    const created = await app.inject({
+      headers,
+      method: 'POST',
+      payload: { selectedOptions: ['Buscador'] },
+      url: '/v1/welcome-survey-response',
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({
+      response: { selectedOptions: ['Buscador'] },
+    });
+
+    const replay = await app.inject({
+      headers,
+      method: 'POST',
+      payload: { selectedOptions: ['Publicidad'] },
+      url: '/v1/welcome-survey-response',
+    });
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json()).toMatchObject({
+      response: { selectedOptions: ['Buscador'] },
+    });
+
+    const invalid = await app.inject({
+      headers,
+      method: 'POST',
+      payload: { selectedOptions: ['Canal no registrado'] },
+      url: '/v1/welcome-survey-response',
+    });
+    expect(invalid.statusCode).toBe(400);
+
+    const anonymous = await app.inject({
+      method: 'GET',
+      url: '/v1/welcome-survey-response',
+    });
+    expect(anonymous.statusCode).toBe(401);
+  });
+
   it('crea cuenta, sesión y onboarding atómico', async () => {
     const token = await register('owner@example.com');
     const created = await onboard(token, 'barberia-principal');
@@ -4468,6 +4517,28 @@ describeWithDatabase('API con PostgreSQL', () => {
     const owner = await database.user.findUniqueOrThrow({
       where: { email: 'pilot-owner@example.com' },
     });
+    await database.welcomeSurveyResponse.create({
+      data: {
+        selectedOptions: ['Buscador'],
+        userId: owner.id,
+      },
+    });
+    const welcomeSurveyResponses = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'GET',
+      url: '/v1/platform/welcome-survey-responses?search=pilot-owner',
+    });
+    expect(welcomeSurveyResponses.statusCode).toBe(200);
+    expect(welcomeSurveyResponses.json()).toMatchObject({
+      pagination: { page: 1, total: 1 },
+      responses: [
+        {
+          selectedOptions: ['Buscador'],
+          user: { email: 'pilot-owner@example.com', id: owner.id },
+        },
+      ],
+    });
+
     await database.appNotification.create({
       data: {
         body: 'No se expone en el panel.',
