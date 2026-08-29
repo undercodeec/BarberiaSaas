@@ -155,7 +155,7 @@ export default function RescheduleBookingScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: 116 + layout.bottomInset },
+          { paddingBottom: 100 + layout.bottomActionPadding },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -300,7 +300,9 @@ export default function RescheduleBookingScreen() {
           </View>
         ) : null}
       </ScrollView>
-      <View style={[styles.footer, { paddingBottom: 16 + layout.bottomInset }]}>
+      <View
+        style={[styles.footer, { paddingBottom: layout.bottomActionPadding }]}
+      >
         <Pressable
           disabled={!startsAt || reschedule.isPending}
           onPress={() => reschedule.mutate()}

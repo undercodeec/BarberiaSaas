@@ -423,7 +423,12 @@ export default function BookingDetailsScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: 130 + layout.bottomInset },
+        ]}
+      >
         {step === 'professional' ? (
           <>
             <Text style={styles.title}>Elige al profesional</Text>
@@ -773,7 +778,9 @@ export default function BookingDetailsScreen() {
         ) : null}
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View
+        style={[styles.footer, { paddingBottom: layout.bottomActionPadding }]}
+      >
         {step === 'professional' ? (
           <ActionButton
             disabled={!professionalId}

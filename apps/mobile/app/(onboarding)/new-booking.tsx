@@ -15,12 +15,14 @@ import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 import {
   appTheme,
   goldButtonShadow,
+  useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { ClientFormSheet } from './clients';
 
 export default function NewBookingScreen() {
   const { session } = useAuth();
   const tenant = useTenantScope();
+  const layout = useNativeLayoutMetrics();
   const router = useRouter();
   const organizationQuery = useCurrentOrganization();
   const clientAccess = clientAccessForRole(
@@ -74,7 +76,10 @@ export default function NewBookingScreen() {
         <View style={styles.headerSpacer} />
       </View>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: 130 + layout.bottomInset },
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.title}>Elige a tu cliente</Text>
@@ -163,7 +168,9 @@ export default function NewBookingScreen() {
           visible={isCreateClientOpen}
         />
       ) : null}
-      <View style={styles.footer}>
+      <View
+        style={[styles.footer, { paddingBottom: layout.bottomActionPadding }]}
+      >
         <View style={styles.progressTrack}>
           <View style={styles.progressValue} />
         </View>

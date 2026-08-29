@@ -871,7 +871,7 @@ export default function AgendaScreen() {
           <ScrollView
             contentContainerStyle={[
               styles.timelineContent,
-              { paddingBottom: layout.bottomInset + 84 },
+              { paddingBottom: layout.bottomNavigationContentPadding },
             ]}
             showsVerticalScrollIndicator={false}
             style={styles.timelinePage}
@@ -960,7 +960,7 @@ export default function AgendaScreen() {
           <ScrollView
             contentContainerStyle={[
               styles.timelineContent,
-              { paddingBottom: layout.bottomInset + 84 },
+              { paddingBottom: layout.bottomNavigationContentPadding },
             ]}
             showsVerticalScrollIndicator={false}
             style={styles.timelinePage}
@@ -1065,7 +1065,7 @@ export default function AgendaScreen() {
           <ScrollView
             contentContainerStyle={[
               styles.timelineContent,
-              { paddingBottom: layout.bottomInset + 84 },
+              { paddingBottom: layout.bottomNavigationContentPadding },
             ]}
             showsVerticalScrollIndicator={false}
             style={styles.timelinePage}

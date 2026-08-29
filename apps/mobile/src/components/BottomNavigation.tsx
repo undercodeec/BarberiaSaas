@@ -10,6 +10,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import {
+  bottomActionPadding,
+  bottomNavigationContentPadding,
+  bottomSafeAreaInset,
+} from '../lib/safe-area-layout';
+
 export type NavigationTab =
   'agenda' | 'cash' | 'clients' | 'dashboard' | 'settings';
 
@@ -86,9 +92,14 @@ export function useNativeLayoutMetrics(sheetRatio = 0.88) {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const availableHeight = Math.max(1, height - insets.top - insets.bottom - 12);
+  const bottomInset = bottomSafeAreaInset(insets.bottom);
 
   return {
-    bottomInset: Math.max(insets.bottom, 12),
+    bottomActionPadding: bottomActionPadding(insets.bottom),
+    bottomInset,
+    bottomNavigationContentPadding: bottomNavigationContentPadding(
+      insets.bottom,
+    ),
     sheetMaxHeight: Math.floor(Math.min(height * sheetRatio, availableHeight)),
     topInset: Math.max(insets.top, 12),
   } as const;
@@ -149,7 +160,10 @@ export function BottomNavigation({
   return (
     <View
       accessibilityRole="tablist"
-      style={[styles.navigation, { bottom: Math.max(insets.bottom, 12) }]}
+      style={[
+        styles.navigation,
+        { bottom: bottomSafeAreaInset(insets.bottom) },
+      ]}
     >
       {items.map((item) => {
         const selected = item.value === active;

@@ -707,7 +707,7 @@ export default function ClientsScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: layout.bottomInset + 84 },
+          { paddingBottom: layout.bottomNavigationContentPadding },
         ]}
         keyboardShouldPersistTaps="handled"
       >
@@ -917,7 +917,7 @@ export default function ClientsScreen() {
           {...floatingClientPanResponder.panHandlers}
           style={[
             styles.floatingAdd,
-            { bottom: layout.bottomInset + 84 },
+            { bottom: layout.bottomNavigationContentPadding },
             { transform: floatingClientOffset.getTranslateTransform() },
           ]}
         >

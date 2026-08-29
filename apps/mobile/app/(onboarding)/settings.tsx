@@ -248,7 +248,7 @@ export default function SettingsScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: layout.bottomInset + 84 },
+          { paddingBottom: layout.bottomNavigationContentPadding },
         ]}
       >
         <View style={styles.header}>

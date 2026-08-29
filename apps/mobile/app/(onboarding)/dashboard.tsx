@@ -565,7 +565,7 @@ export default function DashboardScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: layout.bottomInset + 84 },
+          { paddingBottom: layout.bottomNavigationContentPadding },
         ]}
         showsVerticalScrollIndicator={false}
       >

@@ -14,15 +14,13 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   appStyles,
   appTheme,
   goldButtonShadow,
+  useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { NavaButton } from '../../src/components/NavaButton';
 import {
@@ -45,7 +43,7 @@ export default function ServicesOnboardingScreen() {
   const queryClient = useQueryClient();
   const { session, user } = useAuth();
   const { height, width } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
+  const layout = useNativeLayoutMetrics();
   const compact = height < 850;
   const [serviceSheetOpen, setServiceSheetOpen] = useState(false);
   const [editingService, setEditingService] = useState<StoredService | null>(
@@ -267,9 +265,7 @@ export default function ServicesOnboardingScreen() {
         </View>
       </ScrollView>
 
-      <View
-        style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}
-      >
+      <View style={[styles.footer, { paddingBottom: layout.bottomInset }]}>
         <NavaButton
           disabled={services.length === 0}
           foregroundColor={appTheme.colors.accentDark}

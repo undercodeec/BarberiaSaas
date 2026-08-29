@@ -18,6 +18,7 @@ import {
   appStyles,
   appTheme,
   goldButtonShadow,
+  useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { requireApiClient } from '../../src/lib/api';
@@ -43,6 +44,7 @@ const leadOptions = [
 export default function BookingSettingsScreen() {
   const { session } = useAuth();
   const tenant = useTenantScope();
+  const layout = useNativeLayoutMetrics();
   const router = useRouter();
   const queryClient = useQueryClient();
   const settingsQuery = useQuery({
@@ -92,7 +94,7 @@ export default function BookingSettingsScreen() {
   if (!session) return <Redirect href="/(auth)/login" />;
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
       <View style={styles.header}>
         <Pressable
           onPress={() =>
@@ -112,7 +114,12 @@ export default function BookingSettingsScreen() {
         </View>
         <View style={styles.spacer} />
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: 130 + layout.bottomInset },
+        ]}
+      >
         {!current ? (
           <Text style={styles.empty}>
             {settingsQuery.isError
@@ -230,7 +237,9 @@ export default function BookingSettingsScreen() {
         )}
       </ScrollView>
       {current ? (
-        <View style={styles.footer}>
+        <View
+          style={[styles.footer, { paddingBottom: layout.bottomActionPadding }]}
+        >
           <Pressable
             disabled={
               saveSettings.isPending || current.policyText.trim().length < 20
