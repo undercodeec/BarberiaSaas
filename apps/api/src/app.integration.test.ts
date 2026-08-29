@@ -445,6 +445,57 @@ describeWithDatabase('API con PostgreSQL', () => {
     };
   }
 
+  it('expone preferencias de notificacion predeterminadas y permite actualizar solo las no criticas', async () => {
+    const token = await register('notification-preferences@example.com');
+    const headers = { authorization: `Bearer ${token}` };
+
+    const defaults = await app.inject({
+      headers,
+      method: 'GET',
+      url: '/v1/notification-preferences',
+    });
+    expect(defaults.statusCode).toBe(200);
+    expect(defaults.json()).toEqual({
+      preferences: expect.arrayContaining([
+        expect.objectContaining({ category: 'agenda', pushEnabled: true }),
+        expect.objectContaining({ category: 'billing', pushEnabled: true }),
+        expect.objectContaining({ category: 'security', pushEnabled: true }),
+      ]),
+    });
+
+    const updated = await app.inject({
+      headers,
+      method: 'PUT',
+      payload: { category: 'agenda', pushEnabled: false },
+      url: '/v1/notification-preferences',
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json()).toMatchObject({
+      preference: { category: 'agenda', pushEnabled: false },
+    });
+
+    const persisted = await app.inject({
+      headers,
+      method: 'GET',
+      url: '/v1/notification-preferences',
+    });
+    expect(persisted.json()).toEqual({
+      preferences: expect.arrayContaining([
+        expect.objectContaining({ category: 'agenda', pushEnabled: false }),
+      ]),
+    });
+
+    for (const category of ['billing', 'security']) {
+      const disableCritical = await app.inject({
+        headers,
+        method: 'PUT',
+        payload: { category, pushEnabled: false },
+        url: '/v1/notification-preferences',
+      });
+      expect(disableCritical.statusCode).toBe(400);
+    }
+  });
+
   it('solicita la confirmacion de cobro al completar una cita y solo la registra en Caja al aprobarla', async () => {
     const agenda = await setupAgenda('confirmacion-cobro-servicio');
     const created = await app.inject({

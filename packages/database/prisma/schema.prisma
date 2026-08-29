@@ -285,7 +285,25 @@ enum AppNotificationType {
   APPOINTMENT_CREATED
   APPOINTMENT_CANCELLED
   APPOINTMENT_RESCHEDULED
+  APPOINTMENT_REMINDER
   PAYMENT_CONFIRMATION_REQUIRED
+  CASH_REGISTER_CLOSED
+  CASH_REGISTER_VARIANCE
+  LOW_STOCK
+  TEAM_MEMBER_ACCEPTED
+  REVIEW_NEGATIVE
+  SUBSCRIPTION_RENEWAL
+}
+
+enum NotificationCategory {
+  AGENDA
+  CASH
+  INVENTORY
+  TEAM
+  REVIEWS
+  SUBSCRIPTION
+  BILLING
+  SECURITY
 }
 
 enum RegistrationAccountType {
@@ -385,6 +403,7 @@ model User {
   reviewsHidden                        AppointmentReview[]            @relation("ReviewHiddenBy")
   portfolioItems                       UserPortfolioItem[]
   appNotifications                     AppNotification[]
+  notificationPreferences              NotificationPreference[]
   pushTokens                           PushToken[]
   payphoneManualConfirmations          PaymentAttempt[]               @relation("PayphoneManualConfirmation")
   platformOperator                     PlatformOperator?              @relation("PlatformOperatorUser")
@@ -1992,6 +2011,19 @@ model AppNotification {
 
   @@index([userId, readAt, createdAt])
   @@map("app_notifications")
+}
+
+model NotificationPreference {
+  id          String               @id @default(uuid()) @db.Uuid
+  userId      String               @map("user_id") @db.Uuid
+  category    NotificationCategory
+  pushEnabled Boolean              @default(true) @map("push_enabled")
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category])
+  @@map("notification_preferences")
 }
 
 model PushToken {

@@ -2,6 +2,7 @@
   AppNotificationType,
   MembershipRole,
   MembershipStatus,
+  NotificationCategory,
   type DatabaseClient,
 } from '@barber-saas/database';
 import { z } from 'zod';
@@ -30,6 +31,34 @@ const pushTokenSchema = z.object({
   platform: z.enum(['android', 'ios', 'web']),
   token: z.string().trim().min(10).max(255),
 });
+const notificationPreferenceSchema = z.object({
+  category: z.enum([
+    'agenda',
+    'cash',
+    'inventory',
+    'team',
+    'reviews',
+    'subscription',
+    'billing',
+    'security',
+  ]),
+  pushEnabled: z.boolean(),
+});
+const notificationCategories = [
+  'agenda',
+  'cash',
+  'inventory',
+  'team',
+  'reviews',
+  'subscription',
+  'billing',
+  'security',
+] as const;
+const protectedNotificationCategories = new Set(['billing', 'security']);
+
+function notificationCategory(value: string): NotificationCategory {
+  return value.toUpperCase() as NotificationCategory;
+}
 
 // Las notificaciones son avisos temporales, no un historial permanente. La
 // limpieza ocurre al consultar la bandeja, por lo que no depende de que el
@@ -173,6 +202,48 @@ export function registerNotificationRoutes(
   database: DatabaseClient,
   authenticate: Authenticate,
 ) {
+  app.get('/v1/notification-preferences', async (request) => {
+    const { user } = await authenticate(database, request);
+    const savedPreferences = await database.notificationPreference.findMany({
+      where: { userId: user.id },
+    });
+    const preferencesByCategory = new Map(
+      savedPreferences.map((preference) => [preference.category, preference]),
+    );
+    return {
+      preferences: notificationCategories.map((category) => ({
+        category,
+        pushEnabled:
+          preferencesByCategory.get(notificationCategory(category))
+            ?.pushEnabled ?? true,
+      })),
+    };
+  });
+  app.put('/v1/notification-preferences', async (request, reply) => {
+    const { user } = await authenticate(database, request);
+    const input = notificationPreferenceSchema.parse(request.body);
+    if (
+      protectedNotificationCategories.has(input.category) &&
+      !input.pushEnabled
+    )
+      return reply.status(400).send({
+        code: 'NOTIFICATION_PREFERENCE_PROTECTED',
+        message:
+          'Las notificaciones de seguridad y facturación no se pueden desactivar.',
+      });
+    const category = notificationCategory(input.category);
+    const preference = await database.notificationPreference.upsert({
+      create: { category, pushEnabled: input.pushEnabled, userId: user.id },
+      update: { pushEnabled: input.pushEnabled },
+      where: { userId_category: { category, userId: user.id } },
+    });
+    return {
+      preference: {
+        category: preference.category.toLowerCase(),
+        pushEnabled: preference.pushEnabled,
+      },
+    };
+  });
   app.get('/v1/notifications', async (request) => {
     const { user } = await authenticate(database, request);
     await database.appNotification.deleteMany({
