@@ -89,6 +89,8 @@ const notificationCategoryByType: Record<
   [AppNotificationType.REVIEW_NEGATIVE]: NotificationCategory.REVIEWS,
   [AppNotificationType.SUBSCRIPTION_RENEWAL]: NotificationCategory.SUBSCRIPTION,
   [AppNotificationType.TEAM_MEMBER_ACCEPTED]: NotificationCategory.TEAM,
+  [AppNotificationType.TEAM_MEMBER_UPDATED]: NotificationCategory.TEAM,
+  [AppNotificationType.SCHEDULE_UPDATED]: NotificationCategory.TEAM,
 };
 
 export function notificationCategoryForType(

@@ -2404,6 +2404,25 @@ describeWithDatabase('API con PostgreSQL', () => {
         whatsappPhone: '0999999998',
       },
     });
+    const manager = await database.user.create({
+      data: {
+        email: 'reassignment-manager@example.com',
+        fullName: 'Gerente Norte',
+      },
+    });
+    const managerMembership = await database.membership.create({
+      data: {
+        organizationId: organization.organizationId,
+        role: 'MANAGER',
+        userId: manager.id,
+      },
+    });
+    await database.memberLocation.create({
+      data: {
+        locationId: secondLocation.id,
+        membershipId: managerMembership.id,
+      },
+    });
     const invitationResponse = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },
       method: 'POST',
@@ -2425,6 +2444,21 @@ describeWithDatabase('API con PostgreSQL', () => {
       url: '/v1/team/invitations/accept',
     });
     expect(acceptanceResponse.statusCode).toBe(200);
+    const receptionistUserId = (
+      await database.membership.findUniqueOrThrow({
+        select: { userId: true },
+        where: { id: membershipId },
+      })
+    ).userId;
+    const ownerUserId = (
+      await database.membership.findFirstOrThrow({
+        select: { userId: true },
+        where: {
+          organizationId: organization.organizationId,
+          role: 'OWNER',
+        },
+      })
+    ).userId;
 
     const locationsResponse = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },
@@ -2445,7 +2479,7 @@ describeWithDatabase('API con PostgreSQL', () => {
         commissionPercentage: null,
         fullName: 'Recepcionista reasignada',
         locationIds: [secondLocation.id],
-        role: 'receptionist',
+        role: 'manager',
       },
       url: `/v1/team/members/${membershipId}`,
     });
@@ -2457,6 +2491,92 @@ describeWithDatabase('API con PostgreSQL', () => {
         where: { membershipId },
       }),
     ).toEqual([expect.objectContaining({ locationId: secondLocation.id })]);
+
+    const notifications = await database.appNotification.findMany({
+      select: { type: true, userId: true },
+      where: { organizationId: organization.organizationId },
+    });
+    const teamUpdateNotifications = notifications.filter(
+      ({ type }) => String(type) === 'TEAM_MEMBER_UPDATED',
+    );
+    expect(teamUpdateNotifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'TEAM_MEMBER_UPDATED',
+          userId: receptionistUserId,
+        }),
+        expect.objectContaining({
+          type: 'TEAM_MEMBER_UPDATED',
+          userId: manager.id,
+        }),
+      ]),
+    );
+    expect(teamUpdateNotifications).toHaveLength(2);
+    expect(teamUpdateNotifications).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'TEAM_MEMBER_UPDATED',
+          userId: ownerUserId,
+        }),
+      ]),
+    );
+  });
+
+  it('notifica al profesional cuando se reemplaza su horario semanal', async () => {
+    const agenda = await setupAgenda('schedule-update-notification');
+    await database.appNotification.deleteMany({
+      where: { organizationId: agenda.organizationId },
+    });
+    const [{ userId: barberUserId }, { userId: ownerUserId }] =
+      await Promise.all([
+        database.membership.findUniqueOrThrow({
+          select: { userId: true },
+          where: { id: agenda.membershipId },
+        }),
+        database.membership.findFirstOrThrow({
+          select: { userId: true },
+          where: {
+            organizationId: agenda.organizationId,
+            role: 'OWNER',
+          },
+        }),
+      ]);
+
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'PUT',
+      payload: {
+        locationId: agenda.locationId,
+        membershipId: agenda.membershipId,
+        schedules: [{ endMinute: 1080, startMinute: 600, weekday: 2 }],
+      },
+      url: '/v1/schedules',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const scheduleUpdateNotifications = (
+      await database.appNotification.findMany({
+        select: { type: true, userId: true },
+        where: { organizationId: agenda.organizationId },
+      })
+    ).filter(({ type }) => String(type) === 'SCHEDULE_UPDATED');
+    expect(scheduleUpdateNotifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'SCHEDULE_UPDATED',
+          userId: barberUserId,
+        }),
+      ]),
+    );
+    expect(scheduleUpdateNotifications).toHaveLength(1);
+    expect(scheduleUpdateNotifications).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'SCHEDULE_UPDATED',
+          userId: ownerUserId,
+        }),
+      ]),
+    );
   });
 
   it('guarda asignaciones informativas para un administrador', async () => {

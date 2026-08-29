@@ -1,4 +1,5 @@
 import {
+  AppNotificationType,
   AppointmentStatus,
   CashRegisterStatus,
   InvitationStatus,
@@ -46,6 +47,7 @@ import type { ApiConfig } from './config';
 import { ApiError, isUniqueConstraintError } from './errors';
 import { resolvePlatformLoginCredentials } from './platform-login-credentials';
 import type { InvitationMailer, PlatformAccessMailer } from './recovery-mailer';
+import type { AppointmentNotifier } from './notifications';
 import {
   createOpaqueToken,
   createVerificationCode,
@@ -1048,6 +1050,13 @@ function assertNoScheduleOverlaps(
       );
     }
   }
+}
+
+function sameIds(left: readonly string[], right: readonly string[]) {
+  return (
+    left.length === right.length &&
+    left.every((id) => right.includes(id))
+  );
 }
 
 function registerPlatformRoutes(
@@ -5161,6 +5170,7 @@ export function registerOperationsRoutes(
     pendingRegistrationId: string,
   ) => Promise<{ readonly verificationExpiresAt: string }>,
   requestPasswordRecovery: (userId: string) => Promise<void>,
+  notifier: AppointmentNotifier | null = null,
 ) {
   registerPlatformRoutes(
     app,
@@ -6358,6 +6368,44 @@ export function registerOperationsRoutes(
       });
       return { membership: updatedMembership, user: updatedUser };
     });
+    const changed =
+      member.role !== role ||
+      !sameIds(previousLocationIds, resultingLocationIds);
+    if (changed) {
+      const affectedLocationIds = [
+        ...new Set([...previousLocationIds, ...resultingLocationIds]),
+      ];
+      const recipients = await database.membership.findMany({
+        select: { userId: true },
+        where: {
+          organizationId: current.organizationId,
+          status: MembershipStatus.ACTIVE,
+          OR: [
+            { role: MembershipRole.OWNER },
+            {
+              memberLocations: {
+                some: { locationId: { in: affectedLocationIds } },
+              },
+              role: MembershipRole.MANAGER,
+            },
+          ],
+        },
+      });
+      await notifier?.notifyOperational?.({
+        actorUserId: user.id,
+        body:
+          `Se actualizÃ³ el rol o las sucursales de ${updated.user.fullName}.`,
+        data: {
+          membershipId: member.id,
+          route: '/team-management',
+          type: 'team_member_updated',
+        },
+        organizationId: current.organizationId,
+        title: 'Integrante actualizado',
+        type: AppNotificationType.TEAM_MEMBER_UPDATED,
+        userIds: [member.userId, ...recipients.map(({ userId }) => userId)],
+      });
+    }
     return {
       member: {
         commissionPercentage:
@@ -7251,7 +7299,7 @@ export function registerOperationsRoutes(
     const input = replaceWeeklySchedulesSchema.parse(request.body);
     assertNoScheduleOverlaps(input.schedules);
     await requireLocation(database, current.organizationId, input.locationId);
-    await requireProfessional(
+    const scheduleOwner = await requireProfessional(
       database,
       current.organizationId,
       input.membershipId,
@@ -7302,6 +7350,19 @@ export function registerOperationsRoutes(
           organizationId: current.organizationId,
         },
       });
+    });
+    await notifier?.notifyOperational?.({
+      actorUserId: user.id,
+      body: 'Tu horario semanal fue actualizado.',
+      data: {
+        locationId: input.locationId,
+        route: '/agenda',
+        type: 'schedule_updated',
+      },
+      organizationId: current.organizationId,
+      title: 'Horario actualizado',
+      type: AppNotificationType.SCHEDULE_UPDATED,
+      userIds: [scheduleOwner.userId],
     });
     return { schedules: input.schedules };
   });
