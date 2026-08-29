@@ -496,6 +496,126 @@ describeWithDatabase('API con PostgreSQL', () => {
     }
   });
 
+  it('conserva en bandeja los avisos de agenda silenciados, excluye al actor y crea recordatorios aunque ya exista otro aviso', async () => {
+    const agenda = await setupAgenda('preferencias-cola-agenda');
+    const memberships = await database.membership.findMany({
+      select: { role: true, userId: true },
+      where: { organizationId: agenda.organizationId },
+    });
+    const ownerUserId = memberships.find(
+      ({ role }) => role === 'OWNER',
+    )?.userId;
+    const barberUserId = memberships.find(
+      ({ role }) => role === 'BARBER',
+    )?.userId;
+    expect(ownerUserId).toBeDefined();
+    expect(barberUserId).toBeDefined();
+    if (!ownerUserId || !barberUserId)
+      throw new Error('La agenda de prueba debe incluir propietario y barbero.');
+    await database.pushToken.create({
+      data: {
+        platform: 'ios',
+        token: 'push-token-for-muted-agenda-recipient',
+        userId: barberUserId,
+      },
+    });
+
+    const muted = await app.inject({
+      headers: { authorization: `Bearer ${agenda.barberToken}` },
+      method: 'PUT',
+      payload: { category: 'agenda', pushEnabled: false },
+      url: '/v1/notification-preferences',
+    });
+    expect(muted.statusCode).toBe(200);
+
+    const created = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        clientName: 'Cliente con avisos silenciados',
+        locationId: agenda.locationId,
+        professionalMembershipId: agenda.membershipId,
+        serviceIds: [agenda.serviceId],
+        startsAt: '2030-01-14T15:00:00.000Z',
+      },
+      url: '/v1/appointments',
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    const appointmentId = created.json<{ appointment: { id: string } }>()
+      .appointment.id;
+
+    const createdNotification = await database.appNotification.findFirstOrThrow({
+      where: {
+        appointmentId,
+        type: 'APPOINTMENT_CREATED',
+        userId: barberUserId,
+      },
+    });
+    expect(
+      (createdNotification.data as {
+        delivery: { push: { state: string } };
+      }).delivery.push.state,
+    ).toBe('skipped');
+    expect(
+      await database.appNotification.count({
+        where: { appointmentId, userId: barberUserId },
+      }),
+    ).toBe(1);
+    expect(
+      await database.appNotification.count({
+        where: { appointmentId, userId: ownerUserId },
+      }),
+    ).toBe(0);
+
+    const reminderStartsAt = new Date(Date.now() + 20 * 60_000);
+    await database.appointment.update({
+      data: {
+        endsAt: new Date(reminderStartsAt.getTime() + 30 * 60_000),
+        startsAt: reminderStartsAt,
+      },
+      where: { id: appointmentId },
+    });
+    await app.close();
+    app = await buildApi({
+      config,
+      database,
+      invitationMailer: {
+        send: (message) => {
+          invitationMessages.push(message);
+          return Promise.resolve();
+        },
+      },
+      platformAccessMailer: {
+        send: (message) => {
+          platformAccessMessages.push(message);
+          return Promise.resolve();
+        },
+      },
+      verificationMailer: {
+        send: (message) => {
+          verificationMessages.push(message);
+          return Promise.resolve();
+        },
+      },
+    });
+
+    let reminder = null;
+    for (let attempt = 0; attempt < 20 && !reminder; attempt += 1) {
+      reminder = await database.appNotification.findFirst({
+        where: {
+          appointmentId,
+          type: 'APPOINTMENT_REMINDER',
+          userId: barberUserId,
+        },
+      });
+      if (!reminder)
+        await new Promise((resolve) => {
+          setTimeout(resolve, 25);
+        });
+    }
+    expect(reminder?.type).toBe('APPOINTMENT_REMINDER');
+  });
+
   it('solicita la confirmacion de cobro al completar una cita y solo la registra en Caja al aprobarla', async () => {
     const agenda = await setupAgenda('confirmacion-cobro-servicio');
     const created = await app.inject({

@@ -19,11 +19,28 @@ type Authenticate = (
 
 export type AppointmentNotificationKind =
   'created' | 'cancelled' | 'rescheduled';
+export interface OperationalNotification {
+  readonly actorUserId?: string;
+  readonly appointmentId?: string;
+  readonly body: string;
+  readonly data: Record<string, string>;
+  readonly organizationId: string;
+  readonly title: string;
+  readonly type: AppNotificationType;
+  readonly userIds: readonly string[];
+}
 export interface AppointmentNotifier {
   notify(
     appointmentId: string,
     kind: AppointmentNotificationKind,
+    actorUserId?: string,
   ): Promise<void>;
+  notifyPaymentConfirmation?(
+    appointmentId: string,
+    actorUserId?: string,
+  ): Promise<void>;
+  notifyReminder?(appointmentId: string): Promise<void>;
+  notifyOperational?(input: OperationalNotification): Promise<void>;
 }
 
 const notificationPathSchema = z.object({ notificationId: z.uuid() });
@@ -55,6 +72,55 @@ const notificationCategories = [
   'security',
 ] as const;
 const protectedNotificationCategories = new Set(['billing', 'security']);
+
+const notificationCategoryByType: Record<
+  AppNotificationType,
+  NotificationCategory
+> = {
+  [AppNotificationType.APPOINTMENT_CREATED]: NotificationCategory.AGENDA,
+  [AppNotificationType.APPOINTMENT_CANCELLED]: NotificationCategory.AGENDA,
+  [AppNotificationType.APPOINTMENT_REMINDER]: NotificationCategory.AGENDA,
+  [AppNotificationType.APPOINTMENT_RESCHEDULED]: NotificationCategory.AGENDA,
+  [AppNotificationType.CASH_REGISTER_CLOSED]: NotificationCategory.CASH,
+  [AppNotificationType.CASH_REGISTER_VARIANCE]: NotificationCategory.CASH,
+  [AppNotificationType.LOW_STOCK]: NotificationCategory.INVENTORY,
+  [AppNotificationType.PAYMENT_CONFIRMATION_REQUIRED]:
+    NotificationCategory.CASH,
+  [AppNotificationType.REVIEW_NEGATIVE]: NotificationCategory.REVIEWS,
+  [AppNotificationType.SUBSCRIPTION_RENEWAL]: NotificationCategory.SUBSCRIPTION,
+  [AppNotificationType.TEAM_MEMBER_ACCEPTED]: NotificationCategory.TEAM,
+};
+
+export function notificationCategoryForType(
+  type: AppNotificationType,
+): NotificationCategory {
+  return notificationCategoryByType[type];
+}
+
+function isCriticalNotification(type: AppNotificationType) {
+  const category = notificationCategoryForType(type);
+  return (
+    category === NotificationCategory.BILLING ||
+    category === NotificationCategory.SECURITY
+  );
+}
+
+export async function isPushEnabledForRecipient(
+  database: DatabaseClient,
+  userId: string,
+  type: AppNotificationType,
+) {
+  if (isCriticalNotification(type)) return true;
+  const preference = await database.notificationPreference.findUnique({
+    where: {
+      userId_category: {
+        category: notificationCategoryForType(type),
+        userId,
+      },
+    },
+  });
+  return preference?.pushEnabled !== false;
+}
 
 function notificationCategory(value: string): NotificationCategory {
   return value.toUpperCase() as NotificationCategory;

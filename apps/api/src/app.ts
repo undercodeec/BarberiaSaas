@@ -54,7 +54,10 @@ import { registerClientRoutes } from './clients';
 import { registerInventoryRoutes } from './inventory';
 import { registerOperationsRoutes } from './operations';
 import { sendFcmNotifications } from './fcm';
-import { registerNotificationRoutes } from './notifications';
+import {
+  isPushEnabledForRecipient,
+  registerNotificationRoutes,
+} from './notifications';
 import type {
   AppointmentNotificationKind,
   AppointmentNotifier,
@@ -275,6 +278,22 @@ function failedNotificationAttempt(attempts: number) {
   };
 }
 
+async function pushDeliveryStateForRecipients(
+  database: DatabaseClient,
+  recipients: readonly { readonly id: string }[],
+  type: AppNotificationType,
+) {
+  const states = await Promise.all(
+    recipients.map(async (recipient) => [
+      recipient.id,
+      (await isPushEnabledForRecipient(database, recipient.id, type))
+        ? ('pending' as const)
+        : ('skipped' as const),
+    ] as const),
+  );
+  return new Map<string, 'pending' | 'skipped'>(states);
+}
+
 let notificationDeliveryRunning = false;
 
 async function processQueuedNotificationDeliveries(
@@ -366,7 +385,7 @@ function createQueuedAppointmentNotifier(
   config: ApiConfig,
 ): AppointmentNotifier {
   return {
-    async notify(appointmentId, kind) {
+    async notify(appointmentId, kind, actorUserId) {
       try {
         const appointment = await database.appointment.findUnique({
           include: {
@@ -383,9 +402,25 @@ function createQueuedAppointmentNotifier(
             organizationId: appointment.organizationId,
             status: MembershipStatus.ACTIVE,
             OR: [
-              { id: appointment.professionalMembershipId },
+              {
+                id: appointment.professionalMembershipId,
+                memberLocations: {
+                  some: { locationId: appointment.locationId },
+                },
+              },
               { role: MembershipRole.OWNER },
-              { role: MembershipRole.MANAGER },
+              {
+                memberLocations: {
+                  some: { locationId: appointment.locationId },
+                },
+                role: MembershipRole.MANAGER,
+              },
+              {
+                memberLocations: {
+                  some: { locationId: appointment.locationId },
+                },
+                role: MembershipRole.RECEPTIONIST,
+              },
             ],
           },
         });
@@ -393,7 +428,7 @@ function createQueuedAppointmentNotifier(
           ...new Map(
             memberships.map((member) => [member.userId, member.user]),
           ).values(),
-        ];
+        ].filter((recipient) => recipient.id !== actorUserId);
         const content = appointmentNotificationCopy(
           kind,
           appointment.clientName,
@@ -404,6 +439,11 @@ function createQueuedAppointmentNotifier(
           timeStyle: 'short',
           timeZone: appointment.location.timezone,
         }).format(appointment.startsAt);
+        const pushStates = await pushDeliveryStateForRecipients(
+          database,
+          recipients,
+          content.type,
+        );
         await database.appNotification.createMany({
           data: recipients.map((recipient) => ({
             appointmentId: appointment.id,
@@ -419,7 +459,10 @@ function createQueuedAppointmentNotifier(
                       ? ('pending' as const)
                       : ('skipped' as const),
                 },
-                push: { attempts: 0, state: 'pending' as const },
+                push: {
+                  attempts: 0,
+                  state: pushStates.get(recipient.id) ?? 'pending',
+                },
               },
               details: `${appointment.clientName} · ${appointment.professional.user.fullName}\n${startsAt}`,
               route: '/agenda',
@@ -436,7 +479,219 @@ function createQueuedAppointmentNotifier(
         // La cita ya quedó confirmada; la cola reintentará entregas persistidas.
       }
     },
+    async notifyPaymentConfirmation(appointmentId, actorUserId) {
+      try {
+        const appointment = await database.appointment.findUnique({
+          include: {
+            professional: { include: { user: true } },
+          },
+          where: { id: appointmentId },
+        });
+        if (!appointment) return;
+        const memberships = await database.membership.findMany({
+          include: { user: { select: { id: true } } },
+          where: {
+            organizationId: appointment.organizationId,
+            status: MembershipStatus.ACTIVE,
+            OR: [
+              { role: MembershipRole.OWNER },
+              {
+                memberLocations: {
+                  some: { locationId: appointment.locationId },
+                },
+                role: MembershipRole.MANAGER,
+              },
+            ],
+          },
+        });
+        const recipients = [
+          ...new Map(
+            memberships.map((member) => [member.userId, member.user]),
+          ).values(),
+        ].filter((recipient) => recipient.id !== actorUserId);
+        if (!recipients.length) return;
+
+        const body = `${appointment.clientName} fue atendido por ${appointment.professional.user.fullName}. Confirma el cobro para registrarlo en Caja.`;
+        const notificationType =
+          AppNotificationType.PAYMENT_CONFIRMATION_REQUIRED;
+        const pushStates = await pushDeliveryStateForRecipients(
+          database,
+          recipients,
+          notificationType,
+        );
+        await database.appNotification.createMany({
+          data: recipients.map((recipient) => ({
+            appointmentId: appointment.id,
+            body,
+            data: {
+              appointmentId: appointment.id,
+              delivery: {
+                email: {
+                  attempts: 0,
+                  state:
+                    config.SMTP_HOST && config.SMTP_FROM
+                      ? ('pending' as const)
+                      : ('skipped' as const),
+                },
+                push: {
+                  attempts: 0,
+                  state: pushStates.get(recipient.id) ?? 'pending',
+                },
+              },
+              route: '/payment-confirmations',
+              type: 'payment_confirmation_required',
+            },
+            organizationId: appointment.organizationId,
+            title: 'Cobro pendiente de confirmar',
+            type: notificationType,
+            userId: recipient.id,
+          })),
+        });
+        await processQueuedNotificationDeliveries(database, config);
+      } catch {
+        // La transaccion de la cita se conserva aunque la entrega falle.
+      }
+    },
+    async notifyReminder(appointmentId) {
+      try {
+        const appointment = await database.appointment.findUnique({
+          include: {
+            professional: {
+              include: {
+                memberLocations: true,
+                user: true,
+              },
+            },
+          },
+          where: { id: appointmentId },
+        });
+        if (!appointment) return;
+        if (
+          appointment.professional.status !== MembershipStatus.ACTIVE ||
+          !appointment.professional.memberLocations.some(
+            ({ locationId }) => locationId === appointment.locationId,
+          )
+        )
+          return;
+        const pushState = await isPushEnabledForRecipient(
+          database,
+          appointment.professional.userId,
+          AppNotificationType.APPOINTMENT_REMINDER,
+        );
+        const startsAt = new Intl.DateTimeFormat('es-EC', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }).format(appointment.startsAt);
+        const created = await database.$transaction(async (transaction) => {
+          await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`appointment-reminder:${appointment.id}`}))`;
+          const existing = await transaction.appNotification.findFirst({
+            where: {
+              appointmentId: appointment.id,
+              type: AppNotificationType.APPOINTMENT_REMINDER,
+              userId: appointment.professional.userId,
+            },
+          });
+          if (existing) return false;
+          await transaction.appNotification.create({
+            data: {
+              appointmentId: appointment.id,
+              body: `Tu cita con ${appointment.clientName} comienza a las ${startsAt}.`,
+              data: {
+                appointmentId: appointment.id,
+                appointmentStartsAt: appointment.startsAt.toISOString(),
+                delivery: {
+                  email: { attempts: 0, state: 'skipped' as const },
+                  push: {
+                    attempts: 0,
+                    state: pushState ? 'pending' : 'skipped',
+                  },
+                },
+                route: '/agenda',
+                type: 'appointment_reminder',
+              },
+              organizationId: appointment.organizationId,
+              title: 'Tu cita comienza pronto',
+              type: AppNotificationType.APPOINTMENT_REMINDER,
+              userId: appointment.professional.userId,
+            },
+          });
+          return true;
+        });
+        if (created) await processQueuedNotificationDeliveries(database, config);
+      } catch {
+        // El recordatorio se intentara en la proxima ejecucion del ciclo.
+      }
+    },
+    async notifyOperational(input) {
+      try {
+        const userIds = [...new Set(input.userIds)].filter(
+          (userId) => userId !== input.actorUserId,
+        );
+        if (!userIds.length) return;
+        const recipients = await database.membership.findMany({
+          select: { userId: true },
+          where: {
+            organizationId: input.organizationId,
+            status: MembershipStatus.ACTIVE,
+            userId: { in: userIds },
+          },
+        });
+        if (!recipients.length) return;
+        const pushStates = await pushDeliveryStateForRecipients(
+          database,
+          recipients.map(({ userId }) => ({ id: userId })),
+          input.type,
+        );
+        await database.appNotification.createMany({
+          data: recipients.map(({ userId }) => ({
+            appointmentId: input.appointmentId ?? null,
+            body: input.body,
+            data: {
+              ...input.data,
+              delivery: {
+                email: { attempts: 0, state: 'skipped' as const },
+                push: {
+                  attempts: 0,
+                  state: pushStates.get(userId) ?? 'pending',
+                },
+              },
+            },
+            organizationId: input.organizationId,
+            title: input.title,
+            type: input.type,
+            userId,
+          })),
+        });
+        await processQueuedNotificationDeliveries(database, config);
+      } catch {
+        // La operacion original no debe fallar si la entrega no esta disponible.
+      }
+    },
   };
+}
+
+async function processAppointmentReminders(
+  database: DatabaseClient,
+  notifier: AppointmentNotifier,
+  now = new Date(),
+) {
+  const dueAt = new Date(now.getTime() + 30 * 60_000);
+  const appointments = await database.appointment.findMany({
+    select: { id: true },
+    where: {
+      appNotifications: {
+        none: { type: AppNotificationType.APPOINTMENT_REMINDER },
+      },
+      reservesSlot: true,
+      startsAt: { gt: now, lte: dueAt },
+      status: {
+        in: [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED],
+      },
+    },
+  });
+  await Promise.all(
+    appointments.map(({ id }) => notifier.notifyReminder?.(id)),
+  );
 }
 
 function minuteForRegistrationTime(
@@ -2153,14 +2408,16 @@ export async function buildApi({
       addressLine: profile?.addressLine ?? null,
       businessName: profile?.businessName ?? null,
       businessLocation,
-      bookingUrl:
-        profile && membership
-          ? publicBookingUrl(
-              config.PUBLIC_WEB_URL,
-              membership?.organization.publicBookingToken ??
-                createSlug(profile.businessName).slice(0, 80),
-            )
-          : null,
+      // Todo miembro activo puede compartir el enlace publico del negocio.
+      // Un colaborador invitado puede no tener perfil de registro propio, pero
+      // su membresia siempre identifica la organizacion que recibe reservas.
+      bookingUrl: membership
+        ? publicBookingUrl(
+            config.PUBLIC_WEB_URL,
+            membership.organization.publicBookingToken ??
+              membership.organization.slug,
+          )
+        : null,
       city: profile?.city ?? null,
       closingTime: profile?.closingTime ?? null,
       coverImageUri: profile?.coverImageUri ?? null,
@@ -2899,6 +3156,7 @@ export async function buildApi({
         );
       }
     },
+    appointmentNotifier,
   );
   registerAgendaRoutes(
     app,
@@ -2921,8 +3179,8 @@ export async function buildApi({
   registerNotificationRoutes(app, database, authenticate);
   registerBusinessScheduleRoutes(app, database, authenticate);
   registerClientRoutes(app, database, authenticate);
-  registerInventoryRoutes(app, database, authenticate);
-  registerCashRegisterRoutes(app, database, authenticate);
+  registerInventoryRoutes(app, database, authenticate, appointmentNotifier);
+  registerCashRegisterRoutes(app, database, authenticate, appointmentNotifier);
   registerCommissionRoutes(app, database, authenticate);
   registerProfileRoutes(app, database, authenticate);
   registerWelcomeSurveyRoutes(app, database, authenticate);
@@ -2954,6 +3212,15 @@ export async function buildApi({
     );
   }, 60_000);
   notificationDeliveryTimer.unref();
+  const appointmentReminderTimer = setInterval(() => {
+    void processAppointmentReminders(database, appointmentNotifier).catch(
+      (error: unknown) => app.log.error(error),
+    );
+  }, 60_000);
+  appointmentReminderTimer.unref();
+  void processAppointmentReminders(database, appointmentNotifier).catch(
+    (error: unknown) => app.log.error(error),
+  );
   const productOrderLifecycleTimer = setInterval(() => {
     void processProductOrderLifecycle(database).catch((error: unknown) =>
       app.log.error(error),
@@ -2966,19 +3233,21 @@ export async function buildApi({
     );
   }, 60_000);
   subscriptionPaymentLifecycleTimer.unref();
-  const subscriptionLifecycleTimer = setInterval(
-    () => {
-      void reconcileSubscriptionLifecycle(database)
-        .then((candidateCount) =>
-          app.log.info({ candidateCount }, 'Subscription lifecycle reconciled'),
-        )
-        .catch((error: unknown) => app.log.error(error));
-      void processSubscriptionRenewalReminders(database, config).catch(
-        (error: unknown) => app.log.error(error),
-      );
-    },
-    60_000,
-  );
+  const subscriptionLifecycleTimer = setInterval(() => {
+    void reconcileSubscriptionLifecycle(database)
+      .then((candidateCount) =>
+        app.log.info({ candidateCount }, 'Subscription lifecycle reconciled'),
+      )
+      .catch((error: unknown) => app.log.error(error));
+    void processSubscriptionRenewalReminders(
+      database,
+      config,
+      undefined,
+      appointmentNotifier,
+    ).catch(
+      (error: unknown) => app.log.error(error),
+    );
+  }, 60_000);
   subscriptionLifecycleTimer.unref();
   const sriInvoiceLifecycleTimer = setInterval(() => {
     void enqueuePendingSriInvoices(database, config).catch((error: unknown) =>
@@ -3025,6 +3294,7 @@ export async function buildApi({
   app.addHook('onClose', async () => {
     clearInterval(publicBookingLifecycleTimer);
     clearInterval(notificationDeliveryTimer);
+    clearInterval(appointmentReminderTimer);
     clearInterval(productOrderLifecycleTimer);
     clearInterval(subscriptionPaymentLifecycleTimer);
     clearInterval(subscriptionLifecycleTimer);
