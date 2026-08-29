@@ -2408,16 +2408,14 @@ export async function buildApi({
       addressLine: profile?.addressLine ?? null,
       businessName: profile?.businessName ?? null,
       businessLocation,
-      // Todo miembro activo puede compartir el enlace publico del negocio.
-      // Un colaborador invitado puede no tener perfil de registro propio, pero
-      // su membresia siempre identifica la organizacion que recibe reservas.
-      bookingUrl: membership
-        ? publicBookingUrl(
-            config.PUBLIC_WEB_URL,
-            membership.organization.publicBookingToken ??
-              membership.organization.slug,
-          )
-        : null,
+      bookingUrl:
+        profile && membership
+          ? publicBookingUrl(
+              config.PUBLIC_WEB_URL,
+              membership?.organization.publicBookingToken ??
+                createSlug(profile.businessName).slice(0, 80),
+            )
+          : null,
       city: profile?.city ?? null,
       closingTime: profile?.closingTime ?? null,
       coverImageUri: profile?.coverImageUri ?? null,
