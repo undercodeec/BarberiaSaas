@@ -6394,7 +6394,7 @@ export function registerOperationsRoutes(
       await notifier?.notifyOperational?.({
         actorUserId: user.id,
         body:
-          `Se actualizÃ³ el rol o las sucursales de ${updated.user.fullName}.`,
+          `Se actualiz\u00f3 el rol o las sucursales de ${updated.user.fullName}.`,
         data: {
           membershipId: member.id,
           route: '/team-management',

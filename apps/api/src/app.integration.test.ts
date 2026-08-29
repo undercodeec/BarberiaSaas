@@ -2493,7 +2493,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     ).toEqual([expect.objectContaining({ locationId: secondLocation.id })]);
 
     const notifications = await database.appNotification.findMany({
-      select: { type: true, userId: true },
+      select: { body: true, type: true, userId: true },
       where: { organizationId: organization.organizationId },
     });
     const teamUpdateNotifications = notifications.filter(
@@ -2502,6 +2502,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(teamUpdateNotifications).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
+          body: expect.stringContaining('actualiz\u00f3'),
           type: 'TEAM_MEMBER_UPDATED',
           userId: receptionistUserId,
         }),
