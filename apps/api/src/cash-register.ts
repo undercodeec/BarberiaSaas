@@ -21,6 +21,11 @@ import {
   assertCanUseProfessional,
   getEntitlements,
 } from './subscription-policy';
+import {
+  hasPermission,
+  type MembershipRole as PermissionRole,
+  type OrganizationPermission,
+} from '@barber-saas/permissions';
 
 type Authenticate = (
   database: DatabaseClient,
@@ -38,6 +43,7 @@ const createMovementSchema = z.object({
   productId: z.uuid().optional(),
   productQuantity: z.number().int().min(1).max(10_000).optional(),
   professionalMembershipId: z.uuid().optional(),
+  sellerMembershipId: z.uuid().optional(),
   serviceId: z.uuid().optional(),
   type: z.enum(['sale', 'deposit', 'other_income', 'expense', 'withdrawal']),
 });
@@ -52,6 +58,70 @@ const openCashRegisterSchema = z.object({
   responsibleMembershipId: z.string().uuid().optional(),
 });
 const cashLocationQuerySchema = z.object({ locationId: z.uuid().optional() });
+const financialRecordsQuerySchema = z.object({
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/u)
+    .optional(),
+  locationId: z.uuid().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(30),
+  paymentMethod: z.enum(['cash', 'card', 'transfer', 'other']).optional(),
+  professionalMembershipId: z.uuid().optional(),
+  sellerMembershipId: z.uuid().optional(),
+  type: z
+    .enum([
+      'sale',
+      'deposit',
+      'other_income',
+      'expense',
+      'withdrawal',
+      'professional_advance',
+      'commission_settlement',
+      'professional_advance_reversal',
+    ])
+    .optional(),
+});
+
+function zonedDateTimeToUtc(
+  localDate: string,
+  minuteOfDay: number,
+  timeZone: string,
+): Date {
+  const [year, month, day] = localDate.split('-').map(Number);
+  if (!year || !month || !day)
+    throw new ApiError(400, 'INVALID_DATE', 'La fecha no es válida.');
+  const target = Date.UTC(
+    year,
+    month - 1,
+    day + Math.floor(minuteOfDay / 1440),
+    Math.floor((minuteOfDay % 1440) / 60),
+    minuteOfDay % 60,
+  );
+  let candidate = target;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      day: '2-digit',
+      hour: '2-digit',
+      hourCycle: 'h23',
+      minute: '2-digit',
+      month: '2-digit',
+      timeZone,
+      year: 'numeric',
+    }).formatToParts(new Date(candidate));
+    const part = (type: Intl.DateTimeFormatPartTypes) =>
+      Number(parts.find((item) => item.type === type)?.value);
+    const representedUtc = Date.UTC(
+      part('year'),
+      part('month') - 1,
+      part('day'),
+      part('hour'),
+      part('minute'),
+    );
+    candidate -= representedUtc - target;
+  }
+  return new Date(candidate);
+}
 
 async function scope(database: DatabaseClient, userId: string) {
   const membership = await database.membership.findFirst({
@@ -99,6 +169,22 @@ async function locationScope(
       'No tienes acceso a esta sucursal.',
     );
   return { ...currentScope, locationId };
+}
+
+function requireCashPermission(
+  currentScope: Awaited<ReturnType<typeof scope>>,
+  permission: Extract<OrganizationPermission, 'cash.read' | 'cash.manage'>,
+) {
+  // Conserva el flujo histórico de caja personal para cuentas sin organización.
+  // En organizaciones, la API —no la UI— es la autoridad financiera.
+  if (!currentScope.organizationId) return;
+  const role = currentScope.role?.toLowerCase() as PermissionRole | undefined;
+  if (role && hasPermission(role, permission)) return;
+  throw new ApiError(
+    403,
+    'FINANCIAL_ACCESS_FORBIDDEN',
+    'No tienes permiso para consultar u operar Caja.',
+  );
 }
 
 function publicSession(session: {
@@ -208,9 +294,13 @@ function publicMovement(movement: {
   productId: string | null;
   productQuantity: number | null;
   professionalMembershipId: string | null;
+  professionalNameSnapshot?: string | null;
+  recordedByNameSnapshot?: string | null;
   reversalReason: string | null;
   reversedAt: Date | null;
   serviceId: string | null;
+  sellerMembershipId?: string | null;
+  sellerNameSnapshot?: string | null;
   type: CashMovementType;
 }) {
   return {
@@ -223,11 +313,162 @@ function publicMovement(movement: {
     productId: movement.productId,
     productQuantity: movement.productQuantity,
     professionalMembershipId: movement.professionalMembershipId,
+    professionalNameSnapshot: movement.professionalNameSnapshot ?? null,
+    recordedByNameSnapshot: movement.recordedByNameSnapshot ?? null,
     reversalReason: movement.reversalReason,
     reversedAt: movement.reversedAt?.toISOString() ?? null,
     serviceId: movement.serviceId,
+    sellerMembershipId: movement.sellerMembershipId ?? null,
+    sellerNameSnapshot: movement.sellerNameSnapshot ?? null,
     type: movement.type.toLowerCase(),
   };
+}
+
+async function publicMovements(
+  database: DatabaseClient,
+  organizationId: string | null,
+  movements: ReadonlyArray<{
+    amountCents: number;
+    appointmentId: string | null;
+    createdAt: Date;
+    createdByUserId: string;
+    description: string;
+    id: string;
+    paymentMethod: PaymentMethod | null;
+    productId: string | null;
+    productQuantity: number | null;
+    professionalMembershipId: string | null;
+    professionalNameSnapshot: string | null;
+    recordedByNameSnapshot: string | null;
+    reversalReason: string | null;
+    reversedAt: Date | null;
+    reversedByUserId: string | null;
+    sellerMembershipId: string | null;
+    sellerNameSnapshot: string | null;
+    serviceId: string | null;
+    type: CashMovementType;
+  }>,
+) {
+  const appointmentIds = movements.flatMap((movement) =>
+    movement.appointmentId ? [movement.appointmentId] : [],
+  );
+  const membershipIds = movements.flatMap((movement) =>
+    [movement.professionalMembershipId, movement.sellerMembershipId].filter(
+      (id): id is string => Boolean(id),
+    ),
+  );
+  const userIds = movements.flatMap((movement) =>
+    [movement.createdByUserId, movement.reversedByUserId].filter(
+      (id): id is string => Boolean(id),
+    ),
+  );
+  const productIds = movements.flatMap((movement) =>
+    movement.productId ? [movement.productId] : [],
+  );
+  const [appointments, memberships, products, users] = await Promise.all([
+    appointmentIds.length && organizationId
+      ? database.appointment.findMany({
+          include: {
+            professional: { include: { user: { select: { fullName: true } } } },
+            services: { orderBy: { sortOrder: 'asc' } },
+          },
+          where: { id: { in: appointmentIds }, organizationId },
+        })
+      : [],
+    membershipIds.length && organizationId
+      ? database.membership.findMany({
+          include: { user: { select: { fullName: true } } },
+          where: { id: { in: membershipIds }, organizationId },
+        })
+      : [],
+    productIds.length && organizationId
+      ? database.product.findMany({
+          select: { id: true, name: true },
+          where: { id: { in: productIds }, organizationId },
+        })
+      : [],
+    userIds.length
+      ? database.user.findMany({
+          select: { fullName: true, id: true },
+          where: { id: { in: userIds } },
+        })
+      : [],
+  ]);
+  const appointmentsById = new Map(appointments.map((row) => [row.id, row]));
+  const membershipsById = new Map(memberships.map((row) => [row.id, row]));
+  const productsById = new Map(products.map((row) => [row.id, row]));
+  const usersById = new Map(users.map((row) => [row.id, row]));
+  return movements.map((movement) => {
+    const appointment = movement.appointmentId
+      ? appointmentsById.get(movement.appointmentId)
+      : undefined;
+    const professional = movement.professionalMembershipId
+      ? membershipsById.get(movement.professionalMembershipId)
+      : appointment?.professional;
+    const seller = movement.sellerMembershipId
+      ? membershipsById.get(movement.sellerMembershipId)
+      : undefined;
+    const recordedBy = usersById.get(movement.createdByUserId);
+    const reversedBy = movement.reversedByUserId
+      ? usersById.get(movement.reversedByUserId)
+      : undefined;
+    const source = appointment
+      ? 'appointment'
+      : movement.productId
+        ? 'product_sale'
+        : movement.serviceId
+          ? 'manual_service'
+          : movement.type === CashMovementType.SALE
+            ? 'cash_adjustment'
+            : movement.type === CashMovementType.PROFESSIONAL_ADVANCE ||
+                movement.type === CashMovementType.COMMISSION_SETTLEMENT ||
+                movement.type === CashMovementType.PROFESSIONAL_ADVANCE_REVERSAL
+              ? 'commission'
+              : 'cash_adjustment';
+    return {
+      ...publicMovement(movement),
+      attribution: {
+        professional: professional
+          ? {
+              membershipId: professional.id,
+              name:
+                movement.professionalNameSnapshot ?? professional.user.fullName,
+            }
+          : null,
+        recordedBy: recordedBy
+          ? {
+              name: movement.recordedByNameSnapshot ?? recordedBy.fullName,
+              userId: recordedBy.id,
+            }
+          : movement.recordedByNameSnapshot
+            ? {
+                name: movement.recordedByNameSnapshot,
+                userId: movement.createdByUserId,
+              }
+            : null,
+        reversedBy: reversedBy
+          ? { name: reversedBy.fullName, userId: reversedBy.id }
+          : null,
+        seller: seller
+          ? {
+              membershipId: seller.id,
+              name: movement.sellerNameSnapshot ?? seller.user.fullName,
+            }
+          : null,
+      },
+      clientName: appointment?.clientName ?? null,
+      productName: movement.productId
+        ? (productsById.get(movement.productId)?.name ?? null)
+        : null,
+      services:
+        appointment?.services.map((service) => ({
+          id: service.serviceId,
+          name: service.serviceName,
+          priceCents: service.priceCents,
+        })) ?? [],
+      source,
+    };
+  });
 }
 
 async function recordAudit(
@@ -266,6 +507,7 @@ export function registerCashRegisterRoutes(
       await scope(database, user.id),
       input.locationId,
     );
+    requireCashPermission(currentScope, 'cash.read');
     const session = await database.cashRegisterSession.findFirst({
       orderBy: { openedAt: 'desc' },
       where: {
@@ -289,6 +531,7 @@ export function registerCashRegisterRoutes(
       await scope(database, user.id),
       input.locationId,
     );
+    requireCashPermission(currentScope, 'cash.manage');
     const existing = await database.cashRegisterSession.findFirst({
       where: {
         status: CashRegisterStatus.OPEN,
@@ -371,6 +614,7 @@ export function registerCashRegisterRoutes(
       await scope(database, user.id),
       input.locationId,
     );
+    requireCashPermission(currentScope, 'cash.read');
     const session = await database.cashRegisterSession.findFirst({
       include: { movements: { orderBy: { createdAt: 'desc' } } },
       orderBy: { openedAt: 'desc' },
@@ -386,9 +630,14 @@ export function registerCashRegisterRoutes(
     });
     if (!session) return { session: null, movements: [], totals: null };
     const totals = totalsFor(session.openingAmountCents, session.movements);
+    const movements = await publicMovements(
+      database,
+      currentScope.organizationId,
+      session.movements,
+    );
     return {
       session: publicSession(session),
-      movements: session.movements.map(publicMovement),
+      movements,
       totals: { ...totals, expectedCash: totals.cash },
     };
   });
@@ -401,6 +650,7 @@ export function registerCashRegisterRoutes(
       await scope(database, user.id),
       input.locationId,
     );
+    requireCashPermission(currentScope, 'cash.read');
     const sessions = await database.cashRegisterSession.findMany({
       include: { movements: true },
       orderBy: { openedAt: 'desc' },
@@ -426,6 +676,73 @@ export function registerCashRegisterRoutes(
     };
   });
 
+  app.get('/v1/financial-records', async (request) => {
+    const { user } = await authenticate(database, request);
+    const input = financialRecordsQuerySchema.parse(request.query);
+    const currentScope = await locationScope(
+      database,
+      await scope(database, user.id),
+      input.locationId,
+    );
+    requireCashPermission(currentScope, 'cash.read');
+    if (!currentScope.locationId)
+      throw new ApiError(
+        409,
+        'CASH_LOCATION_REQUIRED',
+        'Selecciona una sucursal para consultar movimientos.',
+      );
+    const location = await database.location.findUnique({
+      select: { timezone: true },
+      where: { id: currentScope.locationId },
+    });
+    const dateRange = input.date
+      ? {
+          gte: zonedDateTimeToUtc(input.date, 0, location?.timezone ?? 'UTC'),
+          lt: zonedDateTimeToUtc(input.date, 1440, location?.timezone ?? 'UTC'),
+        }
+      : undefined;
+    const where = {
+      ...(dateRange ? { createdAt: dateRange } : {}),
+      ...(input.paymentMethod
+        ? { paymentMethod: input.paymentMethod.toUpperCase() as PaymentMethod }
+        : {}),
+      ...(input.professionalMembershipId
+        ? { professionalMembershipId: input.professionalMembershipId }
+        : {}),
+      ...(input.sellerMembershipId
+        ? { sellerMembershipId: input.sellerMembershipId }
+        : {}),
+      ...(input.type
+        ? { type: input.type.toUpperCase() as CashMovementType }
+        : {}),
+      cashRegisterSession: {
+        locationId: currentScope.locationId,
+        ...(currentScope.organizationId
+          ? { organizationId: currentScope.organizationId }
+          : { organizationId: null, ownerUserId: user.id }),
+      },
+    };
+    const [total, movements] = await Promise.all([
+      database.cashMovement.count({ where }),
+      database.cashMovement.findMany({
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (input.page - 1) * input.pageSize,
+        take: input.pageSize,
+        where,
+      }),
+    ]);
+    return {
+      page: input.page,
+      pageSize: input.pageSize,
+      records: await publicMovements(
+        database,
+        currentScope.organizationId,
+        movements,
+      ),
+      total,
+    };
+  });
+
   app.get('/v1/cash-register/sessions/:sessionId', async (request) => {
     const { user } = await authenticate(database, request);
     const { sessionId } = z
@@ -437,6 +754,7 @@ export function registerCashRegisterRoutes(
       await scope(database, user.id),
       input.locationId,
     );
+    requireCashPermission(currentScope, 'cash.read');
     const session = await database.cashRegisterSession.findFirst({
       include: { movements: { orderBy: { createdAt: 'desc' } } },
       where: {
@@ -453,8 +771,13 @@ export function registerCashRegisterRoutes(
       throw new ApiError(404, 'CASH_REGISTER_NOT_FOUND', 'La caja no existe.');
     const calculated = totalsFor(session.openingAmountCents, session.movements);
     const expectedCash = session.expectedAmountCents ?? calculated.cash;
+    const movements = await publicMovements(
+      database,
+      currentScope.organizationId,
+      session.movements,
+    );
     return {
-      movements: session.movements.map(publicMovement),
+      movements,
       session: publicSession(session),
       totals: { ...calculated, cash: expectedCash, expectedCash },
     };
@@ -496,6 +819,12 @@ export function registerCashRegisterRoutes(
         400,
         'PRODUCT_REQUIRES_SALE',
         'Solo una venta puede descontar existencias de producto.',
+      );
+    if (input.sellerMembershipId && !hasProduct)
+      throw new ApiError(
+        400,
+        'SELLER_REQUIRES_PRODUCT',
+        'El vendedor solo se puede asignar a una venta de producto.',
       );
     if (
       hasProduct &&
@@ -541,6 +870,7 @@ export function registerCashRegisterRoutes(
       await scope(database, user.id),
       input.locationId,
     );
+    requireCashPermission(currentScope, 'cash.manage');
     const session = await database.cashRegisterSession.findFirst({
       where: {
         status: CashRegisterStatus.OPEN,
@@ -559,6 +889,7 @@ export function registerCashRegisterRoutes(
         'Abre una caja antes de registrar movimientos.',
       );
     const movement = await database.$transaction(async (transaction) => {
+      let appointmentProfessional: { name: string } | null = null;
       if (input.appointmentId) {
         if (!currentScope.organizationId)
           throw new ApiError(
@@ -567,7 +898,10 @@ export function registerCashRegisterRoutes(
             'La cita debe pertenecer a una organización activa.',
           );
         const appointment = await transaction.appointment.findFirst({
-          include: { services: true },
+          include: {
+            professional: { include: { user: { select: { fullName: true } } } },
+            services: true,
+          },
           where: {
             id: input.appointmentId,
             organizationId: currentScope.organizationId,
@@ -596,6 +930,9 @@ export function registerCashRegisterRoutes(
             'APPOINTMENT_TOTAL_MISMATCH',
             'El cobro debe coincidir con el total completo de la cita.',
           );
+        appointmentProfessional = {
+          name: appointment.professional.user.fullName,
+        };
         await transaction.appointment.update({
           data: { paymentStatus: AppointmentPaymentStatus.PAID },
           where: { id: appointment.id },
@@ -606,6 +943,7 @@ export function registerCashRegisterRoutes(
         id: string;
         name: string;
         generatesCommission: boolean;
+        professionalName: string;
       } | null = null;
       if (input.serviceId && input.professionalMembershipId) {
         if (!currentScope.organizationId || !session.locationId)
@@ -631,7 +969,9 @@ export function registerCashRegisterRoutes(
         );
         const assignment = await transaction.professionalService.findFirst({
           include: {
-            membership: { select: { role: true } },
+            membership: {
+              select: { role: true, user: { select: { fullName: true } } },
+            },
             service: true,
           },
           where: {
@@ -658,6 +998,7 @@ export function registerCashRegisterRoutes(
           ...assignment.service,
           generatesCommission:
             assignment.membership.role === MembershipRole.BARBER,
+          professionalName: assignment.membership.user.fullName,
         };
       }
 
@@ -668,6 +1009,7 @@ export function registerCashRegisterRoutes(
         quantity: number;
         resultingQuantity: number | null;
       } | null = null;
+      let seller: { id: string; name: string } | null = null;
       if (input.productId && input.productQuantity) {
         if (!currentScope.organizationId || !session.locationId)
           throw new ApiError(
@@ -685,6 +1027,33 @@ export function registerCashRegisterRoutes(
             'PLAN_FEATURE_NOT_INCLUDED',
             'El inventario requiere Nava Esencial o un plan superior.',
           );
+        const sellerMembership = input.sellerMembershipId
+          ? await transaction.membership.findFirst({
+              include: { user: { select: { fullName: true } } },
+              where: {
+                id: input.sellerMembershipId,
+                organizationId: currentScope.organizationId,
+                status: MembershipStatus.ACTIVE,
+                memberLocations: { some: { locationId: session.locationId } },
+              },
+            })
+          : await transaction.membership.findFirst({
+              include: { user: { select: { fullName: true } } },
+              where: {
+                organizationId: currentScope.organizationId,
+                status: MembershipStatus.ACTIVE,
+                userId: user.id,
+              },
+            });
+        if (input.sellerMembershipId && !sellerMembership)
+          throw new ApiError(
+            404,
+            'SELLER_NOT_FOUND',
+            'El vendedor no está activo o no pertenece a esta sucursal.',
+          );
+        seller = sellerMembership
+          ? { id: sellerMembership.id, name: sellerMembership.user.fullName }
+          : null;
         await transaction.$queryRaw`
           WITH lock AS MATERIALIZED (
             SELECT pg_advisory_xact_lock(hashtext(${`${session.locationId}:${input.productId}`}))
@@ -767,6 +1136,10 @@ export function registerCashRegisterRoutes(
         };
       }
 
+      const recordedBy = await transaction.user.findUniqueOrThrow({
+        select: { fullName: true },
+        where: { id: user.id },
+      });
       const created = await transaction.cashMovement.create({
         data: {
           amountCents: input.amountCents,
@@ -779,7 +1152,17 @@ export function registerCashRegisterRoutes(
             : null,
           productId: productSale?.id ?? null,
           productQuantity: productSale?.quantity ?? null,
+          // Las citas ya vinculan su profesional mediante appointmentId. No se
+          // repite aquí: la restricción histórica exige serviceId cuando este
+          // campo está presente y las citas pueden contener varios servicios.
           professionalMembershipId: input.professionalMembershipId ?? null,
+          professionalNameSnapshot:
+            commissionableService?.professionalName ??
+            appointmentProfessional?.name ??
+            null,
+          recordedByNameSnapshot: recordedBy.fullName,
+          sellerMembershipId: seller?.id ?? null,
+          sellerNameSnapshot: seller?.name ?? null,
           serviceId: input.serviceId ?? null,
           type: input.type.toUpperCase() as CashMovementType,
         },
@@ -864,6 +1247,7 @@ export function registerCashRegisterRoutes(
       await scope(database, user.id),
       input.locationId,
     );
+    requireCashPermission(currentScope, 'cash.manage');
     const session = await database.cashRegisterSession.findFirst({
       include: { movements: true },
       where: {

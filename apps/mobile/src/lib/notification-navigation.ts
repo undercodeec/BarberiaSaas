@@ -15,6 +15,7 @@ const APPOINTMENT_NOTIFICATION_TYPES = new Set([
   'created',
   'rescheduled',
 ]);
+const PAYMENT_CONFIRMATION_TYPES = new Set(['payment_confirmation_required']);
 const AGENDA_ROLES = new Set<NotificationRole>([
   'barber',
   'manager',
@@ -28,6 +29,12 @@ export function notificationDestination(
   data: NotificationData | undefined,
   role: NotificationRole | undefined,
 ) {
+  if (
+    (role === 'owner' || role === 'manager') &&
+    typeof data?.type === 'string' &&
+    PAYMENT_CONFIRMATION_TYPES.has(data.type)
+  )
+    return '/payment-confirmations';
   if (
     !role ||
     !AGENDA_ROLES.has(role) ||

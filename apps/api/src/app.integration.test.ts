@@ -445,6 +445,165 @@ describeWithDatabase('API con PostgreSQL', () => {
     };
   }
 
+  it('solicita la confirmacion de cobro al completar una cita y solo la registra en Caja al aprobarla', async () => {
+    const agenda = await setupAgenda('confirmacion-cobro-servicio');
+    const created = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        clientName: 'Cliente pendiente de cobro',
+        locationId: agenda.locationId,
+        professionalMembershipId: agenda.membershipId,
+        serviceIds: [agenda.serviceId],
+        startsAt: '2030-01-14T15:00:00.000Z',
+      },
+      url: '/v1/appointments',
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    const appointmentId = created.json<{ appointment: { id: string } }>()
+      .appointment.id;
+
+    const completed = await app.inject({
+      headers: { authorization: `Bearer ${agenda.barberToken}` },
+      method: 'PATCH',
+      payload: { status: 'completed' },
+      url: `/v1/appointments/${appointmentId}/status`,
+    });
+    expect(completed.statusCode, completed.body).toBe(200);
+    expect(
+      await database.cashMovement.count({ where: { appointmentId } }),
+    ).toBe(0);
+    expect(
+      await database.appNotification.count({
+        where: {
+          appointmentId,
+          type: 'PAYMENT_CONFIRMATION_REQUIRED',
+        },
+      }),
+    ).toBe(1);
+
+    const barberConfirmations = await app.inject({
+      headers: { authorization: `Bearer ${agenda.barberToken}` },
+      method: 'GET',
+      url: '/v1/appointment-payment-confirmations',
+    });
+    expect(barberConfirmations.statusCode).toBe(403);
+    const pending = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'GET',
+      url: '/v1/appointment-payment-confirmations',
+    });
+    expect(pending.statusCode, pending.body).toBe(200);
+    expect(
+      pending.json<{
+        confirmations: Array<{
+          appointmentId: string;
+          professionalName: string;
+          totalCents: number;
+        }>;
+      }>().confirmations,
+    ).toEqual([
+      expect.objectContaining({
+        appointmentId,
+        professionalName: 'Propietario de prueba',
+        totalCents: 1_200,
+      }),
+    ]);
+
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${agenda.ownerToken}` },
+          method: 'POST',
+          payload: { openingAmountCents: 0 },
+          url: '/v1/cash-register/open',
+        })
+      ).statusCode,
+    ).toBe(201);
+    const confirmation = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        amountCents: 1_200,
+        appointmentId,
+        description: 'Cobro aprobado por administracion',
+        paymentMethod: 'card',
+        type: 'sale',
+      },
+      url: '/v1/cash-register/movements',
+    });
+    expect(confirmation.statusCode, confirmation.body).toBe(201);
+    expect(
+      await database.appointment.findUniqueOrThrow({
+        where: { id: appointmentId },
+      }),
+    ).toMatchObject({ paymentStatus: 'PAID' });
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${agenda.ownerToken}` },
+          method: 'GET',
+          url: '/v1/appointment-payment-confirmations',
+        })
+      ).json<{ confirmations: unknown[] }>().confirmations,
+    ).toEqual([]);
+  });
+
+  it('impide que un barbero consulte u opere Caja por API', async () => {
+    const agenda = await setupAgenda('caja-restringida-barbero');
+    const headers = { authorization: `Bearer ${agenda.barberToken}` };
+    const responses = await Promise.all([
+      app.inject({
+        headers,
+        method: 'GET',
+        url: `/v1/cash-register/current?locationId=${agenda.locationId}`,
+      }),
+      app.inject({
+        headers,
+        method: 'GET',
+        url: `/v1/cash-register/summary?locationId=${agenda.locationId}`,
+      }),
+      app.inject({
+        headers,
+        method: 'GET',
+        url: `/v1/cash-register/history?locationId=${agenda.locationId}`,
+      }),
+      app.inject({
+        headers,
+        method: 'GET',
+        url: `/v1/financial-records?locationId=${agenda.locationId}`,
+      }),
+      app.inject({
+        headers,
+        method: 'POST',
+        payload: { openingAmountCents: 0 },
+        url: '/v1/cash-register/open',
+      }),
+      app.inject({
+        headers,
+        method: 'POST',
+        payload: {
+          amountCents: 1_200,
+          description: 'Intento no autorizado',
+          paymentMethod: 'cash',
+          professionalMembershipId: agenda.membershipId,
+          serviceId: agenda.serviceId,
+          type: 'sale',
+        },
+        url: '/v1/cash-register/movements',
+      }),
+      app.inject({
+        headers,
+        method: 'POST',
+        payload: { closingAmountCents: 0 },
+        url: '/v1/cash-register/close',
+      }),
+    ]);
+    expect(responses.map(({ statusCode }) => statusCode)).toEqual([
+      403, 403, 403, 403, 403, 403, 403,
+    ]);
+  });
+
   it('persiste una única respuesta de bienvenida por usuario', async () => {
     const token = await register('welcome-survey@example.com');
     const headers = { authorization: `Bearer ${token}` };

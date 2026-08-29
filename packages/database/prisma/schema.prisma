@@ -285,6 +285,7 @@ enum AppNotificationType {
   APPOINTMENT_CREATED
   APPOINTMENT_CANCELLED
   APPOINTMENT_RESCHEDULED
+  PAYMENT_CONFIRMATION_REQUIRED
 }
 
 enum RegistrationAccountType {
@@ -855,6 +856,7 @@ model Organization {
   bookingRescheduleLeadMinutes       Int                          @default(120) @map("booking_reschedule_lead_minutes")
   bookingPolicyVersion               Int                          @default(1) @map("booking_policy_version")
   bookingPolicyText                  String                       @default("Acepto asistir puntualmente y cancelar o reprogramar dentro del plazo informado por el negocio.") @map("booking_policy_text") @db.VarChar(1000)
+  servicePaymentConfirmationEnabled  Boolean                      @default(true) @map("service_payment_confirmation_enabled")
   createdAt                          DateTime                     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                          DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt                          DateTime?                    @map("deleted_at") @db.Timestamptz(3)
@@ -1670,6 +1672,10 @@ model CashMovement {
   productId                String?             @map("product_id") @db.Uuid
   productQuantity          Int?                @map("product_quantity")
   professionalMembershipId String?             @map("professional_membership_id") @db.Uuid
+  professionalNameSnapshot String?             @map("professional_name_snapshot") @db.VarChar(120)
+  sellerMembershipId       String?             @map("seller_membership_id") @db.Uuid
+  sellerNameSnapshot       String?             @map("seller_name_snapshot") @db.VarChar(120)
+  recordedByNameSnapshot   String?             @map("recorded_by_name_snapshot") @db.VarChar(120)
   reversedAt               DateTime?           @map("reversed_at") @db.Timestamptz(3)
   reversedByUserId         String?             @map("reversed_by_user_id") @db.Uuid
   reversalReason           String?             @map("reversal_reason") @db.VarChar(240)
@@ -1682,6 +1688,7 @@ model CashMovement {
   @@index([cashRegisterSessionId, createdAt])
   @@index([appointmentId])
   @@index([professionalMembershipId, serviceId])
+  @@index([sellerMembershipId, createdAt])
   @@index([productId, createdAt])
   @@index([reversedAt])
   @@map("cash_movements")
@@ -1928,6 +1935,8 @@ model Appointment {
   endsAt                            DateTime                 @map("ends_at") @db.Timestamptz(3)
   status                            AppointmentStatus        @default(SCHEDULED)
   paymentStatus                     AppointmentPaymentStatus @default(PENDING) @map("payment_status")
+  paymentConfirmationRequestedAt    DateTime?                 @map("payment_confirmation_requested_at") @db.Timestamptz(3)
+  paymentConfirmationRequestedByUserId String?                 @map("payment_confirmation_requested_by_user_id") @db.Uuid
   source                            AppointmentSource        @default(MANUAL)
   reservesSlot                      Boolean                  @default(true) @map("reserves_slot")
   notes                             String?                  @db.VarChar(500)
@@ -1962,6 +1971,7 @@ model Appointment {
   @@index([locationId, startsAt])
   @@index([professionalMembershipId, startsAt])
   @@index([clientId, startsAt])
+  @@index([organizationId, paymentStatus, paymentConfirmationRequestedAt])
   @@map("appointments")
 }
 

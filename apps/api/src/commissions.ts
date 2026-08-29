@@ -244,7 +244,7 @@ const overviewQuerySchema = z.object({
 
 async function commissionContext(database: DatabaseClient, userId: string) {
   const membership = await database.membership.findFirst({
-    include: { organization: true },
+    include: { organization: true, user: { select: { fullName: true } } },
     where: { status: MembershipStatus.ACTIVE, userId },
   });
   if (!membership)
@@ -675,6 +675,9 @@ export function registerCommissionRoutes(
             createdByUserId: user.id,
             description: `Anticipo de comisión · ${professional.user.fullName}`,
             paymentMethod: PaymentMethod.CASH,
+            professionalMembershipId: professional.id,
+            professionalNameSnapshot: professional.user.fullName,
+            recordedByNameSnapshot: current.user.fullName,
             type: CashMovementType.PROFESSIONAL_ADVANCE,
           },
         });
@@ -756,6 +759,7 @@ export function registerCommissionRoutes(
             createdByUserId: user.id,
             description: 'Reverso de anticipo de comisión',
             paymentMethod: PaymentMethod.CASH,
+            recordedByNameSnapshot: current.user.fullName,
             type: CashMovementType.PROFESSIONAL_ADVANCE_REVERSAL,
           },
         });
@@ -1179,6 +1183,7 @@ export function registerCommissionRoutes(
             createdByUserId: user.id,
             description: 'Pago de liquidación de comisiones',
             paymentMethod: PaymentMethod.CASH,
+            recordedByNameSnapshot: current.user.fullName,
             type: CashMovementType.COMMISSION_SETTLEMENT,
           },
         });

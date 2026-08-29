@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Redirect, Stack, useSegments } from 'expo-router';
 
 import { requireApiClient } from '../../src/lib/api';
+import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { accountQueryKey } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 
@@ -26,7 +27,27 @@ export default function OnboardingLayout() {
     refetchOnMount: 'always',
     staleTime: 0,
   });
+  const organizationQuery = useCurrentOrganization();
   const routeName = segments.at(-1);
+  const financialRoutes = new Set([
+    'cash-register',
+    'cash-register-detail',
+    'cash-register-history',
+    'financial-records',
+    'payment-confirmations',
+  ]);
+  const canAccessCash =
+    organizationQuery.data?.membership.role === 'owner' ||
+    organizationQuery.data?.membership.role === 'manager';
+
+  if (
+    organizationQuery.isFetched &&
+    routeName &&
+    financialRoutes.has(routeName) &&
+    !canAccessCash
+  ) {
+    return <Redirect href={'/dashboard' as never} />;
+  }
 
   if (
     profileQuery.data?.onboardingCompletedAt &&

@@ -382,6 +382,8 @@ async function publicCatalog(
       policyVersion: location.organization.bookingPolicyVersion,
       reminderMinutes: location.organization.bookingReminderMinutes,
       rescheduleLeadMinutes: location.organization.bookingRescheduleLeadMinutes,
+      servicePaymentConfirmationEnabled:
+        location.organization.servicePaymentConfirmationEnabled,
       unconfirmedAction:
         location.organization.bookingUnconfirmedAction.toLowerCase(),
     },
@@ -1474,6 +1476,8 @@ export function registerPublicBookingRoutes(
       policyVersion: organization.bookingPolicyVersion,
       reminderMinutes: organization.bookingReminderMinutes,
       rescheduleLeadMinutes: organization.bookingRescheduleLeadMinutes,
+      servicePaymentConfirmationEnabled:
+        organization.servicePaymentConfirmationEnabled,
       unconfirmedAction: organization.bookingUnconfirmedAction.toLowerCase(),
     };
   });
@@ -1498,6 +1502,12 @@ export function registerPublicBookingRoutes(
           : previous.bookingPolicyVersion,
         bookingReminderMinutes: input.reminderMinutes,
         bookingRescheduleLeadMinutes: input.rescheduleLeadMinutes,
+        ...(input.servicePaymentConfirmationEnabled === undefined
+          ? {}
+          : {
+              servicePaymentConfirmationEnabled:
+                input.servicePaymentConfirmationEnabled,
+            }),
         bookingUnconfirmedAction:
           input.unconfirmedAction === 'cancel'
             ? UnconfirmedBookingAction.CANCEL
@@ -1514,6 +1524,8 @@ export function registerPublicBookingRoutes(
       policyVersion: organization.bookingPolicyVersion,
       reminderMinutes: organization.bookingReminderMinutes,
       rescheduleLeadMinutes: organization.bookingRescheduleLeadMinutes,
+      servicePaymentConfirmationEnabled:
+        organization.servicePaymentConfirmationEnabled,
       unconfirmedAction: organization.bookingUnconfirmedAction.toLowerCase(),
     };
   });

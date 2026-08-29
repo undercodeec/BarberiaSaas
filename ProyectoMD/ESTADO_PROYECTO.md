@@ -108,6 +108,23 @@ cualquier corte histórico del resto del documento.
   migraciones pendientes. Después se repite `pnpm db:status` para confirmar el
   resultado.
 
+### Incidente de sincronización de Prisma — 28 de agosto de 2026
+
+- Un despliegue puede tener PostgreSQL y `schema.prisma` actualizados mientras
+  el Prisma Client generado en `packages/database/src/generated/prisma` sigue
+  desactualizado. Por tanto, **migraciones aplicadas correctamente ≠ Prisma
+  Client actualizado**.
+- El incidente se manifestó durante el build con imports inexistentes de enums
+  nuevos, aunque `pnpm db:status` ya reportaba la base al día. Su causa fue no
+  regenerar el cliente después de actualizar el repositorio.
+- `pnpm --filter @barber-saas/database exec prisma generate` es obligatorio en
+  cada despliegue, inmediatamente después de instalar dependencias y antes de
+  comprobar o aplicar migraciones y antes de compilar. Regenera código local:
+  no modifica PostgreSQL ni sustituye `pnpm db:migrate:deploy`.
+- Nunca usar `prisma migrate dev` en producción. Las migraciones de producción
+  continúan siendo condicionales: solo se aplica `pnpm db:migrate:deploy` si
+  `pnpm db:status` informa pendientes.
+
 ### PostgreSQL local exclusivo para pruebas
 
 Las pruebas SQL y las integraciones PostgreSQL deben ejecutarse únicamente
@@ -162,28 +179,39 @@ docker compose stop postgres-test
 
 ## REGLAS DE DESPLIEGUE — NO REGRESIONAR
 
-1. Usar exclusivamente `/opt/nava/app` y actualizar con
-   `git pull --ff-only origin main`.
-2. Ejecutar `pnpm install --frozen-lockfile`, comprobar migraciones con
-   `pnpm db:status` y aplicar `pnpm db:migrate:deploy` solo si hay pendientes.
-3. Tras una migración aplicada, repetir `pnpm db:status`; ante `P1002`,
-   comprobar ese estado antes de cualquier nuevo intento.
+1. Usar exclusivamente `/opt/nava/app`, revisar `git status --short` y
+   actualizar con `git pull --ff-only origin main`.
+2. Ejecutar `pnpm install --frozen-lockfile` y luego, sin excepción,
+   `pnpm --filter @barber-saas/database exec prisma generate`. Este paso no
+   reemplaza migraciones ni altera datos: evita compilar con un Prisma Client
+   obsoleto.
+3. Comprobar migraciones con `pnpm db:status` y aplicar
+   `pnpm db:migrate:deploy` solo si hay pendientes. Tras aplicarlas, repetir
+   `pnpm db:status`; ante `P1002`, comprobar ese estado antes de cualquier
+   nuevo intento.
 4. Validar variables y compilar con `pnpm env:check:production` y
    `pnpm build:production`. No sustituir estos comandos por builds que lean
-   `.env.production` dentro de las aplicaciones.
-5. Recargar systemd y reiniciar los tres servicios. Verificar estado, puertos,
-   HTTP y Nginx antes de considerar terminado el despliegue.
+   `.env.production` dentro de las aplicaciones. Nunca usar `source
+   /etc/nava/api.env` ni crear `.env.production` como mecanismo de producción.
+5. Si el build falla, no reiniciar servicios: puede haber limpiado
+   `apps/api/dist`. Solo después de un build correcto y de confirmar
+   `test -f apps/api/dist/index.js` se puede recargar systemd y reiniciar los
+   tres servicios. Verificar estado, puertos, HTTP y Nginx antes de considerar
+   terminado el despliegue.
 
 ```bash
 cd /opt/nava/app
+git status --short
 git pull --ff-only origin main
 pnpm install --frozen-lockfile
+pnpm --filter @barber-saas/database exec prisma generate
 pnpm db:status
-# Ejecutar solo si el estado informa migraciones pendientes.
+# Ejecutar las dos líneas siguientes solo si el estado informa migraciones pendientes.
 pnpm db:migrate:deploy
 pnpm db:status
 pnpm env:check:production
 pnpm build:production
+test -f apps/api/dist/index.js
 sudo systemctl daemon-reload
 sudo systemctl restart nava-api
 sudo systemctl restart nava-web

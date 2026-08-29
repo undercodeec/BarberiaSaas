@@ -107,7 +107,7 @@ export default function DashboardScreen() {
     queryKey: tenant.key('agenda-appointments', 'dashboard', operationDate),
   });
   const cashRegisterQuery = useQuery({
-    enabled: Boolean(session),
+    enabled: Boolean(session && canAccessFinancialReports),
     queryFn: () =>
       requireApiClient().request<CurrentCashRegisterResponse>(
         '/v1/cash-register/current',
@@ -115,7 +115,7 @@ export default function DashboardScreen() {
     queryKey: tenant.key('cash-register-current'),
   });
   const cashSummaryQuery = useQuery({
-    enabled: Boolean(session),
+    enabled: Boolean(session && canAccessFinancialReports),
     queryFn: () =>
       requireApiClient().request<CashRegisterSummaryResponse>(
         '/v1/cash-register/summary',

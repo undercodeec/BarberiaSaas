@@ -69,6 +69,8 @@ export default function BookingSettingsScreen() {
             policyText: current!.policyText,
             reminderMinutes: current!.reminderMinutes,
             rescheduleLeadMinutes: current!.rescheduleLeadMinutes,
+            servicePaymentConfirmationEnabled:
+              current!.servicePaymentConfirmationEnabled,
             unconfirmedAction: current!.unconfirmedAction,
           },
           method: 'PUT',
@@ -144,6 +146,31 @@ export default function BookingSettingsScreen() {
                   true: appTheme.colors.text,
                 }}
                 value={current.confirmationEnabled}
+              />
+            </View>
+
+            <View style={styles.toggleCard}>
+              <View style={styles.toggleCopy}>
+                <Text style={styles.cardTitle}>
+                  Confirmar cobro al terminar el servicio
+                </Text>
+                <Text style={styles.cardDescription}>
+                  Cuando un barbero complete una cita, owner o admin deberá
+                  confirmar el pago antes de que entre a Caja.
+                </Text>
+              </View>
+              <Switch
+                onValueChange={(servicePaymentConfirmationEnabled) =>
+                  setDraft({
+                    ...current,
+                    servicePaymentConfirmationEnabled,
+                  })
+                }
+                trackColor={{
+                  false: appTheme.colors.border,
+                  true: appTheme.colors.text,
+                }}
+                value={current.servicePaymentConfirmationEnabled}
               />
             </View>
 

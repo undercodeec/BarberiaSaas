@@ -1,4 +1,5 @@
 import {
+  AppNotificationType,
   AppointmentEventType,
   AppointmentSource,
   AppointmentStatus,
@@ -1060,7 +1061,12 @@ export function registerAgendaRoutes(
     const existing = await database.appointment.findFirst({
       include: {
         location: { select: { timezone: true } },
-        organization: { select: { name: true } },
+        organization: {
+          select: {
+            name: true,
+            servicePaymentConfirmationEnabled: true,
+          },
+        },
         professional: { include: { user: { select: { fullName: true } } } },
         publicAccess: { select: { id: true } },
       },
@@ -1079,6 +1085,11 @@ export function registerAgendaRoutes(
     const releasesSlot =
       status === AppointmentStatus.COMPLETED ||
       status === AppointmentStatus.NO_SHOW;
+    const requestsPaymentConfirmation =
+      status === AppointmentStatus.COMPLETED &&
+      existing.status !== AppointmentStatus.COMPLETED &&
+      existing.paymentStatus === 'PENDING' &&
+      existing.organization.servicePaymentConfirmationEnabled;
     const updated = await database.$transaction(async (transaction) => {
       const completedPublicBookingClient =
         status === AppointmentStatus.COMPLETED &&
@@ -1093,6 +1104,12 @@ export function registerAgendaRoutes(
       const appointment = await transaction.appointment.update({
         data: {
           clientId: completedPublicBookingClient?.id ?? existing.clientId,
+          ...(requestsPaymentConfirmation
+            ? {
+                paymentConfirmationRequestedAt: new Date(),
+                paymentConfirmationRequestedByUserId: user.id,
+              }
+            : {}),
           reservesSlot: releasesSlot ? false : existing.reservesSlot,
           status,
           updatedByUserId: user.id,
@@ -1106,10 +1123,46 @@ export function registerAgendaRoutes(
           appointmentId: appointment.id,
           locationId: appointment.locationId,
           organizationId: appointment.organizationId,
-          payload: { status: input.status },
+          payload: {
+            paymentConfirmationRequested: requestsPaymentConfirmation,
+            status: input.status,
+          },
           type: AppointmentEventType.STATUS_CHANGED,
         },
       });
+      if (requestsPaymentConfirmation) {
+        const recipients = await transaction.membership.findMany({
+          select: { userId: true },
+          where: {
+            organizationId: appointment.organizationId,
+            OR: [
+              { role: MembershipRole.OWNER },
+              {
+                memberLocations: {
+                  some: { locationId: appointment.locationId },
+                },
+                role: MembershipRole.MANAGER,
+              },
+            ],
+            status: MembershipStatus.ACTIVE,
+          },
+        });
+        await transaction.appNotification.createMany({
+          data: recipients.map(({ userId }) => ({
+            appointmentId: appointment.id,
+            body: `${existing.clientName} fue atendido por ${existing.professional.user.fullName}. Confirma el cobro para registrarlo en Caja.`,
+            data: {
+              appointmentId: appointment.id,
+              route: '/payment-confirmations',
+              type: 'payment_confirmation_required',
+            },
+            organizationId: appointment.organizationId,
+            title: 'Cobro pendiente de confirmar',
+            type: AppNotificationType.PAYMENT_CONFIRMATION_REQUIRED,
+            userId,
+          })),
+        });
+      }
       await reconcileAppointmentCommissions(transaction, appointment.id);
       return appointment;
     });
@@ -1144,6 +1197,77 @@ export function registerAgendaRoutes(
         updated,
         canReadFullClientContact(current.role),
       ),
+    };
+  });
+
+  app.get('/v1/appointment-payment-confirmations', async (request) => {
+    const { user } = await authenticate(database, request);
+    const current = await requireAgendaMembership(
+      database,
+      user.id,
+      'appointment.read',
+    );
+    if (!hasPermission(permissionRole(current.role), 'cash.read'))
+      throw new ApiError(
+        403,
+        'FINANCIAL_ACCESS_FORBIDDEN',
+        'No tienes permiso para confirmar cobros.',
+      );
+    const appointments = await database.appointment.findMany({
+      include: {
+        professional: { include: { user: { select: { fullName: true } } } },
+        services: { orderBy: { sortOrder: 'asc' } },
+      },
+      orderBy: { paymentConfirmationRequestedAt: 'asc' },
+      where: {
+        organizationId: current.organizationId,
+        paymentConfirmationRequestedAt: { not: null },
+        paymentStatus: 'PENDING',
+        status: AppointmentStatus.COMPLETED,
+        ...(current.role === MembershipRole.MANAGER
+          ? {
+              locationId: {
+                in: current.memberLocations.map(({ locationId }) => locationId),
+              },
+            }
+          : {}),
+      },
+    });
+    const requesterIds = appointments.flatMap((appointment) =>
+      appointment.paymentConfirmationRequestedByUserId
+        ? [appointment.paymentConfirmationRequestedByUserId]
+        : [],
+    );
+    const requesters = requesterIds.length
+      ? await database.user.findMany({
+          select: { fullName: true, id: true },
+          where: { id: { in: requesterIds } },
+        })
+      : [];
+    const requestersById = new Map(
+      requesters.map((requester) => [requester.id, requester.fullName]),
+    );
+    return {
+      confirmations: appointments.map((appointment) => ({
+        appointmentId: appointment.id,
+        clientName: appointment.clientName,
+        locationId: appointment.locationId,
+        professionalName: appointment.professional.user.fullName,
+        requestedAt: appointment.paymentConfirmationRequestedAt!.toISOString(),
+        requestedByName: appointment.paymentConfirmationRequestedByUserId
+          ? (requestersById.get(
+              appointment.paymentConfirmationRequestedByUserId,
+            ) ?? null)
+          : null,
+        services: appointment.services.map((service) => ({
+          name: service.serviceName,
+          priceCents: service.priceCents,
+        })),
+        totalCents: appointment.services.reduce(
+          (total, service) => total + service.priceCents,
+          0,
+        ),
+      })),
     };
   });
 

@@ -61,17 +61,21 @@ const newPasswordSchema = passwordSchema.min(
 const timeSchema = z
   .string()
   .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/u, 'La hora debe tener formato HH:MM.');
-export const timezoneSchema = z.string().trim().max(64).refine(
-  (timezone) => {
-    try {
-      new Intl.DateTimeFormat('es', { timeZone: timezone }).format();
-      return true;
-    } catch {
-      return false;
-    }
-  },
-  { message: 'La zona horaria no es válida.' },
-);
+export const timezoneSchema = z
+  .string()
+  .trim()
+  .max(64)
+  .refine(
+    (timezone) => {
+      try {
+        new Intl.DateTimeFormat('es', { timeZone: timezone }).format();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    { message: 'La zona horaria no es válida.' },
+  );
 const businessNameSchema = z
   .string()
   .trim()
@@ -642,6 +646,7 @@ export const updateBookingSettingsSchema = z
     policyText: z.string().trim().min(20).max(1000),
     reminderMinutes: z.number().int().min(60).max(10_080),
     rescheduleLeadMinutes: z.number().int().min(0).max(43_200),
+    servicePaymentConfirmationEnabled: z.boolean().optional(),
     unconfirmedAction: z.enum(['keep', 'cancel']),
   })
   .superRefine((value, context) => {

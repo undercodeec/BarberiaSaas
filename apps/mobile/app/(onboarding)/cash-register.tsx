@@ -181,6 +181,7 @@ export default function CashRegisterScreen() {
   const [movementProductId, setMovementProductId] = useState<string | null>(
     null,
   );
+  const [movementSellerId, setMovementSellerId] = useState<string | null>(null);
   const [movementProductQuantity, setMovementProductQuantity] = useState('1');
   const [closingAmount, setClosingAmount] = useState('');
   const [closingNote, setClosingNote] = useState('');
@@ -329,6 +330,10 @@ export default function CashRegisterScreen() {
             movementType === 'sale' && saleKind === 'service'
               ? movementProfessionalId
               : undefined,
+          sellerMembershipId:
+            movementType === 'sale' && saleKind === 'product'
+              ? (movementSellerId ?? undefined)
+              : undefined,
           serviceId:
             movementType === 'sale' && saleKind === 'service'
               ? movementServiceId
@@ -351,6 +356,7 @@ export default function CashRegisterScreen() {
       setMovementProductId(null);
       setMovementProductQuantity('1');
       setMovementProfessionalId(null);
+      setMovementSellerId(null);
       setMovementServiceId(null);
       await queryClient.invalidateQueries({
         queryKey: tenantQueryPrefix('cash-register-summary'),
@@ -430,6 +436,11 @@ export default function CashRegisterScreen() {
       selectedMovementService?.assignments.some(
         (assignment) => assignment.membershipId === member.id,
       ),
+  );
+  const productSellers = teamMembers.filter(
+    (member) =>
+      member.planAvailable &&
+      member.locations.some((location) => location.id === locationId),
   );
   const movementAmountValue = Number(movementAmount.replace(',', '.'));
   const productQuantityValue = Number(movementProductQuantity);
@@ -531,6 +542,25 @@ export default function CashRegisterScreen() {
               </Pressable>
             </View>
           </View>
+          <Pressable
+            accessibilityLabel="Ver registro detallado del día"
+            onPress={() =>
+              router.push({
+                params: { locationId },
+                pathname: '/financial-records' as never,
+              })
+            }
+            style={{ alignSelf: 'flex-end', marginBottom: 12, marginRight: 4 }}
+          >
+            <Text style={styles.detailsLink}>Ver registro del día</Text>
+          </Pressable>
+          <Pressable
+            accessibilityLabel="Ver cobros pendientes de confirmar"
+            onPress={() => router.push('/payment-confirmations' as never)}
+            style={{ alignSelf: 'flex-end', marginBottom: 12, marginRight: 4 }}
+          >
+            <Text style={styles.detailsLink}>Cobros por confirmar</Text>
+          </Pressable>
           <View style={styles.dayCard}>
             <Text style={styles.dayTitle}>
               {totals?.sales ? 'Tu día en movimiento' : 'El día apenas empieza'}
@@ -574,6 +604,14 @@ export default function CashRegisterScreen() {
                     : ''}
                   {movement.reversedAt ? ' · Revertida' : ''}
                 </Text>
+                {movement.attribution?.professional?.name ||
+                movement.attribution?.seller?.name ? (
+                  <Text style={styles.movementMeta}>
+                    {movement.attribution?.professional?.name
+                      ? `Hecho por: ${movement.attribution?.professional?.name}`
+                      : `Vendió: ${movement.attribution.seller?.name}`}
+                  </Text>
+                ) : null}
               </View>
               <Text
                 style={[
@@ -813,6 +851,7 @@ export default function CashRegisterScreen() {
                             setMovementProductId(null);
                             setMovementProfessionalId(null);
                             setMovementServiceId(null);
+                            setMovementSellerId(null);
                           }
                         }}
                         style={[
@@ -845,6 +884,7 @@ export default function CashRegisterScreen() {
                           onPress={() => {
                             setSaleKind('service');
                             setMovementProductId(null);
+                            setMovementSellerId(null);
                           }}
                           style={[
                             styles.member,
@@ -1027,6 +1067,34 @@ export default function CashRegisterScreen() {
                             style={styles.input}
                             value={movementProductQuantity}
                           />
+                          <Text style={styles.label}>Vendió</Text>
+                          <Text style={styles.inlineEmpty}>
+                            Opcional. Si no eliges a alguien, se registrará a
+                            quien ingresa la venta.
+                          </Text>
+                          <View style={styles.members}>
+                            {productSellers.map((member) => (
+                              <Pressable
+                                key={member.id}
+                                onPress={() => setMovementSellerId(member.id)}
+                                style={[
+                                  styles.member,
+                                  movementSellerId === member.id &&
+                                    styles.selected,
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.memberText,
+                                    movementSellerId === member.id &&
+                                      styles.selectedText,
+                                  ]}
+                                >
+                                  {member.user.fullName}
+                                </Text>
+                              </Pressable>
+                            ))}
+                          </View>
                         </>
                       ) : null}
                     </>

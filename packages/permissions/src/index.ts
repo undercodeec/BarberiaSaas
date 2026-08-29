@@ -35,6 +35,8 @@ export const organizationPermissions = [
   'client.export',
   'client.contacts.import',
   'client.communication.initiate',
+  'cash.read',
+  'cash.manage',
 ] as const;
 export type OrganizationPermission = (typeof organizationPermissions)[number];
 
@@ -67,6 +69,8 @@ const permissionsByRole = {
     'client.label.manage',
     'client.contacts.import',
     'client.communication.initiate',
+    'cash.read',
+    'cash.manage',
   ],
   receptionist: [
     'organization.read',

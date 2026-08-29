@@ -1,265 +1,161 @@
-Quiero implementar en **Nava Mobile para Android** un sistema NATIVO de actualización de la aplicación mediante la funcionalidad oficial **Google Play In-App Updates**.
+Quiero que actualices el procedimiento oficial de despliegue de Nava para evitar que vuelva a ocurrir una desincronización entre `schema.prisma` y el Prisma Client generado.
 
-Antes de modificar código, analiza la arquitectura actual completa de:
+## Problema que ocurrió
 
-* `apps/mobile`
-* `apps/mobile/android`
-* configuración Gradle
-* `MainActivity`
-* `MainApplication`
-* Expo / React Native
-* navegación actual de la app
-* ciclo de vida de la aplicación
+Durante un despliegue en producción:
 
-NO implementes nada basado en suposiciones. Adapta la solución a la arquitectura real existente.
+* `pnpm db:migrate:deploy` aplicó correctamente las migraciones.
+* `pnpm db:status` confirmó que PostgreSQL estaba actualizado.
+* `schema.prisma` contenía nuevos enums:
 
-## Objetivo
-
-Cuando exista en Google Play una versión de Nava con un `versionCode` superior a la versión instalada, quiero que la propia aplicación pueda detectar esa actualización mediante Google Play y ofrecer al usuario actualizarla sin necesidad de implementar un backend propio para comparar versiones.
-
-La implementación debe utilizar exclusivamente la API oficial:
-
-**Google Play In-App Updates / Play Core**
-
-Dependencia oficial actual:
-
-```gradle
-implementation "com.google.android.play:app-update:2.1.0"
-```
-
-Si el proyecto Android utiliza Kotlin, utiliza las APIs Kotlin/Java oficiales apropiadas.
-
-No utilizar paquetes React Native de terceros para esta funcionalidad si puede implementarse limpiamente mediante el proyecto Android nativo existente.
-
-No implementar Expo Updates, EAS Update, CodePush ni ningún mecanismo OTA.
-
-## Comportamiento requerido
-
-### 1. Comprobación automática
-
-Cuando Nava inicia y entra en estado activo, comprobar mediante Google Play si existe una actualización disponible.
-
-También debe poder volver a comprobarse cuando la aplicación regresa desde segundo plano, pero evita ejecutar comprobaciones innecesarias repetidamente durante la misma sesión.
-
-La comprobación NO debe:
-
-* consultar una API propia de Nava;
-* consultar manualmente la página web de Google Play;
-* comparar versiones mediante scraping;
-* contener números de versión hardcodeados.
-
-Google Play debe ser la fuente de verdad.
-
-### 2. Actualizaciones normales
-
-Implementar inicialmente el flujo:
-
-`AppUpdateType.FLEXIBLE`
-
-Cuando Google Play indique:
-
-`UpdateAvailability.UPDATE_AVAILABLE`
-
-y permita:
-
-`AppUpdateType.FLEXIBLE`
-
-debe iniciar el flujo oficial de actualización de Google Play.
-
-El usuario debe poder continuar utilizando Nava mientras Google Play descarga la actualización.
-
-### 3. Actualización descargada
-
-Registrar correctamente `InstallStateUpdatedListener`.
-
-Cuando el estado alcance:
-
-`InstallStatus.DOWNLOADED`
-
-mostrar dentro de Nava una interfaz sencilla indicando:
-
-**“Actualización lista”**
-
-Texto aproximado:
-
-**“La nueva versión de Nava ya se descargó. Reinicia la aplicación para completar la actualización.”**
-
-Botón:
-
-**“Actualizar ahora”**
-
-Al presionarlo ejecutar:
-
-`appUpdateManager.completeUpdate()`
-
-No crear un mecanismo de instalación propio.
-
-### 4. Reanudación
-
-Si Nava se cierra o pasa a segundo plano durante el proceso, al regresar comprobar el estado actual.
-
-Si existe una actualización flexible ya descargada, volver a ofrecer completar la actualización.
-
-Gestionar correctamente también los estados intermedios para evitar iniciar múltiples flujos simultáneamente.
-
-### 5. Preparar soporte futuro para actualización crítica
-
-Dejar la arquitectura preparada para que en el futuro podamos utilizar:
-
-`AppUpdateType.IMMEDIATE`
-
-para versiones críticas.
-
-NO quiero que todas las actualizaciones sean obligatorias actualmente.
-
-El comportamiento por defecto debe ser `FLEXIBLE`.
-
-No implementar todavía un backend para decidir prioridades.
-
-Si Google Play proporciona `updatePriority` o `clientVersionStalenessDays`, encapsular la lectura de esos valores para que puedan utilizarse posteriormente, pero no convertirlos ahora en reglas arbitrarias.
-
-### 6. React Native / Expo
-
-Nava utiliza React Native/Expo pero mantiene proyecto Android nativo.
-
-Integra Play In-App Updates de manera compatible con la arquitectura existente.
-
-Si es necesario crear un Native Module o puente Kotlin → React Native, créalo siguiendo la arquitectura actual del proyecto.
-
-No ejectar ni rehacer innecesariamente el proyecto Android.
-
-No ejecutar `expo prebuild` si pudiera sobrescribir personalizaciones existentes.
-
-No introducir Expo Updates.
-
-No modificar configuración de Google Play, Firebase, Maps, notificaciones, PayPhone o cualquier otra funcionalidad que no corresponda a esta tarea.
-
-### 7. Ciclo de vida
-
-La implementación debe evitar:
-
-* listeners duplicados;
-* memory leaks;
-* lanzar dos ventanas de actualización;
-* ejecutar comprobaciones simultáneas;
-* errores al rotar/recrear Activity;
-* bloquear el inicio de sesión;
-* bloquear navegación normal;
-* crashes si Google Play no devuelve información;
-* crashes si la aplicación fue instalada fuera de Google Play.
-
-Registrar y eliminar correctamente el listener cuando corresponda.
-
-### 8. Manejo de errores
-
-Si la consulta de Google Play falla:
-
-* Nava debe continuar funcionando normalmente;
-* no mostrar un error técnico al usuario;
-* registrar únicamente información diagnóstica segura;
-* no hacer crash;
-* permitir comprobar nuevamente posteriormente.
-
-Si la app fue instalada mediante APK/ADB durante desarrollo y Play In-App Updates no está disponible, la aplicación debe seguir funcionando normalmente.
-
-### 9. Entornos
-
-La funcionalidad debe estar orientada a builds Android distribuidos por Google Play.
-
-No asumir que funcionará en:
-
-* APK instalado manualmente;
-* ADB;
-* desarrollo local;
-* Expo Go.
-
-Documentar claramente esta limitación.
-
-### 10. Testing
-
-Añade las pruebas razonables que permita la arquitectura.
-
-Después verifica como mínimo:
+  * `SubscriptionDiscountGrantStatus`
+  * `SubscriptionPaymentReceiptDeliveryStatus`
+* Pero el Prisma Client generado en `packages/database/src/generated/prisma` estaba desactualizado.
+* Como consecuencia, `pnpm build:production` falló con errores del tipo:
 
 ```text
-pnpm --filter @barber-saas/mobile typecheck
+No matching export in "../../packages/database/src/index.ts"
+for import "SubscriptionDiscountGrantStatus"
+
+No matching export in "../../packages/database/src/index.ts"
+for import "SubscriptionPaymentReceiptDeliveryStatus"
 ```
 
-y las pruebas Mobile relacionadas.
+El problema se solucionó ejecutando:
 
-También ejecuta las verificaciones Gradle necesarias para comprobar que Android continúa compilando.
+```bash
+pnpm --filter @barber-saas/database exec prisma generate
+```
 
-No generar todavía un AAB de producción si no es necesario para validar la implementación.
+Después de eso:
 
-## Prueba real con Google Play
+```bash
+pnpm --filter @barber-saas/api build
+pnpm build:production
+```
 
-Documenta cómo comprobar posteriormente la funcionalidad.
+compilaron correctamente.
 
-La prueba debe contemplar:
+## Regla obligatoria nueva
 
-1. Tener instalada desde Google Play una versión anterior de Nava.
-2. Publicar una versión con `versionCode` superior en un track de pruebas.
-3. La cuenta del dispositivo debe tener acceso a ese track.
-4. La nueva versión debe estar disponible para ese usuario.
-5. Abrir la versión anterior.
-6. Nava consulta Play In-App Updates.
-7. Google Play informa que existe la actualización.
-8. Aparece el flujo oficial de actualización.
-9. Descargar actualización.
-10. Nava detecta `DOWNLOADED`.
-11. Pulsar “Actualizar ahora”.
-12. Google Play instala la nueva versión.
-13. Confirmar que la aplicación abre con el nuevo `versionCode`.
+A partir de ahora, TODO despliegue en VPS debe regenerar explícitamente Prisma Client después de actualizar dependencias y antes de comprobar/aplicar migraciones y antes del build.
 
-Ten presente que el sistema debe probarse mediante una instalación administrada por Google Play; no considerar una instalación ADB como prueba válida del flujo real.
+El flujo canónico debe quedar conceptualmente así:
 
-## Seguridad y mantenimiento
+```bash
+cd /opt/nava/app
 
-No agregues:
+git status --short
+git pull --ff-only origin main
 
-* secretos;
-* tokens;
-* APIs externas;
-* servicios cloud;
-* permisos Android innecesarios;
-* comprobadores de versión hechos a mano.
+pnpm install --frozen-lockfile
 
-No modificar código no relacionado.
+pnpm --filter @barber-saas/database exec prisma generate
 
-Usar la API oficial de Google Play como autoridad de disponibilidad de actualización.
+pnpm db:status
+
+# SOLO si db:status informa migraciones pendientes:
+pnpm db:migrate:deploy
+pnpm db:status
+
+pnpm env:check:production
+pnpm build:production
+
+sudo systemctl daemon-reload
+sudo systemctl restart nava-api
+sudo systemctl restart nava-web
+sudo systemctl restart nava-admin
+```
+
+## Reglas de seguridad que debes conservar
+
+1. `prisma generate` NO reemplaza `prisma migrate deploy`.
+2. `prisma generate` regenera código del Prisma Client y no debe interpretarse como una modificación de PostgreSQL.
+3. `pnpm db:migrate:deploy` solamente se ejecutará si `pnpm db:status` informa migraciones pendientes.
+4. Nunca usar `prisma migrate dev` en producción.
+5. Nunca usar `source /etc/nava/api.env`.
+6. No crear `.env.production` como mecanismo productivo si el runbook vigente indica que systemd administra las variables.
+7. No reiniciar ningún servicio si `pnpm build:production` falla.
+8. Un build de API fallido puede haber limpiado `apps/api/dist` antes de fallar. Por tanto, ante un fallo de build, NO reiniciar `nava-api`.
+9. Antes de reiniciar la API debe existir:
+
+```bash
+test -f apps/api/dist/index.js
+```
+
+10. El reinicio de los servicios solamente puede hacerse después de que `pnpm build:production` termine exitosamente.
+
+## Mejora preventiva
+
+Revisa el repositorio y determina si es conveniente incorporar `prisma generate` dentro de un script canónico de despliegue o preparación del build para que el operador no dependa de recordarlo manualmente.
+
+La solución debe evitar regeneraciones innecesariamente peligrosas, pero `prisma generate` debe ejecutarse siempre que pueda haber cambiado:
+
+* `packages/database/prisma/schema.prisma`;
+* la versión de Prisma;
+* el código generado;
+* las migraciones relacionadas con modelos/enums;
+* o después de actualizar el repositorio en una VPS antes del build.
+
+No introduzcas una actualización de Prisma como parte de este cambio. Mantén las versiones actualmente fijadas en el proyecto.
 
 ## Documentación
 
-Una vez terminada y validada la implementación, actualiza:
+Actualiza:
 
-`ProyectoMD/ESTADO_PROYECTO.md`
+```text
+ProyectoMD/ESTADO_PROYECTO.md
+```
 
-Documenta:
+en la sección vigente de:
 
-* que Android utiliza Google Play In-App Updates;
-* archivos modificados;
-* dependencia utilizada;
-* estrategia `FLEXIBLE`;
-* comportamiento al detectar actualización;
-* comportamiento cuando termina la descarga;
-* manejo al volver del background;
-* pruebas ejecutadas;
-* limitaciones para APK/ADB;
-* procedimiento para validar mediante un track de Google Play.
+```text
+REGLAS DE DESPLIEGUE — NO REGRESIONAR
+```
 
-No reemplaces información vigente ni vuelvas a introducir procedimientos Android antiguos.
+para que `prisma generate` sea un paso obligatorio y quede documentado también el incidente que originó esta regla.
 
-## Entrega final
+Debe quedar explícitamente documentado que:
 
-Al finalizar dame un resumen con:
+```text
+Migraciones aplicadas correctamente ≠ Prisma Client actualizado
+```
 
-1. diagnóstico de la arquitectura encontrada;
-2. archivos modificados;
-3. implementación realizada;
-4. dependencia Play utilizada;
-5. flujo completo de actualización;
-6. pruebas ejecutadas y resultados;
-7. cualquier limitación encontrada;
-8. pasos exactos que debo realizar yo posteriormente en Google Play Console para probarlo.
+y que es posible tener:
 
-No realices cambios en Google Play Console ni despliegues una versión por tu cuenta.
+```text
+PostgreSQL actualizado
+schema.prisma actualizado
+Prisma Client generado desactualizado
+```
+
+## Validación
+
+Después de implementar el cambio, ejecuta las validaciones apropiadas del repositorio y verifica como mínimo que:
+
+```bash
+pnpm --filter @barber-saas/database exec prisma generate
+pnpm --filter @barber-saas/api build
+```
+
+terminen correctamente.
+
+Si existe un script productivo que pueda modificarse de manera segura para incorporar esta protección automáticamente, hazlo y valida también:
+
+```bash
+pnpm build:production
+```
+
+No modifiques migraciones ya aplicadas.
+No crees migraciones nuevas para resolver este problema.
+No alteres datos de producción.
+No actualices Prisma a una versión mayor.
+No hagas cambios manuales en la VPS.
+
+Al finalizar, explícame:
+
+* qué archivos modificaste;
+* dónde quedó establecida la nueva regla;
+* si automatizaste `prisma generate`;
+* qué validaciones ejecutaste;
+* y cuál será a partir de ahora el procedimiento canónico de despliegue.

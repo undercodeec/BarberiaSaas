@@ -33,6 +33,25 @@ function movementIsIncome(type: CashMovementRecord['type']) {
   );
 }
 
+function attributionSummary(movement: CashMovementRecord) {
+  const recordedBy =
+    movement.attribution?.recordedBy?.name ?? movement.recordedByNameSnapshot;
+  const labels = [
+    movement.attribution?.professional?.name
+      ? `Hecho por: ${movement.attribution.professional.name}`
+      : movement.professionalNameSnapshot
+        ? `Hecho por: ${movement.professionalNameSnapshot}`
+        : null,
+    movement.attribution?.seller?.name
+      ? `Vendió: ${movement.attribution.seller.name}`
+      : movement.sellerNameSnapshot
+        ? `Vendió: ${movement.sellerNameSnapshot}`
+        : null,
+    recordedBy ? `Registró: ${recordedBy}` : null,
+  ].filter((value): value is string => Boolean(value));
+  return labels.join(' · ');
+}
+
 export default function CashRegisterDetailScreen() {
   const { session } = useAuth();
   const tenant = useTenantScope();
@@ -300,6 +319,11 @@ export default function CashRegisterDetailScreen() {
                       {movement.appointmentId ? ' · Cita vinculada' : ''}
                       {movement.reversedAt ? ' · Revertida' : ''}
                     </Text>
+                    {attributionSummary(movement) ? (
+                      <Text style={styles.movementMeta}>
+                        {attributionSummary(movement)}
+                      </Text>
+                    ) : null}
                   </View>
                   <View style={styles.movementValue}>
                     <Text

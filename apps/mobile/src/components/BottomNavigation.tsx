@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useCurrentOrganization } from '../features/organization/useCurrentOrganization';
+
 import {
   bottomActionPadding,
   bottomNavigationContentPadding,
@@ -120,6 +122,10 @@ export function BottomNavigation({
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const organizationQuery = useCurrentOrganization();
+  const canAccessCash =
+    organizationQuery.data?.membership.role === 'owner' ||
+    organizationQuery.data?.membership.role === 'manager';
   const items: ReadonlyArray<{
     readonly icon: React.ComponentProps<typeof Ionicons>['name'];
     readonly label: string;
@@ -157,6 +163,9 @@ export function BottomNavigation({
       value: 'settings',
     },
   ];
+  const visibleItems = items.filter(
+    (item) => item.value !== 'cash' || canAccessCash,
+  );
   return (
     <View
       accessibilityRole="tablist"
@@ -165,7 +174,7 @@ export function BottomNavigation({
         { bottom: bottomSafeAreaInset(insets.bottom) },
       ]}
     >
-      {items.map((item) => {
+      {visibleItems.map((item) => {
         const selected = item.value === active;
         return (
           <Pressable

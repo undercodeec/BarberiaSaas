@@ -81,7 +81,7 @@ async function lockInventory(
 
 async function managerScope(database: DatabaseClient, userId: string) {
   const membership = await database.membership.findFirst({
-    include: { memberLocations: true },
+    include: { memberLocations: true, user: { select: { fullName: true } } },
     where: { status: MembershipStatus.ACTIVE, userId },
   });
   if (
@@ -514,6 +514,7 @@ export function registerProductOrderRoutes(
               paymentMethod: input.paymentMethod.toUpperCase() as PaymentMethod,
               productId: item.productId,
               productQuantity: item.quantity,
+              recordedByNameSnapshot: current.membership.user.fullName,
               type: CashMovementType.SALE,
             },
           });
@@ -542,6 +543,7 @@ export function registerProductOrderRoutes(
               paymentMethod: input.paymentMethod.toUpperCase() as PaymentMethod,
               productId: item.productId,
               productQuantity: item.quantity,
+              recordedByNameSnapshot: current.membership.user.fullName,
               type: CashMovementType.SALE,
             },
           });

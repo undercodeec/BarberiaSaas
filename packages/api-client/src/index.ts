@@ -174,9 +174,44 @@ export interface CashMovementRecord {
   readonly productId: string | null;
   readonly productQuantity: number | null;
   readonly professionalMembershipId: string | null;
+  readonly professionalNameSnapshot: string | null;
+  readonly recordedByNameSnapshot: string | null;
   readonly reversalReason: string | null;
   readonly reversedAt: string | null;
   readonly serviceId: string | null;
+  readonly sellerMembershipId: string | null;
+  readonly sellerNameSnapshot: string | null;
+  readonly attribution?: {
+    readonly professional: {
+      readonly membershipId: string;
+      readonly name: string;
+    } | null;
+    readonly recordedBy: {
+      readonly name: string;
+      readonly userId: string;
+    } | null;
+    readonly reversedBy: {
+      readonly name: string;
+      readonly userId: string;
+    } | null;
+    readonly seller: {
+      readonly membershipId: string;
+      readonly name: string;
+    } | null;
+  };
+  readonly clientName?: string | null;
+  readonly productName?: string | null;
+  readonly services?: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+    readonly priceCents: number;
+  }>;
+  readonly source?:
+    | 'appointment'
+    | 'cash_adjustment'
+    | 'commission'
+    | 'manual_service'
+    | 'product_sale';
   readonly type:
     | 'commission_settlement'
     | 'deposit'
@@ -285,6 +320,13 @@ export interface CashRegisterDetailResponse {
   readonly movements: readonly CashMovementRecord[];
   readonly session: CashRegisterSession;
   readonly totals: CashRegisterTotals;
+}
+
+export interface FinancialRecordsResponse {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly records: readonly CashMovementRecord[];
+  readonly total: number;
 }
 
 export interface InventoryProduct {
@@ -920,7 +962,26 @@ export interface BookingSettingsResponse {
   readonly policyVersion: number;
   readonly reminderMinutes: number;
   readonly rescheduleLeadMinutes: number;
+  readonly servicePaymentConfirmationEnabled: boolean;
   readonly unconfirmedAction: 'cancel' | 'keep';
+}
+
+export interface AppointmentPaymentConfirmationRecord {
+  readonly appointmentId: string;
+  readonly clientName: string;
+  readonly locationId: string;
+  readonly professionalName: string;
+  readonly requestedAt: string;
+  readonly requestedByName: string | null;
+  readonly services: ReadonlyArray<{
+    readonly name: string;
+    readonly priceCents: number;
+  }>;
+  readonly totalCents: number;
+}
+
+export interface AppointmentPaymentConfirmationsResponse {
+  readonly confirmations: readonly AppointmentPaymentConfirmationRecord[];
 }
 
 export interface PublicBookingCatalog {
