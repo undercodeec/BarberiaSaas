@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nava",
     "slug": "barber-saas-mobile",
-    "version": "0.1.14",
+    "version": "0.1.15",
     "icon": "./assets/icon.png",
     "orientation": "portrait",
     "scheme": "barbersaas",
@@ -28,7 +28,7 @@
     "web": { "bundler": "metro" },
     "android": {
       "allowBackup": false,
-      "versionCode": 36,
+      "versionCode": 37,
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.RECORD_AUDIO",
