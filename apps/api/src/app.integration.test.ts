@@ -511,7 +511,9 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(ownerUserId).toBeDefined();
     expect(barberUserId).toBeDefined();
     if (!ownerUserId || !barberUserId)
-      throw new Error('La agenda de prueba debe incluir propietario y barbero.');
+      throw new Error(
+        'La agenda de prueba debe incluir propietario y barbero.',
+      );
     await database.pushToken.create({
       data: {
         platform: 'ios',
@@ -544,17 +546,21 @@ describeWithDatabase('API con PostgreSQL', () => {
     const appointmentId = created.json<{ appointment: { id: string } }>()
       .appointment.id;
 
-    const createdNotification = await database.appNotification.findFirstOrThrow({
-      where: {
-        appointmentId,
-        type: 'APPOINTMENT_CREATED',
-        userId: barberUserId,
+    const createdNotification = await database.appNotification.findFirstOrThrow(
+      {
+        where: {
+          appointmentId,
+          type: 'APPOINTMENT_CREATED',
+          userId: barberUserId,
+        },
       },
-    });
+    );
     expect(
-      (createdNotification.data as {
-        delivery: { push: { state: string } };
-      }).delivery.push.state,
+      (
+        createdNotification.data as {
+          delivery: { push: { state: string } };
+        }
+      ).delivery.push.state,
     ).toBe('skipped');
     expect(
       await database.appNotification.count({

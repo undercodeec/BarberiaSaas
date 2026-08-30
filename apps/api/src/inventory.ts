@@ -1,4 +1,5 @@
 import {
+  AppNotificationType,
   CashMovementType,
   CashRegisterStatus,
   MembershipRole,
@@ -12,6 +13,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { ApiError, isUniqueConstraintError } from './errors';
+import type { AppointmentNotifier } from './notifications';
 
 type Authenticate = (
   database: DatabaseClient,
@@ -223,6 +225,7 @@ export function registerInventoryRoutes(
   app: FastifyInstance,
   database: DatabaseClient,
   authenticate: Authenticate,
+  notifier: AppointmentNotifier | null = null,
 ) {
   app.get('/v1/inventory', async (request) => {
     const { user } = await authenticate(database, request);
@@ -570,8 +573,47 @@ export function registerInventoryRoutes(
           organizationId: currentScope.membership.organizationId,
         },
       });
-      return { movement, product, resultingQuantity };
+      return {
+        movement,
+        previousQuantity: inventory.quantityOnHand,
+        product,
+        resultingQuantity,
+      };
     });
+    if (
+      result.product.minimumStock > 0 &&
+      result.previousQuantity > result.product.minimumStock &&
+      result.resultingQuantity <= result.product.minimumStock
+    ) {
+      const recipients = await database.membership.findMany({
+        select: { userId: true },
+        where: {
+          organizationId: currentScope.membership.organizationId,
+          status: MembershipStatus.ACTIVE,
+          OR: [
+            { role: MembershipRole.OWNER },
+            {
+              memberLocations: { some: { locationId: location.id } },
+              role: MembershipRole.MANAGER,
+            },
+          ],
+        },
+      });
+      await notifier?.notifyOperational?.({
+        actorUserId: user.id,
+        body: `${result.product.name} llegó al mínimo de ${result.product.minimumStock} unidades; quedan ${result.resultingQuantity}.`,
+        data: {
+          locationId: location.id,
+          productId: result.product.id,
+          route: '/inventory',
+          type: 'low_stock',
+        },
+        organizationId: currentScope.membership.organizationId,
+        title: 'Stock bajo',
+        type: AppNotificationType.LOW_STOCK,
+        userIds: recipients.map(({ userId }) => userId),
+      });
+    }
     return reply.code(201).send({
       movement: {
         createdAt: result.movement.createdAt.toISOString(),

@@ -47,6 +47,33 @@ describe('notificationDestination', () => {
       notificationDestination({ type: 'appointment_created' }, undefined),
     ).toBeNull();
   });
+
+  it('envía las alertas operativas a su destino autorizado', () => {
+    expect(
+      notificationDestination({ type: 'cash_register_variance' }, 'owner'),
+    ).toBe('/cash-register');
+    expect(notificationDestination({ type: 'low_stock' }, 'manager')).toBe(
+      '/inventory',
+    );
+    expect(
+      notificationDestination({ type: 'team_member_accepted' }, 'receptionist'),
+    ).toBeNull();
+    expect(
+      notificationDestination({ type: 'subscription_renewal' }, 'owner'),
+    ).toBe('/subscription');
+  });
+
+  it('abre los cambios de equipo y horario para sus destinatarios', () => {
+    expect(
+      notificationDestination({ type: 'team_member_updated' }, 'barber'),
+    ).toBe('/team-management');
+    expect(
+      notificationDestination({ type: 'schedule_updated' }, 'barber'),
+    ).toBe('/agenda');
+    expect(
+      notificationDestination({ type: 'team_member_accepted' }, 'barber'),
+    ).toBeNull();
+  });
 });
 
 describe('createNotificationResponseConsumer', () => {

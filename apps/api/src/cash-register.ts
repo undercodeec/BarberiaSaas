@@ -1,4 +1,5 @@
 import {
+  AppNotificationType,
   CashRegisterStatus,
   CashMovementType,
   PaymentMethod,
@@ -26,6 +27,7 @@ import {
   type MembershipRole as PermissionRole,
   type OrganizationPermission,
 } from '@barber-saas/permissions';
+import type { AppointmentNotifier } from './notifications';
 
 type Authenticate = (
   database: DatabaseClient,
@@ -498,6 +500,7 @@ export function registerCashRegisterRoutes(
   app: FastifyInstance,
   database: DatabaseClient,
   authenticate: Authenticate,
+  notifier: AppointmentNotifier | null = null,
 ) {
   app.get('/v1/cash-register/current', async (request) => {
     const { user } = await authenticate(database, request);
@@ -1296,6 +1299,46 @@ export function registerCashRegisterRoutes(
         note: input.note ?? null,
       },
     );
+    if (
+      currentScope.organizationId &&
+      currentScope.locationId &&
+      closed.differenceCents !== null
+    ) {
+      const recipients = await database.membership.findMany({
+        select: { userId: true },
+        where: {
+          organizationId: currentScope.organizationId,
+          status: MembershipStatus.ACTIVE,
+          OR: [
+            { role: MembershipRole.OWNER },
+            {
+              memberLocations: {
+                some: { locationId: currentScope.locationId },
+              },
+              role: MembershipRole.MANAGER,
+            },
+          ],
+        },
+      });
+      const hasVariance = closed.differenceCents !== 0;
+      await notifier?.notifyOperational?.({
+        actorUserId: user.id,
+        body: hasVariance
+          ? `La caja cerró con una diferencia de $${(Math.abs(closed.differenceCents) / 100).toFixed(2)}.`
+          : 'La caja se cerró sin diferencias.',
+        data: {
+          locationId: currentScope.locationId,
+          route: '/cash-register',
+          type: hasVariance ? 'cash_register_variance' : 'cash_register_closed',
+        },
+        organizationId: currentScope.organizationId,
+        title: hasVariance ? 'Diferencia al cerrar caja' : 'Caja cerrada',
+        type: hasVariance
+          ? AppNotificationType.CASH_REGISTER_VARIANCE
+          : AppNotificationType.CASH_REGISTER_CLOSED,
+        userIds: recipients.map(({ userId }) => userId),
+      });
+    }
     return {
       session: {
         ...publicSession(closed),

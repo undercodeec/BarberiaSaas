@@ -1,161 +1,101 @@
-Quiero que actualices el procedimiento oficial de despliegue de Nava para evitar que vuelva a ocurrir una desincronización entre `schema.prisma` y el Prisma Client generado.
+ Sí. La recomendación es definir una política de notificaciones antes de añadir más envíos, porque un push debe
+  requerir atención o una acción; si se usa para todo, los usuarios terminan desactivándolo.
 
-## Problema que ocurrió
+  La matriz inicial que propongo:
 
-Durante un despliegue en producción:
+   Evento                             Push a                              Prioridad    Regla
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Nueva cita / reserva               Barbero asignado, recepción y            Alta    No avisar al usuario que la creó
+                                      gerente de la sede; propietario
+                                      opcional
+  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
+   Cita cancelada o reprogramada      Mismos destinatarios                     Alta    Solo si afecta una cita futura
+  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
+   Cita próxima                       Solo barbero asignado                    Alta    Recordatorio configurable: 30 o
+                                                                                       15 min antes
+  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
+   Reserva pendiente de               Recepción y gerente de la sede          Media    Evitar uno por cada intento del
+   confirmar / vencida                                                                 cliente
+  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
+   Cobro de servicio pendiente de     Propietario y gerente de la sede         Alta    Debe pasar de aviso interno a
+   confirmar                                                                           push real
+  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
+   Caja cerrada con diferencia        Propietario y gerente de la sede         Alta    Incluir monto de diferencia, no
+                                                                                       datos del cliente
+  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
+   Caja abierta o cerrada sin         Propietario y gerente de la sede         Baja    Opcional; puede quedar solo en
+   diferencia                                                                          el historial
+  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
+   Stock bajo mínimo                  Propietario y gerente de la sede        Media    Solo al cruzar el mínimo; no en
+                                                                                       cada ajuste
+  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
+   Pedido pagado / listo para         Recepción y gerente de la sede          Media    Si el flujo de productos opera
+   entregar                                                                            por sucursal
+  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
+   Nuevo miembro acepta invitación    Propietario y gerente                   Media    Aviso único
+  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
+   Cambio de rol, sede o agenda       Usuario afectado + propietario/          Alta    Importante para el colaborador
+                                      gerente                                          afectado
+  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
+   Reseña nueva negativa              Propietario y gerente de la sede        Media    Por ejemplo, calificación 1–3;
+                                                                                       positivas pueden ir al panel
+  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
+   Suscripción, pago rechazado o      Solo propietario                         Alta    También por correo, pues es un
+   vencimiento                                                                         tema administrativo
+  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
+   Seguridad: cambio de               Usuario afectado y/o propietario         Alta    Push y correo; no depender solo
+   contraseña, cierre de sesión,                                                       de la app
+   cuenta suspendida
 
-* `pnpm db:migrate:deploy` aplicó correctamente las migraciones.
-* `pnpm db:status` confirmó que PostgreSQL estaba actualizado.
-* `schema.prisma` contenía nuevos enums:
+  Reglas de roles recomendadas:
 
-  * `SubscriptionDiscountGrantStatus`
-  * `SubscriptionPaymentReceiptDeliveryStatus`
-* Pero el Prisma Client generado en `packages/database/src/generated/prisma` estaba desactualizado.
-* Como consecuencia, `pnpm build:production` falló con errores del tipo:
+  - owner: asuntos financieros, seguridad, suscripción y visión global; no necesariamente cada cita si hay mucho
+    volumen.
 
-```text
-No matching export in "../../packages/database/src/index.ts"
-for import "SubscriptionDiscountGrantStatus"
+  - manager: eventos operativos de las sedes asignadas, caja, inventario, equipo y citas.
+  - receptionist: citas, cambios, cancelaciones, pedidos y alertas operativas de su sede; nunca pagos, suscripción o
+    configuración sensible.
 
-No matching export in "../../packages/database/src/index.ts"
-for import "SubscriptionPaymentReceiptDeliveryStatus"
-```
+  - barber: solo sus propias citas, cambios, cancelaciones, recordatorios y cambios que afecten su agenda.
+  - Ningún aviso debe llegar a una persona sin acceso a esa sede.
+  - El actor de una acción no debe recibir su propio push.
+  - Si una persona tiene varios roles, se consolida en un único envío.
 
-El problema se solucionó ejecutando:
+  Además, separaría tres canales:
 
-```bash
-pnpm --filter @barber-saas/database exec prisma generate
-```
+  - Push: requiere atención inmediata.
+  - Bandeja dentro de Nava: historial y novedades no urgentes.
+  - Correo: seguridad, facturación, invitaciones y avisos que no deben perderse.
 
-Después de eso:
+  Hoy ya existe una buena base para citas, pero falta aplicar estas reglas por sede y completar eventos como
+  confirmación de cobro, caja, inventario, equipo, reseñas y suscripción. El punto más urgente es convertir “cobro
 
-```bash
-pnpm --filter @barber-saas/api build
-pnpm build:production
-```
+  La siguiente fase debería ser convertir esta matriz en preferencias configurables por usuario: por ejemplo, que el
+  propietario pueda apagar “nuevas citas” pero mantener activas “caja con diferencia”, “pagos pendientes” y “stock
+  bajo”.
+  desde la app— y cobros pendientes. Aplicaré los destinatarios por sede, evitaré notificar al autor de su propia acción
+  y haré que el cobro pendiente llegue como push real.
 
-compilaron correctamente.
+   Primera fase implementada.
 
-## Regla obligatoria nueva
+  - Las citas creadas, canceladas y reprogramadas desde Nava ahora notifican.
+  - Destinatarios: profesional asignado, propietarios, gerentes y recepción de la misma sede.
+  - Un cobro pendiente de confirmar ahora entra en la cola real de push para propietarios y gerentes de la sede; antes
+    era solo un aviso interno.
 
-A partir de ahora, TODO despliegue en VPS debe regenerar explícitamente Prisma Client después de actualizar dependencias y antes de comprobar/aplicar migraciones y antes del build.
+  Cambios principales: apps/api/src/app.ts:364 y apps/api/src/agenda.ts:852.
 
-El flujo canónico debe quedar conceptualmente así:
+  Validado con typecheck del API y las pruebas de FCM. No hice commit aún.
 
-```bash
-cd /opt/nava/app
+   No. Está completa la primera fase crítica de citas y cobros pendientes.
 
-git status --short
-git pull --ff-only origin main
+  Aún faltan por implementar:
 
-pnpm install --frozen-lockfile
+  - Inventario: stock bajo.
+  - Equipo: invitación aceptada, cambio de rol/sede/horario.
+  - Reseñas negativas.
+  - Suscripción y pagos rechazados.
+  - Preferencias por usuario para activar o silenciar categorías.
+  - Pruebas integrales con dispositivos reales y FCM configurado.
 
-pnpm --filter @barber-saas/database exec prisma generate
-
-pnpm db:status
-
-# SOLO si db:status informa migraciones pendientes:
-pnpm db:migrate:deploy
-pnpm db:status
-
-pnpm env:check:production
-pnpm build:production
-
-sudo systemctl daemon-reload
-sudo systemctl restart nava-api
-sudo systemctl restart nava-web
-sudo systemctl restart nava-admin
-```
-
-## Reglas de seguridad que debes conservar
-
-1. `prisma generate` NO reemplaza `prisma migrate deploy`.
-2. `prisma generate` regenera código del Prisma Client y no debe interpretarse como una modificación de PostgreSQL.
-3. `pnpm db:migrate:deploy` solamente se ejecutará si `pnpm db:status` informa migraciones pendientes.
-4. Nunca usar `prisma migrate dev` en producción.
-5. Nunca usar `source /etc/nava/api.env`.
-6. No crear `.env.production` como mecanismo productivo si el runbook vigente indica que systemd administra las variables.
-7. No reiniciar ningún servicio si `pnpm build:production` falla.
-8. Un build de API fallido puede haber limpiado `apps/api/dist` antes de fallar. Por tanto, ante un fallo de build, NO reiniciar `nava-api`.
-9. Antes de reiniciar la API debe existir:
-
-```bash
-test -f apps/api/dist/index.js
-```
-
-10. El reinicio de los servicios solamente puede hacerse después de que `pnpm build:production` termine exitosamente.
-
-## Mejora preventiva
-
-Revisa el repositorio y determina si es conveniente incorporar `prisma generate` dentro de un script canónico de despliegue o preparación del build para que el operador no dependa de recordarlo manualmente.
-
-La solución debe evitar regeneraciones innecesariamente peligrosas, pero `prisma generate` debe ejecutarse siempre que pueda haber cambiado:
-
-* `packages/database/prisma/schema.prisma`;
-* la versión de Prisma;
-* el código generado;
-* las migraciones relacionadas con modelos/enums;
-* o después de actualizar el repositorio en una VPS antes del build.
-
-No introduzcas una actualización de Prisma como parte de este cambio. Mantén las versiones actualmente fijadas en el proyecto.
-
-## Documentación
-
-Actualiza:
-
-```text
-ProyectoMD/ESTADO_PROYECTO.md
-```
-
-en la sección vigente de:
-
-```text
-REGLAS DE DESPLIEGUE — NO REGRESIONAR
-```
-
-para que `prisma generate` sea un paso obligatorio y quede documentado también el incidente que originó esta regla.
-
-Debe quedar explícitamente documentado que:
-
-```text
-Migraciones aplicadas correctamente ≠ Prisma Client actualizado
-```
-
-y que es posible tener:
-
-```text
-PostgreSQL actualizado
-schema.prisma actualizado
-Prisma Client generado desactualizado
-```
-
-## Validación
-
-Después de implementar el cambio, ejecuta las validaciones apropiadas del repositorio y verifica como mínimo que:
-
-```bash
-pnpm --filter @barber-saas/database exec prisma generate
-pnpm --filter @barber-saas/api build
-```
-
-terminen correctamente.
-
-Si existe un script productivo que pueda modificarse de manera segura para incorporar esta protección automáticamente, hazlo y valida también:
-
-```bash
-pnpm build:production
-```
-
-No modifiques migraciones ya aplicadas.
-No crees migraciones nuevas para resolver este problema.
-No alteres datos de producción.
-No actualices Prisma a una versión mayor.
-No hagas cambios manuales en la VPS.
-
-Al finalizar, explícame:
-
-* qué archivos modificaste;
-* dónde quedó establecida la nueva regla;
-* si automatizaste `prisma generate`;
-* qué validaciones ejecutaste;
-* y cuál será a partir de ahora el procedimiento canónico de despliegue.
+  No marqué el trabajo como completo ni hice commit de esta fase.

@@ -10,12 +10,19 @@ export type NotificationRole = 'barber' | 'manager' | 'owner' | 'receptionist';
 const APPOINTMENT_NOTIFICATION_TYPES = new Set([
   'appointment_cancelled',
   'appointment_created',
+  'appointment_reminder',
   'appointment_rescheduled',
   'cancelled',
   'created',
   'rescheduled',
+  'schedule_updated',
 ]);
 const PAYMENT_CONFIRMATION_TYPES = new Set(['payment_confirmation_required']);
+const REVIEW_TYPES = new Set(['review_negative']);
+const CASH_TYPES = new Set(['cash_register_closed', 'cash_register_variance']);
+const INVENTORY_TYPES = new Set(['low_stock']);
+const TEAM_TYPES = new Set(['team_member_accepted', 'team_member_updated']);
+const SUBSCRIPTION_TYPES = new Set(['subscription_renewal']);
 const AGENDA_ROLES = new Set<NotificationRole>([
   'barber',
   'manager',
@@ -35,6 +42,38 @@ export function notificationDestination(
     PAYMENT_CONFIRMATION_TYPES.has(data.type)
   )
     return '/payment-confirmations';
+  if (
+    (role === 'owner' || role === 'manager') &&
+    typeof data?.type === 'string' &&
+    REVIEW_TYPES.has(data.type)
+  )
+    return '/reviews-management';
+  if (
+    (role === 'owner' || role === 'manager') &&
+    typeof data?.type === 'string' &&
+    CASH_TYPES.has(data.type)
+  )
+    return '/cash-register';
+  if (
+    (role === 'owner' || role === 'manager') &&
+    typeof data?.type === 'string' &&
+    INVENTORY_TYPES.has(data.type)
+  )
+    return '/inventory';
+  if (
+    typeof data?.type === 'string' &&
+    TEAM_TYPES.has(data.type) &&
+    (role === 'owner' ||
+      role === 'manager' ||
+      data.type === 'team_member_updated')
+  )
+    return '/team-management';
+  if (
+    role === 'owner' &&
+    typeof data?.type === 'string' &&
+    SUBSCRIPTION_TYPES.has(data.type)
+  )
+    return '/subscription';
   if (
     !role ||
     !AGENDA_ROLES.has(role) ||

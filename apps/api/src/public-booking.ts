@@ -1,4 +1,5 @@
 import {
+  AppNotificationType,
   AppointmentEventType,
   AppointmentSource,
   AppointmentStatus,
@@ -1457,6 +1458,36 @@ export function registerPublicBookingRoutes(
       },
       where: { appointmentId: access.appointment.id },
     });
+    if (review.rating <= 3) {
+      const recipients = await database.membership.findMany({
+        select: { userId: true },
+        where: {
+          organizationId: review.organizationId,
+          status: MembershipStatus.ACTIVE,
+          OR: [
+            { role: MembershipRole.OWNER },
+            {
+              memberLocations: { some: { locationId: review.locationId } },
+              role: MembershipRole.MANAGER,
+            },
+          ],
+        },
+      });
+      await notifier?.notifyOperational?.({
+        appointmentId: review.appointmentId,
+        body: `${review.clientName} dejó una reseña de ${review.rating} estrellas.`,
+        data: {
+          appointmentId: review.appointmentId,
+          locationId: review.locationId,
+          route: '/reviews-management',
+          type: 'review_negative',
+        },
+        organizationId: review.organizationId,
+        title: 'Nueva reseña para revisar',
+        type: AppNotificationType.REVIEW_NEGATIVE,
+        userIds: recipients.map(({ userId }) => userId),
+      });
+    }
     return reply.code(201).send({ review });
   });
 

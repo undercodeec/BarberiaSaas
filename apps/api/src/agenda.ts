@@ -1,5 +1,4 @@
 import {
-  AppNotificationType,
   AppointmentEventType,
   AppointmentSource,
   AppointmentStatus,
@@ -853,7 +852,7 @@ export function registerAgendaRoutes(
         await recordBookingMilestone(transaction, current.organizationId);
         return created;
       });
-      await notifier?.notify(appointment.id, 'created');
+      await notifier?.notify(appointment.id, 'created', user.id);
       return reply.code(201).send({
         appointment: publicAppointment(
           appointment,
@@ -966,6 +965,7 @@ export function registerAgendaRoutes(
         });
         return appointment;
       });
+      await notifier?.notify(updated.id, 'rescheduled', user.id);
       return {
         appointment: publicAppointment(
           updated,
@@ -1041,6 +1041,7 @@ export function registerAgendaRoutes(
       });
       return appointment;
     });
+    await notifier?.notify(updated.id, 'cancelled', user.id);
     return {
       appointment: publicAppointment(
         updated,
@@ -1130,42 +1131,11 @@ export function registerAgendaRoutes(
           type: AppointmentEventType.STATUS_CHANGED,
         },
       });
-      if (requestsPaymentConfirmation) {
-        const recipients = await transaction.membership.findMany({
-          select: { userId: true },
-          where: {
-            organizationId: appointment.organizationId,
-            OR: [
-              { role: MembershipRole.OWNER },
-              {
-                memberLocations: {
-                  some: { locationId: appointment.locationId },
-                },
-                role: MembershipRole.MANAGER,
-              },
-            ],
-            status: MembershipStatus.ACTIVE,
-          },
-        });
-        await transaction.appNotification.createMany({
-          data: recipients.map(({ userId }) => ({
-            appointmentId: appointment.id,
-            body: `${existing.clientName} fue atendido por ${existing.professional.user.fullName}. Confirma el cobro para registrarlo en Caja.`,
-            data: {
-              appointmentId: appointment.id,
-              route: '/payment-confirmations',
-              type: 'payment_confirmation_required',
-            },
-            organizationId: appointment.organizationId,
-            title: 'Cobro pendiente de confirmar',
-            type: AppNotificationType.PAYMENT_CONFIRMATION_REQUIRED,
-            userId,
-          })),
-        });
-      }
       await reconcileAppointmentCommissions(transaction, appointment.id);
       return appointment;
     });
+    if (requestsPaymentConfirmation)
+      await notifier?.notifyPaymentConfirmation?.(updated.id, user.id);
     if (
       status === AppointmentStatus.COMPLETED &&
       existing.status !== AppointmentStatus.COMPLETED &&

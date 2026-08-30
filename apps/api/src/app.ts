@@ -3271,9 +3271,12 @@ export async function buildApi({
   void reconcileSubscriptionLifecycle(database).catch((error: unknown) =>
     app.log.error(error),
   );
-  void processSubscriptionRenewalReminders(database, config).catch(
-    (error: unknown) => app.log.error(error),
-  );
+  void processSubscriptionRenewalReminders(
+    database,
+    config,
+    undefined,
+    appointmentNotifier,
+  ).catch((error: unknown) => app.log.error(error));
   void enqueuePendingSriInvoices(database, config).catch((error: unknown) =>
     app.log.error(error),
   );
