@@ -2408,14 +2408,12 @@ export async function buildApi({
       addressLine: profile?.addressLine ?? null,
       businessName: profile?.businessName ?? null,
       businessLocation,
-      bookingUrl:
-        profile && membership
-          ? publicBookingUrl(
-              config.PUBLIC_WEB_URL,
-              membership?.organization.publicBookingToken ??
-                createSlug(profile.businessName).slice(0, 80),
-            )
-          : null,
+      bookingUrl: membership
+        ? publicBookingUrl(
+            config.PUBLIC_WEB_URL,
+            membership.organization.publicBookingToken,
+          )
+        : null,
       city: profile?.city ?? null,
       closingTime: profile?.closingTime ?? null,
       coverImageUri: profile?.coverImageUri ?? null,

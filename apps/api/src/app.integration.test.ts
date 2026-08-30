@@ -1616,15 +1616,26 @@ describeWithDatabase('API con PostgreSQL', () => {
       url: '/v1/auth/verify-email',
     });
     expect(verified.statusCode).toBe(200);
+    const barberToken = verified.json<{ session: { token: string } }>().session
+      .token;
     const acceptance = await app.inject({
       headers: {
-        authorization: `Bearer ${verified.json<{ session: { token: string } }>().session.token}`,
+        authorization: `Bearer ${barberToken}`,
       },
       method: 'POST',
       payload: { token: invitationToken },
       url: '/v1/team/invitations/accept',
     });
     expect(acceptance.statusCode).toBe(200);
+    const accountDetails = await app.inject({
+      headers: { authorization: `Bearer ${barberToken}` },
+      method: 'GET',
+      url: '/v1/onboarding/account-details',
+    });
+    expect(accountDetails.statusCode).toBe(200);
+    expect(
+      accountDetails.json<{ bookingUrl: string | null }>().bookingUrl,
+    ).toMatch(/^https:\/\/book\.nava\.app\//u);
 
     const invitedUser = await database.user.findUniqueOrThrow({
       where: { email: invitedEmail },
