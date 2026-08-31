@@ -142,6 +142,7 @@ export function RegistrationFlow() {
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const [timezonePickerVisible, setTimezonePickerVisible] = useState(false);
   const revealFocusedField = useCallback(() => {
     const focusedInput = TextInput.State.currentlyFocusedInput();
@@ -597,29 +598,109 @@ export function RegistrationFlow() {
                           <Controller
                             control={control}
                             name="businessCategory"
-                            render={({ field }) => (
-                              <View style={s.fields}>
-                                {BUSINESS_CATEGORY_OPTIONS.map((category) => (
-                                  <NavaButton
-                                    key={category.value}
-                                    compact
-                                    icon={category.icon}
-                                    label={category.label}
-                                    onPress={() => {
-                                      field.onChange(category.value);
-                                      setStep('business');
+                            render={({ field }) => {
+                              const selectedCategory =
+                                BUSINESS_CATEGORY_OPTIONS.find(
+                                  (category) => category.value === field.value,
+                                ) ?? BUSINESS_CATEGORY_OPTIONS[0]!;
+
+                              return (
+                                <View style={s.fields}>
+                                  <Pressable
+                                    accessibilityLabel="Seleccionar tipo de negocio"
+                                    accessibilityRole="button"
+                                    accessibilityState={{
+                                      expanded: isCategoryMenuOpen,
                                     }}
-                                    style={[
-                                      s.choiceButton,
-                                      field.value === category.value
-                                        ? s.categoryButtonSelected
-                                        : null,
-                                    ]}
-                                    variant="outline"
-                                  />
-                                ))}
-                              </View>
-                            )}
+                                    onPress={() =>
+                                      setIsCategoryMenuOpen((isOpen) => !isOpen)
+                                    }
+                                    style={s.categorySelector}
+                                  >
+                                    <Text style={s.categorySelectorLabel}>
+                                      Tipo de negocio
+                                    </Text>
+                                    <View style={s.categorySelectorValue}>
+                                      <Ionicons
+                                        color={appTheme.colors.accentDark}
+                                        name={selectedCategory.icon}
+                                        size={21}
+                                      />
+                                      <Text style={s.categorySelectorValueText}>
+                                        {selectedCategory.label}
+                                      </Text>
+                                      <Ionicons
+                                        color={appTheme.colors.textMuted}
+                                        name={
+                                          isCategoryMenuOpen
+                                            ? 'chevron-up'
+                                            : 'chevron-down'
+                                        }
+                                        size={20}
+                                      />
+                                    </View>
+                                  </Pressable>
+                                  {isCategoryMenuOpen ? (
+                                    <View
+                                      accessibilityRole="radiogroup"
+                                      style={s.categoryMenu}
+                                    >
+                                      {BUSINESS_CATEGORY_OPTIONS.map(
+                                        (category) => {
+                                          const selected =
+                                            field.value === category.value;
+                                          return (
+                                            <Pressable
+                                              accessibilityRole="radio"
+                                              accessibilityState={{ selected }}
+                                              key={category.value}
+                                              onPress={() => {
+                                                field.onChange(category.value);
+                                                setIsCategoryMenuOpen(false);
+                                                setStep('business');
+                                              }}
+                                              style={[
+                                                s.categoryMenuOption,
+                                                selected
+                                                  ? s.categoryMenuOptionSelected
+                                                  : null,
+                                              ]}
+                                            >
+                                              <Ionicons
+                                                color={
+                                                  selected
+                                                    ? '#FFFFFF'
+                                                    : appTheme.colors.accentDark
+                                                }
+                                                name={category.icon}
+                                                size={19}
+                                              />
+                                              <Text
+                                                style={[
+                                                  s.categoryMenuOptionLabel,
+                                                  selected
+                                                    ? s.categoryMenuOptionLabelSelected
+                                                    : null,
+                                                ]}
+                                              >
+                                                {category.label}
+                                              </Text>
+                                              {selected ? (
+                                                <Ionicons
+                                                  color="#FFFFFF"
+                                                  name="checkmark-circle"
+                                                  size={20}
+                                                />
+                                              ) : null}
+                                            </Pressable>
+                                          );
+                                        },
+                                      )}
+                                    </View>
+                                  ) : null}
+                                </View>
+                              );
+                            }}
                           />
                         </Section>
                       ) : null}
@@ -737,23 +818,39 @@ export function RegistrationFlow() {
                             name="timezone"
                             render={({ field, fieldState }) => (
                               <View style={{ marginTop: 16 }}>
-                                <Text style={s.label}>Zona horaria del negocio</Text>
+                                <Text style={s.label}>
+                                  Zona horaria del negocio
+                                </Text>
                                 <Pressable
                                   onPress={() => setTimezonePickerVisible(true)}
                                   style={s.timezoneSelect}
                                 >
-                                  <Text style={s.timezoneSelectText}>{field.value}</Text>
+                                  <Text style={s.timezoneSelectText}>
+                                    {field.value}
+                                  </Text>
                                 </Pressable>
-                                {fieldState.error ? <Text style={s.error}>{fieldState.error.message}</Text> : null}
+                                {fieldState.error ? (
+                                  <Text style={s.error}>
+                                    {fieldState.error.message}
+                                  </Text>
+                                ) : null}
                                 <Modal
                                   animationType="slide"
-                                  onRequestClose={() => setTimezonePickerVisible(false)}
+                                  onRequestClose={() =>
+                                    setTimezonePickerVisible(false)
+                                  }
                                   visible={timezonePickerVisible}
                                 >
                                   <SafeAreaView style={s.timezoneModal}>
                                     <View style={s.timezoneModalHeader}>
                                       <Text style={s.title}>Zona horaria</Text>
-                                      <Pressable onPress={() => setTimezonePickerVisible(false)}><Text style={s.backText}>Listo</Text></Pressable>
+                                      <Pressable
+                                        onPress={() =>
+                                          setTimezonePickerVisible(false)
+                                        }
+                                      >
+                                        <Text style={s.backText}>Listo</Text>
+                                      </Pressable>
                                     </View>
                                     <ScrollView>
                                       {TIMEZONE_OPTIONS.map((timezone) => (
@@ -765,7 +862,9 @@ export function RegistrationFlow() {
                                           }}
                                           style={s.timezoneOption}
                                         >
-                                          <Text style={s.timezoneOptionText}>{timezone.label}</Text>
+                                          <Text style={s.timezoneOptionText}>
+                                            {timezone.label}
+                                          </Text>
                                         </Pressable>
                                       ))}
                                     </ScrollView>
@@ -776,7 +875,10 @@ export function RegistrationFlow() {
                           />
                           <Next
                             onPress={() =>
-                              requireFields(['country', 'city', 'timezone'], 'schedule')
+                              requireFields(
+                                ['country', 'city', 'timezone'],
+                                'schedule',
+                              )
                             }
                           />
                         </Section>
