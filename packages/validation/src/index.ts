@@ -158,12 +158,7 @@ export const signUpSchema = z
     email: emailSchema,
     fullName: z.string().trim().min(2, 'Ingresa tu nombre completo.').max(120),
     marketingOptIn: z.boolean().default(false),
-    privacyPolicyAccepted: z
-      .boolean()
-      .refine(
-        (value) => value,
-        'Debes aceptar la Política de Privacidad para crear tu cuenta.',
-      ),
+    privacyPolicyAccepted: z.boolean().default(false),
     openingTime: timeSchema,
     password: newPasswordSchema,
     phone: phoneSchema,

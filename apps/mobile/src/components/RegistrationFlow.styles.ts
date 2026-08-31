@@ -223,6 +223,16 @@ export const s = StyleSheet.create({
   },
   nextContainer: { marginTop: 18, paddingBottom: 4, width: '100%' },
   options: { gap: 13, marginTop: 28, width: '100%' },
+  passwordInput: { position: 'relative' },
+  passwordInputText: { paddingRight: 52 },
+  passwordVisibilityButton: {
+    alignItems: 'center',
+    height: 54,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 0,
+    width: 52,
+  },
   reviewLabel: {
     color: appTheme.colors.textMuted,
     fontSize: 13,

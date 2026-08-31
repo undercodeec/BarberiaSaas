@@ -15,7 +15,6 @@ import {
   Image,
   Keyboard,
   KeyboardAvoidingView,
-  Linking,
   Modal,
   PanResponder,
   Platform,
@@ -57,7 +56,6 @@ import { useAuth } from '../providers/AuthProvider';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const logoImage = require('../../assets/nava-logo.png') as number;
 const VERIFICATION_DURATION_SECONDS = 10 * 60;
-const PRIVACY_POLICY_URL = 'https://navacloud.app/tratamiento-de-datos';
 
 async function checkRegistrationAvailability(
   input: RegistrationAvailabilityInput,
@@ -326,11 +324,9 @@ export function RegistrationFlow() {
       confirmPassword,
       email,
       fullName,
-      marketingOptIn,
       openingTime,
       password,
       phone,
-      privacyPolicyAccepted,
       timezone,
     }) => {
       if (!email.trim() || !password || !confirmPassword) {
@@ -345,12 +341,6 @@ export function RegistrationFlow() {
         setFormError('Selecciona el tipo de cuenta.');
         return;
       }
-      if (!privacyPolicyAccepted) {
-        setError('privacyPolicyAccepted', {
-          message: 'Acepta la Política de Privacidad para continuar.',
-        });
-        return;
-      }
       setFormError(null);
       try {
         const response = await signUp({
@@ -363,11 +353,11 @@ export function RegistrationFlow() {
           countryCode,
           email,
           fullName,
-          marketingOptIn,
+          marketingOptIn: false,
           openingTime,
           password,
           phone: `${phoneCountry.dial} ${phone.trim()}`,
-          privacyPolicyAccepted,
+          privacyPolicyAccepted: false,
           timezone,
         });
         setVerificationEmail(response.email);
@@ -1053,103 +1043,6 @@ export function RegistrationFlow() {
                             onEdit={() => setStep('credentials')}
                             value={values.email}
                           />
-                          <Controller
-                            control={control}
-                            name="privacyPolicyAccepted"
-                            render={({ field, fieldState }) => (
-                              <View>
-                                <Pressable
-                                  accessibilityRole="checkbox"
-                                  accessibilityState={{ checked: field.value }}
-                                  onPress={() => {
-                                    clearErrors('privacyPolicyAccepted');
-                                    field.onChange(!field.value);
-                                  }}
-                                  style={[
-                                    s.legalConsent,
-                                    field.value && s.legalConsentChecked,
-                                  ]}
-                                >
-                                  <Ionicons
-                                    color={
-                                      field.value
-                                        ? '#FFFFFF'
-                                        : appTheme.colors.accentDark
-                                    }
-                                    name={
-                                      field.value
-                                        ? 'checkmark-circle'
-                                        : 'ellipse-outline'
-                                    }
-                                    size={22}
-                                  />
-                                  <Text
-                                    style={[
-                                      s.legalConsentText,
-                                      field.value && s.legalConsentTextChecked,
-                                    ]}
-                                  >
-                                    Acepto la Política de Privacidad y declaro
-                                    tener al menos 18 años o capacidad legal
-                                    para contratar Nava.
-                                  </Text>
-                                </Pressable>
-                                <Pressable
-                                  accessibilityRole="link"
-                                  onPress={() =>
-                                    void Linking.openURL(PRIVACY_POLICY_URL)
-                                  }
-                                >
-                                  <Text style={s.privacyPolicyLink}>
-                                    Leer Política de Privacidad
-                                  </Text>
-                                </Pressable>
-                                {fieldState.error ? (
-                                  <Text style={s.error}>
-                                    {fieldState.error.message}
-                                  </Text>
-                                ) : null}
-                              </View>
-                            )}
-                          />
-                          <Controller
-                            control={control}
-                            name="marketingOptIn"
-                            render={({ field }) => (
-                              <Pressable
-                                accessibilityRole="checkbox"
-                                accessibilityState={{ checked: field.value }}
-                                onPress={() => field.onChange(!field.value)}
-                                style={[
-                                  s.legalConsent,
-                                  field.value && s.legalConsentChecked,
-                                ]}
-                              >
-                                <Ionicons
-                                  color={
-                                    field.value
-                                      ? '#FFFFFF'
-                                      : appTheme.colors.accentDark
-                                  }
-                                  name={
-                                    field.value
-                                      ? 'checkmark-circle'
-                                      : 'ellipse-outline'
-                                  }
-                                  size={22}
-                                />
-                                <Text
-                                  style={[
-                                    s.legalConsentText,
-                                    field.value && s.legalConsentTextChecked,
-                                  ]}
-                                >
-                                  Quiero recibir novedades, promociones y
-                                  ofertas de Nava por correo electrónico.
-                                </Text>
-                              </Pressable>
-                            )}
-                          />
                           <NavaButton
                             disabled={formState.isSubmitting}
                             foregroundColor={appTheme.colors.accentDark}
@@ -1324,21 +1217,50 @@ function Next({
 function Field({
   error,
   label,
+  secureTextEntry,
   ...props
 }: TextInputProps & {
   readonly error?: string | undefined;
   readonly label: string;
 }) {
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const hasPasswordToggle = Boolean(secureTextEntry);
+  const passwordDescription =
+    label === 'Confirmar contraseña'
+      ? 'confirmación de contraseña'
+      : 'contraseña';
   return (
     <View style={s.field}>
       <Text style={s.label}>{label}</Text>
-      <TextInput
-        accessibilityHint={error}
-        accessibilityLabel={label}
-        placeholderTextColor={appTheme.colors.textMuted}
-        style={[s.input, error ? s.inputError : null]}
-        {...props}
-      />
+      <View style={hasPasswordToggle ? s.passwordInput : undefined}>
+        <TextInput
+          accessibilityHint={error}
+          accessibilityLabel={label}
+          placeholderTextColor={appTheme.colors.textMuted}
+          secureTextEntry={hasPasswordToggle ? !passwordVisible : undefined}
+          style={[
+            s.input,
+            hasPasswordToggle ? s.passwordInputText : null,
+            error ? s.inputError : null,
+          ]}
+          {...props}
+        />
+        {hasPasswordToggle ? (
+          <Pressable
+            accessibilityLabel={`${passwordVisible ? 'Ocultar' : 'Mostrar'} ${passwordDescription}`}
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => setPasswordVisible((visible) => !visible)}
+            style={s.passwordVisibilityButton}
+          >
+            <Ionicons
+              color={appTheme.colors.accentDark}
+              name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
+              size={22}
+            />
+          </Pressable>
+        ) : null}
+      </View>
       {error ? (
         <Text accessibilityRole="alert" style={s.error}>
           {error}

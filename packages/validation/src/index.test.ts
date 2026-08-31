@@ -349,7 +349,7 @@ describe('autenticación y onboarding', () => {
     expect(result.success).toBe(false);
   });
 
-  it('requiere aceptar la Política de Privacidad al registrar una cuenta', () => {
+  it('permite registrar una cuenta sin aceptar la Política de Privacidad', () => {
     expect(
       signUpSchema.safeParse({
         accountType: 'professional',
@@ -364,8 +364,9 @@ describe('autenticación y onboarding', () => {
         password: 'clave-segura',
         phone: '+593999999999',
         privacyPolicyAccepted: false,
+        timezone: 'America/Guayaquil',
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('valida todos los datos del perfil de registro', () => {
@@ -431,8 +432,12 @@ describe('autenticación y onboarding', () => {
       privacyPolicyAccepted: true,
       timezone: 'America/Lima',
     };
-    expect(signUpSchema.safeParse({ ...valid, timezone: 'America/Lima' }).success).toBe(true);
-    expect(signUpSchema.safeParse({ ...valid, timezone: 'UTC+5' }).success).toBe(false);
+    expect(
+      signUpSchema.safeParse({ ...valid, timezone: 'America/Lima' }).success,
+    ).toBe(true);
+    expect(
+      signUpSchema.safeParse({ ...valid, timezone: 'UTC+5' }).success,
+    ).toBe(false);
   });
 
   it('rechaza un horario de registro que cierre antes de abrir', () => {

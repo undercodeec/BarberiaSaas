@@ -1622,13 +1622,6 @@ export async function buildApi({
           remainingAttempts: MAX_VERIFICATION_ATTEMPTS - updated.failedAttempts,
         };
       }
-      if (!verification.privacyPolicyAccepted) {
-        throw new ApiError(
-          400,
-          'PRIVACY_POLICY_NOT_ACCEPTED',
-          'Debes aceptar la Política de Privacidad antes de verificar tu cuenta.',
-        );
-      }
       const consumed = await transaction.pendingRegistration.deleteMany({
         where: {
           codeHash: verification.codeHash,
@@ -1655,12 +1648,14 @@ export async function buildApi({
         },
         where: { email: verification.email },
       });
-      await transaction.privacyConsent.create({
-        data: {
-          policyVersion: config.PLATFORM_PRIVACY_POLICY_VERSION,
-          userId: user.id,
-        },
-      });
+      if (verification.privacyPolicyAccepted) {
+        await transaction.privacyConsent.create({
+          data: {
+            policyVersion: config.PLATFORM_PRIVACY_POLICY_VERSION,
+            userId: user.id,
+          },
+        });
+      }
       if (verification.marketingOptIn) {
         await transaction.marketingConsent.create({
           data: {
@@ -3220,7 +3215,9 @@ export async function buildApi({
         database,
         email: pendingRegistration.email,
         fullName: pendingRegistration.fullName,
+        marketingOptIn: pendingRegistration.marketingOptIn,
         passwordHash: pendingRegistration.passwordHash,
+        privacyPolicyAccepted: pendingRegistration.privacyPolicyAccepted,
         ...(registrationProfile ? { registrationProfile } : {}),
         verificationMailer,
       });

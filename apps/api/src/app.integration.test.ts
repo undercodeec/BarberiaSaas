@@ -1321,6 +1321,39 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(reusedCode.statusCode).toBe(400);
   });
 
+  it('verifica un registro sin consentimiento de privacidad ni crea ese consentimiento', async () => {
+    const email = 'mobile-no-consent@example.com';
+    const password = 'Clave-segura-123';
+    const registrationResponse = await app.inject({
+      method: 'POST',
+      payload: {
+        ...registrationProfilePayload(),
+        confirmPassword: password,
+        email,
+        fullName: 'Registro móvil',
+        password,
+        privacyPolicyAccepted: false,
+      },
+      url: '/v1/auth/register',
+    });
+    expect(registrationResponse.statusCode).toBe(201);
+    const registration = registrationResponse.json<{
+      developmentVerificationCode: string;
+    }>();
+
+    const verification = await app.inject({
+      method: 'POST',
+      payload: { code: registration.developmentVerificationCode, email },
+      url: '/v1/auth/verify-email',
+    });
+
+    expect(verification.statusCode).toBe(200);
+    const user = await database.user.findUniqueOrThrow({ where: { email } });
+    expect(
+      await database.privacyConsent.findFirst({ where: { userId: user.id } }),
+    ).toBeNull();
+  });
+
   it('rechaza correo, teléfono y nombre de negocio repetidos', async () => {
     const password = 'Clave-segura-123';
     const firstProfile = {
@@ -5337,7 +5370,9 @@ describeWithDatabase('API con PostgreSQL', () => {
         email: 'pending-admin@example.com',
         expiresAt: new Date(Date.now() + 10 * 60 * 1000),
         fullName: 'Cuenta pendiente',
+        marketingOptIn: true,
         passwordHash: 'hash-de-prueba',
+        privacyPolicyAccepted: true,
       },
     });
     const onboarding = await app.inject({
@@ -5368,6 +5403,11 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(verificationMessages.at(-1)?.email).toBe(
       'pending-admin@example.com',
     );
+    expect(
+      await database.pendingRegistration.findUnique({
+        where: { id: pendingRegistration.id },
+      }),
+    ).toMatchObject({ marketingOptIn: true, privacyPolicyAccepted: true });
     const blockedResend = await app.inject({
       headers: { authorization: `Bearer ${platformToken}` },
       method: 'POST',
