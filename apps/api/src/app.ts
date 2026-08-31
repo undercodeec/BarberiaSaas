@@ -30,6 +30,7 @@ import {
   registrationAvailabilitySchema,
   resendVerificationSchema,
   resetPasswordSchema,
+  selectBusinessCategorySchema,
   signInSchema,
   signUpSchema,
   updateOnboardingCollaboratorSchema,
@@ -284,12 +285,15 @@ async function pushDeliveryStateForRecipients(
   type: AppNotificationType,
 ) {
   const states = await Promise.all(
-    recipients.map(async (recipient) => [
-      recipient.id,
-      (await isPushEnabledForRecipient(database, recipient.id, type))
-        ? ('pending' as const)
-        : ('skipped' as const),
-    ] as const),
+    recipients.map(
+      async (recipient) =>
+        [
+          recipient.id,
+          (await isPushEnabledForRecipient(database, recipient.id, type))
+            ? ('pending' as const)
+            : ('skipped' as const),
+        ] as const,
+    ),
   );
   return new Map<string, 'pending' | 'skipped'>(states);
 }
@@ -617,7 +621,8 @@ function createQueuedAppointmentNotifier(
           });
           return true;
         });
-        if (created) await processQueuedNotificationDeliveries(database, config);
+        if (created)
+          await processQueuedNotificationDeliveries(database, config);
       } catch {
         // El recordatorio se intentara en la proxima ejecucion del ciclo.
       }
@@ -731,6 +736,14 @@ interface BuildApiOptions {
 
 interface RegistrationProfileDraft {
   readonly accountType: RegistrationAccountType;
+  readonly businessCategory:
+    | 'AESTHETICS'
+    | 'BARBERSHOP'
+    | 'BEAUTY_SALON'
+    | 'NAIL_STUDIO'
+    | 'PERSONAL_CARE_OTHER'
+    | 'SPA_WELLNESS';
+  readonly businessCategoryConfirmedAt: Date | null;
   readonly businessName: string;
   readonly city: string;
   readonly closingTime: string;
@@ -742,6 +755,15 @@ interface RegistrationProfileDraft {
 
 function completeRegistrationProfile(input: {
   readonly accountType: RegistrationAccountType | null;
+  readonly businessCategory:
+    | 'AESTHETICS'
+    | 'BARBERSHOP'
+    | 'BEAUTY_SALON'
+    | 'NAIL_STUDIO'
+    | 'PERSONAL_CARE_OTHER'
+    | 'SPA_WELLNESS'
+    | null;
+  readonly businessCategoryConfirmedAt: Date | null;
   readonly businessName: string | null;
   readonly city: string | null;
   readonly closingTime: string | null;
@@ -764,6 +786,8 @@ function completeRegistrationProfile(input: {
   }
   return {
     accountType: input.accountType,
+    businessCategory: input.businessCategory ?? 'BARBERSHOP',
+    businessCategoryConfirmedAt: input.businessCategoryConfirmedAt,
     businessName: input.businessName,
     city: input.city,
     closingTime: input.closingTime,
@@ -1306,6 +1330,10 @@ export async function buildApi({
       scope: 'register',
       windowMs: authRateLimitWindowMs,
     });
+    const categoryWasExplicitlySelected =
+      typeof request.body === 'object' &&
+      request.body !== null &&
+      Object.hasOwn(request.body, 'businessCategory');
     const input = signUpSchema.parse(request.body);
     const email = normalizeEmail(input.email);
     const phoneKey = normalizePhone(input.phone);
@@ -1380,6 +1408,10 @@ export async function buildApi({
             input.accountType === 'business'
               ? RegistrationAccountType.BUSINESS
               : RegistrationAccountType.PROFESSIONAL,
+          businessCategory: input.businessCategory,
+          businessCategoryConfirmedAt: categoryWasExplicitlySelected
+            ? new Date()
+            : null,
           businessName: input.businessName.trim(),
           city: input.city.trim(),
           closingTime: input.closingTime,
@@ -1640,6 +1672,7 @@ export async function buildApi({
       if (registrationProfile) {
         const {
           accountType,
+          businessCategory,
           businessName,
           city,
           closingTime,
@@ -1649,6 +1682,9 @@ export async function buildApi({
         } = registrationProfile;
         const profileData = {
           accountType,
+          businessCategory,
+          businessCategoryConfirmedAt:
+            registrationProfile.businessCategoryConfirmedAt,
           businessName,
           businessNameKey: normalizeBusinessName(businessName),
           city,
@@ -2392,7 +2428,13 @@ export async function buildApi({
             },
             take: 1,
           },
-          organization: { select: { publicBookingToken: true, slug: true } },
+          organization: {
+            select: {
+              businessCategory: true,
+              publicBookingToken: true,
+              slug: true,
+            },
+          },
         },
         where: { status: MembershipStatus.ACTIVE, userId: user.id },
       }),
@@ -2408,6 +2450,12 @@ export async function buildApi({
       addressLine: profile?.addressLine ?? null,
       businessName: profile?.businessName ?? null,
       businessLocation,
+      businessCategory:
+        profile?.businessCategory ??
+        membership?.organization.businessCategory ??
+        'BARBERSHOP',
+      businessCategoryConfirmedAt:
+        profile?.businessCategoryConfirmedAt?.toISOString() ?? null,
       bookingUrl: membership
         ? publicBookingUrl(
             config.PUBLIC_WEB_URL,
@@ -2463,6 +2511,9 @@ export async function buildApi({
             await transaction.userRegistrationProfile.update({
               data: {
                 addressLine: input.addressLine,
+                businessCategory: input.businessCategory,
+                businessCategoryConfirmedAt:
+                  existingProfile.businessCategoryConfirmedAt ?? new Date(),
                 businessName: input.businessName,
                 businessNameKey: normalizeBusinessName(input.businessName),
                 city: input.city,
@@ -2479,6 +2530,7 @@ export async function buildApi({
           if (activeMembership) {
             await transaction.organization.update({
               data: {
+                businessCategory: input.businessCategory,
                 defaultTimezone: input.timezone,
                 name: input.businessName,
               },
@@ -2507,6 +2559,9 @@ export async function buildApi({
         accountType: updatedProfile.accountType.toLowerCase() as
           'business' | 'professional',
         addressLine: updatedProfile.addressLine,
+        businessCategory: updatedProfile.businessCategory,
+        businessCategoryConfirmedAt:
+          updatedProfile.businessCategoryConfirmedAt?.toISOString() ?? null,
         businessName: updatedProfile.businessName,
         bookingUrl: publicBookingUrl(
           config.PUBLIC_WEB_URL,
@@ -2538,6 +2593,55 @@ export async function buildApi({
       }
       throw error;
     }
+  });
+
+  app.patch('/v1/onboarding/business-category', async (request) => {
+    const { user } = await authenticate(database, request);
+    const input = selectBusinessCategorySchema.parse(request.body);
+    const confirmedAt = new Date();
+
+    const profile = await database.userRegistrationProfile.findUnique({
+      where: { userId: user.id },
+    });
+    if (!profile) {
+      throw new ApiError(
+        404,
+        'ONBOARDING_ACCOUNT_DETAILS_NOT_FOUND',
+        'No encontramos la informaci\u00f3n de tu cuenta.',
+      );
+    }
+
+    const membership = await database.membership.findFirst({
+      where: { status: MembershipStatus.ACTIVE, userId: user.id },
+    });
+    if (membership && membership.role !== MembershipRole.OWNER) {
+      throw new ApiError(
+        403,
+        'BUSINESS_CATEGORY_OWNER_REQUIRED',
+        'Solo la persona propietaria puede cambiar la categor\u00eda del negocio.',
+      );
+    }
+
+    await database.$transaction(async (transaction) => {
+      await transaction.userRegistrationProfile.update({
+        data: {
+          businessCategory: input.businessCategory,
+          businessCategoryConfirmedAt: confirmedAt,
+        },
+        where: { userId: user.id },
+      });
+      if (membership) {
+        await transaction.organization.update({
+          data: { businessCategory: input.businessCategory },
+          where: { id: membership.organizationId },
+        });
+      }
+    });
+
+    return {
+      businessCategory: input.businessCategory,
+      businessCategoryConfirmedAt: confirmedAt.toISOString(),
+    };
   });
 
   app.patch('/v1/onboarding/account-type', async (request) => {
@@ -2692,6 +2796,7 @@ export async function buildApi({
 
       const organization = await transaction.organization.create({
         data: {
+          businessCategory: profile.businessCategory,
           currencyCode: 'USD',
           defaultTimezone: profile.timezone,
           name: profile.businessName,
@@ -3240,9 +3345,7 @@ export async function buildApi({
       config,
       undefined,
       appointmentNotifier,
-    ).catch(
-      (error: unknown) => app.log.error(error),
-    );
+    ).catch((error: unknown) => app.log.error(error));
   }, 60_000);
   subscriptionLifecycleTimer.unref();
   const sriInvoiceLifecycleTimer = setInterval(() => {

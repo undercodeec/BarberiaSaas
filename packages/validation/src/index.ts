@@ -81,6 +81,18 @@ const businessNameSchema = z
   .trim()
   .min(2, 'Ingresa el nombre del negocio.')
   .max(120);
+export const BUSINESS_CATEGORY_VALUES = [
+  'BARBERSHOP',
+  'BEAUTY_SALON',
+  'NAIL_STUDIO',
+  'SPA_WELLNESS',
+  'AESTHETICS',
+  'PERSONAL_CARE_OTHER',
+] as const;
+export const businessCategorySchema = z.enum(BUSINESS_CATEGORY_VALUES);
+export const selectBusinessCategorySchema = z.object({
+  businessCategory: businessCategorySchema,
+});
 const phoneSchema = z
   .string()
   .trim()
@@ -133,6 +145,9 @@ export const closeOwnedBusinessSchema = z.object({
 export const signUpSchema = z
   .object({
     accountType: z.enum(['business', 'professional']),
+    // El valor por defecto conserva los registros iniciados antes de que el
+    // selector de categoría llegue a todos los clientes publicados.
+    businessCategory: businessCategorySchema.default('BARBERSHOP'),
     businessName: businessNameSchema,
     city: z.string().trim().min(2, 'Selecciona una ciudad.').max(120),
     closingTime: timeSchema,
@@ -250,6 +265,7 @@ const imageDataSchema = z
   );
 export const updateOnboardingAccountDetailsSchema = z.object({
   addressLine: optionalProfileText(240),
+  businessCategory: businessCategorySchema,
   businessName: businessNameSchema,
   city: z.string().trim().min(2).max(120),
   countryCode: z

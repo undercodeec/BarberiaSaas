@@ -1,6 +1,8 @@
 import {
+  BUSINESS_CATEGORY_PROMPT_SNOOZE_MS,
   EXTRA_QUICK_ACTIONS,
   shouldCelebrateSubscriptionActivation,
+  shouldShowBusinessCategoryPrompt,
   shouldShowWelcomeSurvey,
 } from './dashboard-model';
 
@@ -55,5 +57,27 @@ describe('encuesta de bienvenida', () => {
         },
       }),
     ).toBe(false);
+  });
+});
+
+describe('recordatorio de categoría del negocio', () => {
+  it('se muestra al no existir un descarte previo', () => {
+    expect(shouldShowBusinessCategoryPrompt(null, 1_000)).toBe(true);
+  });
+
+  it('respeta el descarte durante catorce días y luego lo vuelve a mostrar', () => {
+    const dismissedAt = 1_000;
+    expect(
+      shouldShowBusinessCategoryPrompt(
+        dismissedAt,
+        dismissedAt + BUSINESS_CATEGORY_PROMPT_SNOOZE_MS - 1,
+      ),
+    ).toBe(false);
+    expect(
+      shouldShowBusinessCategoryPrompt(
+        dismissedAt,
+        dismissedAt + BUSINESS_CATEGORY_PROMPT_SNOOZE_MS,
+      ),
+    ).toBe(true);
   });
 });

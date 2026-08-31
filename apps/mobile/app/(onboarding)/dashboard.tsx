@@ -26,7 +26,9 @@ import {
   useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
+import { businessCategoryIcon } from '../../src/lib/business-category';
 import { BookingLinkSheet } from '../../src/components/BookingLinkSheet';
+import { BusinessCategoryPromptSheet } from '../../src/components/BusinessCategoryPromptSheet';
 import { BusinessLocationSheet } from '../../src/components/BusinessLocationSheet';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -35,6 +37,7 @@ import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 import {
   DASHBOARD_BANNER_DELAY_MS,
+  getBusinessCategoryPromptDismissedAt,
   LOCATION_BANNER_DELAY_MS,
   type WelcomeSurveyOption,
   type ExtraQuickActionId,
@@ -45,6 +48,8 @@ import {
   getSubscriptionCelebrationState,
   storeSubscriptionCelebrationState,
   shouldCelebrateSubscriptionActivation,
+  shouldShowBusinessCategoryPrompt,
+  storeBusinessCategoryPromptDismissedAt,
   syncPushToken,
   greeting,
   subscriptionProgress,
@@ -130,6 +135,7 @@ export default function DashboardScreen() {
   });
 
   const businessName = accountQuery.data?.businessName ?? 'Tu negocio';
+  const businessCategory = accountQuery.data?.businessCategory ?? 'BARBERSHOP';
   const [progressClock, setProgressClock] = useState(() => Date.now());
   const [isBookingSheetOpen, setIsBookingSheetOpen] = useState(false);
   const [isNotificationSheetOpen, setIsNotificationSheetOpen] = useState(false);
@@ -149,6 +155,10 @@ export default function DashboardScreen() {
     boolean | null
   >(null);
   const [isLocationBannerOpen, setIsLocationBannerOpen] = useState(false);
+  const [needsBusinessCategoryPrompt, setNeedsBusinessCategoryPrompt] =
+    useState(false);
+  const [isBusinessCategoryPromptOpen, setIsBusinessCategoryPromptOpen] =
+    useState(false);
   const [isDashboardFocused, setIsDashboardFocused] = useState(false);
   const [extraQuickActionIds, setExtraQuickActionIds] = useState<
     ExtraQuickActionId[]
@@ -415,6 +425,42 @@ export default function DashboardScreen() {
   }, [session, user]);
 
   useEffect(() => {
+    let isMounted = true;
+    setNeedsBusinessCategoryPrompt(false);
+    setIsBusinessCategoryPromptOpen(false);
+
+    if (!session || !user || !accountQuery.isSuccess) {
+      return () => {
+        isMounted = false;
+      };
+    }
+    const account = accountQuery.data;
+    const requiresSelection =
+      account.accountType !== null &&
+      account.businessCategoryConfirmedAt === null;
+    if (!requiresSelection) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    void getBusinessCategoryPromptDismissedAt(user.id)
+      .then((dismissedAt) => {
+        if (isMounted)
+          setNeedsBusinessCategoryPrompt(
+            shouldShowBusinessCategoryPrompt(dismissedAt),
+          );
+      })
+      .catch(() => {
+        if (isMounted) setNeedsBusinessCategoryPrompt(true);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [accountQuery.data, accountQuery.isSuccess, session, user]);
+
+  useEffect(() => {
     if (
       notificationFlowState === 'completed' &&
       needsWelcomeSurvey &&
@@ -514,6 +560,24 @@ export default function DashboardScreen() {
     setNeedsLocationBanner(false);
   };
 
+  const dismissBusinessCategoryPrompt = () => {
+    setIsBusinessCategoryPromptOpen(false);
+    setNeedsBusinessCategoryPrompt(false);
+    if (user) void storeBusinessCategoryPromptDismissedAt(user.id);
+  };
+
+  const saveBusinessCategory = async (
+    category: OnboardingAccountDetailsResponse['businessCategory'],
+  ) => {
+    await requireApiClient().request('/v1/onboarding/business-category', {
+      body: { businessCategory: category },
+      method: 'PATCH',
+    });
+    setIsBusinessCategoryPromptOpen(false);
+    setNeedsBusinessCategoryPrompt(false);
+    await Promise.all([accountQuery.refetch(), organizationQuery.refetch()]);
+  };
+
   const addExtraQuickAction = (id: ExtraQuickActionId) => {
     if (
       !user ||
@@ -609,6 +673,49 @@ export default function DashboardScreen() {
           />
         </View>
 
+        {needsBusinessCategoryPrompt ? (
+          <View style={styles.businessCategoryPrompt}>
+            <View style={styles.businessCategoryPromptIcon}>
+              <Ionicons
+                color={appTheme.colors.accentDark}
+                name="color-palette-outline"
+                size={22}
+              />
+            </View>
+            <View style={styles.businessCategoryPromptCopy}>
+              <Text style={styles.businessCategoryPromptTitle}>
+                Personaliza tu experiencia
+              </Text>
+              <Text style={styles.businessCategoryPromptText}>
+                Selecciona el tipo de negocio que atiendes. Podrás cambiarlo
+                cuando quieras.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setIsBusinessCategoryPromptOpen(true)}
+                style={styles.businessCategoryPromptButton}
+              >
+                <Text style={styles.businessCategoryPromptButtonLabel}>
+                  Elegir categoría
+                </Text>
+              </Pressable>
+            </View>
+            <Pressable
+              accessibilityLabel="Recordar después la categoría del negocio"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={dismissBusinessCategoryPrompt}
+              style={styles.businessCategoryPromptDismiss}
+            >
+              <Ionicons
+                color={appTheme.colors.textMuted}
+                name="close"
+                size={18}
+              />
+            </Pressable>
+          </View>
+        ) : null}
+
         <View style={styles.quickActions}>
           <QuickAction
             icon="add-circle-outline"
@@ -616,7 +723,7 @@ export default function DashboardScreen() {
             onPress={() => router.push('/new-booking')}
           />
           <QuickAction
-            icon="cut-outline"
+            icon={businessCategoryIcon(businessCategory)}
             label="Servicios"
             onPress={() => router.push('/service-management')}
           />
@@ -803,6 +910,12 @@ export default function DashboardScreen() {
         onClose={() => setIsBookingSheetOpen(false)}
         url={bookingUrl}
         visible={isBookingSheetOpen}
+      />
+      <BusinessCategoryPromptSheet
+        initialCategory={businessCategory}
+        onDismiss={dismissBusinessCategoryPrompt}
+        onSubmit={saveBusinessCategory}
+        visible={isBusinessCategoryPromptOpen}
       />
       <ExtraQuickActionsSheet
         isSolo={isSolo}

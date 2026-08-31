@@ -53,6 +53,11 @@ export const s = StyleSheet.create({
     transform: [{ translateY: -3 }],
     ...goldButtonShadow,
   },
+  categoryButtonSelected: {
+    backgroundColor: appTheme.colors.accentSubtle,
+    borderColor: appTheme.colors.accent,
+    borderWidth: 1,
+  },
   content: { paddingBottom: 0 },
   description: {
     color: appTheme.colors.textMuted,

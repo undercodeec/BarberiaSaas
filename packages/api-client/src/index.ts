@@ -30,6 +30,14 @@ export interface AuthenticatedUser {
   readonly id: string;
 }
 
+export type BusinessCategory =
+  | 'AESTHETICS'
+  | 'BARBERSHOP'
+  | 'BEAUTY_SALON'
+  | 'NAIL_STUDIO'
+  | 'PERSONAL_CARE_OTHER'
+  | 'SPA_WELLNESS';
+
 export interface AuthResponse {
   readonly session: { readonly expiresAt: string; readonly token: string };
   readonly user: AuthenticatedUser;
@@ -70,6 +78,9 @@ export interface OnboardingAccountDetailsResponse {
   readonly canCloseOwnedBusiness: boolean;
   readonly addressLine: string | null;
   readonly businessLocation: BusinessLocation | null;
+  readonly businessCategory: BusinessCategory;
+  /** Null when the account has not yet explicitly chosen its category. */
+  readonly businessCategoryConfirmedAt: string | null;
   readonly bookingUrl: string | null;
   readonly coverImageUri: string | null;
   readonly description: string | null;
@@ -619,6 +630,7 @@ export interface CurrentOrganizationResponse {
     readonly status: 'active' | 'invited' | 'suspended';
   };
   readonly organization: {
+    readonly businessCategory: BusinessCategory;
     readonly currencyCode: string;
     readonly defaultTimezone: string;
     readonly id: string;

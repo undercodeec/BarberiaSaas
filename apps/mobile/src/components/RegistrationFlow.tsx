@@ -50,6 +50,7 @@ import {
   TimeField,
 } from './RegistrationSelectors';
 import { requireApiClient } from '../lib/api';
+import { BUSINESS_CATEGORY_OPTIONS } from '../lib/business-category';
 import { detectTimezone, TIMEZONE_OPTIONS } from '../lib/timezones';
 import { useAuth } from '../providers/AuthProvider';
 
@@ -95,6 +96,7 @@ function formatCountdown(seconds: number): string {
 type AccountType = 'business' | 'professional';
 type Step =
   | 'choice'
+  | 'category'
   | 'business'
   | 'attention'
   | 'schedule'
@@ -213,6 +215,7 @@ export function RegistrationFlow() {
     setValue,
   } = useForm<Values>({
     defaultValues: {
+      businessCategory: 'BARBERSHOP',
       businessName: '',
       city: '',
       closingTime: '',
@@ -316,6 +319,7 @@ export function RegistrationFlow() {
   const submit = handleSubmit(
     async ({
       businessName,
+      businessCategory,
       city,
       closingTime,
       confirmPassword,
@@ -350,6 +354,7 @@ export function RegistrationFlow() {
       try {
         const response = await signUp({
           accountType: account,
+          businessCategory,
           businessName,
           city,
           closingTime,
@@ -438,8 +443,9 @@ export function RegistrationFlow() {
     }
   };
   const previous: Record<Exclude<Step, 'choice'>, Step> = {
+    category: 'choice',
     attention: 'business',
-    business: 'choice',
+    business: 'category',
     credentials: 'schedule',
     review: 'credentials',
     schedule: 'attention',
@@ -447,7 +453,7 @@ export function RegistrationFlow() {
   };
   const choose = (type: AccountType) => {
     setAccount(type);
-    setStep('business');
+    setStep('category');
   };
   const [sheetTranslateY] = useState(() => new Animated.Value(0));
   const dismissRegistration = () => {
@@ -583,6 +589,40 @@ export function RegistrationFlow() {
                       >
                         <Text style={s.backText}>‹ Volver</Text>
                       </Pressable>
+                      {step === 'category' ? (
+                        <Section
+                          description="Usaremos esta selección para adaptar el lenguaje y las imágenes de tu espacio. Podrás cambiarla después."
+                          title="¿Qué tipo de negocio atiendes?"
+                        >
+                          <Controller
+                            control={control}
+                            name="businessCategory"
+                            render={({ field }) => (
+                              <View style={s.fields}>
+                                {BUSINESS_CATEGORY_OPTIONS.map((category) => (
+                                  <NavaButton
+                                    key={category.value}
+                                    compact
+                                    icon={category.icon}
+                                    label={category.label}
+                                    onPress={() => {
+                                      field.onChange(category.value);
+                                      setStep('business');
+                                    }}
+                                    style={[
+                                      s.choiceButton,
+                                      field.value === category.value
+                                        ? s.categoryButtonSelected
+                                        : null,
+                                    ]}
+                                    variant="outline"
+                                  />
+                                ))}
+                              </View>
+                            )}
+                          />
+                        </Section>
+                      ) : null}
                       {step === 'business' ? (
                         <Section
                           description={
@@ -894,6 +934,16 @@ export function RegistrationFlow() {
                               account === 'business'
                                 ? 'Tengo un negocio'
                                 : 'Solo yo'
+                            }
+                          />
+                          <ReviewRow
+                            label="Tipo de negocio"
+                            onEdit={() => setStep('category')}
+                            value={
+                              BUSINESS_CATEGORY_OPTIONS.find(
+                                (category) =>
+                                  category.value === values.businessCategory,
+                              )?.label ?? 'Barbería'
                             }
                           />
                           <ReviewRow

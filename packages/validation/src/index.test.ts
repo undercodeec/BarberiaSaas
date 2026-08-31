@@ -386,8 +386,33 @@ describe('autenticación y onboarding', () => {
     });
     expect(result.success).toBe(true);
     if (result.success) {
+      expect(result.data.businessCategory).toBe('BARBERSHOP');
       expect(result.data.marketingOptIn).toBe(false);
     }
+  });
+
+  it('acepta las categorías de cuidado personal y rechaza valores ajenos', () => {
+    const valid = {
+      accountType: 'business' as const,
+      businessName: 'Estudio de uñas Ana',
+      businessCategory: 'NAIL_STUDIO',
+      city: 'Quito',
+      closingTime: '18:00',
+      confirmPassword: 'clave-segura',
+      countryCode: 'EC',
+      email: 'unas@example.com',
+      fullName: 'Ana Dueña',
+      openingTime: '09:00',
+      password: 'clave-segura',
+      phone: '+593999999999',
+      privacyPolicyAccepted: true,
+      timezone: 'America/Guayaquil',
+    };
+    expect(signUpSchema.safeParse(valid).success).toBe(true);
+    expect(
+      signUpSchema.safeParse({ ...valid, businessCategory: 'MEDICAL_CLINIC' })
+        .success,
+    ).toBe(false);
   });
 
   it('acepta zonas IANA y rechaza valores que no lo son', () => {

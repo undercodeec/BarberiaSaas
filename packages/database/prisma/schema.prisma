@@ -313,6 +313,17 @@ enum RegistrationAccountType {
   PROFESSIONAL
 }
 
+// Rubro principal de una organización de cuidado personal. No reemplaza a
+// ServiceCategory, que clasifica los servicios que ofrece cada organización.
+enum BusinessCategory {
+  BARBERSHOP
+  BEAUTY_SALON
+  NAIL_STUDIO
+  SPA_WELLNESS
+  AESTHETICS
+  PERSONAL_CARE_OTHER
+}
+
 enum OnboardingCollaboratorRole {
   BARBER
   ADMINISTRATOR
@@ -497,6 +508,8 @@ model PendingRegistration {
   failedAttempts  Int                      @default(0) @map("failed_attempts")
   lockedUntil     DateTime?                @map("locked_until") @db.Timestamptz(3)
   accountType     RegistrationAccountType? @map("account_type")
+  businessCategory BusinessCategory?       @map("business_category")
+  businessCategoryConfirmedAt DateTime?    @map("business_category_confirmed_at") @db.Timestamptz(3)
   businessName    String?                  @map("business_name") @db.VarChar(120)
   businessNameKey String?                  @map("business_name_key") @db.VarChar(120)
   phone           String?                  @db.VarChar(24)
@@ -542,6 +555,10 @@ model PrivacyConsent {
 model UserRegistrationProfile {
   userId                String                  @id @map("user_id") @db.Uuid
   accountType           RegistrationAccountType @map("account_type")
+  businessCategory      BusinessCategory        @default(BARBERSHOP) @map("business_category")
+  // Null identifies accounts created before category selection was available,
+  // or registrations completed from an older client that did not send it.
+  businessCategoryConfirmedAt DateTime?         @map("business_category_confirmed_at") @db.Timestamptz(3)
   businessName          String                  @map("business_name") @db.VarChar(120)
   businessNameKey       String                  @map("business_name_key") @db.VarChar(120)
   countryCode           String                  @map("country_code") @db.Char(2)
@@ -866,6 +883,7 @@ model Organization {
   slug                               String                       @unique @db.VarChar(80)
   publicBookingToken                 String                       @unique @default(uuid()) @map("public_booking_token") @db.VarChar(36)
   status                             OrganizationStatus           @default(TRIAL)
+  businessCategory                   BusinessCategory             @default(BARBERSHOP) @map("business_category")
   currencyCode                       String                       @default("USD") @map("currency_code") @db.Char(3)
   defaultTimezone                    String                       @default("America/Guayaquil") @map("default_timezone") @db.VarChar(64)
   primaryLocationId                  String?                      @map("primary_location_id") @db.Uuid

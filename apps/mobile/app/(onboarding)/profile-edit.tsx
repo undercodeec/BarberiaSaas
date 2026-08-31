@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect -- API profile and account responses hydrate editable local drafts after queries resolve. */
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
+  BusinessCategory,
   OnboardingAccountDetailsResponse,
   UserProfileResponse,
 } from '@barber-saas/api-client';
@@ -30,6 +31,7 @@ import {
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { CountryCityFields } from '../../src/components/RegistrationSelectors';
 import { requireApiClient } from '../../src/lib/api';
+import { BUSINESS_CATEGORY_OPTIONS } from '../../src/lib/business-category';
 import { accountQueryKey, accountQueryPrefix } from '../../src/lib/query-keys';
 import { detectTimezone } from '../../src/lib/timezones';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -58,6 +60,8 @@ export default function ProfileEditScreen() {
   const [bio, setBio] = useState('');
   const [photoData, setPhotoData] = useState<string | null>(null);
   const [businessName, setBusinessName] = useState('');
+  const [businessCategory, setBusinessCategory] =
+    useState<BusinessCategory>('BARBERSHOP');
   const [businessAddress, setBusinessAddress] = useState('');
   const [businessCity, setBusinessCity] = useState('');
   const [businessCountryCode, setBusinessCountryCode] = useState('EC');
@@ -99,6 +103,7 @@ export default function ProfileEditScreen() {
   useEffect(() => {
     if (!accountDetails) return;
     setBusinessName(accountDetails.businessName ?? '');
+    setBusinessCategory(accountDetails.businessCategory);
     setBusinessAddress(accountDetails.addressLine ?? '');
     setBusinessCity(accountDetails.city ?? '');
     setBusinessCountryCode(accountDetails.countryCode ?? 'EC');
@@ -112,6 +117,15 @@ export default function ProfileEditScreen() {
     queryClient.invalidateQueries({
       queryKey: accountQueryPrefix('user-profile'),
     });
+  const refreshBusinessContext = () =>
+    Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: accountQueryPrefix('onboarding-account-details'),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: accountQueryPrefix('current-organization'),
+      }),
+    ]);
   const saveProfile = useMutation({
     mutationFn: async () => {
       const updatedProfile =
@@ -128,6 +142,7 @@ export default function ProfileEditScreen() {
         await requireApiClient().request('/v1/onboarding/account-details', {
           body: {
             addressLine: businessAddress.trim() || null,
+            businessCategory,
             businessName:
               businessName.trim() ||
               accountDetails.businessName ||
@@ -148,6 +163,7 @@ export default function ProfileEditScreen() {
     },
     onSuccess: () => {
       void refreshProfile();
+      void refreshBusinessContext();
       Alert.alert('Perfil guardado', 'Tus cambios fueron actualizados.');
     },
     onError: (error) =>
@@ -311,6 +327,44 @@ export default function ProfileEditScreen() {
               onChangeText={setBusinessName}
               value={businessName}
             />
+            <Text style={styles.fieldLabel}>Tipo de negocio</Text>
+            <View style={styles.categoryOptions}>
+              {BUSINESS_CATEGORY_OPTIONS.map((category) => {
+                const selected = businessCategory === category.value;
+                return (
+                  <Pressable
+                    accessibilityLabel={`Seleccionar ${category.label}`}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    key={category.value}
+                    onPress={() => setBusinessCategory(category.value)}
+                    style={[
+                      styles.categoryOption,
+                      selected ? styles.categoryOptionSelected : null,
+                    ]}
+                  >
+                    <Ionicons
+                      color={selected ? '#FFFFFF' : PRIMARY}
+                      name={category.icon}
+                      size={18}
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.categoryOptionLabel,
+                        selected ? styles.categoryOptionLabelSelected : null,
+                      ]}
+                    >
+                      {category.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={styles.businessHint}>
+              Cambiar esta categoría solo ajusta el lenguaje y las imágenes de
+              Nava. Tus servicios y reservas no se modifican.
+            </Text>
             <Field
               label="Dirección"
               onChangeText={setBusinessAddress}
@@ -502,6 +556,21 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 8,
   },
+  categoryOption: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderColor: '#D9E0E8',
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 7,
+    minHeight: 42,
+    paddingHorizontal: 11,
+  },
+  categoryOptionLabel: { color: '#424B57', fontSize: 12, fontWeight: '800' },
+  categoryOptionLabelSelected: { color: '#FFFFFF' },
+  categoryOptionSelected: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  categoryOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   businessHint: {
     color: '#697483',
     fontSize: 13,

@@ -24,6 +24,9 @@ export const LOCATION_BANNER_DELAY_MS = 500;
 export const QUICK_ACTIONS_STORAGE_KEY = 'barber-saas.dashboard-quick-actions';
 export const SUBSCRIPTION_CELEBRATION_STORAGE_KEY =
   'barber-saas.subscription-celebration';
+export const BUSINESS_CATEGORY_PROMPT_STORAGE_KEY =
+  'barber-saas.business-category-prompt-dismissed-at';
+export const BUSINESS_CATEGORY_PROMPT_SNOOZE_MS = 14 * DAY_MS;
 export { WELCOME_SURVEY_OPTIONS };
 export type { WelcomeSurveyOption };
 export type SubscriptionCelebrationState = Pick<
@@ -97,6 +100,44 @@ export function quickActionsStorageKey(userId: string) {
 
 export function subscriptionCelebrationStorageKey(userId: string) {
   return `${SUBSCRIPTION_CELEBRATION_STORAGE_KEY}.${userId}`;
+}
+
+export function businessCategoryPromptStorageKey(userId: string) {
+  return `${BUSINESS_CATEGORY_PROMPT_STORAGE_KEY}.${userId}`;
+}
+
+export async function getBusinessCategoryPromptDismissedAt(userId: string) {
+  const key = businessCategoryPromptStorageKey(userId);
+  const value =
+    Platform.OS === 'web'
+      ? globalThis.localStorage.getItem(key)
+      : await SecureStore.getItemAsync(key);
+  if (!value) return null;
+  const dismissedAt = Number(value);
+  return Number.isFinite(dismissedAt) ? dismissedAt : null;
+}
+
+export async function storeBusinessCategoryPromptDismissedAt(
+  userId: string,
+  dismissedAt = Date.now(),
+) {
+  const key = businessCategoryPromptStorageKey(userId);
+  const value = String(dismissedAt);
+  if (Platform.OS === 'web') {
+    globalThis.localStorage.setItem(key, value);
+    return;
+  }
+  await SecureStore.setItemAsync(key, value);
+}
+
+export function shouldShowBusinessCategoryPrompt(
+  dismissedAt: number | null,
+  now = Date.now(),
+) {
+  return (
+    dismissedAt === null ||
+    now - dismissedAt >= BUSINESS_CATEGORY_PROMPT_SNOOZE_MS
+  );
 }
 
 export function shouldCelebrateSubscriptionActivation(

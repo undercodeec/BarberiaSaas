@@ -57,6 +57,13 @@ type AccessView = 'login' | 'register' | 'setup' | 'verify';
 
 type RegistrationForm = {
   accountType: 'business' | 'professional';
+  businessCategory:
+    | 'AESTHETICS'
+    | 'BARBERSHOP'
+    | 'BEAUTY_SALON'
+    | 'NAIL_STUDIO'
+    | 'PERSONAL_CARE_OTHER'
+    | 'SPA_WELLNESS';
   businessName: string;
   city: string;
   closingTime: string;
@@ -237,6 +244,7 @@ export default function CheckoutExperience() {
   });
   const [registration, setRegistration] = useState<RegistrationForm>({
     accountType: 'business',
+    businessCategory: 'BARBERSHOP',
     businessName: '',
     city: '',
     closingTime: '19:00',
@@ -975,6 +983,28 @@ export default function CheckoutExperience() {
                           <option value="business">Negocio</option>
                           <option value="professional">
                             Profesional independiente
+                          </option>
+                        </select>
+                      </label>
+                      <label>
+                        Tipo de negocio
+                        <select
+                          onChange={(event) =>
+                            setRegistration((current) => ({
+                              ...current,
+                              businessCategory: event.target
+                                .value as RegistrationForm['businessCategory'],
+                            }))
+                          }
+                          value={registration.businessCategory}
+                        >
+                          <option value="BARBERSHOP">Barbería</option>
+                          <option value="BEAUTY_SALON">Salón de belleza</option>
+                          <option value="NAIL_STUDIO">Estudio de uñas</option>
+                          <option value="SPA_WELLNESS">Spa y bienestar</option>
+                          <option value="AESTHETICS">Centro de estética</option>
+                          <option value="PERSONAL_CARE_OTHER">
+                            Otro cuidado personal
                           </option>
                         </select>
                       </label>
