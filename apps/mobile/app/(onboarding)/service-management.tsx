@@ -2,8 +2,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ServiceRecord, ServicesResponse } from '@barber-saas/api-client';
 import * as ImagePicker from 'expo-image-picker';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Redirect, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Image,
@@ -28,6 +28,8 @@ import { requireApiClient } from '../../src/lib/api';
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
+import { GuideAnchor } from '../../src/features/guides/GuideAnchor';
+import { useGuides } from '../../src/features/guides/GuideProvider';
 
 const MAX_IMAGE_BYTES = 1_500_000;
 const MAX_IMAGE_DIMENSION = 1_600;
@@ -44,6 +46,11 @@ export default function ServiceManagementScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { session } = useAuth();
+  const { guide, replay } = useLocalSearchParams<{
+    guide?: string;
+    replay?: string;
+  }>();
+  const { completeGuide, startGuide } = useGuides();
   const tenant = useTenantScope();
   const organizationQuery = useCurrentOrganization();
   const current = organizationQuery.data;
@@ -61,6 +68,11 @@ export default function ServiceManagementScreen() {
     null,
   );
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (guide !== 'add-service') return;
+    startGuide('add-service', { force: replay === '1' });
+  }, [guide, replay, startGuide]);
 
   const servicesQuery = useQuery({
     enabled: Boolean(session && current),
@@ -145,6 +157,7 @@ export default function ServiceManagementScreen() {
           ? 'Servicio actualizado correctamente.'
           : 'Servicio creado y habilitado correctamente.',
       );
+      if (!wasEditing) completeGuide('add-service');
       await queryClient.invalidateQueries({
         queryKey: tenantQueryPrefix('services'),
       });
@@ -462,32 +475,38 @@ export default function ServiceManagementScreen() {
             </View>
             <Switch onValueChange={setOnlineBooking} value={onlineBooking} />
           </View>
-          <Pressable
-            accessibilityLabel={
-              editingService ? 'Guardar cambios del servicio' : 'Crear servicio'
-            }
-            accessibilityRole="button"
-            disabled={!canCreateService || serviceMutation.isPending}
-            onPress={() => serviceMutation.mutate()}
-            style={[
-              styles.primaryButton,
-              (!canCreateService || serviceMutation.isPending) &&
-                styles.buttonMuted,
-            ]}
-          >
-            <Ionicons
-              color={appTheme.colors.accentDark}
-              name={editingService ? 'checkmark-outline' : 'add-circle-outline'}
-              size={21}
-            />
-            <Text style={styles.primaryButtonLabel}>
-              {serviceMutation.isPending
-                ? 'Guardando…'
-                : editingService
-                  ? 'Guardar cambios'
-                  : 'Crear servicio'}
-            </Text>
-          </Pressable>
+          <GuideAnchor id="services-create-service">
+            <Pressable
+              accessibilityLabel={
+                editingService
+                  ? 'Guardar cambios del servicio'
+                  : 'Crear servicio'
+              }
+              accessibilityRole="button"
+              disabled={!canCreateService || serviceMutation.isPending}
+              onPress={() => serviceMutation.mutate()}
+              style={[
+                styles.primaryButton,
+                (!canCreateService || serviceMutation.isPending) &&
+                  styles.buttonMuted,
+              ]}
+            >
+              <Ionicons
+                color={appTheme.colors.accentDark}
+                name={
+                  editingService ? 'checkmark-outline' : 'add-circle-outline'
+                }
+                size={21}
+              />
+              <Text style={styles.primaryButtonLabel}>
+                {serviceMutation.isPending
+                  ? 'Guardando…'
+                  : editingService
+                    ? 'Guardar cambios'
+                    : 'Crear servicio'}
+              </Text>
+            </Pressable>
+          </GuideAnchor>
           {editingService ? (
             <View style={styles.editActions}>
               <Pressable

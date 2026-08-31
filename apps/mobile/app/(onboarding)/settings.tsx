@@ -309,6 +309,12 @@ export default function SettingsScreen() {
           onPress={() => router.push('/(onboarding)/reports')}
           title="Estadísticas e informes"
         />
+        <SettingsCard
+          description="Aprende a crear citas, compartir tu enlace, servicios y clientes a tu ritmo."
+          icon="help-buoy-outline"
+          onPress={() => router.push('/guides' as never)}
+          title="Ayuda y guías"
+        />
         <PromoCard
           description="Comparte el enlace de reservas de tu negocio en tus redes sociales y aumenta tus citas."
           icon="qr-code-outline"

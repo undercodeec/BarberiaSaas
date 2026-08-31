@@ -49,6 +49,7 @@ export default function AccountSetupScreen() {
   return (
     <AccountSetupWelcomeScreen
       accountType={accountQuery.data?.accountType ?? 'professional'}
+      businessCategory={accountQuery.data?.businessCategory ?? 'BARBERSHOP'}
       fullName={user.fullName}
       onBack={() => void returnToHome()}
       onContinue={() => router.push('/(onboarding)/services')}

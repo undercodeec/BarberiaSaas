@@ -45,6 +45,8 @@ import { clientAccessForRole } from '../../src/lib/client-access';
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
+import { GuideAnchor } from '../../src/features/guides/GuideAnchor';
+import { useGuides } from '../../src/features/guides/GuideProvider';
 
 import { AgendaCalendarModal } from '../../src/features/screens/agenda-components';
 import {
@@ -65,8 +67,18 @@ export default function AgendaScreen() {
   const layout = useNativeLayoutMetrics();
   const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const router = useRouter();
-  const { date: notificationDate, locationId: notificationLocationId } =
-    useLocalSearchParams<{ date?: string; locationId?: string }>();
+  const {
+    date: notificationDate,
+    guide,
+    locationId: notificationLocationId,
+    replay,
+  } = useLocalSearchParams<{
+    date?: string;
+    guide?: string;
+    locationId?: string;
+    replay?: string;
+  }>();
+  const { completeGuide, startGuide } = useGuides();
   const queryClient = useQueryClient();
   const floatingBookingOffset = useRef(new Animated.ValueXY()).current;
   const floatingBookingOffsetRef = useRef({ x: 0, y: 0 });
@@ -189,6 +201,10 @@ export default function AgendaScreen() {
       new Map(agendaLocations.map((location) => [location.id, location.name])),
     [agendaLocations],
   );
+  useEffect(() => {
+    if (guide !== 'first-booking') return;
+    startGuide('first-booking', { force: replay === '1' });
+  }, [guide, replay, startGuide]);
   useEffect(() => {
     if (
       !notificationLocationId ||
@@ -1681,36 +1697,39 @@ export default function AgendaScreen() {
         sheetMaxHeight={layout.sheetMaxHeight}
         visible={manualPaymentSheetOpen}
       /> */}
-      <Animated.View
-        {...floatingBookingPanResponder.panHandlers}
-        onLayout={({ nativeEvent }) => {
-          floatingBookingSizeRef.current = nativeEvent.layout;
-        }}
-        style={[
-          styles.floatingButton,
-          { transform: floatingBookingOffset.getTranslateTransform() },
-        ]}
-      >
-        <Pressable
-          accessibilityLabel="Crear cita"
-          accessibilityRole="button"
-          onPress={() => {
-            if (
-              clientsQuery.isLoading ||
-              clientsQuery.isError ||
-              !clientsQuery.data?.clients.length
-            ) {
-              router.push('/clients');
-              return;
-            }
-            router.push('/new-booking');
+      <GuideAnchor id="agenda-new-booking">
+        <Animated.View
+          {...floatingBookingPanResponder.panHandlers}
+          onLayout={({ nativeEvent }) => {
+            floatingBookingSizeRef.current = nativeEvent.layout;
           }}
-          style={styles.floatingButtonContent}
+          style={[
+            styles.floatingButton,
+            { transform: floatingBookingOffset.getTranslateTransform() },
+          ]}
         >
-          <Ionicons color="#ffffff" name="add" size={30} />
-          <Text style={styles.floatingLabel}>Nueva cita</Text>
-        </Pressable>
-      </Animated.View>
+          <Pressable
+            accessibilityLabel="Crear cita"
+            accessibilityRole="button"
+            onPress={() => {
+              completeGuide('first-booking');
+              if (
+                clientsQuery.isLoading ||
+                clientsQuery.isError ||
+                !clientsQuery.data?.clients.length
+              ) {
+                router.push('/clients');
+                return;
+              }
+              router.push('/new-booking');
+            }}
+            style={styles.floatingButtonContent}
+          >
+            <Ionicons color="#ffffff" name="add" size={30} />
+            <Text style={styles.floatingLabel}>Nueva cita</Text>
+          </Pressable>
+        </Animated.View>
+      </GuideAnchor>
 
       <BottomNavigation active="agenda" />
     </SafeAreaView>

@@ -13,9 +13,14 @@ import type {
   SubscriptionResponse,
 } from '@barber-saas/api-client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Redirect, useFocusEffect, useRouter } from 'expo-router';
+import {
+  Redirect,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from 'expo-router';
 /* eslint-disable react-hooks/refs -- React Native Animated and PanResponder expose stable imperative values used by the floating control. */
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Linking,
@@ -44,6 +49,8 @@ import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { shareTemporaryExport } from '../../src/lib/temporary-export';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
+import { GuideAnchor } from '../../src/features/guides/GuideAnchor';
+import { useGuides } from '../../src/features/guides/GuideProvider';
 
 import {
   CONTACT_IMPORT_FIELDS,
@@ -61,11 +68,20 @@ export { ClientFormSheet } from '../../src/features/screens/clients-components';
 
 export default function ClientsScreen() {
   const { session } = useAuth();
+  const { guide, replay } = useLocalSearchParams<{
+    guide?: string;
+    replay?: string;
+  }>();
+  const { completeGuide, startGuide } = useGuides();
   const tenant = useTenantScope();
   const layout = useNativeLayoutMetrics();
   const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const router = useRouter();
   const queryClient = useQueryClient();
+  useEffect(() => {
+    if (guide !== 'add-client') return;
+    startGuide('add-client', { force: replay === '1' });
+  }, [guide, replay, startGuide]);
   const floatingClientOffset = useRef(new Animated.ValueXY()).current;
   const floatingClientOffsetRef = useRef({ x: 0, y: 0 });
   const floatingClientBoundsRef = useRef({
@@ -913,28 +929,30 @@ export default function ClientsScreen() {
       </ScrollView>
 
       {clientAccess.canManage ? (
-        <Animated.View
-          {...floatingClientPanResponder.panHandlers}
-          style={[
-            styles.floatingAdd,
-            { bottom: layout.bottomNavigationContentPadding },
-            { transform: floatingClientOffset.getTranslateTransform() },
-          ]}
-        >
-          <Pressable
-            accessibilityLabel="Agregar cliente"
-            accessibilityRole="button"
-            accessibilityState={{ disabled: isClientLimitReached }}
-            disabled={isClientLimitReached}
-            onPress={() => setIsCreateOpen(true)}
+        <GuideAnchor id="clients-add-client">
+          <Animated.View
+            {...floatingClientPanResponder.panHandlers}
             style={[
-              styles.floatingAddContent,
-              isClientLimitReached && { opacity: 0.42 },
+              styles.floatingAdd,
+              { bottom: layout.bottomNavigationContentPadding },
+              { transform: floatingClientOffset.getTranslateTransform() },
             ]}
           >
-            <Ionicons color="#ffffff" name="add" size={29} />
-          </Pressable>
-        </Animated.View>
+            <Pressable
+              accessibilityLabel="Agregar cliente"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isClientLimitReached }}
+              disabled={isClientLimitReached}
+              onPress={() => setIsCreateOpen(true)}
+              style={[
+                styles.floatingAddContent,
+                isClientLimitReached && { opacity: 0.42 },
+              ]}
+            >
+              <Ionicons color="#ffffff" name="add" size={29} />
+            </Pressable>
+          </Animated.View>
+        </GuideAnchor>
       ) : null}
 
       <BottomNavigation active="clients" />
@@ -943,6 +961,7 @@ export default function ClientsScreen() {
           <ClientFormSheet
             onClose={() => setIsCreateOpen(false)}
             onCreated={async () => {
+              completeGuide('add-client');
               await queryClient.invalidateQueries({
                 queryKey: tenant.key('subscription'),
               });

@@ -14,7 +14,12 @@ import type {
 import { useQuery } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Redirect, useFocusEffect, useRouter } from 'expo-router';
+import {
+  Redirect,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Image, Linking, Platform, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,7 +31,11 @@ import {
   useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
-import { businessCategoryIcon } from '../../src/lib/business-category';
+import {
+  businessCategoryIcon,
+  businessCategoryImage,
+  businessCategoryImageAccessibilityLabel,
+} from '../../src/lib/business-category';
 import { BookingLinkSheet } from '../../src/components/BookingLinkSheet';
 import { BusinessCategoryPromptSheet } from '../../src/components/BusinessCategoryPromptSheet';
 import { BusinessLocationSheet } from '../../src/components/BusinessLocationSheet';
@@ -34,6 +43,9 @@ import { useCurrentOrganization } from '../../src/features/organization/useCurre
 import { useAuth } from '../../src/providers/AuthProvider';
 import { accountQueryKey } from '../../src/lib/query-keys';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
+import { FirstStepsCard } from '../../src/features/guides/FirstStepsCard';
+import { GuideAnchor } from '../../src/features/guides/GuideAnchor';
+import { useGuides } from '../../src/features/guides/GuideProvider';
 
 import {
   DASHBOARD_BANNER_DELAY_MS,
@@ -70,9 +82,15 @@ import {
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const { guide, replay } = useLocalSearchParams<{
+    guide?: string;
+    replay?: string;
+  }>();
   const layout = useNativeLayoutMetrics();
   const { session, user } = useAuth();
   const tenant = useTenantScope();
+  const { completeGuide, dismissFirstSteps, firstStepsVisible, startGuide } =
+    useGuides();
   const accountQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -471,6 +489,26 @@ export default function DashboardScreen() {
   }, [needsLocationBanner, needsWelcomeSurvey, notificationFlowState]);
 
   useEffect(() => {
+    if (
+      guide !== 'share-booking-link' ||
+      isNotificationSheetOpen ||
+      isWelcomeSurveyOpen ||
+      isBusinessCategoryPromptOpen ||
+      notificationFlowState !== 'completed'
+    )
+      return;
+    startGuide('share-booking-link', { force: replay === '1' });
+  }, [
+    guide,
+    isBusinessCategoryPromptOpen,
+    isNotificationSheetOpen,
+    isWelcomeSurveyOpen,
+    notificationFlowState,
+    replay,
+    startGuide,
+  ]);
+
+  useEffect(() => {
     setNeedsLocationBanner(null);
     setIsLocationBannerOpen(false);
 
@@ -716,6 +754,19 @@ export default function DashboardScreen() {
           </View>
         ) : null}
 
+        {firstStepsVisible && !needsBusinessCategoryPrompt ? (
+          <FirstStepsCard
+            onDismiss={dismissFirstSteps}
+            onStartBooking={() =>
+              router.push({
+                params: { guide: 'first-booking' },
+                pathname: '/agenda',
+              })
+            }
+            onStartShareLink={() => startGuide('share-booking-link')}
+          />
+        ) : null}
+
         <View style={styles.quickActions}>
           <QuickAction
             icon="add-circle-outline"
@@ -873,26 +924,32 @@ export default function DashboardScreen() {
                     {bookingUrl || 'Preparando tu enlace de reservas'}
                   </Text>
                 </View>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => setIsBookingSheetOpen(true)}
-                  style={[styles.openButton, styles.reservationOpenButton]}
-                >
-                  <View
-                    pointerEvents="none"
-                    style={styles.openButtonInnerBorder}
-                  />
-                  <Text style={styles.openLabel}>Abrir</Text>
-                  <OpenButtonFlare />
-                </Pressable>
+                <GuideAnchor id="dashboard-booking-link">
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => {
+                      completeGuide('share-booking-link');
+                      setIsBookingSheetOpen(true);
+                    }}
+                    style={[styles.openButton, styles.reservationOpenButton]}
+                  >
+                    <View
+                      pointerEvents="none"
+                      style={styles.openButtonInnerBorder}
+                    />
+                    <Text style={styles.openLabel}>Abrir</Text>
+                    <OpenButtonFlare />
+                  </Pressable>
+                </GuideAnchor>
               </View>
             </View>
             <View style={styles.reservationImageColumn}>
               <Image
-                accessibilityLabel="Silla de barbería"
+                accessibilityLabel={businessCategoryImageAccessibilityLabel(
+                  businessCategory,
+                )}
                 resizeMode="contain"
-                // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
-                source={require('../../assets/silla.png')}
+                source={businessCategoryImage(businessCategory, 'dashboard')}
                 style={styles.reservationChair}
               />
             </View>

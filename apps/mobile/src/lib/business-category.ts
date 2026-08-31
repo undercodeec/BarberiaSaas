@@ -1,4 +1,5 @@
 import type { BusinessCategory } from '@barber-saas/api-client';
+import type { ImageSourcePropType } from 'react-native';
 
 export const BUSINESS_CATEGORY_OPTIONS: ReadonlyArray<{
   readonly icon:
@@ -27,25 +28,75 @@ export const BUSINESS_CATEGORY_OPTIONS: ReadonlyArray<{
   },
 ];
 
-const ASSET_SLUG: Record<BusinessCategory, string> = {
-  AESTHETICS: 'aesthetics',
-  BARBERSHOP: 'barbershop',
-  BEAUTY_SALON: 'beauty-salon',
-  NAIL_STUDIO: 'nail-studio',
-  PERSONAL_CARE_OTHER: 'personal-care-other',
-  SPA_WELLNESS: 'spa-wellness',
+type BusinessCategoryImagePlacement = 'dashboard' | 'onboarding';
+
+type BusinessCategoryVisual = {
+  readonly accessibilityLabel: string;
+  readonly dashboard: ImageSourcePropType;
+  readonly onboarding: ImageSourcePropType;
 };
 
-/**
- * Ruta canónica para los assets que se añadirán manualmente. Metro no permite
- * `require()` dinámico: al incluir cada imagen habrá que registrarla de forma
- * estática en el resolvedor visual que la consuma.
- */
-export function businessCategoryAssetPath(
+// Metro needs every image to be registered through a static require. The same
+// contextual composition is intentionally reused on dashboard and onboarding.
+const BUSINESS_CATEGORY_VISUALS: Record<
+  BusinessCategory,
+  BusinessCategoryVisual
+> = {
+  AESTHETICS: {
+    accessibilityLabel: 'Espacio de centro de estética',
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
+    dashboard: require('../../assets/business-categories/spas.png'),
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
+    onboarding: require('../../assets/business-categories/spas.png'),
+  },
+  BARBERSHOP: {
+    accessibilityLabel: 'Silla de barbería',
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
+    dashboard: require('../../assets/silla.png'),
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
+    onboarding: require('../../assets/onboarding-team.png'),
+  },
+  BEAUTY_SALON: {
+    accessibilityLabel: 'Estación de salón de belleza',
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
+    dashboard: require('../../assets/business-categories/peluqueria.png'),
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
+    onboarding: require('../../assets/business-categories/peluqueria.png'),
+  },
+  NAIL_STUDIO: {
+    accessibilityLabel: 'Estación de estudio de uñas',
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
+    dashboard: require('../../assets/business-categories/estudio-uñas.png'),
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
+    onboarding: require('../../assets/business-categories/estudio-uñas.png'),
+  },
+  PERSONAL_CARE_OTHER: {
+    accessibilityLabel: 'Espacio de cuidado personal',
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
+    dashboard: require('../../assets/business-categories/otros-cuidados-personales.png'),
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
+    onboarding: require('../../assets/business-categories/otros-cuidados-personales.png'),
+  },
+  SPA_WELLNESS: {
+    accessibilityLabel: 'Sala de spa y bienestar',
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
+    dashboard: require('../../assets/business-categories/spa-wellness.png'),
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
+    onboarding: require('../../assets/business-categories/spa-wellness.png'),
+  },
+};
+
+export function businessCategoryImage(
   category: BusinessCategory,
-  placement: 'dashboard' | 'onboarding',
+  placement: BusinessCategoryImagePlacement,
 ) {
-  return `assets/business-categories/${ASSET_SLUG[category]}-${placement}.png`;
+  return BUSINESS_CATEGORY_VISUALS[category][placement];
+}
+
+export function businessCategoryImageAccessibilityLabel(
+  category: BusinessCategory,
+) {
+  return BUSINESS_CATEGORY_VISUALS[category].accessibilityLabel;
 }
 
 export function businessCategoryLabel(category: BusinessCategory) {

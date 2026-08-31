@@ -27,6 +27,7 @@ import { requireApiClient } from '../../src/lib/api';
 import { accountQueryKey, accountQueryPrefix } from '../../src/lib/query-keys';
 import { BookingLinkSheet } from '../../src/components/BookingLinkSheet';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useGuides } from '../../src/features/guides/GuideProvider';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const congratulationsImage = require('../../assets/Felicidadez.png') as number;
@@ -35,6 +36,7 @@ export default function CongratulationsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { session, user } = useAuth();
+  const { enableFirstStepsInvitation } = useGuides();
   const profileQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -54,6 +56,7 @@ export default function CongratulationsScreen() {
         { method: 'POST' },
       ),
     onSuccess: async (result) => {
+      enableFirstStepsInvitation();
       queryClient.setQueryData<OnboardingAccountDetailsResponse>(
         accountQueryKey(user?.id, 'onboarding-account-details'),
         (profile) =>

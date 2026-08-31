@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import type { BusinessCategory } from '@barber-saas/api-client';
 import { StatusBar } from 'expo-status-bar';
 import {
   Image,
@@ -12,13 +13,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { appStyles, appTheme, goldButtonShadow } from './BottomNavigation';
+import {
+  businessCategoryIcon,
+  businessCategoryImage,
+  businessCategoryImageAccessibilityLabel,
+} from '../lib/business-category';
 import { NavaButton } from './NavaButton';
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const teamIllustration = require('../../assets/onboarding-team.png') as number;
 
 interface AccountSetupWelcomeScreenProps {
   readonly accountType: 'business' | 'professional';
+  readonly businessCategory?: BusinessCategory;
   readonly fullName: string;
   readonly onBack: () => void;
   readonly onContinue: () => void;
@@ -26,6 +30,7 @@ interface AccountSetupWelcomeScreenProps {
 
 export function AccountSetupWelcomeScreen({
   accountType,
+  businessCategory = 'BARBERSHOP',
   fullName,
   onBack,
   onContinue,
@@ -46,9 +51,9 @@ export function AccountSetupWelcomeScreen({
         <View style={styles.bottomGlow} />
         <Ionicons
           color={appTheme.colors.accentGhost}
-          name="cut-outline"
+          name={businessCategoryIcon(businessCategory)}
           size={260}
-          style={styles.backgroundScissors}
+          style={styles.backgroundCategoryIcon}
         />
       </View>
 
@@ -82,9 +87,11 @@ export function AccountSetupWelcomeScreen({
 
         <View style={styles.hero}>
           <Image
-            accessibilityLabel="Equipo profesional de barbería"
+            accessibilityLabel={businessCategoryImageAccessibilityLabel(
+              businessCategory,
+            )}
             resizeMode="contain"
-            source={teamIllustration}
+            source={businessCategoryImage(businessCategory, 'onboarding')}
             style={[
               styles.illustration,
               compact ? styles.illustrationCompact : null,
@@ -186,7 +193,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     overflow: 'hidden',
   },
-  backgroundScissors: {
+  backgroundCategoryIcon: {
     bottom: 60,
     left: -110,
     position: 'absolute',

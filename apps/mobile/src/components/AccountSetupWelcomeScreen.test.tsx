@@ -28,4 +28,18 @@ describe('AccountSetupWelcomeScreen', () => {
     await user.press(view.getByRole('button', { name: 'Regresar al inicio' }));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
+
+  it('usa la ilustración y el icono de la categoría seleccionada', async () => {
+    const view = await render(
+      <AccountSetupWelcomeScreen
+        accountType="business"
+        businessCategory="SPA_WELLNESS"
+        fullName="Ana Torres"
+        onBack={jest.fn()}
+        onContinue={jest.fn()}
+      />,
+    );
+
+    expect(view.getByLabelText('Sala de spa y bienestar')).toBeOnTheScreen();
+  });
 });
