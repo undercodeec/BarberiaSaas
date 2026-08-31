@@ -20,6 +20,7 @@ import type { ApiConfig } from './config';
 import { ApiError } from './errors';
 import {
   confirmPayphoneWebButton,
+  PayphonePrepareRejectedError,
   preparePayphoneWebButton,
 } from './payphone-web-button';
 import { decryptPlatformPaymentCredential } from './security';
@@ -1157,6 +1158,11 @@ export function registerSubscriptionPaymentRoutes(
       });
       return reply.code(201).send(publicAttempt(attempt));
     } catch (error) {
+      if (error instanceof PayphonePrepareRejectedError)
+        request.log.warn(
+          { payphone: error.diagnostics },
+          'platform_payphone_prepare_rejected',
+        );
       await database.$transaction([
         database.subscriptionPaymentAttempt.update({
           data: {

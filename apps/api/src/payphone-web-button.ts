@@ -40,6 +40,35 @@ export interface PayphoneWebButtonConfirmation {
   readonly status: 'approved' | 'rejected';
 }
 
+export interface PayphonePrepareRejectionDiagnostics {
+  readonly amountCents: number;
+  readonly cancellationUrlHostname: string | null;
+  readonly clientTransactionIdLength: number;
+  readonly currencyCode: string;
+  readonly errorCode: string | number | null;
+  readonly message: string | null;
+  readonly responseUrlHostname: string | null;
+  readonly statusCode: number;
+  readonly validationErrors: ReadonlyArray<{
+    readonly code: string | number | null;
+    readonly field: string | null;
+    readonly message: string | null;
+  }>;
+}
+
+/** Error público de PayPhone junto con datos seguros únicamente para logs internos. */
+export class PayphonePrepareRejectedError extends ApiError {
+  public constructor(
+    public readonly diagnostics: PayphonePrepareRejectionDiagnostics,
+  ) {
+    super(
+      502,
+      'PAYPHONE_PREPARE_REJECTED',
+      'PayPhone rechazó la preparación del pago.',
+    );
+  }
+}
+
 function authorizationHeaders(token: string) {
   return {
     authorization: `Bearer ${token}`,
@@ -76,6 +105,86 @@ function paymentUrl(value: string | undefined): string {
     );
   }
   return value;
+}
+
+function boundedText(
+  value: unknown,
+  redactions: ReadonlyArray<string> = [],
+  maximumLength = 240,
+): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = redactions.reduce(
+    (text, secret) => (secret ? text.replaceAll(secret, '[redacted]') : text),
+    value.replace(/[\r\n\t]+/gu, ' ').trim(),
+  );
+  return normalized ? normalized.slice(0, maximumLength) : null;
+}
+
+function diagnosticCode(value: unknown): string | number | null {
+  if (typeof value === 'number' || typeof value === 'string') return value;
+  return null;
+}
+
+function urlHostname(value: string): string | null {
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return null;
+  }
+}
+
+function diagnosticValidationErrors(
+  value: unknown,
+  redactions: ReadonlyArray<string>,
+) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 10).map((entry) => {
+    const item: Record<string, unknown> =
+      entry && typeof entry === 'object' && !Array.isArray(entry) ? entry : {};
+    return {
+      code: diagnosticCode(item.code ?? item.errorCode ?? item.Code),
+      field: boundedText(
+        item.field ?? item.property ?? item.path,
+        redactions,
+        120,
+      ),
+      message: boundedText(
+        item.message ?? item.errorMessage ?? item.Message,
+        redactions,
+      ),
+    };
+  });
+}
+
+function prepareRejectionDiagnostics(
+  input: Parameters<typeof preparePayphoneWebButton>[0],
+  payload: unknown,
+  statusCode: number,
+): PayphonePrepareRejectionDiagnostics {
+  const redactions = [input.storeId, input.token];
+  const response: Record<string, unknown> =
+    payload && typeof payload === 'object' && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : {};
+  return {
+    amountCents: input.amountCents,
+    cancellationUrlHostname: urlHostname(input.cancellationUrl),
+    clientTransactionIdLength: input.clientTransactionId.length,
+    currencyCode: input.currencyCode,
+    errorCode: diagnosticCode(
+      response.errorCode ??
+        response.ErrorCode ??
+        response.code ??
+        response.Code,
+    ),
+    message: boundedText(response.message ?? response.Message, redactions),
+    responseUrlHostname: urlHostname(input.responseUrl),
+    statusCode,
+    validationErrors: diagnosticValidationErrors(
+      response.errors ?? response.Errors,
+      redactions,
+    ),
+  };
 }
 
 export async function preparePayphoneWebButton(input: {
@@ -131,10 +240,8 @@ export async function preparePayphoneWebButton(input: {
   }
   const payload = await responseJson(response);
   if (!response.ok)
-    throw new ApiError(
-      502,
-      'PAYPHONE_PREPARE_REJECTED',
-      'PayPhone rechazó la preparación del pago.',
+    throw new PayphonePrepareRejectedError(
+      prepareRejectionDiagnostics(input, payload, response.status),
     );
   const parsed = prepareResponseSchema.safeParse(payload);
   if (!parsed.success)
