@@ -1,101 +1,172 @@
- Sí. La recomendación es definir una política de notificaciones antes de añadir más envíos, porque un push debe
-  requerir atención o una acción; si se usa para todo, los usuarios terminan desactivándolo.
+Implementa ahora el diagnóstico mínimo y seguro para identificar por qué PayPhone rechaza el request real de Nava.
 
-  La matriz inicial que propongo:
+Ya fue confirmado mediante curl desde el mismo VPS que PayPhone funciona correctamente con el Token y StoreId productivos y devuelve correctamente:
 
-   Evento                             Push a                              Prioridad    Regla
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   Nueva cita / reserva               Barbero asignado, recepción y            Alta    No avisar al usuario que la creó
-                                      gerente de la sede; propietario
-                                      opcional
-  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
-   Cita cancelada o reprogramada      Mismos destinatarios                     Alta    Solo si afecta una cita futura
-  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
-   Cita próxima                       Solo barbero asignado                    Alta    Recordatorio configurable: 30 o
-                                                                                       15 min antes
-  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
-   Reserva pendiente de               Recepción y gerente de la sede          Media    Evitar uno por cada intento del
-   confirmar / vencida                                                                 cliente
-  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
-   Cobro de servicio pendiente de     Propietario y gerente de la sede         Alta    Debe pasar de aviso interno a
-   confirmar                                                                           push real
-  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
-   Caja cerrada con diferencia        Propietario y gerente de la sede         Alta    Incluir monto de diferencia, no
-                                                                                       datos del cliente
-  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
-   Caja abierta o cerrada sin         Propietario y gerente de la sede         Baja    Opcional; puede quedar solo en
-   diferencia                                                                          el historial
-  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
-   Stock bajo mínimo                  Propietario y gerente de la sede        Media    Solo al cruzar el mínimo; no en
-                                                                                       cada ajuste
-  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
-   Pedido pagado / listo para         Recepción y gerente de la sede          Media    Si el flujo de productos opera
-   entregar                                                                            por sucursal
-  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
-   Nuevo miembro acepta invitación    Propietario y gerente                   Media    Aviso único
-  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
-   Cambio de rol, sede o agenda       Usuario afectado + propietario/          Alta    Importante para el colaborador
-                                      gerente                                          afectado
-  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
-   Reseña nueva negativa              Propietario y gerente de la sede        Media    Por ejemplo, calificación 1–3;
-                                                                                       positivas pueden ir al panel
-  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
-   Suscripción, pago rechazado o      Solo propietario                         Alta    También por correo, pues es un
-   vencimiento                                                                         tema administrativo
-  ─────────────────────────────────  ──────────────────────────────────  ───────────  ──────────────────────────────────
-   Seguridad: cambio de               Usuario afectado y/o propietario         Alta    Push y correo; no depender solo
-   contraseña, cierre de sesión,                                                       de la app
-   cuenta suspendida
+paymentId
+payWithPayPhone
+payWithCard
 
-  Reglas de roles recomendadas:
+Por tanto, NO modificar credenciales, StoreId, entorno, DATABASE_URL, Nginx ni cifrado.
 
-  - owner: asuntos financieros, seguridad, suscripción y visión global; no necesariamente cada cita si hay mucho
-    volumen.
+## Objetivo
 
-  - manager: eventos operativos de las sedes asignadas, caja, inventario, equipo y citas.
-  - receptionist: citas, cambios, cancelaciones, pedidos y alertas operativas de su sede; nunca pagos, suscripción o
-    configuración sensible.
+Cuando:
 
-  - barber: solo sus propias citas, cambios, cancelaciones, recordatorios y cambios que afecten su agenda.
-  - Ningún aviso debe llegar a una persona sin acceso a esa sede.
-  - El actor de una acción no debe recibir su propio push.
-  - Si una persona tiene varios roles, se consolida en un único envío.
+POST /v1/subscription/checkout
 
-  Además, separaría tres canales:
+termine en:
 
-  - Push: requiere atención inmediata.
-  - Bandeja dentro de Nava: historial y novedades no urgentes.
-  - Correo: seguridad, facturación, invitaciones y avisos que no deben perderse.
+PAYPHONE_PREPARE_REJECTED
 
-  Hoy ya existe una buena base para citas, pero falta aplicar estas reglas por sede y completar eventos como
-  confirmación de cobro, caja, inventario, equipo, reseñas y suscripción. El punto más urgente es convertir “cobro
+quiero que el backend registre de forma estructurada y segura la respuesta real de PayPhone y el contexto NO sensible del request.
 
-  La siguiente fase debería ser convertir esta matriz en preferencias configurables por usuario: por ejemplo, que el
-  propietario pueda apagar “nuevas citas” pero mantener activas “caja con diferencia”, “pagos pendientes” y “stock
-  bajo”.
-  desde la app— y cobros pendientes. Aplicaré los destinatarios por sede, evitaré notificar al autor de su propia acción
-  y haré que el cobro pendiente llegue como push real.
+## Implementación
 
-   Primera fase implementada.
+Revisa principalmente:
 
-  - Las citas creadas, canceladas y reprogramadas desde Nava ahora notifican.
-  - Destinatarios: profesional asignado, propietarios, gerentes y recepción de la misma sede.
-  - Un cobro pendiente de confirmar ahora entra en la cola real de push para propietarios y gerentes de la sede; antes
-    era solo un aviso interno.
+apps/api/src/payphone-web-button.ts
+apps/api/src/subscription-payments.ts
 
-  Cambios principales: apps/api/src/app.ts:364 y apps/api/src/agenda.ts:852.
+Actualmente existe algo equivalente a:
 
-  Validado con typecheck del API y las pruebas de FCM. No hice commit aún.
+const payload = await responseJson(response);
 
-   No. Está completa la primera fase crítica de citas y cobros pendientes.
+if (!response.ok)
+throw new ApiError(
+502,
+'PAYPHONE_PREPARE_REJECTED',
+'PayPhone rechazó la preparación del pago.',
+);
 
-  Aún faltan por implementar:
+El problema es que `payload` se pierde.
 
-  - Inventario: stock bajo.
-  - Equipo: invitación aceptada, cambio de rol/sede/horario.
-  - Reseñas negativas.
-  - Suscripción y pagos rechazados.
-  - Preferencias por usuario para activar o silenciar categorías.
-  - Pruebas integrales con dispositivos reales y FCM configurado.
+Modifica el diseño mínimamente para conservar información diagnóstica segura del rechazo de PayPhone.
 
-  No marqué el trabajo como completo ni hice commit de esta fase.
+Quiero poder registrar:
+
+* HTTP status devuelto por PayPhone
+* Code o errorCode
+* Message o message
+* errors de validación, si existen
+* amount
+* amountWithoutTax
+* amountWithTax
+* tax
+* service
+* tip
+* currency
+* clientTransactionId
+* clientTransactionIdLength
+* reference
+* responseUrl
+* cancellationUrl
+* hostname de responseUrl
+* hostname de cancellationUrl
+* longitud del StoreId o StoreId parcialmente enmascarado
+
+## Seguridad obligatoria
+
+NUNCA registrar:
+
+* Bearer Token
+* token descifrado
+* encryptedToken
+* PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY
+* Authorization header
+* DATABASE_URL
+* secretos completos
+
+Preferiblemente tampoco registrar StoreId completo.
+
+## Importante
+
+El usuario final debe seguir recibiendo un error genérico y seguro.
+
+Por ejemplo:
+
+HTTP 502
+PAYPHONE_PREPARE_REJECTED
+"PayPhone rechazó la preparación del pago."
+
+El detalle del proveedor solo debe aparecer en logs internos del backend.
+
+## Payload
+
+Además, quiero que el log permita comparar el request REAL enviado por Nava contra este request manual que YA FUNCIONÓ:
+
+{
+"amount": 200,
+"amountWithoutTax": 200,
+"clientTransactionId": "NAVA200428",
+"currency": "USD",
+"storeId": "...",
+"reference": "Prueba Nava",
+"responseUrl": "https://navacloud.app/checkout/payphone/confirm"
+}
+
+No modificar todavía los campos del request de Nava.
+
+Primero necesitamos obtener evidencia del rechazo real.
+
+## Tests obligatorios
+
+Añade tests que validen:
+
+1. PayPhone HTTP 400 +:
+   {
+   "Code": 1001,
+   "Message": "Esta solicitud no cumple los parámetros necesarios"
+   }
+
+2. PayPhone HTTP 400 con:
+   errorCode
+   message
+   errors[]
+
+3. El diagnóstico conserva Code/Message/errors.
+
+4. Nunca aparece el Bearer Token en logs ni errores.
+
+5. Nunca aparece PLATFORM_PAYPHONE_CREDENTIALS_ENCRYPTION_KEY.
+
+6. El StoreId no aparece completo.
+
+7. El endpoint público continúa devolviendo 502 genérico.
+
+8. Un Prepare exitoso sigue devolviendo correctamente:
+   paymentId
+   payWithCard
+   payWithPayPhone
+
+## No hacer
+
+* No eliminar campos de Prepare todavía.
+* No cambiar clientTransactionId.
+* No cambiar importes.
+* No cambiar URLs.
+* No cambiar token.
+* No cambiar StoreId.
+* No tocar base de datos.
+* No crear migraciones.
+* No modificar infraestructura.
+* No hacer cambios móviles.
+
+## Verificación
+
+Ejecuta las pruebas relacionadas con:
+
+payphone-web-button
+subscription-payments
+
+y cualquier test afectado.
+
+Después explícame:
+
+1. Archivos modificados.
+2. Cómo se sanea la información.
+3. Qué se registrará exactamente.
+4. Qué secretos quedan explícitamente excluidos.
+5. Tests ejecutados y resultado.
+6. Comandos exactos que debo ejecutar en el VPS para desplegar únicamente este cambio y luego observar el próximo intento de pago.
+
+El objetivo de este cambio es DIAGNÓSTICO, no intentar corregir todavía el rechazo de PayPhone.

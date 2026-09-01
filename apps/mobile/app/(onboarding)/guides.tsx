@@ -9,55 +9,53 @@ import {
   BottomNavigation,
 } from '../../src/components/BottomNavigation';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
-import { useGuides } from '../../src/features/guides/GuideProvider';
+import {
+  quickGuideDestination,
+  type QuickGuideId,
+} from '../../src/features/guides/guide-navigation';
 
 const guides = [
   {
     description: 'Recorre los accesos principales del panel de tu negocio.',
     icon: 'grid-outline' as const,
     id: 'dashboard-tour',
-    route: '/dashboard',
     title: 'Conocer mi dashboard',
   },
   {
     description: 'Te mostramos dónde iniciar una cita y qué ocurre después.',
     icon: 'calendar-outline' as const,
     id: 'first-booking',
-    route: '/agenda',
     title: 'Crear una cita',
   },
   {
     description: 'Ubica el enlace que puedes enviar por WhatsApp y redes.',
     icon: 'share-social-outline' as const,
     id: 'share-booking-link',
-    route: '/dashboard',
     title: 'Compartir mi enlace de reservas',
   },
   {
     description: 'Conoce dónde registrar un servicio para tu catálogo.',
     icon: 'cut-outline' as const,
     id: 'add-service',
-    route: '/service-management',
     title: 'Crear un servicio',
   },
   {
     description: 'Te mostramos dónde agregar un cliente a tu directorio.',
     icon: 'person-add-outline' as const,
     id: 'add-client',
-    route: '/clients',
     title: 'Agregar un cliente',
   },
 ] as const;
 
 export default function GuidesScreen() {
   const router = useRouter();
-  const { startGuide } = useGuides();
   const organizationQuery = useCurrentOrganization();
-  const canAccessDashboardTour = ['manager', 'owner'].includes(
-    organizationQuery.data?.membership.role ?? '',
-  );
+  const role = organizationQuery.data?.membership.role ?? '';
+  const canManageBusiness = ['manager', 'owner'].includes(role);
   const visibleGuides = guides.filter(
-    (guide) => guide.id !== 'dashboard-tour' || canAccessDashboardTour,
+    (guide) =>
+      (guide.id !== 'dashboard-tour' || canManageBusiness) &&
+      (guide.id !== 'add-client' || canManageBusiness),
   );
 
   return (
@@ -91,12 +89,12 @@ export default function GuidesScreen() {
               accessibilityRole="button"
               key={guide.id}
               onPress={() => {
-                if (guide.id === 'dashboard-tour')
-                  startGuide('dashboard-booking-link', { force: true });
-                router.push({
-                  params: { guide: guide.id, replay: '1' },
-                  pathname: guide.route,
-                });
+                router.push(
+                  quickGuideDestination(
+                    guide.id as QuickGuideId,
+                    Date.now().toString(),
+                  ) as never,
+                );
               }}
               style={styles.card}
             >

@@ -6215,15 +6215,17 @@ export function registerOperationsRoutes(
       );
     }
     const role = input.role.toUpperCase() as MembershipRole;
-    if (
-      member.role === MembershipRole.BARBER ||
-      role === MembershipRole.BARBER
-    ) {
+    if (member.role === MembershipRole.BARBER) {
       await assertCanUseProfessional(
         database,
         current.organizationId,
         member.id,
       );
+    } else if (role === MembershipRole.BARBER) {
+      // This member is not in the current professional set yet. Checking
+      // availability by id would incorrectly mark them as historical, even
+      // when the active trial (Nava Local) allows collaborators.
+      await assertCanCreateTeamMember(database, current.organizationId);
     }
     const previousLocationIds = member.memberLocations.map(
       ({ locationId }) => locationId,

@@ -19,6 +19,7 @@ import { appTheme, goldButtonShadow } from './BottomNavigation';
 import { LocalQrCode } from './LocalQrCode';
 import { CoachmarkOverlay } from '../features/guides/CoachmarkOverlay';
 import { GuideAnchor } from '../features/guides/GuideAnchor';
+import { BOOKING_LINK_TOUR_IDS } from '../features/guides/guide-catalog';
 import { useGuides } from '../features/guides/GuideProvider';
 
 type BookingLinkSheetProps = {
@@ -33,8 +34,13 @@ export function BookingLinkSheet({
   visible,
 }: BookingLinkSheetProps) {
   const insets = useSafeAreaInsets();
-  const { activeGuide, advanceGuide, dismissGuide, previousGuide } =
-    useGuides();
+  const {
+    activeGuide,
+    advanceGuide,
+    dismissGuide,
+    previousGuide,
+    refreshAnchors,
+  } = useGuides();
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const translateY = useRef(new Animated.Value(540)).current;
@@ -47,8 +53,10 @@ export function BookingLinkSheet({
       easing: Easing.out(Easing.cubic),
       toValue: 0,
       useNativeDriver: true,
-    }).start();
-  }, [translateY, visible]);
+    }).start(({ finished }) => {
+      if (finished) refreshAnchors();
+    });
+  }, [refreshAnchors, translateY, visible]);
 
   const close = () => {
     setShowQr(false);
@@ -236,8 +244,12 @@ export function BookingLinkSheet({
               activeGuide.definition.previousId ? previousGuide : undefined
             }
             rect={activeGuide.rect}
-            step={null}
-            totalSteps={null}
+            step={
+              BOOKING_LINK_TOUR_IDS.findIndex(
+                (guideId) => guideId === activeGuide.definition.id,
+              ) + 1
+            }
+            totalSteps={BOOKING_LINK_TOUR_IDS.length}
           />
         ) : null}
       </View>

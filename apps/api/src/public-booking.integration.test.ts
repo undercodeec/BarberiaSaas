@@ -370,6 +370,7 @@ integrationDescribe('reservas públicas', () => {
       route: '/agenda',
       type: 'created',
     });
+    expect(queuedNotification?.body).toContain('con Profesional P\u00fablico');
     expect(management.managementToken.length).toBeGreaterThan(32);
 
     const managed = await app.inject({
@@ -378,6 +379,9 @@ integrationDescribe('reservas públicas', () => {
     });
     expect(managed.statusCode).toBe(200);
     expect(managed.json().appointment.status).toBe('confirmed');
+    expect(managed.json().appointment.professionalName).toBe(
+      'Profesional P\u00fablico',
+    );
     expect(managed.json().appointment.services).toHaveLength(1);
 
     const rescheduledAt = futureSlot(4, 11);

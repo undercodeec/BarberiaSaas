@@ -490,6 +490,7 @@ export function publicAppointment(
     id: string;
     locationId: string;
     notes: string | null;
+    professional?: { user: { fullName: string } } | null;
     professionalMembershipId: string;
     paymentStatus: AppointmentPaymentStatus;
     startsAt: Date;
@@ -516,6 +517,7 @@ export function publicAppointment(
     id: appointment.id,
     locationId: appointment.locationId,
     notes: appointment.notes,
+    professionalName: appointment.professional?.user.fullName ?? null,
     startsAt: appointment.startsAt.toISOString(),
     paymentStatus: appointment.paymentStatus.toLowerCase(),
     professionalMembershipId: appointment.professionalMembershipId,
@@ -691,7 +693,10 @@ export function registerAgendaRoutes(
     const dayStart = zonedDateTimeToUtc(fromDate, 0, location.timezone);
     const dayEnd = zonedDateTimeToUtc(toDate, 1440, location.timezone);
     const appointments = await database.appointment.findMany({
-      include: { services: { orderBy: { sortOrder: 'asc' } } },
+      include: {
+        professional: { select: { user: { select: { fullName: true } } } },
+        services: { orderBy: { sortOrder: 'asc' } },
+      },
       orderBy: { startsAt: 'asc' },
       where: {
         locationId: input.locationId,
@@ -819,7 +824,10 @@ export function registerAgendaRoutes(
             startsAt,
             updatedByUserId: user.id,
           },
-          include: { services: { orderBy: { sortOrder: 'asc' } } },
+          include: {
+            professional: { select: { user: { select: { fullName: true } } } },
+            services: { orderBy: { sortOrder: 'asc' } },
+          },
         });
         await transaction.appointmentEvent.create({
           data: {
@@ -928,7 +936,10 @@ export function registerAgendaRoutes(
         });
         const appointment = await transaction.appointment.update({
           data: { endsAt, startsAt, updatedByUserId: user.id },
-          include: { services: { orderBy: { sortOrder: 'asc' } } },
+          include: {
+            professional: { select: { user: { select: { fullName: true } } } },
+            services: { orderBy: { sortOrder: 'asc' } },
+          },
           where: { id: existing.id },
         });
         await transaction.appointmentEvent.create({
@@ -1014,7 +1025,10 @@ export function registerAgendaRoutes(
           status: AppointmentStatus.CANCELLED,
           updatedByUserId: user.id,
         },
-        include: { services: { orderBy: { sortOrder: 'asc' } } },
+        include: {
+          professional: { select: { user: { select: { fullName: true } } } },
+          services: { orderBy: { sortOrder: 'asc' } },
+        },
         where: { id: existing.id },
       });
       await transaction.appointmentEvent.create({
@@ -1115,7 +1129,10 @@ export function registerAgendaRoutes(
           status,
           updatedByUserId: user.id,
         },
-        include: { services: { orderBy: { sortOrder: 'asc' } } },
+        include: {
+          professional: { select: { user: { select: { fullName: true } } } },
+          services: { orderBy: { sortOrder: 'asc' } },
+        },
         where: { id: existing.id },
       });
       await transaction.appointmentEvent.create({

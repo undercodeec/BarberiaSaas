@@ -83,8 +83,9 @@ import {
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { guide, replay } = useLocalSearchParams<{
+  const { guide, guideRun, replay } = useLocalSearchParams<{
     guide?: string;
+    guideRun?: string;
     replay?: string;
   }>();
   const layout = useNativeLayoutMetrics();
@@ -579,21 +580,29 @@ export default function DashboardScreen() {
       startedRouteGuideRef.current = null;
       return;
     }
-    const routeGuideKey = `${guide}:${replay ?? '0'}`;
+    const routeGuideKey = `${guide}:${replay ?? '0'}:${guideRun ?? 'default'}`;
     if (startedRouteGuideRef.current === routeGuideKey) return;
 
     if (
-      guide === 'dashboard-tour' &&
       replay === '1' &&
-      canAccessFinancialReports
+      (guide === 'share-booking-link' ||
+        (guide === 'dashboard-tour' && canAccessFinancialReports))
     ) {
       setIsNotificationSheetOpen(false);
       setIsWelcomeSurveyOpen(false);
       setIsBusinessCategoryPromptOpen(false);
       setIsLocationBannerOpen(false);
-      setIsBookingSheetOpen(false);
+      setIsBookingSheetOpen(guide === 'share-booking-link');
       setIsQuickActionsPickerOpen(false);
-      const started = startGuide('dashboard-booking-link', { force: true });
+      if (guide === 'share-booking-link') {
+        completeGuide('share-booking-link');
+      }
+      const started = startGuide(
+        guide === 'dashboard-tour'
+          ? 'dashboard-booking-link'
+          : 'booking-link-qr',
+        { force: true },
+      );
       if (started) startedRouteGuideRef.current = routeGuideKey;
       return;
     }
@@ -604,7 +613,8 @@ export default function DashboardScreen() {
         activeGuideId !==
           (guide === 'dashboard-tour'
             ? 'dashboard-booking-link'
-            : 'share-booking-link')) ||
+            : 'share-booking-link') &&
+        replay !== '1') ||
       isNotificationSheetOpen ||
       isWelcomeSurveyOpen ||
       isBusinessCategoryPromptOpen ||
@@ -621,7 +631,9 @@ export default function DashboardScreen() {
   }, [
     activeGuideId,
     canAccessFinancialReports,
+    completeGuide,
     guide,
+    guideRun,
     isBusinessCategoryPromptOpen,
     isNotificationSheetOpen,
     isWelcomeSurveyOpen,
@@ -1078,8 +1090,13 @@ export default function DashboardScreen() {
                   <Pressable
                     accessibilityRole="button"
                     onPress={() => {
+                      if (activeGuideId === 'share-booking-link') {
+                        completeGuide('share-booking-link');
+                        setIsBookingSheetOpen(true);
+                        startGuide('booking-link-qr', { force: true });
+                        return;
+                      }
                       advanceFromDashboardTarget('dashboard-booking-link');
-                      completeGuide('share-booking-link');
                       setIsBookingSheetOpen(true);
                     }}
                     style={[styles.openButton, styles.reservationOpenButton]}

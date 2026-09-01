@@ -2573,6 +2573,50 @@ describeWithDatabase('API con PostgreSQL', () => {
     );
   });
 
+  it('permite convertir recepci\u00f3n en profesional durante la demo activa', async () => {
+    const ownerToken = await register('trial-role-owner@example.com');
+    const organization = await onboard(ownerToken, 'trial-role-change');
+    const receptionist = await database.user.create({
+      data: {
+        email: 'trial-role-receptionist@example.com',
+        fullName: 'Recepcionista Demo',
+      },
+    });
+    const membership = await database.membership.create({
+      data: {
+        organizationId: organization.organizationId,
+        role: 'RECEPTIONIST',
+        userId: receptionist.id,
+      },
+    });
+    await database.memberLocation.create({
+      data: {
+        locationId: organization.locationId,
+        membershipId: membership.id,
+      },
+    });
+
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'PATCH',
+      payload: {
+        commissionPercentage: 45,
+        fullName: 'Profesional Demo',
+        locationIds: [organization.locationId],
+        role: 'barber',
+      },
+      url: `/v1/team/members/${membership.id}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ member: { role: string } }>().member.role).toBe(
+      'barber',
+    );
+    await expect(
+      database.membership.findUniqueOrThrow({ where: { id: membership.id } }),
+    ).resolves.toMatchObject({ role: 'BARBER' });
+  });
+
   it('notifica al profesional cuando se reemplaza su horario semanal', async () => {
     const agenda = await setupAgenda('schedule-update-notification');
     await database.appNotification.deleteMany({

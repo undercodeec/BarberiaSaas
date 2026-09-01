@@ -3,7 +3,7 @@ import type { ServiceRecord, ServicesResponse } from '@barber-saas/api-client';
 import * as ImagePicker from 'expo-image-picker';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Image,
@@ -46,8 +46,9 @@ export default function ServiceManagementScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { session } = useAuth();
-  const { guide, replay } = useLocalSearchParams<{
+  const { guide, guideRun, replay } = useLocalSearchParams<{
     guide?: string;
+    guideRun?: string;
     replay?: string;
   }>();
   const { completeGuide, startGuide } = useGuides();
@@ -68,11 +69,18 @@ export default function ServiceManagementScreen() {
     null,
   );
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const startedRouteGuideRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (guide !== 'add-service') return;
-    startGuide('add-service', { force: replay === '1' });
-  }, [guide, replay, startGuide]);
+    if (guide !== 'add-service') {
+      startedRouteGuideRef.current = null;
+      return;
+    }
+    const routeGuideKey = `${guide}:${replay ?? '0'}:${guideRun ?? 'default'}`;
+    if (startedRouteGuideRef.current === routeGuideKey) return;
+    if (startGuide('add-service', { force: replay === '1' }))
+      startedRouteGuideRef.current = routeGuideKey;
+  }, [guide, guideRun, replay, startGuide]);
 
   const servicesQuery = useQuery({
     enabled: Boolean(session && current),

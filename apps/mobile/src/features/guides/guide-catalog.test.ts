@@ -1,4 +1,5 @@
 import {
+  BOOKING_LINK_TOUR_IDS,
   DASHBOARD_TOUR_IDS,
   GUIDE_CATALOG,
   GUIDE_SNOOZE_MS,
@@ -42,5 +43,18 @@ describe('guide catalog', () => {
       'dashboard-notifications',
     );
     expect(GUIDE_CATALOG['dashboard-notifications'].nextId).toBeUndefined();
+  });
+
+  it('encadena las opciones del banner de enlace de reservas', () => {
+    expect(BOOKING_LINK_TOUR_IDS).toEqual([
+      'booking-link-qr',
+      'booking-link-copy',
+      'booking-link-website',
+    ]);
+    expect(GUIDE_CATALOG['booking-link-qr'].nextId).toBe('booking-link-copy');
+    expect(GUIDE_CATALOG['booking-link-copy'].nextId).toBe(
+      'booking-link-website',
+    );
+    expect(GUIDE_CATALOG['booking-link-website'].nextId).toBeUndefined();
   });
 });

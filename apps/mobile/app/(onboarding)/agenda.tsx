@@ -71,15 +71,18 @@ export default function AgendaScreen() {
   const {
     date: notificationDate,
     guide,
+    guideRun,
     locationId: notificationLocationId,
     replay,
   } = useLocalSearchParams<{
     date?: string;
     guide?: string;
+    guideRun?: string;
     locationId?: string;
     replay?: string;
   }>();
   const { completeGuide, startGuide } = useGuides();
+  const startedRouteGuideRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
   const floatingBookingOffset = useRef(new Animated.ValueXY()).current;
   const floatingBookingOffsetRef = useRef({ x: 0, y: 0 });
@@ -199,9 +202,15 @@ export default function AgendaScreen() {
     [agendaLocations],
   );
   useEffect(() => {
-    if (guide !== 'first-booking') return;
-    startGuide('first-booking', { force: replay === '1' });
-  }, [guide, replay, startGuide]);
+    if (guide !== 'first-booking') {
+      startedRouteGuideRef.current = null;
+      return;
+    }
+    const routeGuideKey = `${guide}:${replay ?? '0'}:${guideRun ?? 'default'}`;
+    if (startedRouteGuideRef.current === routeGuideKey) return;
+    if (startGuide('first-booking', { force: replay === '1' }))
+      startedRouteGuideRef.current = routeGuideKey;
+  }, [guide, guideRun, replay, startGuide]);
   useEffect(() => {
     if (
       !notificationLocationId ||
@@ -952,6 +961,14 @@ export default function AgendaScreen() {
                                   .map((service) => service.serviceName)
                                   .join(', ') || 'Sin servicio'}
                               </Text>
+                              <Text
+                                numberOfLines={1}
+                                style={styles.appointmentMeta}
+                              >
+                                Con:{' '}
+                                {appointment.professionalName ??
+                                  'Profesional asignado'}
+                              </Text>
                               {showingAllLocations ? (
                                 <Text style={styles.appointmentMeta}>
                                   {locationNameById.get(
@@ -1071,6 +1088,13 @@ export default function AgendaScreen() {
                                     style={styles.weekAppointmentClient}
                                   >
                                     {appointment.clientName}
+                                  </Text>
+                                  <Text
+                                    numberOfLines={1}
+                                    style={styles.weekAppointmentProfessional}
+                                  >
+                                    {appointment.professionalName ??
+                                      'Profesional asignado'}
                                   </Text>
                                 </Pressable>
                               ))}

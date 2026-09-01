@@ -916,6 +916,7 @@ export interface AppointmentRecord {
   readonly locationId: string;
   readonly notes: string | null;
   readonly professionalMembershipId: string;
+  readonly professionalName: string | null;
   readonly paymentStatus: 'paid' | 'pending';
   readonly services: ReadonlyArray<{
     readonly durationMinutes: number;

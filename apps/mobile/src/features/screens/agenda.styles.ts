@@ -630,6 +630,11 @@ export const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
   },
+  weekAppointmentProfessional: {
+    color: appTheme.colors.textMuted,
+    fontSize: 10,
+    marginTop: 2,
+  },
   weekAppointmentTime: {
     color: appTheme.colors.accentDark,
     fontSize: 10,

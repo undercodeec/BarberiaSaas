@@ -69,8 +69,9 @@ export { ClientFormSheet } from '../../src/features/screens/clients-components';
 
 export default function ClientsScreen() {
   const { session } = useAuth();
-  const { guide, replay } = useLocalSearchParams<{
+  const { guide, guideRun, replay } = useLocalSearchParams<{
     guide?: string;
+    guideRun?: string;
     replay?: string;
   }>();
   const { completeGuide, startGuide } = useGuides();
@@ -79,10 +80,17 @@ export default function ClientsScreen() {
   const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const startedRouteGuideRef = useRef<string | null>(null);
   useEffect(() => {
-    if (guide !== 'add-client') return;
-    startGuide('add-client', { force: replay === '1' });
-  }, [guide, replay, startGuide]);
+    if (guide !== 'add-client') {
+      startedRouteGuideRef.current = null;
+      return;
+    }
+    const routeGuideKey = `${guide}:${replay ?? '0'}:${guideRun ?? 'default'}`;
+    if (startedRouteGuideRef.current === routeGuideKey) return;
+    if (startGuide('add-client', { force: replay === '1' }))
+      startedRouteGuideRef.current = routeGuideKey;
+  }, [guide, guideRun, replay, startGuide]);
   const floatingClientOffset = useRef(new Animated.ValueXY()).current;
   const floatingClientOffsetRef = useRef({ x: 0, y: 0 });
   const floatingClientPressRef = useRef<() => void>(() => undefined);

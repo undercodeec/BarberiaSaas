@@ -148,6 +148,7 @@ export function GuideProvider({ children }: PropsWithChildren) {
   const startGuide = useCallback(
     (id: GuideId, options?: StartGuideOptions) => {
       if ((!isReady && !options?.force) || !GUIDE_CATALOG[id]) return false;
+      if (activeGuideId === id) return true;
       if (activeGuideId && activeGuideId !== id && !options?.force)
         return false;
       if (!options?.force && !isGuideAvailable(id)) return false;

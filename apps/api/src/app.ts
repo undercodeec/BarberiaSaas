@@ -222,28 +222,29 @@ interface QueuedNotificationData {
 function appointmentNotificationCopy(
   kind: AppointmentNotificationKind,
   clientName: string,
+  professionalName: string,
   source: AppointmentSource,
 ) {
   if (kind === 'cancelled')
     return {
-      body: `${clientName} canceló una reserva online.`,
+      body: `${clientName} canceló una reserva online con ${professionalName}.`,
       title: 'Reserva cancelada',
       type: AppNotificationType.APPOINTMENT_CANCELLED,
     };
   if (kind === 'rescheduled')
     return {
-      body: `${clientName} reprogramó una reserva online.`,
+      body: `${clientName} reprogramó una reserva online con ${professionalName}.`,
       title: 'Reserva reprogramada',
       type: AppNotificationType.APPOINTMENT_RESCHEDULED,
     };
   if (source !== AppointmentSource.PUBLIC_BOOKING)
     return {
-      body: `Se agendó una cita para ${clientName}.`,
+      body: `Se agendó una cita para ${clientName} con ${professionalName}.`,
       title: 'Nueva cita agendada',
       type: AppNotificationType.APPOINTMENT_CREATED,
     };
   return {
-    body: `${clientName} confirmó una nueva reserva online.`,
+    body: `${clientName} confirmó una nueva reserva online con ${professionalName}.`,
     title: 'Nueva reserva online',
     type: AppNotificationType.APPOINTMENT_CREATED,
   };
@@ -436,6 +437,7 @@ function createQueuedAppointmentNotifier(
         const content = appointmentNotificationCopy(
           kind,
           appointment.clientName,
+          appointment.professional.user.fullName,
           appointment.source,
         );
         const startsAt = new Intl.DateTimeFormat('es-EC', {

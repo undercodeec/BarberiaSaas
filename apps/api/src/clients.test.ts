@@ -26,6 +26,7 @@ describe('protección de contacto de clientes', () => {
         locationId: 'location-id',
         notes: null,
         paymentStatus: AppointmentPaymentStatus.PENDING,
+        professional: { user: { fullName: 'Barbero asignado' } },
         professionalMembershipId: 'membership-id',
         source: AppointmentSource.MANUAL,
         startsAt: new Date('2026-08-26T16:00:00.000Z'),
@@ -36,6 +37,7 @@ describe('protección de contacto de clientes', () => {
 
     expect(appointment.clientEmail).toBeNull();
     expect(appointment.clientPhone).toBe('*********4567');
+    expect(appointment.professionalName).toBe('Barbero asignado');
     expect(JSON.stringify(appointment)).not.toContain('cliente@example.com');
     expect(JSON.stringify(appointment)).not.toContain('+593991234567');
   });

@@ -10,6 +10,12 @@ export const DASHBOARD_TOUR_IDS = [
   'dashboard-notifications',
 ] as const satisfies readonly GuideId[];
 
+export const BOOKING_LINK_TOUR_IDS = [
+  'booking-link-qr',
+  'booking-link-copy',
+  'booking-link-website',
+] as const satisfies readonly GuideId[];
+
 export const GUIDE_CATALOG: Record<GuideId, GuideDefinition> = {
   'add-client': {
     body: 'Agrega un cliente para guardar sus datos y agilizar sus próximas citas.',
