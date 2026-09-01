@@ -1184,6 +1184,7 @@ export function registerAgendaRoutes(
         updated,
         canReadFullClientContact(current.role),
       ),
+      paymentConfirmationRequested: requestsPaymentConfirmation,
     };
   });
 

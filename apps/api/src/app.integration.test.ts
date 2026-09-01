@@ -648,6 +648,9 @@ describeWithDatabase('API con PostgreSQL', () => {
     });
     expect(completed.statusCode, completed.body).toBe(200);
     expect(
+      completed.json<{ paymentConfirmationRequested: boolean }>(),
+    ).toMatchObject({ paymentConfirmationRequested: true });
+    expect(
       await database.cashMovement.count({ where: { appointmentId } }),
     ).toBe(0);
     expect(

@@ -279,7 +279,10 @@ export default function AgendaScreen() {
   });
   const completeAppointment = useMutation({
     mutationFn: (appointmentId: string) =>
-      requireApiClient().request<{ appointment: AppointmentRecord }>(
+      requireApiClient().request<{
+        appointment: AppointmentRecord;
+        paymentConfirmationRequested: boolean;
+      }>(
         `/v1/appointments/${appointmentId}/status`,
         { body: { status: 'completed' }, method: 'PATCH' },
       ),
@@ -288,11 +291,27 @@ export default function AgendaScreen() {
         'No pudimos completar la cita',
         error instanceof Error ? error.message : 'Inténtalo nuevamente.',
       ),
-    onSuccess: async () => {
+    onSuccess: async ({ paymentConfirmationRequested }) => {
       setSelectedAppointment(null);
       await queryClient.invalidateQueries({
         queryKey: tenantQueryPrefix('agenda-appointments'),
       });
+      const canConfirmPayment = ['manager', 'owner'].includes(
+        organizationQuery.data?.membership.role ?? '',
+      );
+      if (paymentConfirmationRequested && canConfirmPayment) {
+        Alert.alert(
+          'Servicio completado',
+          'El servicio ya cuenta en Agenda y estadísticas. Para registrarlo en Caja, abre una caja y confirma el cobro.',
+          [
+            { text: 'Más tarde' },
+            {
+              onPress: () => router.push('/payment-confirmations' as never),
+              text: 'Ir a cobros',
+            },
+          ],
+        );
+      }
     },
   });
   const manageAppointment = (appointment: AppointmentRecord) => {
