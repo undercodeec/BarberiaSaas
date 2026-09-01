@@ -13,7 +13,11 @@ import { StyleSheet, View } from 'react-native';
 import { useAuth } from '../../providers/AuthProvider';
 
 import { CoachmarkOverlay } from './CoachmarkOverlay';
-import { GUIDE_CATALOG, GUIDE_SNOOZE_MS } from './guide-catalog';
+import {
+  DASHBOARD_TOUR_IDS,
+  GUIDE_CATALOG,
+  GUIDE_SNOOZE_MS,
+} from './guide-catalog';
 import {
   createEmptyGuideStore,
   getGuideStore,
@@ -21,6 +25,7 @@ import {
 } from './guide-storage';
 import type {
   GuideAnchorRect,
+  GuideDefinition,
   GuideId,
   GuideProgress,
   GuideStore,
@@ -29,18 +34,33 @@ import type {
 type StartGuideOptions = { readonly force?: boolean };
 
 type GuideContextValue = {
+  readonly activeGuide: {
+    readonly definition: GuideDefinition;
+    readonly rect: GuideAnchorRect;
+  } | null;
+  readonly activeGuideId: GuideId | null;
+  readonly advanceGuide: () => void;
+  readonly anchorMeasurementTick: number;
   readonly completeGuide: (id: GuideId) => void;
   readonly dismissFirstSteps: () => void;
   readonly dismissGuide: (id: GuideId) => void;
   readonly enableFirstStepsInvitation: () => void;
   readonly firstStepsVisible: boolean;
   readonly isGuideAvailable: (id: GuideId) => boolean;
+  readonly refreshAnchors: () => void;
   readonly registerAnchor: (id: string, rect: GuideAnchorRect) => void;
+  readonly previousGuide: () => void;
   readonly startGuide: (id: GuideId, options?: StartGuideOptions) => boolean;
   readonly unregisterAnchor: (id: string) => void;
 };
 
 const GuideContext = createContext<GuideContextValue | null>(null);
+
+function isDashboardTourGuide(
+  id: GuideId,
+): id is (typeof DASHBOARD_TOUR_IDS)[number] {
+  return DASHBOARD_TOUR_IDS.includes(id as (typeof DASHBOARD_TOUR_IDS)[number]);
+}
 
 function isSnoozed(progress: GuideProgress | undefined, now: number) {
   return (
@@ -63,6 +83,7 @@ export function GuideProvider({ children }: PropsWithChildren) {
   const [isReady, setIsReady] = useState(false);
   const [activeGuideId, setActiveGuideId] = useState<GuideId | null>(null);
   const [anchors, setAnchors] = useState<Record<string, GuideAnchorRect>>({});
+  const [anchorMeasurementTick, setAnchorMeasurementTick] = useState(0);
   const [visibilityClock, setVisibilityClock] = useState(Date.now);
 
   useEffect(() => {
@@ -126,7 +147,9 @@ export function GuideProvider({ children }: PropsWithChildren) {
 
   const startGuide = useCallback(
     (id: GuideId, options?: StartGuideOptions) => {
-      if (!isReady || !GUIDE_CATALOG[id]) return false;
+      if ((!isReady && !options?.force) || !GUIDE_CATALOG[id]) return false;
+      if (activeGuideId && activeGuideId !== id && !options?.force)
+        return false;
       if (!options?.force && !isGuideAvailable(id)) return false;
       const now = new Date().toISOString();
       updateStore((current) => ({
@@ -139,7 +162,7 @@ export function GuideProvider({ children }: PropsWithChildren) {
       setActiveGuideId(id);
       return true;
     },
-    [isGuideAvailable, isReady, updateStore],
+    [activeGuideId, isGuideAvailable, isReady, updateStore],
   );
 
   const completeGuide = useCallback(
@@ -164,13 +187,53 @@ export function GuideProvider({ children }: PropsWithChildren) {
         ...current,
         guides: {
           ...current.guides,
-          [id]: { dismissedAt: now, lastShownAt: now, status: 'dismissed' },
+          ...(isDashboardTourGuide(id)
+            ? Object.fromEntries(
+                DASHBOARD_TOUR_IDS.map((guideId) => [
+                  guideId,
+                  { dismissedAt: now, lastShownAt: now, status: 'dismissed' },
+                ]),
+              )
+            : {
+                [id]: {
+                  dismissedAt: now,
+                  lastShownAt: now,
+                  status: 'dismissed',
+                },
+              }),
         },
       }));
       setActiveGuideId((current) => (current === id ? null : current));
     },
     [updateStore],
   );
+
+  const advanceGuide = useCallback(() => {
+    if (!activeGuideId) return;
+    const nextId = GUIDE_CATALOG[activeGuideId].nextId;
+    const now = new Date().toISOString();
+    updateStore((current) => ({
+      ...current,
+      guides: {
+        ...current.guides,
+        [activeGuideId]: {
+          completedAt: now,
+          lastShownAt: now,
+          status: 'completed',
+        },
+        ...(nextId
+          ? { [nextId]: { lastShownAt: now, status: 'active' as const } }
+          : {}),
+      },
+    }));
+    setActiveGuideId(nextId ?? null);
+  }, [activeGuideId, updateStore]);
+
+  const previousGuide = useCallback(() => {
+    if (!activeGuideId) return;
+    const previousId = GUIDE_CATALOG[activeGuideId].previousId;
+    if (previousId) setActiveGuideId(previousId);
+  }, [activeGuideId]);
 
   const enableFirstStepsInvitation = useCallback(() => {
     updateStore((current) => ({
@@ -212,6 +275,10 @@ export function GuideProvider({ children }: PropsWithChildren) {
     });
   }, []);
 
+  const refreshAnchors = useCallback(() => {
+    setAnchorMeasurementTick((current) => current + 1);
+  }, []);
+
   const firstStepsGuidesFinished = [
     'first-booking',
     'share-booking-link',
@@ -230,23 +297,41 @@ export function GuideProvider({ children }: PropsWithChildren) {
     : null;
   const value = useMemo<GuideContextValue>(
     () => ({
+      activeGuide:
+        activeDefinition && activeAnchor
+          ? { definition: activeDefinition, rect: activeAnchor }
+          : null,
+      activeGuideId,
+      advanceGuide,
+      activeAnchor,
+      activeDefinition,
+      anchorMeasurementTick,
       completeGuide,
       dismissFirstSteps,
       dismissGuide,
       enableFirstStepsInvitation,
       firstStepsVisible,
       isGuideAvailable,
+      previousGuide,
+      refreshAnchors,
       registerAnchor,
       startGuide,
       unregisterAnchor,
     }),
     [
+      activeAnchor,
+      activeDefinition,
+      activeGuideId,
+      advanceGuide,
+      anchorMeasurementTick,
       completeGuide,
       dismissFirstSteps,
       dismissGuide,
       enableFirstStepsInvitation,
       firstStepsVisible,
       isGuideAvailable,
+      previousGuide,
+      refreshAnchors,
       registerAnchor,
       startGuide,
       unregisterAnchor,
@@ -257,11 +342,25 @@ export function GuideProvider({ children }: PropsWithChildren) {
     <GuideContext.Provider value={value}>
       <View style={styles.root}>
         {children}
-        {activeDefinition && activeAnchor ? (
+        {activeDefinition &&
+        activeAnchor &&
+        !activeDefinition.id.startsWith('booking-link-') ? (
           <CoachmarkOverlay
             definition={activeDefinition}
             onDismiss={() => dismissGuide(activeDefinition.id)}
+            onNext={activeDefinition.nextId ? advanceGuide : undefined}
+            onPrevious={activeDefinition.previousId ? previousGuide : undefined}
             rect={activeAnchor}
+            step={
+              isDashboardTourGuide(activeDefinition.id)
+                ? DASHBOARD_TOUR_IDS.indexOf(activeDefinition.id) + 1
+                : null
+            }
+            totalSteps={
+              isDashboardTourGuide(activeDefinition.id)
+                ? DASHBOARD_TOUR_IDS.length
+                : null
+            }
           />
         ) : null}
       </View>

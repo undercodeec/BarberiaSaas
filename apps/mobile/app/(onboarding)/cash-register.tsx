@@ -27,6 +27,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { clampFloatingControl } from '../../src/features/screens/floating-control';
 
 import {
   BottomNavigation,
@@ -93,65 +94,43 @@ export default function CashRegisterScreen() {
   };
   const floatingSalePanResponder = useRef(
     PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (_, gesture) =>
+        Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
       onMoveShouldSetPanResponder: (_, gesture) =>
         Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
       onPanResponderMove: (_, gesture) => {
         const bounds = floatingSaleBoundsRef.current;
-        const buttonSize = 58;
-        const sideMargin = 16;
-        const navigationHeight = 72;
-        const navigationGap = 12;
-        const baseX = bounds.width - 24 - buttonSize;
-        const baseY = bounds.height - (bounds.bottomInset + 104) - buttonSize;
-        const minimumX = sideMargin - baseX;
-        const maximumX = bounds.width - sideMargin - buttonSize - baseX;
-        const minimumY = bounds.topInset + sideMargin - baseY;
-        const maximumY =
-          bounds.height -
-          bounds.bottomInset -
-          navigationHeight -
-          navigationGap -
-          buttonSize -
-          baseY;
-        const x = Math.min(
-          maximumX,
-          Math.max(minimumX, floatingSaleOffsetRef.current.x + gesture.dx),
+        floatingSaleOffset.setValue(
+          clampFloatingControl(
+            {
+              x: floatingSaleOffsetRef.current.x + gesture.dx,
+              y: floatingSaleOffsetRef.current.y + gesture.dy,
+            },
+            {
+              ...bounds,
+              baseX: bounds.width - 24 - 58,
+              baseY: bounds.height - (bounds.bottomInset + 104) - 58,
+              buttonHeight: 58,
+              buttonWidth: 58,
+            },
+          ),
         );
-        const y = Math.min(
-          maximumY,
-          Math.max(minimumY, floatingSaleOffsetRef.current.y + gesture.dy),
-        );
-        floatingSaleOffset.setValue({ x, y });
       },
       onPanResponderRelease: (_, gesture) => {
         const bounds = floatingSaleBoundsRef.current;
-        const buttonSize = 58;
-        const sideMargin = 16;
-        const navigationHeight = 72;
-        const navigationGap = 12;
-        const baseX = bounds.width - 24 - buttonSize;
-        const baseY = bounds.height - (bounds.bottomInset + 104) - buttonSize;
-        floatingSaleOffsetRef.current = {
-          x: Math.min(
-            bounds.width - sideMargin - buttonSize - baseX,
-            Math.max(
-              sideMargin - baseX,
-              floatingSaleOffsetRef.current.x + gesture.dx,
-            ),
-          ),
-          y: Math.min(
-            bounds.height -
-              bounds.bottomInset -
-              navigationHeight -
-              navigationGap -
-              buttonSize -
-              baseY,
-            Math.max(
-              bounds.topInset + sideMargin - baseY,
-              floatingSaleOffsetRef.current.y + gesture.dy,
-            ),
-          ),
-        };
+        floatingSaleOffsetRef.current = clampFloatingControl(
+          {
+            x: floatingSaleOffsetRef.current.x + gesture.dx,
+            y: floatingSaleOffsetRef.current.y + gesture.dy,
+          },
+          {
+            ...bounds,
+            baseX: bounds.width - 24 - 58,
+            baseY: bounds.height - (bounds.bottomInset + 104) - 58,
+            buttonHeight: 58,
+            buttonWidth: 58,
+          },
+        );
         floatingSaleOffset.setValue(floatingSaleOffsetRef.current);
       },
       onPanResponderTerminationRequest: () => false,

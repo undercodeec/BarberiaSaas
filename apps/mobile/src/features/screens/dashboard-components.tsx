@@ -43,6 +43,7 @@ import {
   type DashboardProgressProps,
   type DashboardOperation,
 } from './dashboard-model';
+import { useGuides } from '../guides/GuideProvider';
 
 export const PRIMARY_WAVE_PATH =
   'M0 10 Q25 0 50 10 T100 10 T150 10 T200 10 V20 H0 Z';
@@ -725,18 +726,22 @@ export const dashboardProgressStyles = StyleSheet.create({
 });
 
 export function QuickAction({
+  guideAnchorId,
   icon,
   label,
   locked = false,
   lockedPlan = 'Nava Local',
   onPress,
 }: {
+  readonly guideAnchorId?: string;
   readonly icon: React.ComponentProps<typeof Ionicons>['name'];
   readonly label: string;
   readonly locked?: boolean;
   readonly lockedPlan?: 'Nava Esencial' | 'Nava Local';
   readonly onPress: () => void;
 }) {
+  const quickActionRef = useRef<View>(null);
+  const { registerAnchor, unregisterAnchor } = useGuides();
   const shimmerTranslateX = useRef(new Animated.Value(-82)).current;
 
   useEffect(() => {
@@ -761,12 +766,31 @@ export function QuickAction({
     return () => shimmerAnimation.stop();
   }, [shimmerTranslateX]);
 
+  useEffect(
+    () => () => {
+      if (guideAnchorId) unregisterAnchor(guideAnchorId);
+    },
+    [guideAnchorId, unregisterAnchor],
+  );
+
+  const measureGuideAnchor = () => {
+    if (!guideAnchorId) return;
+    requestAnimationFrame(() => {
+      quickActionRef.current?.measureInWindow((x, y, width, height) => {
+        if (width > 0 && height > 0)
+          registerAnchor(guideAnchorId, { height, width, x, y });
+      });
+    });
+  };
+
   return (
     <Pressable
       accessibilityHint={locked ? `Disponible con ${lockedPlan}.` : undefined}
       accessibilityRole="button"
       accessibilityState={{ disabled: locked }}
       onPress={onPress}
+      onLayout={measureGuideAnchor}
+      ref={quickActionRef}
       style={[styles.quickAction, locked && { opacity: 0.46 }]}
     >
       <View style={styles.quickIcon}>

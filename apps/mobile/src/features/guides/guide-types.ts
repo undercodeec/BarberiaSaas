@@ -3,6 +3,14 @@ export const GUIDE_IDS = [
   'share-booking-link',
   'add-service',
   'add-client',
+  'dashboard-booking-link',
+  'dashboard-banners',
+  'dashboard-quick-actions',
+  'dashboard-summary',
+  'dashboard-notifications',
+  'booking-link-qr',
+  'booking-link-copy',
+  'booking-link-website',
 ] as const;
 
 export type GuideId = (typeof GUIDE_IDS)[number];
@@ -28,6 +36,8 @@ export type GuideStore = {
 export type GuideDefinition = {
   readonly body: string;
   readonly id: GuideId;
+  readonly nextId?: GuideId;
+  readonly previousId?: GuideId;
   readonly targetId: string;
   readonly title: string;
 };

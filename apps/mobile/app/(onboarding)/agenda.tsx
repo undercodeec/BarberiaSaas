@@ -34,6 +34,7 @@ import {
   useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
+import { clampFloatingControl } from '../../src/features/screens/floating-control';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import {
   agendaRange,
@@ -82,6 +83,8 @@ export default function AgendaScreen() {
   const queryClient = useQueryClient();
   const floatingBookingOffset = useRef(new Animated.ValueXY()).current;
   const floatingBookingOffsetRef = useRef({ x: 0, y: 0 });
+  const floatingBookingPressRef = useRef<() => void>(() => undefined);
+  const floatingBookingDraggedRef = useRef(false);
   const floatingBookingSizeRef = useRef({ height: 58, width: 150 });
   const floatingBookingBoundsRef = useRef({
     bottomInset: layout.bottomInset,
@@ -97,66 +100,60 @@ export default function AgendaScreen() {
   };
   const floatingBookingPanResponder = useRef(
     PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponderCapture: (_, gesture) =>
+        Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
       onMoveShouldSetPanResponder: (_, gesture) =>
         Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
       onPanResponderMove: (_, gesture) => {
+        if (Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4)
+          floatingBookingDraggedRef.current = true;
         const bounds = floatingBookingBoundsRef.current;
         const button = floatingBookingSizeRef.current;
-        const sideMargin = 16;
-        const navigationHeight = 72;
-        const navigationGap = 12;
-        const baseX = bounds.width - 20 - button.width;
-        const baseY = bounds.height - 94 - button.height;
-        const minimumX = sideMargin - baseX;
-        const maximumX = bounds.width - sideMargin - button.width - baseX;
-        const minimumY = bounds.topInset + sideMargin - baseY;
-        const maximumY =
-          bounds.height -
-          bounds.bottomInset -
-          navigationHeight -
-          navigationGap -
-          button.height -
-          baseY;
-        floatingBookingOffset.setValue({
-          x: Math.min(
-            maximumX,
-            Math.max(minimumX, floatingBookingOffsetRef.current.x + gesture.dx),
+        floatingBookingOffset.setValue(
+          clampFloatingControl(
+            {
+              x: floatingBookingOffsetRef.current.x + gesture.dx,
+              y: floatingBookingOffsetRef.current.y + gesture.dy,
+            },
+            {
+              ...bounds,
+              baseX: bounds.width - 20 - button.width,
+              baseY: bounds.height - 94 - button.height,
+              buttonHeight: button.height,
+              buttonWidth: button.width,
+            },
           ),
-          y: Math.min(
-            maximumY,
-            Math.max(minimumY, floatingBookingOffsetRef.current.y + gesture.dy),
-          ),
-        });
+        );
+      },
+      onPanResponderGrant: () => {
+        floatingBookingDraggedRef.current = false;
       },
       onPanResponderRelease: (_, gesture) => {
+        if (!floatingBookingDraggedRef.current) {
+          floatingBookingOffset.setValue(floatingBookingOffsetRef.current);
+          floatingBookingPressRef.current();
+          return;
+        }
         const bounds = floatingBookingBoundsRef.current;
         const button = floatingBookingSizeRef.current;
-        const sideMargin = 16;
-        const navigationHeight = 72;
-        const navigationGap = 12;
-        const baseX = bounds.width - 20 - button.width;
-        const baseY = bounds.height - 94 - button.height;
-        floatingBookingOffsetRef.current = {
-          x: Math.min(
-            bounds.width - sideMargin - button.width - baseX,
-            Math.max(
-              sideMargin - baseX,
-              floatingBookingOffsetRef.current.x + gesture.dx,
-            ),
-          ),
-          y: Math.min(
-            bounds.height -
-              bounds.bottomInset -
-              navigationHeight -
-              navigationGap -
-              button.height -
-              baseY,
-            Math.max(
-              bounds.topInset + sideMargin - baseY,
-              floatingBookingOffsetRef.current.y + gesture.dy,
-            ),
-          ),
-        };
+        floatingBookingOffsetRef.current = clampFloatingControl(
+          {
+            x: floatingBookingOffsetRef.current.x + gesture.dx,
+            y: floatingBookingOffsetRef.current.y + gesture.dy,
+          },
+          {
+            ...bounds,
+            baseX: bounds.width - 20 - button.width,
+            baseY: bounds.height - 94 - button.height,
+            buttonHeight: button.height,
+            buttonWidth: button.width,
+          },
+        );
+        floatingBookingOffset.setValue(floatingBookingOffsetRef.current);
+      },
+      onPanResponderTerminate: () => {
         floatingBookingOffset.setValue(floatingBookingOffsetRef.current);
       },
       onPanResponderTerminationRequest: () => false,
@@ -701,6 +698,19 @@ export default function AgendaScreen() {
   ]);
   const moveCalendarPeriod = (offset: number) => {
     moveSelectedDay(offset);
+  };
+
+  floatingBookingPressRef.current = () => {
+    completeGuide('first-booking');
+    if (
+      clientsQuery.isLoading ||
+      clientsQuery.isError ||
+      !clientsQuery.data?.clients.length
+    ) {
+      router.push('/clients');
+      return;
+    }
+    router.push('/new-booking');
   };
 
   if (!session) return <Redirect href="/(auth)/login" />;
@@ -1697,39 +1707,28 @@ export default function AgendaScreen() {
         sheetMaxHeight={layout.sheetMaxHeight}
         visible={manualPaymentSheetOpen}
       /> */}
-      <GuideAnchor id="agenda-new-booking">
-        <Animated.View
-          {...floatingBookingPanResponder.panHandlers}
-          onLayout={({ nativeEvent }) => {
-            floatingBookingSizeRef.current = nativeEvent.layout;
-          }}
-          style={[
-            styles.floatingButton,
-            { transform: floatingBookingOffset.getTranslateTransform() },
-          ]}
-        >
+      <Animated.View
+        {...floatingBookingPanResponder.panHandlers}
+        onLayout={({ nativeEvent }) => {
+          floatingBookingSizeRef.current = nativeEvent.layout;
+        }}
+        style={[
+          styles.floatingButton,
+          { transform: floatingBookingOffset.getTranslateTransform() },
+        ]}
+      >
+        <GuideAnchor id="agenda-new-booking">
           <Pressable
             accessibilityLabel="Crear cita"
             accessibilityRole="button"
-            onPress={() => {
-              completeGuide('first-booking');
-              if (
-                clientsQuery.isLoading ||
-                clientsQuery.isError ||
-                !clientsQuery.data?.clients.length
-              ) {
-                router.push('/clients');
-                return;
-              }
-              router.push('/new-booking');
-            }}
+            onPress={() => floatingBookingPressRef.current()}
             style={styles.floatingButtonContent}
           >
             <Ionicons color="#ffffff" name="add" size={30} />
             <Text style={styles.floatingLabel}>Nueva cita</Text>
           </Pressable>
-        </Animated.View>
-      </GuideAnchor>
+        </GuideAnchor>
+      </Animated.View>
 
       <BottomNavigation active="agenda" />
     </SafeAreaView>

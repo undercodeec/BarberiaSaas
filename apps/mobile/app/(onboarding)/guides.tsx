@@ -8,8 +8,17 @@ import {
   appTheme,
   BottomNavigation,
 } from '../../src/components/BottomNavigation';
+import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
+import { useGuides } from '../../src/features/guides/GuideProvider';
 
 const guides = [
+  {
+    description: 'Recorre los accesos principales del panel de tu negocio.',
+    icon: 'grid-outline' as const,
+    id: 'dashboard-tour',
+    route: '/dashboard',
+    title: 'Conocer mi dashboard',
+  },
   {
     description: 'Te mostramos dónde iniciar una cita y qué ocurre después.',
     icon: 'calendar-outline' as const,
@@ -42,6 +51,14 @@ const guides = [
 
 export default function GuidesScreen() {
   const router = useRouter();
+  const { startGuide } = useGuides();
+  const organizationQuery = useCurrentOrganization();
+  const canAccessDashboardTour = ['manager', 'owner'].includes(
+    organizationQuery.data?.membership.role ?? '',
+  );
+  const visibleGuides = guides.filter(
+    (guide) => guide.id !== 'dashboard-tour' || canAccessDashboardTour,
+  );
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
@@ -67,18 +84,20 @@ export default function GuidesScreen() {
           Elige lo que quieres aprender. Puedes repetir una guía cuando quieras.
         </Text>
         <View style={styles.list}>
-          {guides.map((guide) => (
+          {visibleGuides.map((guide) => (
             <Pressable
               accessibilityHint="Abre la pantalla y destaca la acción indicada"
               accessibilityLabel={`Ver guía: ${guide.title}`}
               accessibilityRole="button"
               key={guide.id}
-              onPress={() =>
+              onPress={() => {
+                if (guide.id === 'dashboard-tour')
+                  startGuide('dashboard-booking-link', { force: true });
                 router.push({
                   params: { guide: guide.id, replay: '1' },
                   pathname: guide.route,
-                })
-              }
+                });
+              }}
               style={styles.card}
             >
               <View style={styles.iconShell}>

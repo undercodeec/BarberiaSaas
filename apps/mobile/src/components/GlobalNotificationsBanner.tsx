@@ -25,6 +25,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { appTheme, goldButtonShadow, goldShadow } from './BottomNavigation';
 import { useCurrentOrganization } from '../features/organization/useCurrentOrganization';
+import { GuideAnchor } from '../features/guides/GuideAnchor';
+import { useGuides } from '../features/guides/GuideProvider';
 import { requireApiClient } from '../lib/api';
 import { notificationDestination } from '../lib/notification-navigation';
 import { tenantQueryPrefix } from '../lib/query-keys';
@@ -119,6 +121,7 @@ export function GlobalNotificationsBanner() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const organizationQuery = useCurrentOrganization();
+  const { activeGuideId, advanceGuide } = useGuides();
   const [isOpen, setIsOpen] = useState(false);
   const [isTriggerPositionReady, setIsTriggerPositionReady] = useState(false);
   const [translateX] = useState(() => new Animated.Value(-520));
@@ -298,26 +301,37 @@ export function GlobalNotificationsBanner() {
           {
             opacity: isTriggerPositionReady ? 1 : 0,
             transform: triggerPosition.getTranslateTransform(),
+            zIndex: activeGuideId === 'dashboard-notifications' ? 2_001 : 9_999,
           },
         ]}
       >
-        <Pressable
-          accessibilityHint="Mantén presionado y arrastra para cambiar su posición"
-          accessibilityLabel={
-            unread ? `Notificaciones, ${unread} sin leer` : 'Notificaciones'
-          }
-          accessibilityRole="button"
-          onPress={openBanner}
-          style={styles.trigger}
-        >
-          <Ionicons color="#B47D17" name="notifications-outline" size={24} />
-          <NotificationBorderOrbit />
-          {unread ? (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
-            </View>
-          ) : null}
-        </Pressable>
+        <GuideAnchor id="dashboard-notifications" style={styles.triggerAnchor}>
+          <Pressable
+            accessibilityHint="Mantén presionado y arrastra para cambiar su posición"
+            accessibilityLabel={
+              unread ? `Notificaciones, ${unread} sin leer` : 'Notificaciones'
+            }
+            accessibilityRole="button"
+            onPress={() => {
+              if (activeGuideId === 'dashboard-notifications') {
+                advanceGuide();
+                return;
+              }
+              openBanner();
+            }}
+            style={styles.trigger}
+          >
+            <Ionicons color="#B47D17" name="notifications-outline" size={24} />
+            <NotificationBorderOrbit />
+            {unread ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {unread > 9 ? '9+' : unread}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+        </GuideAnchor>
       </Animated.View>
       <Modal
         animationType="none"
@@ -568,6 +582,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     width: 52,
   },
+  triggerAnchor: { flex: 1, height: TRIGGER_SIZE, width: TRIGGER_SIZE },
   triggerPosition: {
     height: TRIGGER_SIZE,
     left: 0,

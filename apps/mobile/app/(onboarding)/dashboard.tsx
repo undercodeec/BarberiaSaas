@@ -21,6 +21,7 @@ import {
   useRouter,
 } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import type { ScrollView as NativeScrollView } from 'react-native';
 import { Image, Linking, Platform, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
@@ -43,9 +44,9 @@ import { useCurrentOrganization } from '../../src/features/organization/useCurre
 import { useAuth } from '../../src/providers/AuthProvider';
 import { accountQueryKey } from '../../src/lib/query-keys';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
-import { FirstStepsCard } from '../../src/features/guides/FirstStepsCard';
 import { GuideAnchor } from '../../src/features/guides/GuideAnchor';
 import { useGuides } from '../../src/features/guides/GuideProvider';
+import { shouldStartDashboardTour } from '../../src/features/guides/dashboard-tour';
 
 import {
   DASHBOARD_BANNER_DELAY_MS,
@@ -89,8 +90,16 @@ export default function DashboardScreen() {
   const layout = useNativeLayoutMetrics();
   const { session, user } = useAuth();
   const tenant = useTenantScope();
-  const { completeGuide, dismissFirstSteps, firstStepsVisible, startGuide } =
-    useGuides();
+  const {
+    activeGuideId,
+    advanceGuide,
+    completeGuide,
+    firstStepsVisible,
+    refreshAnchors,
+    startGuide,
+  } = useGuides();
+  const isDashboardTourActive =
+    activeGuideId?.startsWith('dashboard-') ?? false;
   const accountQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -178,6 +187,10 @@ export default function DashboardScreen() {
   const [isBusinessCategoryPromptOpen, setIsBusinessCategoryPromptOpen] =
     useState(false);
   const [isDashboardFocused, setIsDashboardFocused] = useState(false);
+  const dashboardScrollRef = useRef<NativeScrollView | null>(null);
+  const startedRouteGuideRef = useRef<string | null>(null);
+  const [dashboardGuideTargetOffsets, setDashboardGuideTargetOffsets] =
+    useState<Record<string, number>>({});
   const [extraQuickActionIds, setExtraQuickActionIds] = useState<
     ExtraQuickActionId[]
   >([]);
@@ -261,6 +274,66 @@ export default function DashboardScreen() {
       return () => setIsDashboardFocused(false);
     }, []),
   );
+
+  useEffect(() => {
+    if (!activeGuideId?.startsWith('dashboard-')) return;
+    const targetOffset = dashboardGuideTargetOffsets[activeGuideId];
+    if (targetOffset === undefined) return;
+    const timer = setTimeout(() => {
+      dashboardScrollRef.current?.scrollTo({
+        animated: true,
+        y: Math.max(0, targetOffset - 120),
+      });
+    }, 0);
+    const refreshTimer = setTimeout(refreshAnchors, 420);
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(refreshTimer);
+    };
+  }, [activeGuideId, dashboardGuideTargetOffsets, refreshAnchors]);
+
+  useEffect(() => {
+    const hasBlockingOverlay =
+      isNotificationSheetOpen ||
+      isWelcomeSurveyOpen ||
+      isBusinessCategoryPromptOpen ||
+      isLocationBannerOpen ||
+      notificationFlowState !== 'completed' ||
+      needsLocationBanner !== false ||
+      isBookingSheetOpen ||
+      isQuickActionsPickerOpen ||
+      isSubscriptionCelebrationVisible;
+    if (
+      !isDashboardFocused ||
+      !shouldStartDashboardTour({
+        activeGuideId,
+        canAccessFinancialReports,
+        firstStepsVisible,
+        hasBlockingOverlay,
+      })
+    )
+      return;
+    const timer = setTimeout(
+      () => startGuide('dashboard-booking-link'),
+      DASHBOARD_BANNER_DELAY_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [
+    activeGuideId,
+    canAccessFinancialReports,
+    firstStepsVisible,
+    isBusinessCategoryPromptOpen,
+    isBookingSheetOpen,
+    isDashboardFocused,
+    isLocationBannerOpen,
+    isNotificationSheetOpen,
+    isQuickActionsPickerOpen,
+    isSubscriptionCelebrationVisible,
+    isWelcomeSurveyOpen,
+    needsLocationBanner,
+    notificationFlowState,
+    startGuide,
+  ]);
 
   const showSubscriptionCelebration = useCallback((planName: string) => {
     setSubscriptionCelebrationPlanName(planName);
@@ -354,6 +427,13 @@ export default function DashboardScreen() {
       };
     }
 
+    if (isDashboardTourActive) {
+      setNotificationFlowState('completed');
+      return () => {
+        isMounted = false;
+      };
+    }
+
     // Expo Web can report the browser permission as undetermined after a
     // refresh or sign-out. Push registration is native-only, so do not start
     // the permission flow in the web build.
@@ -413,7 +493,7 @@ export default function DashboardScreen() {
       isMounted = false;
       if (notificationPromptTimer) clearTimeout(notificationPromptTimer);
     };
-  }, [isDashboardFocused, session, user]);
+  }, [isDashboardFocused, isDashboardTourActive, session, user]);
 
   useEffect(() => {
     let isMounted = true;
@@ -482,23 +562,65 @@ export default function DashboardScreen() {
     if (
       notificationFlowState === 'completed' &&
       needsWelcomeSurvey &&
-      !needsLocationBanner
+      !needsLocationBanner &&
+      !isDashboardTourActive
     ) {
       setIsWelcomeSurveyOpen(true);
     }
-  }, [needsLocationBanner, needsWelcomeSurvey, notificationFlowState]);
+  }, [
+    isDashboardTourActive,
+    needsLocationBanner,
+    needsWelcomeSurvey,
+    notificationFlowState,
+  ]);
 
   useEffect(() => {
+    if (!guide) {
+      startedRouteGuideRef.current = null;
+      return;
+    }
+    const routeGuideKey = `${guide}:${replay ?? '0'}`;
+    if (startedRouteGuideRef.current === routeGuideKey) return;
+
     if (
-      guide !== 'share-booking-link' ||
+      guide === 'dashboard-tour' &&
+      replay === '1' &&
+      canAccessFinancialReports
+    ) {
+      setIsNotificationSheetOpen(false);
+      setIsWelcomeSurveyOpen(false);
+      setIsBusinessCategoryPromptOpen(false);
+      setIsLocationBannerOpen(false);
+      setIsBookingSheetOpen(false);
+      setIsQuickActionsPickerOpen(false);
+      const started = startGuide('dashboard-booking-link', { force: true });
+      if (started) startedRouteGuideRef.current = routeGuideKey;
+      return;
+    }
+    if (
+      (guide !== 'share-booking-link' && guide !== 'dashboard-tour') ||
+      (guide === 'dashboard-tour' && !canAccessFinancialReports) ||
+      (activeGuideId !== null &&
+        activeGuideId !==
+          (guide === 'dashboard-tour'
+            ? 'dashboard-booking-link'
+            : 'share-booking-link')) ||
       isNotificationSheetOpen ||
       isWelcomeSurveyOpen ||
       isBusinessCategoryPromptOpen ||
       notificationFlowState !== 'completed'
     )
       return;
-    startGuide('share-booking-link', { force: replay === '1' });
+    const started = startGuide(
+      guide === 'dashboard-tour'
+        ? 'dashboard-booking-link'
+        : 'share-booking-link',
+      { force: replay === '1' },
+    );
+    if (started) startedRouteGuideRef.current = routeGuideKey;
   }, [
+    activeGuideId,
+    canAccessFinancialReports,
     guide,
     isBusinessCategoryPromptOpen,
     isNotificationSheetOpen,
@@ -536,6 +658,7 @@ export default function DashboardScreen() {
       notificationFlowState === 'completed' &&
       !isNotificationSheetOpen &&
       !isWelcomeSurveyOpen &&
+      !isDashboardTourActive &&
       needsLocationBanner
     ) {
       locationBannerTimer = setTimeout(
@@ -549,6 +672,7 @@ export default function DashboardScreen() {
     };
   }, [
     isDashboardFocused,
+    isDashboardTourActive,
     notificationFlowState,
     isNotificationSheetOpen,
     isWelcomeSurveyOpen,
@@ -659,6 +783,16 @@ export default function DashboardScreen() {
     setNeedsLocationBanner(false);
   };
 
+  const saveDashboardGuideTargetOffset =
+    (id: string) => (layout: { readonly y: number }) => {
+      setDashboardGuideTargetOffsets((current) =>
+        current[id] === layout.y ? current : { ...current, [id]: layout.y },
+      );
+    };
+  const advanceFromDashboardTarget = (id: string) => {
+    if (activeGuideId === id) advanceGuide();
+  };
+
   if (!session) return <Redirect href="/(auth)/login" />;
   return (
     <SafeAreaView edges={['left', 'right', 'top']} style={styles.screen}>
@@ -669,6 +803,7 @@ export default function DashboardScreen() {
           styles.content,
           { paddingBottom: layout.bottomNavigationContentPadding },
         ]}
+        ref={dashboardScrollRef}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.topRow}>
@@ -679,7 +814,11 @@ export default function DashboardScreen() {
             </Text>
           </View>
         </View>
-        <View style={styles.salesCard}>
+        <GuideAnchor
+          id="dashboard-banners"
+          onAnchorLayout={saveDashboardGuideTargetOffset('dashboard-banners')}
+          style={styles.salesCard}
+        >
           <View style={styles.salesHeader}>
             <View style={styles.salesTitleColumn}>
               <Text numberOfLines={1} style={styles.salesTitle}>
@@ -692,14 +831,25 @@ export default function DashboardScreen() {
               ) : null}
             </View>
             {canAccessFinancialReports ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push('/business-summary')}
-                style={styles.summaryButton}
+              <GuideAnchor
+                id="dashboard-summary"
+                onAnchorLayout={saveDashboardGuideTargetOffset(
+                  'dashboard-summary',
+                )}
               >
-                <Text style={styles.summaryLabel}>Resumen</Text>
-                <Ionicons color="#B47D17" name="bar-chart-outline" size={22} />
-              </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => router.push('/business-summary')}
+                  style={styles.summaryButton}
+                >
+                  <Text style={styles.summaryLabel}>Resumen</Text>
+                  <Ionicons
+                    color="#B47D17"
+                    name="bar-chart-outline"
+                    size={22}
+                  />
+                </Pressable>
+              </GuideAnchor>
             ) : null}
           </View>
           <View style={styles.salesMeta}>
@@ -709,7 +859,7 @@ export default function DashboardScreen() {
             caption={planProgress.caption}
             value={planProgress.percentage}
           />
-        </View>
+        </GuideAnchor>
 
         {needsBusinessCategoryPrompt ? (
           <View style={styles.businessCategoryPrompt}>
@@ -754,20 +904,13 @@ export default function DashboardScreen() {
           </View>
         ) : null}
 
-        {firstStepsVisible && !needsBusinessCategoryPrompt ? (
-          <FirstStepsCard
-            onDismiss={dismissFirstSteps}
-            onStartBooking={() =>
-              router.push({
-                params: { guide: 'first-booking' },
-                pathname: '/agenda',
-              })
-            }
-            onStartShareLink={() => startGuide('share-booking-link')}
-          />
-        ) : null}
-
-        <View style={styles.quickActions}>
+        <GuideAnchor
+          id="dashboard-quick-actions"
+          onAnchorLayout={saveDashboardGuideTargetOffset(
+            'dashboard-quick-actions',
+          )}
+          style={styles.quickActions}
+        >
           <QuickAction
             icon="add-circle-outline"
             label="Nueva cita"
@@ -792,7 +935,7 @@ export default function DashboardScreen() {
             label="Nava Wallet"
             onPress={() => router.push('/wallet')}
           />
-        </View>
+        </GuideAnchor>
         {extraQuickActions.length ? (
           <View style={styles.extraQuickActions}>
             {extraQuickActions.map((action) => (
@@ -905,7 +1048,14 @@ export default function DashboardScreen() {
             </View>
           </View>
         ) : null}
-        <View style={styles.reservationCard}>
+        <View
+          onLayout={(event) =>
+            saveDashboardGuideTargetOffset('dashboard-booking-link')(
+              event.nativeEvent.layout,
+            )
+          }
+          style={styles.reservationCard}
+        >
           <View style={styles.reservationTopRow}>
             <View style={styles.reservationCopyColumn}>
               <Text style={styles.cardTitle}>Recibe reservas</Text>
@@ -928,6 +1078,7 @@ export default function DashboardScreen() {
                   <Pressable
                     accessibilityRole="button"
                     onPress={() => {
+                      advanceFromDashboardTarget('dashboard-booking-link');
                       completeGuide('share-booking-link');
                       setIsBookingSheetOpen(true);
                     }}

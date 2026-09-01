@@ -17,6 +17,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { appTheme, goldButtonShadow } from './BottomNavigation';
 import { LocalQrCode } from './LocalQrCode';
+import { CoachmarkOverlay } from '../features/guides/CoachmarkOverlay';
+import { GuideAnchor } from '../features/guides/GuideAnchor';
+import { useGuides } from '../features/guides/GuideProvider';
 
 type BookingLinkSheetProps = {
   readonly onClose: () => void;
@@ -30,6 +33,8 @@ export function BookingLinkSheet({
   visible,
 }: BookingLinkSheetProps) {
   const insets = useSafeAreaInsets();
+  const { activeGuide, advanceGuide, dismissGuide, previousGuide } =
+    useGuides();
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const translateY = useRef(new Animated.Value(540)).current;
@@ -118,83 +123,123 @@ export function BookingLinkSheet({
             </View>
           ) : null}
 
-          <Pressable
-            accessibilityRole="button"
-            disabled={!isBookingUrlReady}
-            onPress={() => setShowQr((current) => !current)}
-            style={[styles.option, !isBookingUrlReady && styles.optionDisabled]}
-          >
-            <View style={styles.iconCircle}>
+          <GuideAnchor id="booking-link-qr">
+            <Pressable
+              accessibilityRole="button"
+              disabled={!isBookingUrlReady}
+              onPress={() => {
+                setShowQr((current) => !current);
+                if (activeGuide?.definition.id === 'booking-link-qr')
+                  advanceGuide();
+              }}
+              style={[
+                styles.option,
+                !isBookingUrlReady && styles.optionDisabled,
+              ]}
+            >
+              <View style={styles.iconCircle}>
+                <Ionicons
+                  color={appTheme.colors.white}
+                  name="qr-code-outline"
+                  size={24}
+                />
+              </View>
+              <View style={styles.optionCopy}>
+                <Text style={styles.optionTitle}>Código QR</Text>
+                <Text style={styles.optionDescription}>
+                  {showQr
+                    ? 'Oculta el código cuando termines de usarlo.'
+                    : 'Muéstralo en tu local sin enviar el enlace a terceros.'}
+                </Text>
+              </View>
               <Ionicons
-                color={appTheme.colors.white}
-                name="qr-code-outline"
-                size={24}
+                color={appTheme.colors.accentDark}
+                name={showQr ? 'chevron-up' : 'chevron-down'}
+                size={20}
               />
-            </View>
-            <View style={styles.optionCopy}>
-              <Text style={styles.optionTitle}>Código QR</Text>
-              <Text style={styles.optionDescription}>
-                {showQr
-                  ? 'Oculta el código cuando termines de usarlo.'
-                  : 'Muéstralo en tu local sin enviar el enlace a terceros.'}
-              </Text>
-            </View>
-            <Ionicons
-              color={appTheme.colors.accentDark}
-              name={showQr ? 'chevron-up' : 'chevron-down'}
-              size={20}
-            />
-          </Pressable>
+            </Pressable>
+          </GuideAnchor>
 
-          <Pressable
-            accessibilityRole="button"
-            disabled={!isBookingUrlReady}
-            onPress={() => void copyLink()}
-            style={[styles.option, !isBookingUrlReady && styles.optionDisabled]}
-          >
-            <View style={styles.iconCircle}>
-              <Ionicons
-                color={appTheme.colors.white}
-                name="copy-outline"
-                size={23}
-              />
-            </View>
-            <View style={styles.optionCopy}>
-              <Text style={styles.optionTitle}>
-                {copied ? 'Enlace copiado' : 'Copiar enlace'}
-              </Text>
-              <Text style={styles.optionDescription}>
-                Pégalo donde quieras compartirlo.
-              </Text>
-            </View>
-          </Pressable>
+          <GuideAnchor id="booking-link-copy">
+            <Pressable
+              accessibilityRole="button"
+              disabled={!isBookingUrlReady}
+              onPress={() => {
+                void copyLink();
+                if (activeGuide?.definition.id === 'booking-link-copy')
+                  advanceGuide();
+              }}
+              style={[
+                styles.option,
+                !isBookingUrlReady && styles.optionDisabled,
+              ]}
+            >
+              <View style={styles.iconCircle}>
+                <Ionicons
+                  color={appTheme.colors.white}
+                  name="copy-outline"
+                  size={23}
+                />
+              </View>
+              <View style={styles.optionCopy}>
+                <Text style={styles.optionTitle}>
+                  {copied ? 'Enlace copiado' : 'Copiar enlace'}
+                </Text>
+                <Text style={styles.optionDescription}>
+                  Pégalo donde quieras compartirlo.
+                </Text>
+              </View>
+            </Pressable>
+          </GuideAnchor>
 
-          <Pressable
-            accessibilityRole="button"
-            disabled={!isBookingUrlReady}
-            onPress={() => void openUrl(url, 'ver tu website')}
-            style={[styles.option, !isBookingUrlReady && styles.optionDisabled]}
-          >
-            <View style={styles.iconCircle}>
+          <GuideAnchor id="booking-link-website">
+            <Pressable
+              accessibilityRole="button"
+              disabled={!isBookingUrlReady}
+              onPress={() => {
+                if (activeGuide?.definition.id === 'booking-link-website')
+                  advanceGuide();
+                void openUrl(url, 'ver tu website');
+              }}
+              style={[
+                styles.option,
+                !isBookingUrlReady && styles.optionDisabled,
+              ]}
+            >
+              <View style={styles.iconCircle}>
+                <Ionicons
+                  color={appTheme.colors.white}
+                  name="globe-outline"
+                  size={24}
+                />
+              </View>
+              <View style={styles.optionCopy}>
+                <Text style={styles.optionTitle}>Ver mi website</Text>
+                <Text style={styles.optionDescription}>
+                  Abre la página pública de tus reservas.
+                </Text>
+              </View>
               <Ionicons
-                color={appTheme.colors.white}
-                name="globe-outline"
-                size={24}
+                color={appTheme.colors.accentDark}
+                name="open-outline"
+                size={20}
               />
-            </View>
-            <View style={styles.optionCopy}>
-              <Text style={styles.optionTitle}>Ver mi website</Text>
-              <Text style={styles.optionDescription}>
-                Abre la página pública de tus reservas.
-              </Text>
-            </View>
-            <Ionicons
-              color={appTheme.colors.accentDark}
-              name="open-outline"
-              size={20}
-            />
-          </Pressable>
+            </Pressable>
+          </GuideAnchor>
         </Animated.View>
+        {activeGuide?.definition.id.startsWith('booking-link-') ? (
+          <CoachmarkOverlay
+            definition={activeGuide.definition}
+            onDismiss={() => dismissGuide(activeGuide.definition.id)}
+            onNext={activeGuide.definition.nextId ? advanceGuide : undefined}
+            onPrevious={
+              activeGuide.definition.previousId ? previousGuide : undefined
+            }
+            rect={activeGuide.rect}
+            step={null}
+            totalSteps={null}
+          />
+        ) : null}
       </View>
     </Modal>
   );

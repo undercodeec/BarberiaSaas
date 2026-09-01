@@ -33,6 +33,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { clampFloatingControl } from '../../src/features/screens/floating-control';
 
 import {
   BottomNavigation,
@@ -84,6 +85,8 @@ export default function ClientsScreen() {
   }, [guide, replay, startGuide]);
   const floatingClientOffset = useRef(new Animated.ValueXY()).current;
   const floatingClientOffsetRef = useRef({ x: 0, y: 0 });
+  const floatingClientPressRef = useRef<() => void>(() => undefined);
+  const floatingClientDraggedRef = useRef(false);
   const floatingClientBoundsRef = useRef({
     bottomInset: layout.bottomInset,
     height: screenHeight,
@@ -98,66 +101,58 @@ export default function ClientsScreen() {
   };
   const floatingClientPanResponder = useRef(
     PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponderCapture: (_, gesture) =>
+        Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
       onMoveShouldSetPanResponder: (_, gesture) =>
         Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
       onPanResponderMove: (_, gesture) => {
+        if (Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4)
+          floatingClientDraggedRef.current = true;
         const bounds = floatingClientBoundsRef.current;
-        const buttonSize = 58;
-        const sideMargin = 16;
-        const navigationHeight = 72;
-        const navigationGap = 12;
-        const baseX = bounds.width - 24 - buttonSize;
-        const baseY = bounds.height - (bounds.bottomInset + 84) - buttonSize;
-        const minimumX = sideMargin - baseX;
-        const maximumX = bounds.width - sideMargin - buttonSize - baseX;
-        const minimumY = bounds.topInset + sideMargin - baseY;
-        const maximumY =
-          bounds.height -
-          bounds.bottomInset -
-          navigationHeight -
-          navigationGap -
-          buttonSize -
-          baseY;
-        floatingClientOffset.setValue({
-          x: Math.min(
-            maximumX,
-            Math.max(minimumX, floatingClientOffsetRef.current.x + gesture.dx),
+        floatingClientOffset.setValue(
+          clampFloatingControl(
+            {
+              x: floatingClientOffsetRef.current.x + gesture.dx,
+              y: floatingClientOffsetRef.current.y + gesture.dy,
+            },
+            {
+              ...bounds,
+              baseX: bounds.width - 24 - 58,
+              baseY: bounds.height - (bounds.bottomInset + 84) - 58,
+              buttonHeight: 58,
+              buttonWidth: 58,
+            },
           ),
-          y: Math.min(
-            maximumY,
-            Math.max(minimumY, floatingClientOffsetRef.current.y + gesture.dy),
-          ),
-        });
+        );
+      },
+      onPanResponderGrant: () => {
+        floatingClientDraggedRef.current = false;
       },
       onPanResponderRelease: (_, gesture) => {
+        if (!floatingClientDraggedRef.current) {
+          floatingClientOffset.setValue(floatingClientOffsetRef.current);
+          floatingClientPressRef.current();
+          return;
+        }
         const bounds = floatingClientBoundsRef.current;
-        const buttonSize = 58;
-        const sideMargin = 16;
-        const navigationHeight = 72;
-        const navigationGap = 12;
-        const baseX = bounds.width - 24 - buttonSize;
-        const baseY = bounds.height - (bounds.bottomInset + 84) - buttonSize;
-        floatingClientOffsetRef.current = {
-          x: Math.min(
-            bounds.width - sideMargin - buttonSize - baseX,
-            Math.max(
-              sideMargin - baseX,
-              floatingClientOffsetRef.current.x + gesture.dx,
-            ),
-          ),
-          y: Math.min(
-            bounds.height -
-              bounds.bottomInset -
-              navigationHeight -
-              navigationGap -
-              buttonSize -
-              baseY,
-            Math.max(
-              bounds.topInset + sideMargin - baseY,
-              floatingClientOffsetRef.current.y + gesture.dy,
-            ),
-          ),
-        };
+        floatingClientOffsetRef.current = clampFloatingControl(
+          {
+            x: floatingClientOffsetRef.current.x + gesture.dx,
+            y: floatingClientOffsetRef.current.y + gesture.dy,
+          },
+          {
+            ...bounds,
+            baseX: bounds.width - 24 - 58,
+            baseY: bounds.height - (bounds.bottomInset + 84) - 58,
+            buttonHeight: 58,
+            buttonWidth: 58,
+          },
+        );
+        floatingClientOffset.setValue(floatingClientOffsetRef.current);
+      },
+      onPanResponderTerminate: () => {
         floatingClientOffset.setValue(floatingClientOffsetRef.current);
       },
       onPanResponderTerminationRequest: () => false,
@@ -625,6 +620,10 @@ export default function ClientsScreen() {
       ],
     );
   }, [deleteSelectedClients, openDialog, selectedClients.length]);
+  floatingClientPressRef.current = () => {
+    if (!isClientLimitReached) setIsCreateOpen(true);
+  };
+
   if (!session) return <Redirect href="/(auth)/login" />;
 
   return (
@@ -929,21 +928,21 @@ export default function ClientsScreen() {
       </ScrollView>
 
       {clientAccess.canManage ? (
-        <GuideAnchor id="clients-add-client">
-          <Animated.View
-            {...floatingClientPanResponder.panHandlers}
-            style={[
-              styles.floatingAdd,
-              { bottom: layout.bottomNavigationContentPadding },
-              { transform: floatingClientOffset.getTranslateTransform() },
-            ]}
-          >
+        <Animated.View
+          {...floatingClientPanResponder.panHandlers}
+          style={[
+            styles.floatingAdd,
+            { bottom: layout.bottomNavigationContentPadding },
+            { transform: floatingClientOffset.getTranslateTransform() },
+          ]}
+        >
+          <GuideAnchor id="clients-add-client">
             <Pressable
               accessibilityLabel="Agregar cliente"
               accessibilityRole="button"
               accessibilityState={{ disabled: isClientLimitReached }}
               disabled={isClientLimitReached}
-              onPress={() => setIsCreateOpen(true)}
+              onPress={() => floatingClientPressRef.current()}
               style={[
                 styles.floatingAddContent,
                 isClientLimitReached && { opacity: 0.42 },
@@ -951,8 +950,8 @@ export default function ClientsScreen() {
             >
               <Ionicons color="#ffffff" name="add" size={29} />
             </Pressable>
-          </Animated.View>
-        </GuideAnchor>
+          </GuideAnchor>
+        </Animated.View>
       ) : null}
 
       <BottomNavigation active="clients" />
