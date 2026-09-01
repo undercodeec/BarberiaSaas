@@ -56,6 +56,12 @@ describe('notificationDestination', () => {
       '/inventory',
     );
     expect(
+      notificationDestination({ type: 'cash_income_recorded' }, 'manager'),
+    ).toBe('/cash-register');
+    expect(
+      notificationDestination({ type: 'commission_earned' }, 'barber'),
+    ).toBe('/wallet?tab=commissions');
+    expect(
       notificationDestination({ type: 'team_member_accepted' }, 'receptionist'),
     ).toBeNull();
     expect(

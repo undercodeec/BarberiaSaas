@@ -40,6 +40,7 @@ import {
   type WelcomeSurveyOption,
   type ExtraQuickActionId,
   EXTRA_QUICK_ACTIONS,
+  canUseExtraQuickAction,
   type DashboardProgressProps,
   type DashboardOperation,
 } from './dashboard-model';
@@ -861,12 +862,14 @@ export function DashboardOperationCard({
 
 export function ExtraQuickActionsSheet({
   isSolo,
+  role,
   selectedIds,
   onClose,
   onSelect,
   visible,
 }: {
   readonly isSolo: boolean;
+  readonly role: string | null | undefined;
   readonly selectedIds: readonly ExtraQuickActionId[];
   readonly onClose: () => void;
   readonly onSelect: (id: ExtraQuickActionId) => void;
@@ -876,7 +879,8 @@ export function ExtraQuickActionsSheet({
   const availableActions = EXTRA_QUICK_ACTIONS.filter(
     (action) =>
       !selectedIds.includes(action.id) &&
-      (!isSolo || action.id !== 'collaborators'),
+      (!isSolo || action.id !== 'collaborators') &&
+      canUseExtraQuickAction(role, action.id),
   );
 
   return (

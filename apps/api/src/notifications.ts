@@ -43,6 +43,28 @@ export interface AppointmentNotifier {
   notifyOperational?(input: OperationalNotification): Promise<void>;
 }
 
+export async function cashIncomeRecipientUserIds(
+  database: DatabaseClient,
+  organizationId: string,
+  locationId: string,
+) {
+  const memberships = await database.membership.findMany({
+    select: { userId: true },
+    where: {
+      organizationId,
+      status: MembershipStatus.ACTIVE,
+      OR: [
+        { role: MembershipRole.OWNER },
+        {
+          memberLocations: { some: { locationId } },
+          role: MembershipRole.MANAGER,
+        },
+      ],
+    },
+  });
+  return [...new Set(memberships.map(({ userId }) => userId))];
+}
+
 const notificationPathSchema = z.object({ notificationId: z.uuid() });
 const pushTokenSchema = z.object({
   platform: z.enum(['android', 'ios', 'web']),
@@ -81,8 +103,10 @@ const notificationCategoryByType: Record<
   [AppNotificationType.APPOINTMENT_CANCELLED]: NotificationCategory.AGENDA,
   [AppNotificationType.APPOINTMENT_REMINDER]: NotificationCategory.AGENDA,
   [AppNotificationType.APPOINTMENT_RESCHEDULED]: NotificationCategory.AGENDA,
+  [AppNotificationType.CASH_INCOME_RECORDED]: NotificationCategory.CASH,
   [AppNotificationType.CASH_REGISTER_CLOSED]: NotificationCategory.CASH,
   [AppNotificationType.CASH_REGISTER_VARIANCE]: NotificationCategory.CASH,
+  [AppNotificationType.COMMISSION_EARNED]: NotificationCategory.CASH,
   [AppNotificationType.LOW_STOCK]: NotificationCategory.INVENTORY,
   [AppNotificationType.PAYMENT_CONFIRMATION_REQUIRED]:
     NotificationCategory.CASH,

@@ -219,6 +219,13 @@ interface QueuedNotificationData {
   type?: string;
 }
 
+function notificationSound(type: AppNotificationType) {
+  return type === AppNotificationType.CASH_INCOME_RECORDED ||
+    type === AppNotificationType.COMMISSION_EARNED
+    ? 'cash_income'
+    : 'default';
+}
+
 function appointmentNotificationCopy(
   kind: AppointmentNotificationKind,
   clientName: string,
@@ -366,6 +373,7 @@ async function processQueuedNotificationDeliveries(
                 route: data.route,
                 type: data.type,
               },
+              sound: notificationSound(notification.type),
               title: notification.title,
               tokens: tokens.map((token) => token.token),
             });
@@ -3294,7 +3302,13 @@ export async function buildApi({
   );
   registerSriBillingRoutes(app, database, authenticate, config);
   registerSubscriptionPaymentReceiptRoutes(app, database, authenticate, config);
-  registerProductOrderRoutes(app, database, authenticate, config);
+  registerProductOrderRoutes(
+    app,
+    database,
+    authenticate,
+    config,
+    appointmentNotifier,
+  );
   registerReportRoutes(app, database, authenticate);
 
   const publicBookingLifecycleTimer = setInterval(() => {

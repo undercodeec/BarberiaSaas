@@ -55,6 +55,7 @@ import {
   type WelcomeSurveyOption,
   type ExtraQuickActionId,
   EXTRA_QUICK_ACTIONS,
+  canUseExtraQuickAction,
   getExtraQuickActionIds,
   storeExtraQuickActionIds,
   shouldShowWelcomeSurvey,
@@ -110,9 +111,10 @@ export default function DashboardScreen() {
     queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
   });
   const organizationQuery = useCurrentOrganization();
+  const membershipRole = organizationQuery.data?.membership.role;
+  const isBarber = membershipRole === 'barber';
   const canAccessFinancialReports =
-    organizationQuery.data?.membership.role === 'owner' ||
-    organizationQuery.data?.membership.role === 'manager';
+    membershipRole === 'owner' || membershipRole === 'manager';
   const subscriptionQuery = useQuery({
     enabled: Boolean(session && user),
     queryFn: () =>
@@ -156,7 +158,7 @@ export default function DashboardScreen() {
     queryKey: tenant.key('cash-register-summary'),
   });
   const inventoryQuery = useQuery({
-    enabled: Boolean(session && inventoryEnabled),
+    enabled: Boolean(session && inventoryEnabled && canAccessFinancialReports),
     queryFn: () =>
       requireApiClient().request<InventoryResponse>('/v1/inventory'),
     queryKey: tenant.key('inventory'),
@@ -221,7 +223,8 @@ export default function DashboardScreen() {
   const extraQuickActions = EXTRA_QUICK_ACTIONS.filter(
     (action) =>
       extraQuickActionIds.includes(action.id) &&
-      (!isSolo || action.id !== 'collaborators'),
+      (!isSolo || action.id !== 'collaborators') &&
+      canUseExtraQuickAction(membershipRole, action.id),
   );
   const planProgress = subscriptionProgress(
     subscriptionQuery.data,
@@ -409,13 +412,21 @@ export default function DashboardScreen() {
     }
 
     void getExtraQuickActionIds(user.id).then((actionIds) => {
-      if (isMounted) setExtraQuickActionIds(actionIds);
+      const permittedIds = actionIds.filter(
+        (actionId) =>
+          (!isSolo || actionId !== 'collaborators') &&
+          canUseExtraQuickAction(membershipRole, actionId),
+      );
+      if (!isMounted) return;
+      setExtraQuickActionIds(permittedIds);
+      if (permittedIds.length !== actionIds.length)
+        void storeExtraQuickActionIds(user.id, permittedIds);
     });
 
     return () => {
       isMounted = false;
     };
-  }, [user]);
+  }, [isSolo, membershipRole, user]);
   useEffect(() => {
     let isMounted = true;
     let notificationPromptTimer: ReturnType<typeof setTimeout> | null = null;
@@ -756,7 +767,8 @@ export default function DashboardScreen() {
     if (
       !user ||
       extraQuickActionIds.includes(id) ||
-      (isSolo && id === 'collaborators')
+      (isSolo && id === 'collaborators') ||
+      !canUseExtraQuickAction(membershipRole, id)
     )
       return;
     const nextIds = [...extraQuickActionIds, id];
@@ -928,24 +940,30 @@ export default function DashboardScreen() {
             label="Nueva cita"
             onPress={() => router.push('/new-booking')}
           />
-          <QuickAction
-            icon={businessCategoryIcon(businessCategory)}
-            label="Servicios"
-            onPress={() => router.push('/service-management')}
-          />
-          <QuickAction
-            icon="cube-outline"
-            label={inventoryEnabled ? 'Inventario' : 'Inventario (Esencial)'}
-            locked={!inventoryEnabled}
-            lockedPlan="Nava Esencial"
-            onPress={() =>
-              router.push(inventoryEnabled ? '/inventory' : '/subscription')
-            }
-          />
+          {!isBarber ? (
+            <QuickAction
+              icon={businessCategoryIcon(businessCategory)}
+              label="Servicios"
+              onPress={() => router.push('/service-management')}
+            />
+          ) : null}
+          {!isBarber ? (
+            <QuickAction
+              icon="cube-outline"
+              label={inventoryEnabled ? 'Inventario' : 'Inventario (Esencial)'}
+              locked={!inventoryEnabled}
+              lockedPlan="Nava Esencial"
+              onPress={() =>
+                router.push(inventoryEnabled ? '/inventory' : '/subscription')
+              }
+            />
+          ) : null}
           <QuickAction
             icon="wallet-outline"
-            label="Nava Wallet"
-            onPress={() => router.push('/wallet')}
+            label={isBarber ? 'Mis comisiones' : 'Nava Wallet'}
+            onPress={() =>
+              router.push(isBarber ? '/wallet?tab=commissions' : '/wallet')
+            }
           />
         </GuideAnchor>
         {extraQuickActions.length ? (
@@ -1018,7 +1036,7 @@ export default function DashboardScreen() {
           </View>
         ) : null}
 
-        {shouldShowWelcome ? (
+        {shouldShowWelcome && !isBarber ? (
           <View style={styles.welcome}>
             <Text style={styles.welcomeTitle}>
               {'\u00a1Bienvenido a Nava!'}
@@ -1144,6 +1162,7 @@ export default function DashboardScreen() {
       />
       <ExtraQuickActionsSheet
         isSolo={isSolo}
+        role={membershipRole}
         onClose={() => setIsQuickActionsPickerOpen(false)}
         onSelect={addExtraQuickAction}
         selectedIds={extraQuickActionIds}

@@ -25,6 +25,7 @@ import { PrivacyShield } from '../src/components/PrivacyShield';
 import { useCurrentOrganization } from '../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../src/lib/api';
 import { createNotificationResponseConsumer } from '../src/lib/notification-navigation';
+import { ensureNativeNotificationChannels } from '../src/lib/notification-channels';
 import { AppProviders } from '../src/providers/AppProviders';
 import { useAuth } from '../src/providers/AuthProvider';
 
@@ -59,13 +60,7 @@ function NativePushNotifications() {
     const register = async () => {
       const { status } = await Notifications.getPermissionsAsync();
       if (status !== Notifications.PermissionStatus.GRANTED) return;
-      if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('appointments', {
-          importance: Notifications.AndroidImportance.MAX,
-          name: 'Citas y reservas',
-          vibrationPattern: [0, 250, 250, 250],
-        });
-      }
+      await ensureNativeNotificationChannels();
       const token = (await Notifications.getDevicePushTokenAsync()).data;
       await requireApiClient().request('/v1/push-tokens', {
         body: { platform: Platform.OS, token },

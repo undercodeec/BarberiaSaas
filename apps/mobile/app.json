@@ -9,7 +9,12 @@
     "userInterfaceStyle": "light",
     "plugins": [
       "expo-router",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "sounds": ["./assets/sounds/cash_income.wav"]
+        }
+      ],
       [
         "expo-image-picker",
         {

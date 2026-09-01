@@ -15,6 +15,7 @@ import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { requireApiClient } from '../../lib/api';
+import { ensureNativeNotificationChannels } from '../../lib/notification-channels';
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 export const SUBSCRIPTION_NOTICE_TRIAL_DAYS = 3;
@@ -93,6 +94,19 @@ export const EXTRA_QUICK_ACTIONS: ReadonlyArray<{
     route: '/reviews-management',
   },
 ];
+
+const BARBER_EXTRA_QUICK_ACTION_IDS = new Set<ExtraQuickActionId>([
+  'agenda',
+  'clients',
+  'notifications',
+]);
+
+export function canUseExtraQuickAction(
+  role: string | null | undefined,
+  actionId: ExtraQuickActionId,
+) {
+  return role !== 'barber' || BARBER_EXTRA_QUICK_ACTION_IDS.has(actionId);
+}
 
 export function quickActionsStorageKey(userId: string) {
   return `${QUICK_ACTIONS_STORAGE_KEY}.${userId}`;
@@ -231,13 +245,7 @@ export function shouldShowWelcomeSurvey(result: WelcomeSurveyResponseResult) {
 
 export async function syncPushToken() {
   if (Platform.OS === 'web') return;
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('appointments', {
-      importance: Notifications.AndroidImportance.MAX,
-      name: 'Citas y reservas',
-      vibrationPattern: [0, 250, 250, 250],
-    });
-  }
+  await ensureNativeNotificationChannels();
   const token = (await Notifications.getDevicePushTokenAsync()).data;
   await requireApiClient().request('/v1/push-tokens', {
     body: { platform: Platform.OS, token },

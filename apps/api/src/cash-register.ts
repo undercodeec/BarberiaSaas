@@ -27,7 +27,10 @@ import {
   type MembershipRole as PermissionRole,
   type OrganizationPermission,
 } from '@barber-saas/permissions';
-import type { AppointmentNotifier } from './notifications';
+import {
+  cashIncomeRecipientUserIds,
+  type AppointmentNotifier,
+} from './notifications';
 
 type Authenticate = (
   database: DatabaseClient,
@@ -496,6 +499,78 @@ async function recordAudit(
   });
 }
 
+function money(amountCents: number) {
+  return `$${(amountCents / 100).toFixed(2)}`;
+}
+
+async function notifyCashIncome(
+  notifier: AppointmentNotifier | null,
+  database: DatabaseClient,
+  input: {
+    actorUserId: string;
+    amountCents: number;
+    description: string;
+    locationId: string | null;
+    organizationId: string | null;
+  },
+) {
+  if (
+    !notifier?.notifyOperational ||
+    !input.organizationId ||
+    !input.locationId
+  )
+    return;
+  try {
+    const userIds = await cashIncomeRecipientUserIds(
+      database,
+      input.organizationId,
+      input.locationId,
+    );
+    await notifier.notifyOperational({
+      actorUserId: input.actorUserId,
+      body: `${input.description}: ingresaron ${money(input.amountCents)} a Caja.`,
+      data: { route: '/cash-register', type: 'cash_income_recorded' },
+      organizationId: input.organizationId,
+      title: 'Nuevo ingreso en Caja',
+      type: AppNotificationType.CASH_INCOME_RECORDED,
+      userIds,
+    });
+  } catch {
+    // El ingreso ya fue registrado y no debe revertirse por una alerta fallida.
+  }
+}
+
+async function notifyCommissionEarned(
+  notifier: AppointmentNotifier | null,
+  input: {
+    actorUserId: string;
+    amountCents: number;
+    organizationId: string | null;
+    professionalUserId: string | null;
+  },
+) {
+  if (
+    !notifier?.notifyOperational ||
+    !input.organizationId ||
+    !input.professionalUserId ||
+    input.amountCents <= 0
+  )
+    return;
+  try {
+    await notifier.notifyOperational({
+      actorUserId: input.actorUserId,
+      body: `Se registró una comisión de ${money(input.amountCents)} a tu favor.`,
+      data: { route: '/wallet?tab=commissions', type: 'commission_earned' },
+      organizationId: input.organizationId,
+      title: 'Nueva comisión registrada',
+      type: AppNotificationType.COMMISSION_EARNED,
+      userIds: [input.professionalUserId],
+    });
+  } catch {
+    // La comisión se conserva aunque la alerta no pueda enviarse.
+  }
+}
+
 export function registerCashRegisterRoutes(
   app: FastifyInstance,
   database: DatabaseClient,
@@ -891,8 +966,9 @@ export function registerCashRegisterRoutes(
         'CASH_REGISTER_CLOSED',
         'Abre una caja antes de registrar movimientos.',
       );
-    const movement = await database.$transaction(async (transaction) => {
-      let appointmentProfessional: { name: string } | null = null;
+    const result = await database.$transaction(async (transaction) => {
+      let appointmentProfessional: { name: string; userId: string } | null =
+        null;
       if (input.appointmentId) {
         if (!currentScope.organizationId)
           throw new ApiError(
@@ -902,7 +978,9 @@ export function registerCashRegisterRoutes(
           );
         const appointment = await transaction.appointment.findFirst({
           include: {
-            professional: { include: { user: { select: { fullName: true } } } },
+            professional: {
+              include: { user: { select: { fullName: true, id: true } } },
+            },
             services: true,
           },
           where: {
@@ -935,6 +1013,7 @@ export function registerCashRegisterRoutes(
           );
         appointmentProfessional = {
           name: appointment.professional.user.fullName,
+          userId: appointment.professional.user.id,
         };
         await transaction.appointment.update({
           data: { paymentStatus: AppointmentPaymentStatus.PAID },
@@ -947,6 +1026,7 @@ export function registerCashRegisterRoutes(
         name: string;
         generatesCommission: boolean;
         professionalName: string;
+        professionalUserId: string;
       } | null = null;
       if (input.serviceId && input.professionalMembershipId) {
         if (!currentScope.organizationId || !session.locationId)
@@ -973,7 +1053,10 @@ export function registerCashRegisterRoutes(
         const assignment = await transaction.professionalService.findFirst({
           include: {
             membership: {
-              select: { role: true, user: { select: { fullName: true } } },
+              select: {
+                role: true,
+                user: { select: { fullName: true, id: true } },
+              },
             },
             service: true,
           },
@@ -1002,6 +1085,7 @@ export function registerCashRegisterRoutes(
           generatesCommission:
             assignment.membership.role === MembershipRole.BARBER,
           professionalName: assignment.membership.user.fullName,
+          professionalUserId: assignment.membership.user.id,
         };
       }
 
@@ -1192,8 +1276,23 @@ export function registerCashRegisterRoutes(
           },
         });
       }
+      let commissionNotification: {
+        amountCents: number;
+        professionalUserId: string;
+      } | null = null;
       if (input.appointmentId) {
-        await reconcileAppointmentCommissions(transaction, input.appointmentId);
+        const entries = await reconcileAppointmentCommissions(
+          transaction,
+          input.appointmentId,
+        );
+        if (appointmentProfessional && entries.length)
+          commissionNotification = {
+            amountCents: entries.reduce(
+              (total, entry) => total + entry.commissionAmountCents,
+              0,
+            ),
+            professionalUserId: appointmentProfessional.userId,
+          };
       } else if (
         commissionableService &&
         commissionableService.generatesCommission &&
@@ -1217,9 +1316,14 @@ export function registerCashRegisterRoutes(
             'COMMISSION_RULE_NOT_FOUND',
             'El profesional no tiene una regla de comisión vigente.',
           );
+        commissionNotification = {
+          amountCents: commission.commissionAmountCents,
+          professionalUserId: commissionableService.professionalUserId,
+        };
       }
-      return created;
+      return { commissionNotification, movement: created };
     });
+    const movement = result.movement;
     await recordAudit(
       database,
       currentScope,
@@ -1239,6 +1343,25 @@ export function registerCashRegisterRoutes(
         type: movement.type,
       },
     );
+    if (
+      movement.type === CashMovementType.SALE ||
+      movement.type === CashMovementType.DEPOSIT ||
+      movement.type === CashMovementType.OTHER_INCOME
+    )
+      await notifyCashIncome(notifier, database, {
+        actorUserId: user.id,
+        amountCents: movement.amountCents,
+        description: movement.description,
+        locationId: currentScope.locationId,
+        organizationId: currentScope.organizationId,
+      });
+    if (result.commissionNotification)
+      await notifyCommissionEarned(notifier, {
+        actorUserId: user.id,
+        amountCents: result.commissionNotification.amountCents,
+        organizationId: currentScope.organizationId,
+        professionalUserId: result.commissionNotification.professionalUserId,
+      });
     return reply.code(201).send({ movement: publicMovement(movement) });
   });
 

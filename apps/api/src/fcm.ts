@@ -11,12 +11,14 @@ export async function sendFcmNotifications({
   body,
   config,
   data,
+  sound = 'default',
   title,
   tokens,
 }: {
   readonly body: string;
   readonly config: ApiConfig;
   readonly data: Record<string, string | undefined>;
+  readonly sound?: 'default' | 'cash_income';
   readonly title: string;
   readonly tokens: readonly string[];
 }): Promise<FcmDeliveryResult> {
@@ -47,9 +49,16 @@ export async function sendFcmNotifications({
           body: JSON.stringify({
             message: {
               android: {
-                notification: { channel_id: 'appointments', sound: 'default' },
+                notification: {
+                  channel_id:
+                    sound === 'cash_income' ? 'cash-income' : 'appointments',
+                  sound: sound === 'cash_income' ? 'cash_income' : 'default',
+                },
                 priority: 'high',
               },
+              ...(sound === 'cash_income'
+                ? { apns: { payload: { aps: { sound: 'cash_income.wav' } } } }
+                : {}),
               data: payloadData,
               notification: { body, title },
               token,

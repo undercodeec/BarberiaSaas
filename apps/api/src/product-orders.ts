@@ -1,4 +1,5 @@
 import {
+  AppNotificationType,
   CashMovementType,
   CashRegisterStatus,
   MembershipRole,
@@ -19,6 +20,10 @@ import { ApiError } from './errors';
 import { payphoneEncryptionKey } from './payphone';
 import { requestPayphoneLink } from './payphone-payments';
 import { decryptPaymentCredential } from './security';
+import {
+  cashIncomeRecipientUserIds,
+  type AppointmentNotifier,
+} from './notifications';
 
 type Authenticate = (
   database: DatabaseClient,
@@ -213,6 +218,7 @@ export function registerProductOrderRoutes(
   database: DatabaseClient,
   authenticate: Authenticate,
   config: ApiConfig,
+  notifier: AppointmentNotifier | null = null,
 ) {
   app.post(
     '/v1/public/:organizationSlug/:locationSlug/orders',
@@ -437,7 +443,7 @@ export function registerProductOrderRoutes(
     const { orderId } = orderIdParams.parse(request.params);
     const input = paymentConfirmationSchema.parse(request.body);
     const current = await managerScope(database, user.id);
-    const order = await database.$transaction(async (transaction) => {
+    const result = await database.$transaction(async (transaction) => {
       const target = await transaction.productOrder.findFirst({
         include: { items: { include: { product: true } } },
         where: {
@@ -548,7 +554,7 @@ export function registerProductOrderRoutes(
             },
           });
       }
-      return transaction.productOrder.update({
+      const order = await transaction.productOrder.update({
         data: {
           paidAt: new Date(),
           paymentReference: input.providerReference ?? null,
@@ -557,8 +563,35 @@ export function registerProductOrderRoutes(
         include: { items: true },
         where: { id: target.id },
       });
+      return {
+        amountCents: target.items.reduce(
+          (total, item) => total + item.unitPriceCents * item.quantity,
+          0,
+        ),
+        locationId: target.locationId,
+        order,
+      };
     });
-    return { order: orderResponse(order) };
+    if (notifier?.notifyOperational)
+      try {
+        const userIds = await cashIncomeRecipientUserIds(
+          database,
+          current.membership.organizationId,
+          result.locationId,
+        );
+        await notifier.notifyOperational({
+          actorUserId: user.id,
+          body: `Pedido de productos: ingresaron $${(result.amountCents / 100).toFixed(2)} a Caja.`,
+          data: { route: '/cash-register', type: 'cash_income_recorded' },
+          organizationId: current.membership.organizationId,
+          title: 'Nuevo ingreso en Caja',
+          type: AppNotificationType.CASH_INCOME_RECORDED,
+          userIds,
+        });
+      } catch {
+        // El pedido ya fue cobrado y no debe fallar por una alerta fallida.
+      }
+    return { order: orderResponse(result.order) };
   });
 
   app.post('/v1/product-orders/:orderId/:action', async (request) => {

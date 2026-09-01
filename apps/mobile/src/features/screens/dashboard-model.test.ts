@@ -4,6 +4,7 @@ import {
   shouldCelebrateSubscriptionActivation,
   shouldShowBusinessCategoryPrompt,
   shouldShowWelcomeSurvey,
+  canUseExtraQuickAction,
 } from './dashboard-model';
 
 describe('accesos rápidos del dashboard', () => {
@@ -14,6 +15,19 @@ describe('accesos rápidos del dashboard', () => {
       label: 'Sucursales',
       route: '/location-management',
     });
+  });
+});
+
+describe('restricción de accesos del barbero', () => {
+  it('solo permite las herramientas operativas del profesional', () => {
+    expect(canUseExtraQuickAction('barber', 'agenda')).toBe(true);
+    expect(canUseExtraQuickAction('barber', 'clients')).toBe(true);
+    expect(canUseExtraQuickAction('barber', 'notifications')).toBe(true);
+    expect(canUseExtraQuickAction('barber', 'cash-register')).toBe(false);
+    expect(canUseExtraQuickAction('barber', 'collaborators')).toBe(false);
+    expect(canUseExtraQuickAction('barber', 'booking-settings')).toBe(false);
+    expect(canUseExtraQuickAction('barber', 'locations')).toBe(false);
+    expect(canUseExtraQuickAction('barber', 'reviews-management')).toBe(false);
   });
 });
 

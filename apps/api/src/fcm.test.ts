@@ -66,4 +66,34 @@ describe('envío directo por FCM', () => {
     ).resolves.toEqual({ delivered: 1, failed: 1 });
     expect(fetchImplementation).toHaveBeenCalledTimes(2);
   });
+
+  it('usa el canal y sonido de ingreso solo para los avisos financieros', async () => {
+    const fetchImplementation = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchImplementation);
+
+    await sendFcmNotifications({
+      body: 'Ingreso registrado',
+      config: configuredFcm,
+      data: { type: 'cash_income_recorded' },
+      sound: 'cash_income',
+      title: 'Nuevo ingreso en Caja',
+      tokens: ['token-vigente'],
+    });
+
+    const request = fetchImplementation.mock.calls[0]?.[1];
+    expect(request?.body).toBeDefined();
+    expect(JSON.parse(String(request?.body))).toMatchObject({
+      message: {
+        android: {
+          notification: {
+            channel_id: 'cash-income',
+            sound: 'cash_income',
+          },
+        },
+        apns: { payload: { aps: { sound: 'cash_income.wav' } } },
+      },
+    });
+  });
 });

@@ -1,4 +1,5 @@
 import {
+  AppNotificationType,
   AppointmentEventType,
   AppointmentSource,
   AppointmentStatus,
@@ -1082,7 +1083,9 @@ export function registerAgendaRoutes(
             servicePaymentConfirmationEnabled: true,
           },
         },
-        professional: { include: { user: { select: { fullName: true } } } },
+        professional: {
+          include: { user: { select: { fullName: true, id: true } } },
+        },
         publicAccess: { select: { id: true } },
       },
       where: { id: appointmentId, organizationId: current.organizationId },
@@ -1105,7 +1108,7 @@ export function registerAgendaRoutes(
       existing.status !== AppointmentStatus.COMPLETED &&
       existing.paymentStatus === 'PENDING' &&
       existing.organization.servicePaymentConfirmationEnabled;
-    const updated = await database.$transaction(async (transaction) => {
+    const result = await database.$transaction(async (transaction) => {
       const completedPublicBookingClient =
         status === AppointmentStatus.COMPLETED &&
         existing.status !== AppointmentStatus.COMPLETED &&
@@ -1130,7 +1133,9 @@ export function registerAgendaRoutes(
           updatedByUserId: user.id,
         },
         include: {
-          professional: { select: { user: { select: { fullName: true } } } },
+          professional: {
+            select: { user: { select: { fullName: true, id: true } } },
+          },
           services: { orderBy: { sortOrder: 'asc' } },
         },
         where: { id: existing.id },
@@ -1148,11 +1153,35 @@ export function registerAgendaRoutes(
           type: AppointmentEventType.STATUS_CHANGED,
         },
       });
-      await reconcileAppointmentCommissions(transaction, appointment.id);
-      return appointment;
+      const commissions = await reconcileAppointmentCommissions(
+        transaction,
+        appointment.id,
+      );
+      return {
+        appointment,
+        commissionAmountCents: commissions.reduce(
+          (total, entry) => total + entry.commissionAmountCents,
+          0,
+        ),
+      };
     });
+    const updated = result.appointment;
     if (requestsPaymentConfirmation)
       await notifier?.notifyPaymentConfirmation?.(updated.id, user.id);
+    if (
+      status === AppointmentStatus.COMPLETED &&
+      existing.status !== AppointmentStatus.COMPLETED &&
+      result.commissionAmountCents > 0
+    )
+      await notifier?.notifyOperational?.({
+        actorUserId: user.id,
+        body: `Se registró una comisión de $${(result.commissionAmountCents / 100).toFixed(2)} a tu favor.`,
+        data: { route: '/wallet?tab=commissions', type: 'commission_earned' },
+        organizationId: updated.organizationId,
+        title: 'Nueva comisión registrada',
+        type: AppNotificationType.COMMISSION_EARNED,
+        userIds: [updated.professional.user.id],
+      });
     if (
       status === AppointmentStatus.COMPLETED &&
       existing.status !== AppointmentStatus.COMPLETED &&
