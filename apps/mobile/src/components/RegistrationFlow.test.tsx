@@ -128,22 +128,6 @@ describe('RegistrationFlow', () => {
     await user.type(confirmation, 'Clave-segura-123');
     await user.press(view.getByRole('button', { name: 'Siguiente' }));
 
-    const consent = view.getByRole('checkbox', {
-      name: 'Acepto la Política de Privacidad',
-    });
-    expect(consent.props.accessibilityState).toEqual({ checked: false });
-    expect(
-      view.getByRole('link', { name: 'Leer Política de Privacidad' }),
-    ).toBeTruthy();
-
-    await user.press(view.getByRole('button', { name: 'Completar registro' }));
-    expect(
-      view.getByText(
-        'Debes aceptar la Política de Privacidad para crear tu cuenta.',
-      ),
-    ).toBeTruthy();
-
-    await user.press(consent);
-    expect(consent.props.accessibilityState).toEqual({ checked: true });
+    expect(view.queryByRole('checkbox')).toBeNull();
   });
 });

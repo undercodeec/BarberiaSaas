@@ -7,11 +7,12 @@ Alcance: UI, UX, lógica móvil, integración con API, configuración nativa, no
 
 La aplicación compila y genera correctamente un IPA de producción para iOS. El artefacto revisado corresponde a `app.navacloud.nava`, versión `0.1.16` (build `4`), incluye el entitlement de notificaciones de producción, textos de permisos nativos, Google Maps y manifiestos de privacidad. El bundle JavaScript de iOS también se genera correctamente y las pruebas existentes de la aplicación móvil pasan.
 
-No obstante, se encontraron tres inconsistencias de prioridad alta que pueden afectar el comportamiento real en iPhone o la revisión de App Store:
+No obstante, se encontraron dos inconsistencias de prioridad alta que pueden afectar el comportamiento real en iPhone o la revisión de App Store:
 
 1. **Notificaciones push incompatibles con iOS:** la aplicación registra un token nativo APNs, pero la API intenta enviarlo mediante Firebase Cloud Messaging. Android sí utiliza un token compatible con el canal actual.
 2. **Universal Links declarados pero no publicados:** iOS declara `applinks:reservas.navacloud.app`, pero el dominio devuelve `404` para `/.well-known/apple-app-site-association`. Los enlaces HTTPS de invitación no pueden abrir la aplicación de forma nativa hasta publicar este archivo.
-3. **Consentimiento de privacidad incompleto en el registro:** el formulario crea cuentas enviando `privacyPolicyAccepted: false` y no ofrece aceptación explícita ni enlace a la política antes de terminar el registro.
+
+El consentimiento de privacidad no es parte del registro móvil: por decisión de producto, se solicita exclusivamente en el checkout web al comprar una suscripción.
 
 También se detectaron diferencias de dependencias respecto a Expo SDK 57, cobertura insuficiente del camino iOS, objetivos táctiles menores de 44 puntos en algunos controles, una condición duplicada en la pantalla de suscripción, advertencias de lint y una configuración EAS duplicada en la raíz que puede apuntar a un proyecto anterior.
 
@@ -74,20 +75,20 @@ Como resultado, los enlaces HTTPS de invitación y recuperación continúan en e
 
 Corrección prevista: incorporar una ruta web que publique el archivo AASA para el Team ID `2K9VPW5R27` y el bundle `app.navacloud.nava`. Será necesario desplegar `apps/web` para que la corrección llegue al dominio.
 
-### IOS-003 — Registro sin consentimiento explícito de privacidad
+### IOS-003 — Consentimiento de privacidad en checkout web
 
-Severidad: **Alta**  
-Estado inicial: **Pendiente**
+Severidad: **No aplica al registro móvil**<br>
+Estado: **Decisión de producto confirmada**
 
-El flujo de registro envía `privacyPolicyAccepted: false`. La validación compartida acepta ese valor y la interfaz no muestra una casilla ni un enlace a la política antes de crear la cuenta. La API solamente registra la aceptación cuando recibe `true`.
+El registro de la aplicación móvil, tanto iOS como Android, debe permanecer sin casilla de aceptación y envía `privacyPolicyAccepted: false`. La aceptación de privacidad corresponde exclusivamente al checkout web durante la compra de una suscripción.
 
 Archivos implicados:
 
 - `apps/mobile/src/components/RegistrationFlow.tsx`
 - `packages/validation/src/index.ts`
-- `apps/api/src/app.ts`
+- `apps/web/app/checkout/CheckoutExperience.tsx`
 
-Corrección prevista: exigir el consentimiento en el esquema compartido, mostrar una casilla accesible en el último paso y abrir la política publicada en `https://navacloud.app/tratamiento-de-datos`.
+No se debe mostrar ni exigir ese consentimiento durante el alta móvil. La validación compartida conserva el valor por defecto `false`, mientras que el checkout web mantiene su propio consentimiento asociado a la compra.
 
 ### IOS-004 — Dependencias patch distintas a las recomendadas por Expo
 
@@ -167,7 +168,7 @@ Corrección recomendada: sustituirlo más adelante por el arte original de 1024 
 
 1. Corregir registro y entrega de push según plataforma.
 2. Publicar en código la asociación de Universal Links.
-3. Añadir consentimiento obligatorio y accesible al registro.
+3. Mantener el consentimiento en el checkout web, sin casilla durante el registro móvil.
 4. Corregir lógica inalcanzable, lint y objetivos táctiles prioritarios.
 5. Alinear dependencias con Expo SDK 57.
 6. Añadir pruebas específicas y ejecutar la batería completa.
@@ -185,7 +186,7 @@ Fecha de corrección: 2026-09-02
 
 - **IOS-001 — Resuelto en código:** iOS registra ahora un Expo Push Token asociado al project ID de EAS; Android conserva su token FCM nativo. La API separa dispositivos por plataforma, envía iOS mediante Expo Push Service y Android mediante FCM, admite lotes de 100 tokens y elimina el token anterior del mismo usuario/plataforma cuando registra uno nuevo. Se añadieron pruebas para ambos caminos y para impedir que un token APNs nativo sea enviado por FCM.
 - **IOS-002 — Resuelto en código; pendiente de despliegue:** `apps/web` publica `/.well-known/apple-app-site-association` con `2K9VPW5R27.app.navacloud.nava` y las rutas de invitación y recuperación. La compilación de Next.js reconoce la ruta y su prueba valida cuerpo y `Content-Type`. El dominio continuará devolviendo `404` hasta desplegar esta versión de la web.
-- **IOS-003 — Resuelto:** el último paso del registro incluye una casilla accesible, enlace a la política y mensaje de validación. El cliente envía el valor real y el esquema compartido rechaza cualquier alta sin aceptación explícita.
+- **IOS-003 — Ajustado a la decisión de producto:** se retiró la casilla del registro móvil. iOS y Android conservan el alta sin consentimiento visible y envían `privacyPolicyAccepted: false`; el consentimiento permanece exclusivamente en el checkout web al comprar una suscripción.
 - **IOS-004 — Resuelto:** los paquetes de Expo SDK 57, React Native y Jest Expo fueron alineados con las versiones recomendadas. Se añadieron los config plugins requeridos por Expo Asset, Secure Store y Sharing.
 - **IOS-005 — Resuelto:** se añadieron pruebas del token iOS/Android y del transporte push de API. La suite móvil aumentó de 139 a 141 pruebas.
 - **IOS-006 — Resuelto en controles prioritarios:** botones de regreso, cierre, edición, eliminación, categorías y selección de equipo revisados tienen ahora un área mínima de 44 puntos. También se amplió el área de edición y navegación del flujo de registro.
@@ -215,7 +216,7 @@ El lint global del repositorio todavía falla por archivos preexistentes fuera d
 ### Orden necesario para activar las correcciones
 
 1. Desplegar `apps/web` y comprobar que `https://reservas.navacloud.app/.well-known/apple-app-site-association` devuelve HTTP 200, sin redirección y con `application/json`.
-2. Generar un nuevo build desde `apps/mobile` y subirlo a App Store Connect. El build `0.1.16 (4)` ya subido no contiene estas correcciones de cliente.
-3. Coordinar la publicación de los clientes nuevos con el despliegue de `apps/api`. La API corregida exige consentimiento explícito; desplegarla antes que el móvil nuevo impediría registrar cuentas desde versiones antiguas que todavía envían `false`.
-4. Probar en iPhone físico la recepción push, apertura de invitaciones, consentimiento, ubicación, mapas, cámara y selector de fotos.
+2. Generar un nuevo build desde `apps/mobile` y subirlo a App Store Connect. El build `0.1.16 (5)` ya enviado contiene temporalmente la casilla de privacidad en el registro móvil y no debe seleccionarse para distribución o revisión; usar el siguiente build con esta corrección.
+3. Desplegar `apps/api` para activar el nuevo transporte push de iOS. Este despliegue no modifica el comportamiento de consentimiento del registro móvil.
+4. Probar en iPhone físico la recepción push, apertura de invitaciones, ubicación, mapas, cámara y selector de fotos.
 5. Confirmar en App Store Connect la política de privacidad, la ficha de datos recolectados y las credenciales de demostración para Apple Review.

@@ -349,7 +349,7 @@ describe('autenticación y onboarding', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rechaza una cuenta sin aceptación de la Política de Privacidad', () => {
+  it('permite registrar una cuenta sin aceptar la Política de Privacidad', () => {
     expect(
       signUpSchema.safeParse({
         accountType: 'professional',
@@ -366,7 +366,7 @@ describe('autenticación y onboarding', () => {
         privacyPolicyAccepted: false,
         timezone: 'America/Guayaquil',
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('valida todos los datos del perfil de registro', () => {
