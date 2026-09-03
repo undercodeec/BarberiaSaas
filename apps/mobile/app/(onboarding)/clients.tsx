@@ -418,10 +418,11 @@ export default function ClientsScreen() {
     refetchInterval: 30_000,
     select: normalizeClientsResponse,
   });
+  const refetchClients = clientsQuery.refetch;
   useFocusEffect(
     useCallback(() => {
-      void clientsQuery.refetch();
-    }, [clientsQuery.refetch]),
+      void refetchClients();
+    }, [refetchClients]),
   );
   const labelsQuery = useQuery({
     enabled: Boolean(session && clientAccess.canManageLabels),

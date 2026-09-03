@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { requireApiClient } from './api';
+import { getCurrentDevicePushRegistration } from './device-push-token';
 
 export async function revokeCurrentDevicePushToken(): Promise<boolean> {
   if (Platform.OS === 'web') return false;
@@ -11,11 +12,11 @@ export async function revokeCurrentDevicePushToken(): Promise<boolean> {
     if (permission.status !== Notifications.PermissionStatus.GRANTED)
       return false;
 
-    const token = (await Notifications.getDevicePushTokenAsync()).data;
-    if (typeof token !== 'string' || !token.trim()) return false;
+    const registration = await getCurrentDevicePushRegistration();
+    if (!registration) return false;
 
     await requireApiClient().request(
-      `/v1/push-tokens/${encodeURIComponent(token)}`,
+      `/v1/push-tokens/${encodeURIComponent(registration.token)}`,
       { method: 'DELETE' },
     );
     return true;

@@ -417,9 +417,9 @@ function DetailRow({
 const styles = StyleSheet.create({
   back: {
     alignItems: 'center',
-    height: 40,
+    height: 44,
     justifyContent: 'center',
-    width: 40,
+    width: 44,
   },
   baseAmount: {
     color: '#288B52',

@@ -163,7 +163,12 @@ const styles = StyleSheet.create({
     height: 5,
     width: 42,
   },
-  later: { alignItems: 'center', marginTop: 14, minHeight: 30 },
+  later: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+    minHeight: 44,
+  },
   laterLabel: {
     color: appTheme.colors.textMuted,
     fontSize: 14,

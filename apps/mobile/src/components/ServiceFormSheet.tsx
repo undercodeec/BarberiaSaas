@@ -1088,9 +1088,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 18,
-    height: 36,
+    height: 44,
     justifyContent: 'center',
-    width: 36,
+    width: 44,
   },
   checkboxLabel: {
     color: appTheme.colors.text,

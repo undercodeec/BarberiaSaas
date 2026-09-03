@@ -11,6 +11,7 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   SafeAreaView: require('react-native').View,
   useSafeAreaInsets: () => ({ bottom: 0, top: 0 }),
 }));
@@ -32,6 +33,7 @@ jest.mock('../lib/api', () => ({
 }));
 
 jest.mock('./RegistrationSelectors', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { TextInput } = require('react-native');
   return {
     COUNTRIES: [{ code: 'EC', dial: '+593', name: 'Ecuador' }],
@@ -126,6 +128,22 @@ describe('RegistrationFlow', () => {
     await user.type(confirmation, 'Clave-segura-123');
     await user.press(view.getByRole('button', { name: 'Siguiente' }));
 
-    expect(view.queryByRole('checkbox')).toBeNull();
+    const consent = view.getByRole('checkbox', {
+      name: 'Acepto la Política de Privacidad',
+    });
+    expect(consent.props.accessibilityState).toEqual({ checked: false });
+    expect(
+      view.getByRole('link', { name: 'Leer Política de Privacidad' }),
+    ).toBeTruthy();
+
+    await user.press(view.getByRole('button', { name: 'Completar registro' }));
+    expect(
+      view.getByText(
+        'Debes aceptar la Política de Privacidad para crear tu cuenta.',
+      ),
+    ).toBeTruthy();
+
+    await user.press(consent);
+    expect(consent.props.accessibilityState).toEqual({ checked: true });
   });
 });

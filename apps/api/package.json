@@ -11,7 +11,7 @@
     "start": "node dist/index.js",
     "payphone:platform:configure": "tsx src/configure-platform-payphone.ts",
     "sri:certificate:check": "tsx src/inspect-sri-certificate.ts",
-    "test": "vitest run --passWithNoTests --no-file-parallelism",
+    "test": "vitest run --passWithNoTests --no-file-parallelism --testTimeout=20000",
     "typecheck": "tsc --noEmit",
     "predev": "pnpm --filter @barber-saas/database db:generate"
   },

@@ -10,7 +10,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import nodemailer from 'nodemailer';
 
 import type { ApiConfig } from './config';
-import { sendFcmNotifications } from './fcm';
+import { sendPushNotifications } from './fcm';
 
 type Authenticate = (
   database: DatabaseClient,
@@ -275,12 +275,12 @@ export function createAppointmentNotifier(
             userId: { in: recipients.map((recipient) => recipient.id) },
           },
         });
-        await sendFcmNotifications({
+        await sendPushNotifications({
           body: content.body,
           config,
           data,
+          devices: tokens,
           title: content.title,
-          tokens: tokens.map((token) => token.token),
         });
       } catch {
         // Delivery is best-effort and never invalidates an appointment.
@@ -380,6 +380,13 @@ export function registerNotificationRoutes(
   app.put('/v1/push-tokens', async (request) => {
     const { user } = await authenticate(database, request);
     const input = pushTokenSchema.parse(request.body);
+    await database.pushToken.deleteMany({
+      where: {
+        platform: input.platform,
+        token: { not: input.token },
+        userId: user.id,
+      },
+    });
     await database.pushToken.upsert({
       create: { platform: input.platform, token: input.token, userId: user.id },
       update: { platform: input.platform, userId: user.id },

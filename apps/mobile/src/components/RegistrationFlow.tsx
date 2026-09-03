@@ -15,6 +15,7 @@ import {
   Image,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   PanResponder,
   Platform,
@@ -56,6 +57,7 @@ import { useAuth } from '../providers/AuthProvider';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const logoImage = require('../../assets/nava-logo.png') as number;
 const VERIFICATION_DURATION_SECONDS = 10 * 60;
+const PRIVACY_POLICY_URL = 'https://navacloud.app/tratamiento-de-datos';
 
 async function checkRegistrationAvailability(
   input: RegistrationAvailabilityInput,
@@ -327,6 +329,7 @@ export function RegistrationFlow() {
       openingTime,
       password,
       phone,
+      privacyPolicyAccepted,
       timezone,
     }) => {
       if (!email.trim() || !password || !confirmPassword) {
@@ -357,7 +360,7 @@ export function RegistrationFlow() {
           openingTime,
           password,
           phone: `${phoneCountry.dial} ${phone.trim()}`,
-          privacyPolicyAccepted: false,
+          privacyPolicyAccepted,
           timezone,
         });
         setVerificationEmail(response.email);
@@ -1043,6 +1046,80 @@ export function RegistrationFlow() {
                             onEdit={() => setStep('credentials')}
                             value={values.email}
                           />
+                          <Controller
+                            control={control}
+                            name="privacyPolicyAccepted"
+                            rules={{
+                              validate: (accepted) =>
+                                accepted ||
+                                'Debes aceptar la Política de Privacidad para crear tu cuenta.',
+                            }}
+                            render={({ field, fieldState }) => (
+                              <>
+                                <Pressable
+                                  accessibilityLabel="Acepto la Política de Privacidad"
+                                  accessibilityRole="checkbox"
+                                  accessibilityState={{ checked: field.value }}
+                                  onPress={() => field.onChange(!field.value)}
+                                  style={[
+                                    s.legalConsent,
+                                    field.value ? s.legalConsentChecked : null,
+                                  ]}
+                                >
+                                  <Ionicons
+                                    color={
+                                      field.value
+                                        ? '#FFFFFF'
+                                        : appTheme.colors.accentDark
+                                    }
+                                    name={
+                                      field.value
+                                        ? 'checkbox'
+                                        : 'square-outline'
+                                    }
+                                    size={24}
+                                  />
+                                  <Text
+                                    style={[
+                                      s.legalConsentText,
+                                      field.value
+                                        ? s.legalConsentTextChecked
+                                        : null,
+                                    ]}
+                                  >
+                                    He leído y acepto la Política de Privacidad
+                                    y el tratamiento de mis datos para crear mi
+                                    cuenta.
+                                  </Text>
+                                </Pressable>
+                                <Pressable
+                                  accessibilityRole="link"
+                                  onPress={() => {
+                                    void Linking.openURL(
+                                      PRIVACY_POLICY_URL,
+                                    ).catch(() =>
+                                      setFormError(
+                                        'No pudimos abrir la Política de Privacidad.',
+                                      ),
+                                    );
+                                  }}
+                                  style={s.privacyPolicyAction}
+                                >
+                                  <Text style={s.privacyPolicyLink}>
+                                    Leer Política de Privacidad
+                                  </Text>
+                                </Pressable>
+                                {fieldState.error ? (
+                                  <Text
+                                    accessibilityRole="alert"
+                                    style={s.error}
+                                  >
+                                    {fieldState.error.message}
+                                  </Text>
+                                ) : null}
+                              </>
+                            )}
+                          />
                           <NavaButton
                             disabled={formState.isSubmitting}
                             foregroundColor={appTheme.colors.accentDark}
@@ -1288,6 +1365,7 @@ function ReviewRow({
         accessibilityLabel={`Editar ${label}`}
         accessibilityRole="button"
         onPress={onEdit}
+        style={s.editAction}
       >
         <Text style={s.edit}>Editar</Text>
       </Pressable>

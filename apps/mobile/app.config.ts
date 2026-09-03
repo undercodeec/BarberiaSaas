@@ -64,11 +64,22 @@ export default function appConfig({ config }: ConfigContext): ExpoConfig {
     process.env.EXPO_PUBLIC_APP_ENV,
     process.env.NODE_ENV === 'production',
   );
-  assertSecureMobileApiConfiguration({
-    allowedHosts: process.env.EXPO_PUBLIC_API_ALLOWED_HOSTS,
-    environment,
-    url: process.env.EXPO_PUBLIC_API_URL,
-  });
+  // EAS first resolves only the static project metadata to discover which
+  // remote environment to load. It deliberately disables dotenv in that
+  // bootstrap pass, so validating required release variables here would make
+  // the project impossible to resolve. Once EAS loads the selected environment
+  // (and in every regular/local build), the full validation remains mandatory.
+  const isEasEnvironmentBootstrap =
+    Object.prototype.hasOwnProperty.call(process.env, 'EXPO_NO_DOTENV') &&
+    !process.env.EXPO_PUBLIC_API_URL &&
+    !process.env.EXPO_PUBLIC_API_ALLOWED_HOSTS;
+  if (!isEasEnvironmentBootstrap) {
+    assertSecureMobileApiConfiguration({
+      allowedHosts: process.env.EXPO_PUBLIC_API_ALLOWED_HOSTS,
+      environment,
+      url: process.env.EXPO_PUBLIC_API_URL,
+    });
+  }
 
   return {
     ...config,
@@ -82,7 +93,10 @@ export default function appConfig({ config }: ConfigContext): ExpoConfig {
     name: config.name ?? 'Nava',
     plugins: [
       ...(config.plugins ?? []),
+      'expo-asset',
       'expo-font',
+      'expo-secure-store',
+      'expo-sharing',
       [
         'expo-location',
         {

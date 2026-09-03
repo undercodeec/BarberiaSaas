@@ -12,7 +12,9 @@
       [
         "expo-notifications",
         {
-          "sounds": ["./assets/sounds/cash_income.wav"]
+          "sounds": [
+            "./assets/sounds/cash_income.wav"
+          ]
         }
       ],
       [
@@ -29,8 +31,12 @@
         }
       ]
     ],
-    "experiments": { "typedRoutes": true },
-    "web": { "bundler": "metro" },
+    "experiments": {
+      "typedRoutes": true
+    },
+    "web": {
+      "bundler": "metro"
+    },
     "android": {
       "allowBackup": false,
       "versionCode": 38,
@@ -48,7 +54,10 @@
         {
           "action": "VIEW",
           "autoVerify": true,
-          "category": ["BROWSABLE", "DEFAULT"],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
           "data": [
             {
               "host": "reservas.navacloud.app",
@@ -70,9 +79,20 @@
       ]
     },
     "ios": {
-      "associatedDomains": ["applinks:reservas.navacloud.app"],
-      "bundleIdentifier": "com.barbersaas.mobile"
+      "associatedDomains": [
+        "applinks:reservas.navacloud.app"
+      ],
+      "bundleIdentifier": "app.navacloud.nava",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
-    "extra": { "router": {} }
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "48601b21-85b7-4e00-92a5-75c361644bc2"
+      }
+    },
+    "owner": "undercodeecs-team"
   }
 }

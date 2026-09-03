@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     backgroundColor: appTheme.colors.surface,
     borderRadius: 13,
     justifyContent: 'center',
-    minHeight: 42,
+    minHeight: 44,
     paddingHorizontal: 12,
   },
   openLabel: { color: appTheme.colors.text, fontSize: 14, fontWeight: '900' },

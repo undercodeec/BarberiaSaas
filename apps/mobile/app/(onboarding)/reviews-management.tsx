@@ -138,9 +138,9 @@ const styles = StyleSheet.create({
     borderColor: appTheme.colors.border,
     borderRadius: 20,
     borderWidth: 1,
-    height: 40,
+    height: 44,
     justifyContent: 'center',
-    width: 40,
+    width: 44,
   },
   card: {
     backgroundColor: appTheme.colors.surface,
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   screen: appStyles.screen,
-  spacer: { width: 40 },
+  spacer: { width: 44 },
   stars: { color: appTheme.colors.text, fontSize: 16, letterSpacing: 2 },
   status: { color: appTheme.colors.textMuted, fontSize: 12 },
   toggle: {

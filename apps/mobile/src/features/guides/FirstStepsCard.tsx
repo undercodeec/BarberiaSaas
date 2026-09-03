@@ -105,7 +105,12 @@ const styles = StyleSheet.create({
     marginTop: 18,
     padding: 16,
   },
-  close: { minHeight: 32, minWidth: 32, padding: 6 },
+  close: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    minWidth: 44,
+  },
   copy: { flex: 1 },
   description: {
     color: appTheme.colors.textMuted,

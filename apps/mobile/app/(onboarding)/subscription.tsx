@@ -69,12 +69,12 @@ function bookingUsageNotice(subscription: SubscriptionResponse | undefined) {
       copy: `Te quedan ${baseLimit - used} reservas antes de alcanzar el limite de Nava Free.`,
       title: 'Estas cerca del limite',
     };
-  if (used >= 20)
+  if (used >= 19)
     return {
       copy: `Ya utilizaste ${used} de ${baseLimit} reservas en los ultimos 30 dias.`,
       title: '75% del limite utilizado',
     };
-  if (used >= 20)
+  if (used >= 15)
     return {
       copy: `Ya gestionaste ${used} reservas con Nava en los ultimos 30 dias.`,
       title: 'Tu negocio esta creciendo',
@@ -413,7 +413,6 @@ export default function SubscriptionScreen() {
             ) : null}
           </View>
         ) : null}
-
       </ScrollView>
     </SafeAreaView>
   );

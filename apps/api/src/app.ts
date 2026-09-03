@@ -54,7 +54,7 @@ import { registerCommissionRoutes } from './commissions';
 import { registerClientRoutes } from './clients';
 import { registerInventoryRoutes } from './inventory';
 import { registerOperationsRoutes } from './operations';
-import { sendFcmNotifications } from './fcm';
+import { sendPushNotifications } from './fcm';
 import {
   isPushEnabledForRecipient,
   registerNotificationRoutes,
@@ -364,7 +364,7 @@ async function processQueuedNotificationDeliveries(
           push = { attempts, state: 'skipped' };
         } else {
           try {
-            await sendFcmNotifications({
+            await sendPushNotifications({
               body: notification.body,
               config,
               data: {
@@ -373,9 +373,9 @@ async function processQueuedNotificationDeliveries(
                 route: data.route,
                 type: data.type,
               },
+              devices: tokens,
               sound: notificationSound(notification.type),
               title: notification.title,
-              tokens: tokens.map((token) => token.token),
             });
             push = { attempts, state: 'sent' };
           } catch {

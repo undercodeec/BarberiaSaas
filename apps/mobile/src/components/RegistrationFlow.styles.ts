@@ -9,7 +9,12 @@ import {
 
 export const s = StyleSheet.create({
   art: { ...StyleSheet.absoluteFill, overflow: 'hidden' },
-  back: { marginBottom: 14 },
+  back: {
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    marginBottom: 14,
+    minHeight: 44,
+  },
   backdrop: {
     ...StyleSheet.absoluteFill,
     backgroundColor: appTheme.colors.overlay,
@@ -114,6 +119,7 @@ export const s = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
+  editAction: { justifyContent: 'center', minHeight: 44, minWidth: 44 },
   error: {
     color: appTheme.colors.dangerBorder,
     fontSize: 13,
@@ -201,9 +207,13 @@ export const s = StyleSheet.create({
     color: appTheme.colors.accentDark,
     fontSize: 13,
     fontWeight: '800',
-    marginLeft: 13,
-    marginTop: 8,
     textDecorationLine: 'underline',
+  },
+  privacyPolicyAction: {
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    marginLeft: 13,
+    minHeight: 44,
   },
   layer: { flex: 1, justifyContent: 'flex-end' },
   logo: { alignSelf: 'center', height: 190, width: '76%' },

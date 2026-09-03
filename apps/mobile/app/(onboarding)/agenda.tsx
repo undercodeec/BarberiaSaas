@@ -62,6 +62,8 @@ import {
   type AgendaStatusFilter,
 } from '../../src/features/screens/agenda-model';
 
+const EMPTY_AGENDA_LOCATIONS: BookingLocationsResponse['locations'] = [];
+
 export default function AgendaScreen() {
   const { session } = useAuth();
   const tenant = useTenantScope();
@@ -174,7 +176,8 @@ export default function AgendaScreen() {
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(
     null,
   );
-  const agendaLocations = agendaLocationsQuery.data?.locations ?? [];
+  const agendaLocations =
+    agendaLocationsQuery.data?.locations ?? EMPTY_AGENDA_LOCATIONS;
   const defaultLocationId =
     agendaLocations.find(
       (location) => location.id === organizationQuery.data?.location?.id,
@@ -282,10 +285,10 @@ export default function AgendaScreen() {
       requireApiClient().request<{
         appointment: AppointmentRecord;
         paymentConfirmationRequested: boolean;
-      }>(
-        `/v1/appointments/${appointmentId}/status`,
-        { body: { status: 'completed' }, method: 'PATCH' },
-      ),
+      }>(`/v1/appointments/${appointmentId}/status`, {
+        body: { status: 'completed' },
+        method: 'PATCH',
+      }),
     onError: (error) =>
       Alert.alert(
         'No pudimos completar la cita',

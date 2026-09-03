@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     gap: 7,
-    minHeight: 42,
+    minHeight: 44,
     paddingHorizontal: 11,
   },
   categoryOptionLabel: { color: '#424B57', fontSize: 12, fontWeight: '800' },

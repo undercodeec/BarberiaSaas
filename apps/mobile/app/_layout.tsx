@@ -24,6 +24,7 @@ import { PlayInAppUpdatesBanner } from '../src/components/PlayInAppUpdatesBanner
 import { PrivacyShield } from '../src/components/PrivacyShield';
 import { useCurrentOrganization } from '../src/features/organization/useCurrentOrganization';
 import { requireApiClient } from '../src/lib/api';
+import { getCurrentDevicePushRegistration } from '../src/lib/device-push-token';
 import { createNotificationResponseConsumer } from '../src/lib/notification-navigation';
 import { ensureNativeNotificationChannels } from '../src/lib/notification-channels';
 import { AppProviders } from '../src/providers/AppProviders';
@@ -61,9 +62,10 @@ function NativePushNotifications() {
       const { status } = await Notifications.getPermissionsAsync();
       if (status !== Notifications.PermissionStatus.GRANTED) return;
       await ensureNativeNotificationChannels();
-      const token = (await Notifications.getDevicePushTokenAsync()).data;
+      const registration = await getCurrentDevicePushRegistration();
+      if (!registration) return;
       await requireApiClient().request('/v1/push-tokens', {
-        body: { platform: Platform.OS, token },
+        body: registration,
         method: 'PUT',
       });
     };

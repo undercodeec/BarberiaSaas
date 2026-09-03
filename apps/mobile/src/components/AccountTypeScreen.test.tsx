@@ -18,6 +18,7 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   SafeAreaView: require('react-native').View,
 }));
 

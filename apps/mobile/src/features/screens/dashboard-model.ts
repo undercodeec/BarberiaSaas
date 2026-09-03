@@ -11,10 +11,10 @@ import {
   WELCOME_SURVEY_OPTIONS,
   type WelcomeSurveyOption,
 } from '@barber-saas/validation';
-import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { requireApiClient } from '../../lib/api';
+import { getCurrentDevicePushRegistration } from '../../lib/device-push-token';
 import { ensureNativeNotificationChannels } from '../../lib/notification-channels';
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
@@ -246,9 +246,10 @@ export function shouldShowWelcomeSurvey(result: WelcomeSurveyResponseResult) {
 export async function syncPushToken() {
   if (Platform.OS === 'web') return;
   await ensureNativeNotificationChannels();
-  const token = (await Notifications.getDevicePushTokenAsync()).data;
+  const registration = await getCurrentDevicePushRegistration();
+  if (!registration) return;
   await requireApiClient().request('/v1/push-tokens', {
-    body: { platform: Platform.OS, token },
+    body: registration,
     method: 'PUT',
   });
 }

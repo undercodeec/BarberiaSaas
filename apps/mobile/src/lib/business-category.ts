@@ -66,9 +66,9 @@ const BUSINESS_CATEGORY_VISUALS: Record<
   NAIL_STUDIO: {
     accessibilityLabel: 'Estación de estudio de uñas',
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
-    dashboard: require('../../assets/business-categories/estudio-uñas.png'),
+    dashboard: require('../../assets/business-categories/estudio-unas.png'),
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro resolves static React Native image assets through require.
-    onboarding: require('../../assets/business-categories/estudio-uñas.png'),
+    onboarding: require('../../assets/business-categories/estudio-unas.png'),
   },
   PERSONAL_CARE_OTHER: {
     accessibilityLabel: 'Espacio de cuidado personal',

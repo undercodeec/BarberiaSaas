@@ -1324,7 +1324,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(reusedCode.statusCode).toBe(400);
   });
 
-  it('verifica un registro sin consentimiento de privacidad ni crea ese consentimiento', async () => {
+  it('rechaza un registro sin consentimiento de privacidad', async () => {
     const email = 'mobile-no-consent@example.com';
     const password = 'Clave-segura-123';
     const registrationResponse = await app.inject({
@@ -1339,21 +1339,9 @@ describeWithDatabase('API con PostgreSQL', () => {
       },
       url: '/v1/auth/register',
     });
-    expect(registrationResponse.statusCode).toBe(201);
-    const registration = registrationResponse.json<{
-      developmentVerificationCode: string;
-    }>();
-
-    const verification = await app.inject({
-      method: 'POST',
-      payload: { code: registration.developmentVerificationCode, email },
-      url: '/v1/auth/verify-email',
-    });
-
-    expect(verification.statusCode).toBe(200);
-    const user = await database.user.findUniqueOrThrow({ where: { email } });
+    expect(registrationResponse.statusCode).toBe(400);
     expect(
-      await database.privacyConsent.findFirst({ where: { userId: user.id } }),
+      await database.pendingRegistration.findUnique({ where: { email } }),
     ).toBeNull();
   });
 

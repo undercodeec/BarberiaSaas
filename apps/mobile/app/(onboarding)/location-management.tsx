@@ -643,7 +643,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
     justifyContent: 'center',
-    minHeight: 42,
+    minHeight: 44,
     paddingHorizontal: 12,
   },
   archiveLabel: { color: '#B42318', fontSize: 13, fontWeight: '800' },
@@ -701,7 +701,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
     justifyContent: 'center',
-    minHeight: 42,
+    minHeight: 44,
     paddingHorizontal: 12,
   },
   backButton: {
@@ -912,7 +912,7 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 7,
     justifyContent: 'center',
-    minHeight: 40,
+    minHeight: 44,
   },
   secondaryLabel: {
     color: appTheme.colors.accentDark,

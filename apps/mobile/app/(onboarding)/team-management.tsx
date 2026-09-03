@@ -989,9 +989,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: appTheme.colors.surfaceMuted,
     borderRadius: 18,
-    height: 36,
+    height: 44,
     justifyContent: 'center',
-    width: 36,
+    width: 44,
   },
   commissionHint: { color: COLORS.muted, fontSize: 12, lineHeight: 17 },
   deleteButton: {
@@ -1041,9 +1041,9 @@ const styles = StyleSheet.create({
   invitationDeleteButton: {
     alignItems: 'center',
     borderRadius: 18,
-    height: 38,
+    height: 44,
     justifyContent: 'center',
-    width: 38,
+    width: 44,
   },
   inviteError: {
     backgroundColor: appTheme.colors.dangerSurface,
@@ -1130,7 +1130,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 8,
-    minHeight: 34,
+    minHeight: 44,
   },
   ownScheduleButtonLabel: {
     color: appTheme.colors.accentDark,
@@ -1164,7 +1164,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     flex: 1,
-    minHeight: 42,
+    minHeight: 44,
     paddingHorizontal: 6,
   },
   roleOptionLabel: { color: COLORS.muted, fontSize: 12, fontWeight: '800' },
@@ -1223,7 +1223,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 10,
-    minHeight: 32,
+    minHeight: 44,
   },
   serviceAssignmentSection: { gap: 10, marginTop: 6 },
   serviceLocation: {

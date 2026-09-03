@@ -934,9 +934,9 @@ const styles = StyleSheet.create({
     borderColor: appTheme.colors.border,
     borderRadius: appTheme.radii.control,
     borderWidth: 1,
-    height: 40,
+    height: 44,
     justifyContent: 'center',
-    width: 40,
+    width: 44,
   },
   card: {
     alignItems: 'center',
@@ -1027,7 +1027,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: appTheme.spacing.page,
     paddingVertical: 12,
   },
-  headerSpacer: { width: 40 },
+  headerSpacer: { width: 44 },
   headerStep: {
     color: appTheme.colors.accentDark,
     fontSize: 10,
