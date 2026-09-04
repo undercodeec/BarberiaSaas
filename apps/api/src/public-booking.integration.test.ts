@@ -337,8 +337,8 @@ integrationDescribe('reservas públicas', () => {
       .slice(0, 3)
       .map((slot) => Date.parse(slot.startsAt));
     expect(availabilityBody.durationMinutes).toBe(30);
-    expect(slotStartTimes[1]! - slotStartTimes[0]!).toBe(30 * 60_000);
-    expect(slotStartTimes[2]! - slotStartTimes[1]!).toBe(30 * 60_000);
+    expect(slotStartTimes[1]! - slotStartTimes[0]!).toBe(5 * 60_000);
+    expect(slotStartTimes[2]! - slotStartTimes[1]!).toBe(5 * 60_000);
 
     const startsAt = futureSlot(3, 10);
     const management = await createAndVerifyBooking(

@@ -201,6 +201,7 @@ export function BookingExperience({
       });
       const response = await fetch(
         `${apiUrl}/v1/public/${catalog.organization.slug}/${catalog.location.slug}/availability?${query.toString()}`,
+        { cache: 'no-store' },
       );
       if (!response.ok) throw new Error(await readError(response));
       const data = (await response.json()) as {

@@ -48,6 +48,9 @@ async function proxyPublicRequest(
     const value = upstream.headers.get(name);
     if (value) responseHeaders.set(name, value);
   }
+  // La disponibilidad cambia al verificar, cancelar o modificar una cita.
+  // Nunca debe quedar una respuesta antigua en el navegador, proxy o CDN.
+  responseHeaders.set('cache-control', 'no-store, max-age=0');
   return new Response(upstream.body, {
     headers: responseHeaders,
     status: upstream.status,
