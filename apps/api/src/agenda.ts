@@ -624,7 +624,7 @@ export function registerAgendaRoutes(
       for (
         let minute = effectiveStartMinute;
         minute + durationMinutes <= effectiveEndMinute;
-        minute += 5
+        minute += context.location.bookingSlotIntervalMinutes
       ) {
         const startsAt = zonedDateTimeToUtc(
           input.date,

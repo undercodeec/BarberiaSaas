@@ -53,6 +53,7 @@ const DAY_NAMES: Record<number, string> = {
   6: 'Sábado',
 };
 const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
+const BOOKING_SLOT_INTERVAL_OPTIONS = [5, 10, 15, 20, 30, 60] as const;
 
 type AccessibleLocationsResponse = {
   readonly locations: ReadonlyArray<{
@@ -97,7 +98,10 @@ export default function BusinessScheduleScreen() {
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(
     null,
   );
+  const [bookingSlotIntervalOverride, setBookingSlotIntervalOverride] =
+    useState<number | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
+  const canManageSchedule = ['manager', 'owner'].includes(tenant.scope.role);
 
   const scheduleQuery = useQuery({
     enabled: Boolean(session),
@@ -119,7 +123,11 @@ export default function BusinessScheduleScreen() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (input: { days: BusinessScheduleDay[]; locationId: string }) =>
+    mutationFn: (input: {
+      bookingSlotIntervalMinutes: number;
+      days: BusinessScheduleDay[];
+      locationId: string;
+    }) =>
       requireApiClient().request<BusinessScheduleResponse>(
         '/v1/business-schedule',
         { body: input, method: 'PUT' },
@@ -133,6 +141,7 @@ export default function BusinessScheduleScreen() {
     },
     onSuccess: async (response) => {
       setDayOverrides({});
+      setBookingSlotIntervalOverride(null);
       setRequestError(null);
       queryClient.setQueryData(tenant.key('business-schedule'), response);
       await queryClient.invalidateQueries({
@@ -152,10 +161,16 @@ export default function BusinessScheduleScreen() {
       ),
     [dayOverrides, scheduleQuery.data?.days],
   );
+  const bookingSlotIntervalMinutes =
+    bookingSlotIntervalOverride ??
+    scheduleQuery.data?.bookingSlotIntervalMinutes ??
+    5;
   const isDirty =
     days.length === 7 &&
-    scheduleSignature(days) !==
-      scheduleSignature(scheduleQuery.data?.days ?? []);
+    (scheduleSignature(days) !==
+      scheduleSignature(scheduleQuery.data?.days ?? []) ||
+      bookingSlotIntervalMinutes !==
+        scheduleQuery.data?.bookingSlotIntervalMinutes);
   const visibleDays = useMemo(() => orderedDays(days), [days]);
 
   const toggleDay = useCallback(
@@ -201,10 +216,11 @@ export default function BusinessScheduleScreen() {
     if (!scheduleQuery.data || days.length !== 7) return;
     setRequestError(null);
     saveMutation.mutate({
+      bookingSlotIntervalMinutes,
       days,
       locationId: scheduleQuery.data.locationId,
     });
-  }, [days, saveMutation, scheduleQuery.data]);
+  }, [bookingSlotIntervalMinutes, days, saveMutation, scheduleQuery.data]);
 
   if (!session) return <Redirect href="/(auth)/login" />;
 
@@ -257,6 +273,50 @@ export default function BusinessScheduleScreen() {
             </Text>
           </View>
         </View>
+        <View style={styles.slotIntervalCard}>
+          <Text style={styles.slotIntervalTitle}>Intervalo de reservas</Text>
+          <Text style={styles.slotIntervalDescription}>
+            Los servicios mantienen su duraciÃ³n. Este valor solo define cada
+            cuÃ¡ntos minutos se ofrecen nuevos horarios.
+          </Text>
+          <View style={styles.slotIntervalOptions}>
+            {BOOKING_SLOT_INTERVAL_OPTIONS.map((option) => {
+              const selected = bookingSlotIntervalMinutes === option;
+              return (
+                <Pressable
+                  accessibilityRole="radio"
+                  accessibilityState={{
+                    disabled: !canManageSchedule,
+                    selected,
+                  }}
+                  disabled={!canManageSchedule}
+                  key={option}
+                  onPress={() => setBookingSlotIntervalOverride(option)}
+                  style={[
+                    styles.slotIntervalOption,
+                    selected && styles.slotIntervalOptionSelected,
+                    !canManageSchedule && styles.slotIntervalOptionDisabled,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.slotIntervalOptionLabel,
+                      selected && styles.slotIntervalOptionLabelSelected,
+                    ]}
+                  >
+                    {option} min
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {!canManageSchedule ? (
+            <Text style={styles.permissionHint}>
+              Solo el propietario o administrador puede modificar esta
+              configuraciÃ³n.
+            </Text>
+          ) : null}
+        </View>
         {(accessibleLocationsQuery.data?.locations.length ?? 0) > 1 ? (
           <View style={styles.locationSelector}>
             <Text style={styles.locationSelectorLabel}>Sucursal</Text>
@@ -272,6 +332,7 @@ export default function BusinessScheduleScreen() {
                     accessibilityState={{ selected }}
                     onPress={() => {
                       setDayOverrides({});
+                      setBookingSlotIntervalOverride(null);
                       setSelectedLocationId(location.id);
                     }}
                     style={[
@@ -323,6 +384,7 @@ export default function BusinessScheduleScreen() {
           <View style={styles.dayList}>
             {visibleDays.map((day) => (
               <DayCard
+                canManage={canManageSchedule}
                 day={day}
                 key={day.weekday}
                 onConfigure={() => setEditingDay({ ...day })}
@@ -338,29 +400,31 @@ export default function BusinessScheduleScreen() {
           </Text>
         ) : null}
 
-        <Pressable
-          accessibilityRole="button"
-          disabled={!isDirty || saveMutation.isPending}
-          onPress={save}
-          style={({ pressed }) => [
-            styles.saveButton,
-            (!isDirty || saveMutation.isPending) && styles.disabledButton,
-            pressed && isDirty && styles.pressed,
-          ]}
-        >
-          {saveMutation.isPending ? (
-            <ActivityIndicator color={appTheme.colors.accentDark} />
-          ) : (
-            <>
-              <Ionicons
-                color={appTheme.colors.accentDark}
-                name="checkmark"
-                size={22}
-              />
-              <Text style={styles.saveText}>Guardar cambios</Text>
-            </>
-          )}
-        </Pressable>
+        {canManageSchedule ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={!isDirty || saveMutation.isPending}
+            onPress={save}
+            style={({ pressed }) => [
+              styles.saveButton,
+              (!isDirty || saveMutation.isPending) && styles.disabledButton,
+              pressed && isDirty && styles.pressed,
+            ]}
+          >
+            {saveMutation.isPending ? (
+              <ActivityIndicator color={appTheme.colors.accentDark} />
+            ) : (
+              <>
+                <Ionicons
+                  color={appTheme.colors.accentDark}
+                  name="checkmark"
+                  size={22}
+                />
+                <Text style={styles.saveText}>Guardar cambios</Text>
+              </>
+            )}
+          </Pressable>
+        ) : null}
       </ScrollView>
 
       {editingDay ? (
@@ -376,10 +440,12 @@ export default function BusinessScheduleScreen() {
 }
 
 function DayCard({
+  canManage,
   day,
   onConfigure,
   onToggle,
 }: {
+  readonly canManage: boolean;
   readonly day: BusinessScheduleDay;
   readonly onConfigure: () => void;
   readonly onToggle: () => void;
@@ -390,10 +456,15 @@ function DayCard({
         <Pressable
           accessibilityLabel={`${day.isOpen ? 'Desactivar' : 'Activar'} ${DAY_NAMES[day.weekday]}`}
           accessibilityRole="checkbox"
-          accessibilityState={{ checked: day.isOpen }}
+          accessibilityState={{ checked: day.isOpen, disabled: !canManage }}
+          disabled={!canManage}
           hitSlop={5}
           onPress={onToggle}
-          style={[styles.checkbox, day.isOpen && styles.checkboxActive]}
+          style={[
+            styles.checkbox,
+            day.isOpen && styles.checkboxActive,
+            !canManage && styles.configureButtonDisabled,
+          ]}
         >
           {day.isOpen ? (
             <Ionicons
@@ -406,18 +477,18 @@ function DayCard({
         <Pressable
           accessibilityLabel={`Configurar horario del ${DAY_NAMES[day.weekday]}`}
           accessibilityRole="button"
-          disabled={!day.isOpen}
+          disabled={!canManage || !day.isOpen}
           hitSlop={5}
           onPress={onConfigure}
           style={({ pressed }) => [
             styles.configureButton,
-            !day.isOpen && styles.configureButtonDisabled,
+            (!canManage || !day.isOpen) && styles.configureButtonDisabled,
             pressed && styles.pressed,
           ]}
         >
           <Ionicons
             color={
-              day.isOpen
+              canManage && day.isOpen
                 ? appTheme.colors.accentDark
                 : appTheme.colors.textMuted
             }
@@ -789,6 +860,11 @@ const styles = StyleSheet.create({
   },
   retryButton: { alignSelf: 'flex-start', marginTop: 10, paddingVertical: 4 },
   retryText: { color: COLORS.text, fontSize: 15, fontWeight: '800' },
+  permissionHint: {
+    color: COLORS.muted,
+    fontSize: 13,
+    lineHeight: 18,
+  },
   saveButton: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surface,
@@ -863,6 +939,43 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 2,
   },
+  slotIntervalCard: {
+    backgroundColor: appTheme.colors.surface,
+    borderRadius: 22,
+    gap: 9,
+    marginTop: 16,
+    padding: 17,
+    transform: [{ translateY: -3 }],
+    ...goldButtonShadow,
+  },
+  slotIntervalDescription: {
+    color: COLORS.muted,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  slotIntervalOption: {
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 38,
+    paddingHorizontal: 11,
+  },
+  slotIntervalOptionDisabled: { opacity: 0.58 },
+  slotIntervalOptionLabel: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  slotIntervalOptionLabelSelected: { color: appTheme.colors.accentDark },
+  slotIntervalOptionSelected: {
+    backgroundColor: appTheme.colors.accentWash,
+    borderColor: appTheme.colors.accent,
+  },
+  slotIntervalOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  slotIntervalTitle: { color: COLORS.text, fontSize: 18, fontWeight: '800' },
   stateContainer: { alignItems: 'center', paddingVertical: 58 },
   stateText: { color: COLORS.muted, fontSize: 15, marginTop: 12 },
   statusPill: {

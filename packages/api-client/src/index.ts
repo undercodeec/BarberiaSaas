@@ -902,6 +902,7 @@ export interface BusinessScheduleDay {
 }
 
 export interface BusinessScheduleResponse {
+  readonly bookingSlotIntervalMinutes: 5 | 10 | 15 | 20 | 30 | 60;
   readonly days: readonly BusinessScheduleDay[];
   readonly locationId: string;
 }

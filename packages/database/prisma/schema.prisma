@@ -1485,6 +1485,7 @@ model Location {
   whatsappPhone           String                   @map("whatsapp_phone") @db.VarChar(24)
   email                   String?                  @db.VarChar(254)
   isActive                Boolean                  @default(true) @map("is_active")
+  bookingSlotIntervalMinutes Int                    @default(5) @map("booking_slot_interval_minutes") @db.SmallInt
   createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
   organization            Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)

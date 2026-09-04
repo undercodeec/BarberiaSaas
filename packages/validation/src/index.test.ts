@@ -187,10 +187,18 @@ describe('servicios y horarios', () => {
     }));
     expect(
       replaceBusinessScheduleSchema.safeParse({
+        bookingSlotIntervalMinutes: 10,
         days,
         locationId: '00000000-0000-4000-8000-000000000001',
       }).success,
     ).toBe(true);
+    expect(
+      replaceBusinessScheduleSchema.safeParse({
+        bookingSlotIntervalMinutes: 12,
+        days,
+        locationId: '00000000-0000-4000-8000-000000000001',
+      }).success,
+    ).toBe(false);
     expect(
       replaceBusinessScheduleSchema.safeParse({
         days: days.map((day) => ({ ...day, weekday: 1 })),

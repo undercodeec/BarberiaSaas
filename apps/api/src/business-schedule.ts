@@ -157,16 +157,17 @@ function publicSchedule(
     startMinute: number;
     weekday: number;
   }>,
-  locationId: string,
+  location: { bookingSlotIntervalMinutes: number; id: string },
 ) {
   return {
+    bookingSlotIntervalMinutes: location.bookingSlotIntervalMinutes,
     days: days.map(({ endMinute, isOpen, startMinute, weekday }) => ({
       endMinute,
       isOpen,
       startMinute,
       weekday,
     })),
-    locationId,
+    locationId: location.id,
   };
 }
 
@@ -201,12 +202,16 @@ export function registerBusinessScheduleRoutes(
         'No tienes acceso a esta sucursal.',
       );
     }
-    await requireLocation(database, current.organizationId, locationId);
+    const location = await requireLocation(
+      database,
+      current.organizationId,
+      locationId,
+    );
     const days = await readSchedule(database, {
       locationId,
       organizationId: current.organizationId,
     });
-    return publicSchedule(days, locationId);
+    return publicSchedule(days, location);
   });
 
   app.put('/v1/business-schedule', async (request) => {
@@ -217,7 +222,11 @@ export function registerBusinessScheduleRoutes(
       'schedule.manage',
     );
     const input = replaceBusinessScheduleSchema.parse(request.body);
-    await requireLocation(database, current.organizationId, input.locationId);
+    const location = await requireLocation(
+      database,
+      current.organizationId,
+      input.locationId,
+    );
     const before = await readSchedule(database, {
       locationId: input.locationId,
       organizationId: current.organizationId,
@@ -244,19 +253,33 @@ export function registerBusinessScheduleRoutes(
           },
         });
       }
+      if (input.bookingSlotIntervalMinutes !== undefined) {
+        await transaction.location.update({
+          data: {
+            bookingSlotIntervalMinutes: input.bookingSlotIntervalMinutes,
+          },
+          where: { id: location.id },
+        });
+      }
       await transaction.auditLog.create({
         data: {
           action: 'business_weekly_schedule.replaced',
           actorUserId: user.id,
-          afterData: input.days,
-          beforeData: before.map(
-            ({ endMinute, isOpen, startMinute, weekday }) => ({
+          afterData: {
+            bookingSlotIntervalMinutes:
+              input.bookingSlotIntervalMinutes ??
+              location.bookingSlotIntervalMinutes,
+            days: input.days,
+          },
+          beforeData: {
+            bookingSlotIntervalMinutes: location.bookingSlotIntervalMinutes,
+            days: before.map(({ endMinute, isOpen, startMinute, weekday }) => ({
               endMinute,
               isOpen,
               startMinute,
               weekday,
-            }),
-          ),
+            })),
+          },
           entityId: input.locationId,
           entityType: 'business_weekly_schedule',
           locationId: input.locationId,
@@ -269,6 +292,11 @@ export function registerBusinessScheduleRoutes(
       locationId: input.locationId,
       organizationId: current.organizationId,
     });
-    return publicSchedule(days, input.locationId);
+    const updatedLocation = await requireLocation(
+      database,
+      current.organizationId,
+      input.locationId,
+    );
+    return publicSchedule(days, updatedLocation);
   });
 }

@@ -533,6 +533,16 @@ export const businessScheduleDaySchema = z
 
 export const replaceBusinessScheduleSchema = z
   .object({
+    bookingSlotIntervalMinutes: z
+      .union([
+        z.literal(5),
+        z.literal(10),
+        z.literal(15),
+        z.literal(20),
+        z.literal(30),
+        z.literal(60),
+      ])
+      .optional(),
     days: z
       .array(businessScheduleDaySchema)
       .length(7, 'Configura los siete días de la semana.'),

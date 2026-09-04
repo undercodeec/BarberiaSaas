@@ -3272,6 +3272,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     });
     expect(initialResponse.statusCode).toBe(200);
     const initial = initialResponse.json<{
+      bookingSlotIntervalMinutes: number;
       days: {
         endMinute: number;
         isOpen: boolean;
@@ -3281,6 +3282,7 @@ describeWithDatabase('API con PostgreSQL', () => {
       locationId: string;
     }>();
     expect(initial.locationId).toBe(agenda.locationId);
+    expect(initial.bookingSlotIntervalMinutes).toBe(5);
     expect(initial.days).toHaveLength(7);
     expect(initial.days).toEqual(
       expect.arrayContaining([
@@ -3299,7 +3301,11 @@ describeWithDatabase('API con PostgreSQL', () => {
     const forbiddenResponse = await app.inject({
       headers: { authorization: `Bearer ${agenda.barberToken}` },
       method: 'PUT',
-      payload: { days: closedMonday, locationId: agenda.locationId },
+      payload: {
+        bookingSlotIntervalMinutes: 10,
+        days: closedMonday,
+        locationId: agenda.locationId,
+      },
       url: '/v1/business-schedule',
     });
     expect(forbiddenResponse.statusCode).toBe(403);
@@ -3307,7 +3313,11 @@ describeWithDatabase('API con PostgreSQL', () => {
     const updateResponse = await app.inject({
       headers: { authorization: `Bearer ${agenda.ownerToken}` },
       method: 'PUT',
-      payload: { days: closedMonday, locationId: agenda.locationId },
+      payload: {
+        bookingSlotIntervalMinutes: 10,
+        days: closedMonday,
+        locationId: agenda.locationId,
+      },
       url: '/v1/business-schedule',
     });
     expect(updateResponse.statusCode).toBe(200);
@@ -3316,6 +3326,29 @@ describeWithDatabase('API con PostgreSQL', () => {
         .json<{ days: { isOpen: boolean; weekday: number }[] }>()
         .days.find(({ weekday }) => weekday === 1)?.isOpen,
     ).toBe(false);
+    expect(
+      updateResponse.json<{ bookingSlotIntervalMinutes: number }>()
+        .bookingSlotIntervalMinutes,
+    ).toBe(10);
+
+    const adjustedAvailability = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'GET',
+      query: {
+        date: '2030-01-15',
+        locationId: agenda.locationId,
+        membershipId: agenda.membershipId,
+        serviceIds: agenda.serviceId,
+      },
+      url: '/v1/availability',
+    });
+    expect(adjustedAvailability.statusCode).toBe(200);
+    const adjustedStarts = adjustedAvailability
+      .json<{ slots: Array<{ startsAt: string }> }>()
+      .slots.slice(0, 3)
+      .map((slot) => Date.parse(slot.startsAt));
+    expect(adjustedStarts[1]! - adjustedStarts[0]!).toBe(10 * 60_000);
+    expect(adjustedStarts[2]! - adjustedStarts[1]!).toBe(10 * 60_000);
 
     const availability = await app.inject({
       headers: { authorization: `Bearer ${agenda.ownerToken}` },

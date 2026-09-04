@@ -534,10 +534,7 @@ async function calculatePublicAvailability(
     for (
       let minute = startMinute;
       minute + durationMinutes <= endMinute;
-      // La agenda interna permite que una cita comience cada cinco minutos.
-      // Mantener la misma cadencia aquí evita perder huecos válidos cuando
-      // las citas existentes no están alineadas con la duración del servicio.
-      minute += 5
+      minute += context.location.bookingSlotIntervalMinutes
     ) {
       const startsAt = zonedDateTimeToUtc(
         input.date,
