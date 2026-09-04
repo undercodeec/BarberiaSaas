@@ -14,10 +14,12 @@ import {
   locationOnboardingSchema,
   mapsAutocompleteSchema,
   mapsReverseGeocodeSchema,
+  MAX_HIGH_END_IPHONE_IMAGE_DATA_URI_LENGTH,
   publicApiConfigSchema,
   replaceBusinessScheduleSchema,
   signUpSchema,
   updateBookingSettingsSchema,
+  updateOnboardingAccountDetailsSchema,
   updateTeamMemberSchema,
   verifyEmailSchema,
   welcomeSurveyResponseSchema,
@@ -308,6 +310,36 @@ describe('motor de agenda', () => {
 });
 
 describe('autenticación y onboarding', () => {
+  it('acepta una portada de hasta 15 MiB codificada por un iPhone de alta gama', () => {
+    const dataUriPrefix = 'data:image/jpeg;base64,';
+    const coverImageUri = `${dataUriPrefix}${'A'.repeat(
+      MAX_HIGH_END_IPHONE_IMAGE_DATA_URI_LENGTH - dataUriPrefix.length,
+    )}`;
+    const accountDetails = {
+      addressLine: null,
+      businessCategory: 'BARBERSHOP',
+      businessName: 'Barbería Ana',
+      city: 'Quito',
+      countryCode: 'EC',
+      coverImageUri,
+      description: null,
+      facebookUrl: null,
+      instagramUrl: null,
+      phone: '+593999999999',
+      timezone: 'America/Guayaquil',
+    };
+
+    expect(
+      updateOnboardingAccountDetailsSchema.safeParse(accountDetails).success,
+    ).toBe(true);
+    expect(
+      updateOnboardingAccountDetailsSchema.safeParse({
+        ...accountDetails,
+        coverImageUri: `${coverImageUri}A`,
+      }).success,
+    ).toBe(false);
+  });
+
   it('valida el registro mínimo de una persona invitada', () => {
     expect(
       invitationSignUpSchema.safeParse({

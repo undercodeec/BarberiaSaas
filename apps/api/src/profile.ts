@@ -1,4 +1,5 @@
 import { type DatabaseClient } from '@barber-saas/database';
+import { MAX_HIGH_END_IPHONE_IMAGE_DATA_URI_LENGTH } from '@barber-saas/validation';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
@@ -15,7 +16,10 @@ const imageDataSchema = z
     /^data:image\/(jpeg|png|webp);base64,/u,
     'Formato de imagen no valido.',
   )
-  .max(2_000_000, 'La imagen supera el limite permitido.');
+  .max(
+    MAX_HIGH_END_IPHONE_IMAGE_DATA_URI_LENGTH,
+    'La imagen supera el limite permitido.',
+  );
 const updateProfileSchema = z.object({
   bio: z.string().trim().max(500).nullable().optional(),
   fullName: z.string().trim().min(2).max(120),

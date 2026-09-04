@@ -231,14 +231,20 @@ const optionalProfileUrl = z
   .union([z.literal(''), z.string().trim().url().max(2048), z.null()])
   .transform((value) => value || null);
 
-const MAX_COVER_IMAGE_DATA_URI_LENGTH = 700_000;
+// The 48 MP camera on current iPhone Pro models produces images up to
+// 8064 × 6048 px. Keep the encoded value in sync with the 15 MiB file limit.
+export const MAX_HIGH_END_IPHONE_IMAGE_BYTES = 15 * 1024 * 1024;
+export const MAX_HIGH_END_IPHONE_IMAGE_DATA_URI_LENGTH =
+  Math.ceil((MAX_HIGH_END_IPHONE_IMAGE_BYTES * 4) / 3) + 128;
+export const MAX_HIGH_END_IPHONE_IMAGE_DIMENSION = 8_064;
+
 const optionalCoverImage = z
   .union([
     z.literal(''),
     z
       .string()
       .trim()
-      .max(MAX_COVER_IMAGE_DATA_URI_LENGTH)
+      .max(MAX_HIGH_END_IPHONE_IMAGE_DATA_URI_LENGTH)
       .refine(
         (value) =>
           /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/u.test(

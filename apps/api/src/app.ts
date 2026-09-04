@@ -1202,7 +1202,8 @@ export async function buildApi({
     .map((value) => value.trim())
     .filter(Boolean);
   const app = Fastify({
-    bodyLimit: 1_048_576,
+    // A 15 MiB image becomes roughly 20 MiB when sent as a Base64 data URI.
+    bodyLimit: 22 * 1024 * 1024,
     logger: config.APP_ENV === 'production',
     requestTimeout: 30_000,
     trustProxy:

@@ -16,6 +16,7 @@ import {
   appTheme,
   goldButtonShadow,
 } from '../src/components/BottomNavigation';
+import { AppStoreUpdatesBanner } from '../src/components/AppStoreUpdatesBanner';
 import { GlobalNotificationsBanner } from '../src/components/GlobalNotificationsBanner';
 import { MobileErrorBoundary } from '../src/components/MobileErrorBoundary';
 import { NavaPreloader } from '../src/components/NavaPreloader';
@@ -145,6 +146,7 @@ export default function RootLayout() {
           <StatusBar style="dark" />
           <SessionStateGate />
           <PlayInAppUpdatesBanner />
+          <AppStoreUpdatesBanner />
         </AppProviders>
         {showPreloader ? <NavaPreloader onFinish={finishPreloader} /> : null}
         <PrivacyShield />

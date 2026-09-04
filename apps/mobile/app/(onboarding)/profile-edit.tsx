@@ -5,6 +5,10 @@ import type {
   OnboardingAccountDetailsResponse,
   UserProfileResponse,
 } from '@barber-saas/api-client';
+import {
+  MAX_HIGH_END_IPHONE_IMAGE_BYTES,
+  MAX_HIGH_END_IPHONE_IMAGE_DIMENSION,
+} from '@barber-saas/validation';
 import * as ImagePicker from 'expo-image-picker';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
@@ -37,8 +41,6 @@ import { detectTimezone } from '../../src/lib/timezones';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const PRIMARY = appTheme.colors.accent;
-const MAX_IMAGE_BYTES = 1_500_000;
-const MAX_IMAGE_DIMENSION = 1_600;
 type PhotoTarget = 'avatar' | 'business-cover';
 
 function initials(name: string) {
@@ -207,13 +209,13 @@ export default function ProfileEditScreen() {
     }
     const bytes = asset.fileSize ?? Math.ceil((asset.base64.length * 3) / 4);
     if (
-      bytes > (target === 'business-cover' ? 500_000 : MAX_IMAGE_BYTES) ||
-      asset.width > MAX_IMAGE_DIMENSION ||
-      asset.height > MAX_IMAGE_DIMENSION
+      bytes > MAX_HIGH_END_IPHONE_IMAGE_BYTES ||
+      asset.width > MAX_HIGH_END_IPHONE_IMAGE_DIMENSION ||
+      asset.height > MAX_HIGH_END_IPHONE_IMAGE_DIMENSION
     ) {
       Alert.alert(
         'Imagen demasiado grande',
-        'Máximo: 1.5 MB y 1600 × 1600 píxeles.',
+        'Máximo: 15 MB y 8064 píxeles por lado.',
       );
       return;
     }
