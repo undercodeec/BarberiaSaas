@@ -251,28 +251,11 @@ export default function BookingDetailsScreen() {
   }, []);
 
   const scheduleSlots = useMemo<ScheduleSlot[]>(() => {
-    const availableSlots = (availabilityQuery.data?.slots ?? []).map(
-      (slot): ScheduleSlot => ({
-        ...slot,
-        state:
-          Date.parse(slot.startsAt) <= scheduleClock ? 'past' : 'available',
-      }),
-    );
-    const unavailableSlots = (
-      availabilityQuery.data?.unavailableSlots ?? []
-    ).map((slot): ScheduleSlot => ({
-      endsAt: slot.endsAt,
-      startsAt: slot.startsAt,
-      state: Date.parse(slot.startsAt) <= scheduleClock ? 'past' : slot.reason,
+    return (availabilityQuery.data?.slots ?? []).map((slot): ScheduleSlot => ({
+      ...slot,
+      state: Date.parse(slot.startsAt) <= scheduleClock ? 'past' : 'available',
     }));
-    return [...availableSlots, ...unavailableSlots].sort(
-      (left, right) => Date.parse(left.startsAt) - Date.parse(right.startsAt),
-    );
-  }, [
-    availabilityQuery.data?.slots,
-    availabilityQuery.data?.unavailableSlots,
-    scheduleClock,
-  ]);
+  }, [availabilityQuery.data?.slots, scheduleClock]);
   const filteredSlots = scheduleSlots.filter((slot) =>
     slotMatchesPeriod(slot.startsAt, timePeriod, timeZone),
   );

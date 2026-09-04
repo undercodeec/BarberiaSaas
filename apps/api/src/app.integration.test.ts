@@ -3358,6 +3358,45 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(audit).not.toBeNull();
   });
 
+  it('devuelve en Agenda solamente horarios que pueden reservarse', async () => {
+    const agenda = await setupAgenda('agenda-sin-ocupados-sinteticos');
+    await database.service.update({
+      data: { durationMinutes: 60 },
+      where: { id: agenda.serviceId },
+    });
+    const created = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        clientName: 'Cliente de una hora',
+        locationId: agenda.locationId,
+        professionalMembershipId: agenda.membershipId,
+        serviceIds: [agenda.serviceId],
+        startsAt: '2030-01-14T15:30:00.000Z',
+      },
+      url: '/v1/appointments',
+    });
+    expect(created.statusCode, created.body).toBe(201);
+
+    const availability = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'GET',
+      query: {
+        date: '2030-01-14',
+        locationId: agenda.locationId,
+        membershipId: agenda.membershipId,
+        serviceIds: agenda.serviceId,
+      },
+      url: '/v1/availability',
+    });
+
+    expect(availability.statusCode).toBe(200);
+    expect(availability.json()).not.toHaveProperty('unavailableSlots');
+    expect(
+      availability.json<{ durationMinutes: number }>().durationMinutes,
+    ).toBe(60);
+  });
+
   it('muestra al administrador las citas de la sucursal elegida y limita al barbero a las propias', async () => {
     const agenda = await setupAgenda('agenda-multi-sucursal-visible');
     const ownerMembership = await database.membership.findFirstOrThrow({

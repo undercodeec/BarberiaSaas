@@ -598,21 +598,15 @@ export function registerAgendaRoutes(
       }),
     ]);
     if (!businessSchedule?.isOpen) {
-      return { durationMinutes, slots: [], unavailableSlots: [] };
+      return { durationMinutes, slots: [] };
     }
     const occupiedRanges = [
       ...appointments.map((appointment) => ({
         endsAt: appointment.endsAt,
-        reason: 'occupied' as const,
         startsAt: appointment.startsAt,
       })),
     ];
     const slots: { endsAt: string; startsAt: string }[] = [];
-    const unavailableSlots: Array<{
-      endsAt: string;
-      reason: 'blocked' | 'occupied';
-      startsAt: string;
-    }> = [];
     for (const schedule of schedules) {
       const effectiveStartMinute = Math.max(
         schedule.startMinute,
@@ -648,21 +642,10 @@ export function registerAgendaRoutes(
             endsAt: endsAt.toISOString(),
             startsAt: startsAt.toISOString(),
           });
-        } else if (endsAt <= scheduleEnd) {
-          const conflictingRange = occupiedRanges.find((range) =>
-            overlaps(startsAt, endsAt, range.startsAt, range.endsAt),
-          );
-          if (conflictingRange) {
-            unavailableSlots.push({
-              endsAt: endsAt.toISOString(),
-              reason: conflictingRange.reason,
-              startsAt: startsAt.toISOString(),
-            });
-          }
         }
       }
     }
-    return { durationMinutes, slots, unavailableSlots };
+    return { durationMinutes, slots };
   });
 
   app.get('/v1/appointments', async (request) => {

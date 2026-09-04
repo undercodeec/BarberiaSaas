@@ -462,6 +462,72 @@ integrationDescribe('reservas públicas', () => {
     expect(await database.client.count({ where: { organizationId } })).toBe(1);
   });
 
+  it('solo bloquea una reserva pública después de verificar el correo', async () => {
+    const startsAt = futureSlot(9, 10);
+    const created = await app.inject({
+      headers: { 'idempotency-key': `pending-verification-${randomUUID()}` },
+      method: 'POST',
+      payload: {
+        email: `pending-verification-${suffix}@example.com`,
+        fullName: 'Cliente pendiente de verificar',
+        membershipId,
+        phone: `+59397${String(Date.now()).slice(-7)}`,
+        policyAccepted: true,
+        serviceIds: [serviceId],
+        startsAt,
+      },
+      url: `/v1/public/${organizationSlug}/principal/bookings`,
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    const bookingId = created.json<{ bookingId: string }>().bookingId;
+
+    expect(
+      await database.appointment.findUniqueOrThrow({
+        where: { id: bookingId },
+      }),
+    ).toMatchObject({
+      reservesSlot: false,
+      status: AppointmentStatus.PENDING_VERIFICATION,
+    });
+
+    const beforeVerification = await app.inject({
+      method: 'GET',
+      url: `/v1/public/${organizationSlug}/principal/availability?date=${startsAt.slice(0, 10)}&membershipId=${membershipId}&serviceIds=${serviceId}`,
+    });
+    expect(beforeVerification.statusCode).toBe(200);
+    expect(
+      beforeVerification
+        .json<{ slots: ReadonlyArray<{ startsAt: string }> }>()
+        .slots.map((slot) => slot.startsAt),
+    ).toContain(startsAt);
+
+    const verified = await app.inject({
+      method: 'POST',
+      payload: { code: lastVerificationCode },
+      url: `/v1/public/bookings/${bookingId}/verify`,
+    });
+    expect(verified.statusCode, verified.body).toBe(200);
+    expect(
+      await database.appointment.findUniqueOrThrow({
+        where: { id: bookingId },
+      }),
+    ).toMatchObject({
+      reservesSlot: true,
+      status: AppointmentStatus.CONFIRMED,
+    });
+
+    const afterVerification = await app.inject({
+      method: 'GET',
+      url: `/v1/public/${organizationSlug}/principal/availability?date=${startsAt.slice(0, 10)}&membershipId=${membershipId}&serviceIds=${serviceId}`,
+    });
+    expect(afterVerification.statusCode).toBe(200);
+    expect(
+      afterVerification
+        .json<{ slots: ReadonlyArray<{ startsAt: string }> }>()
+        .slots.map((slot) => slot.startsAt),
+    ).not.toContain(startsAt);
+  });
+
   it('publica una reseña verificada y permite ocultarla', async () => {
     const management = await createAndVerifyBooking(
       `public-review-${randomUUID()}`,

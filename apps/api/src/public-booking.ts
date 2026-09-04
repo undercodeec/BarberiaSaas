@@ -1087,6 +1087,7 @@ export function registerPublicBookingRoutes(
               source: AppointmentSource.PUBLIC_BOOKING,
               startsAt,
               status: AppointmentStatus.PENDING_VERIFICATION,
+              reservesSlot: false,
               verificationExpiresAt,
             },
           });
@@ -1219,24 +1220,45 @@ export function registerPublicBookingRoutes(
     const managementExpiresAt = new Date(
       existing.endsAt.getTime() + MANAGEMENT_AFTER_END_MS,
     );
-    await database.$transaction(async (transaction) => {
-      await transaction.appointment.update({
-        data: {
-          attendanceConfirmedAt: new Date(),
-          status: AppointmentStatus.CONFIRMED,
-          verificationExpiresAt: null,
-        },
-        where: { id: existing.id },
+    try {
+      await database.$transaction(async (transaction) => {
+        await transaction.$queryRaw`WITH lock AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtext(${existing.professionalMembershipId}))) SELECT 1 AS locked FROM lock`;
+        await transaction.$queryRaw`WITH lock AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtext(${existing.organizationId}))) SELECT 1 AS locked FROM lock`;
+        await assertBookable(transaction, {
+          endsAt: existing.endsAt,
+          locationId: existing.locationId,
+          professionalMembershipId: existing.professionalMembershipId,
+          startsAt: existing.startsAt,
+          timeZone: existing.location.timezone,
+        });
+        await transaction.appointment.update({
+          data: {
+            attendanceConfirmedAt: new Date(),
+            reservesSlot: true,
+            status: AppointmentStatus.CONFIRMED,
+            verificationExpiresAt: null,
+          },
+          where: { id: existing.id },
+        });
+        await transaction.publicBookingAccess.update({
+          data: {
+            managementExpiresAt,
+            managementTokenHash: hashOpaqueToken(token),
+            verifiedAt: new Date(),
+          },
+          where: { id: existing.publicAccess!.id },
+        });
       });
-      await transaction.publicBookingAccess.update({
-        data: {
-          managementExpiresAt,
-          managementTokenHash: hashOpaqueToken(token),
-          verifiedAt: new Date(),
-        },
-        where: { id: existing.publicAccess!.id },
-      });
-    });
+    } catch (error) {
+      if (isAppointmentConflict(error)) {
+        throw new ApiError(
+          409,
+          'APPOINTMENT_CONFLICT',
+          'Ese horario acaba de ser ocupado. Elige otro disponible.',
+        );
+      }
+      throw error;
+    }
     const url = manageUrl(publicBaseUrl, token);
     await sendSafely(
       mailer
