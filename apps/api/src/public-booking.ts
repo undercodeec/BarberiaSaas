@@ -497,10 +497,11 @@ export async function calculatePublicAvailability(
   );
   const weekday = weekdayFor(input.date);
   const [schedules, businessSchedule, appointments] = await Promise.all([
-    database.businessWeeklySchedule.findMany({
+    database.weeklySchedule.findMany({
       orderBy: { startMinute: 'asc' },
       where: {
         locationId: input.locationId,
+        membershipId: input.membershipId,
         weekday,
       },
     }),

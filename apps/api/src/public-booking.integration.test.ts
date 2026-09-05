@@ -623,6 +623,58 @@ integrationDescribe('reservas públicas', () => {
     expect(cancelled.reservesSlot).toBe(false);
   });
 
+  it('limita los cupos publicos al horario del profesional en v1 y v2', async () => {
+    const date = futureSlot(20, 9).slice(0, 10);
+    const weekday = new Date(`${date}T00:00:00.000Z`).getUTCDay();
+    const expectedStartsAt = [
+      '12:00:00.000Z',
+      '12:05:00.000Z',
+      '12:10:00.000Z',
+      '12:15:00.000Z',
+      '12:20:00.000Z',
+      '12:25:00.000Z',
+      '12:30:00.000Z',
+    ].map((time) => `${date}T${time}`);
+
+    await database.weeklySchedule.updateMany({
+      data: { endMinute: 780, startMinute: 720 },
+      where: { locationId, membershipId, weekday },
+    });
+
+    try {
+      const query = new URLSearchParams({
+        date,
+        membershipId,
+        serviceIds: serviceId,
+      });
+      const [legacy, scalable] = await Promise.all([
+        app.inject({
+          method: 'GET',
+          url: `/v1/public/${organizationSlug}/principal/availability?${query}`,
+        }),
+        app.inject({
+          method: 'GET',
+          url: `/v2/public/${organizationSlug}/principal/availability?${query}`,
+        }),
+      ]);
+
+      expect(legacy.statusCode, legacy.body).toBe(200);
+      expect(scalable.statusCode, scalable.body).toBe(200);
+      for (const response of [legacy, scalable]) {
+        expect(
+          response
+            .json<{ slots: ReadonlyArray<{ startsAt: string }> }>()
+            .slots.map((slot) => slot.startsAt),
+        ).toEqual(expectedStartsAt);
+      }
+    } finally {
+      await database.weeklySchedule.updateMany({
+        data: { endMinute: 1080, startMinute: 540 },
+        where: { locationId, membershipId, weekday },
+      });
+    }
+  });
+
   it('oculta al profesional solo en su sucursal y rechaza nuevas reservas publicas', async () => {
     const disabled = await app.inject({
       headers: { authorization: `Bearer ${accessToken}` },
