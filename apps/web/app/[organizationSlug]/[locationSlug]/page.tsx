@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { getWebApiBaseUrl } from '../../api-url';
 import { BookingExperience } from '../../components/BookingExperience';
+import { proxyCatalogMediaUrls } from './catalog-media';
 
 const API_URL = getWebApiBaseUrl();
 
@@ -19,6 +20,9 @@ export default async function PublicBookingPage({
     { next: { revalidate: 60 } },
   );
   if (!response.ok) notFound();
-  const catalog = (await response.json()) as PublicBookingCatalogV2;
+  const catalog = proxyCatalogMediaUrls(
+    (await response.json()) as PublicBookingCatalogV2,
+    '/api/public-proxy',
+  );
   return <BookingExperience apiBaseUrl="/api/public-proxy" catalog={catalog} />;
 }
