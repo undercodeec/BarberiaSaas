@@ -37,7 +37,6 @@ import {
 import { PlatformUsers } from './PlatformUsers';
 import { PlatformPaymentReceipts } from './PlatformPaymentReceipts';
 import { PlatformSubscriptionDiscounts } from './PlatformSubscriptionDiscounts';
-import { PlatformSubscriptions } from './PlatformSubscriptions';
 
 const dateFormatter = new Intl.DateTimeFormat('es-EC', {
   dateStyle: 'medium',

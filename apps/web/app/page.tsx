@@ -1,7 +1,13 @@
 'use client';
 
 import { animate } from 'animejs';
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 
 const trialLink = '/suscripciones';
 const portalMenuItems = [
@@ -264,7 +270,7 @@ export default function HomePage() {
   }, [closeProgress]);
 
   const deckIndex = modules.indexOf(deck[0]!);
-  const shiftDeck = (direction: number) => {
+  const shiftDeck = useCallback((direction: number) => {
     if (deckTransitionRef.current) return;
     deckTransitionRef.current = true;
     setDeckDirection(direction);
@@ -289,7 +295,7 @@ export default function HomePage() {
         deckTransitionRef.current = false;
       }, 110);
     }, 420);
-  };
+  }, [deck]);
 
   useEffect(() => {
     const onWheel = (event: WheelEvent) => {
@@ -317,7 +323,7 @@ export default function HomePage() {
 
     window.addEventListener('wheel', onWheel, { passive: false });
     return () => window.removeEventListener('wheel', onWheel);
-  }, [deck, deckIndex]);
+  }, [deck, deckIndex, shiftDeck]);
 
   useEffect(() => {
     const onTouchStart = (event: TouchEvent) => {
@@ -362,15 +368,15 @@ export default function HomePage() {
       window.removeEventListener('touchend', resetTouch);
       window.removeEventListener('touchcancel', resetTouch);
     };
-  }, [deck, deckIndex]);
+  }, [deck, deckIndex, shiftDeck]);
 
-  const closeMenu = () => {
+  const closeMenu = useCallback(() => {
     if (!isMenuOpen) return;
     setIsMenuOpen(false);
     setIsMenuClosing(true);
     if (menuCloseTimerRef.current) clearTimeout(menuCloseTimerRef.current);
     menuCloseTimerRef.current = setTimeout(() => setIsMenuClosing(false), 680);
-  };
+  }, [isMenuOpen]);
 
   const toggleMenu = () => {
     if (isMenuOpen) {
@@ -396,7 +402,7 @@ export default function HomePage() {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', closeFromKeyboard);
     };
-  }, [isMenuClosing, isMenuOpen]);
+  }, [closeMenu, isMenuClosing, isMenuOpen]);
 
   useEffect(
     () => () => {
@@ -419,6 +425,7 @@ export default function HomePage() {
         <button
           aria-controls="portal-menu-panel"
           aria-expanded={isMenuOpen}
+          aria-label={isMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
           className="portal-menu-toggle"
           onClick={toggleMenu}
           type="button"

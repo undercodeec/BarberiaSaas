@@ -55,30 +55,33 @@ export function PlatformSubscriptions({
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    void getPlatformSubscriptions(token, {
-      invoiceStatus,
-      page,
-      paymentStatus,
-      search,
-      status,
-    })
-      .then((result) => {
-        if (active) setData(result);
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      void getPlatformSubscriptions(token, {
+        invoiceStatus,
+        page,
+        paymentStatus,
+        search,
+        status,
       })
-      .catch((error: unknown) => {
-        if (active)
-          onToast(
-            error instanceof Error
-              ? error.message
-              : 'No fue posible cargar las suscripciones.',
-          );
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+        .then((result) => {
+          if (active) setData(result);
+        })
+        .catch((error: unknown) => {
+          if (active)
+            onToast(
+              error instanceof Error
+                ? error.message
+                : 'No fue posible cargar las suscripciones.',
+            );
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    }, 0);
     return () => {
       active = false;
+      window.clearTimeout(timer);
     };
   }, [invoiceStatus, onToast, page, paymentStatus, search, status, token]);
 

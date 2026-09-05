@@ -222,7 +222,10 @@ function sessionMessage(session: CheckoutSession) {
 
 export default function CheckoutExperience() {
   const router = useRouter();
-  const registrationCountries = useMemo(getRegistrationCountryOptions, []);
+  const registrationCountries = useMemo(
+    () => getRegistrationCountryOptions(),
+    [],
+  );
   const [plans, setPlans] = useState<Plan[]>([]);
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [email, setEmail] = useState('');

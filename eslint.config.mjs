@@ -10,6 +10,7 @@ export default tseslint.config(
       '**/.eas-archive/**',
       '**/.next/**',
       '**/.turbo/**',
+      '**/.worktrees/**',
       '**/coverage/**',
       '**/dist/**',
       '**/.cxx/**',

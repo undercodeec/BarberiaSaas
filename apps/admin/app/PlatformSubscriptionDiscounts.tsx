@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 
 import {
   createPlatformSubscriptionDiscount,
@@ -40,7 +40,7 @@ export function PlatformSubscriptionDiscounts({
   const [planIds, setPlanIds] = useState<string[]>([]);
   const [reason, setReason] = useState('');
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       setData(await getPlatformSubscriptionDiscounts(token, { search, status }));
@@ -49,13 +49,12 @@ export function PlatformSubscriptionDiscounts({
     } finally {
       setLoading(false);
     }
-  }
+  }, [onToast, search, status, token]);
 
   useEffect(() => {
-    void load();
-    // load only needs the current filters and session token.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status, token]);
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   function togglePlan(planId: string) {
     setPlanIds((current) =>
