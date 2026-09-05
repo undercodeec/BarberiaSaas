@@ -13,7 +13,7 @@ export default async function PublicBookingPage({
 }) {
   const { locationSlug, organizationSlug } = await params;
   const response = await fetch(
-    `${API_URL.replace(/\/$/u, '')}/v1/public/${encodeURIComponent(
+    `${API_URL.replace(/\/$/u, '')}/v2/public/${encodeURIComponent(
       organizationSlug,
     )}/${encodeURIComponent(locationSlug)}/catalog`,
     { next: { revalidate: 60 } },
