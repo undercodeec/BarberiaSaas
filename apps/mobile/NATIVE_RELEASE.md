@@ -46,3 +46,40 @@ coincide. Nunca se permite sustituir la firma release por la debug.
 
 El workflow manual `.github/workflows/mobile-release.yml` aplica estas mismas
 comprobaciones usando secretos de GitHub y conserva el AAB solo si todas pasan.
+
+## iOS y TestFlight
+
+iOS se distribuye como `.ipa` mediante EAS Build desde `apps/mobile`; no se
+genera desde Windows ni se versiona una carpeta `ios/` generada. La fuente de
+verdad es `app.json`, `app.config.ts` y `eas.json`.
+
+Antes de iniciar un build remoto, ejecutar:
+
+```powershell
+Set-Location D:\Documentos\BarberiaSaas
+pnpm install --frozen-lockfile
+pnpm --filter @barber-saas/mobile verify:ios-release-config
+pnpm --filter @barber-saas/mobile typecheck
+pnpm --filter @barber-saas/mobile test
+```
+
+El perfil `production` debe conservar `environment: production`,
+`autoIncrement: true`, el bundle ID `app.navacloud.nava`, el dominio asociado
+`applinks:reservas.navacloud.app` y el Apple ID de App Store Connect. Las
+credenciales Apple, certificados, perfiles y claves API se administran en EAS
+y App Store Connect; nunca se almacenan en el repositorio ni en `.env`.
+
+Desde una sesión autenticada en la cuenta Expo propietaria del proyecto:
+
+```powershell
+Set-Location D:\Documentos\BarberiaSaas\apps\mobile
+pnpm dlx eas-cli@latest whoami
+pnpm dlx eas-cli@latest build --platform ios --profile production
+# Cuando el build termine correctamente:
+pnpm dlx eas-cli@latest submit --platform ios --profile production
+```
+
+El primer uso puede requerir acceso Apple Developer para crear o asociar el
+certificado, identificador y provisioning profile. Después de que App Store
+Connect procese el binario, probar primero mediante TestFlight interno antes
+de enviar la versión a revisión.
