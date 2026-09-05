@@ -50,6 +50,32 @@ su resultado debe registrarse aquí antes de archivarlos.
       y typecheck. Las pruebas destructivas usaron sólo
       `127.0.0.1:5433/barber_saas_test`; Neon de producción no fue modificado.
 
+## Candidata móvil 0.1.17 y preparación de despliegue — 5 de septiembre de 2026
+
+- [x] El commit de candidata `4898224` alinea `app.json` y Gradle en versión
+      `0.1.17` / Android `versionCode 39`, e incorpora las actualizaciones de
+      parches compatibles de Expo 57. Aún debe enviarse a `origin/main` antes
+      de que un VPS pueda hacer `git pull --ff-only`.
+- [x] El AAB de producción firmado se generó en un árbol limpio y quedó
+      archivado localmente como `apps/mobile/releases/Nava-0.1.17-code39.aab`
+      (84.919.113 bytes; SHA-256
+      `ECA8BE63BE05CAD4BB47C0DA6CF4E5ED6BB962F95B6DB71D7406F063D2D3A5D8`).
+      Se verificaron manifiesto, firma JAR, bundle JavaScript y ausencia de
+      runtime de actualización no esperado. El AAB no se versiona ni se ha
+      subido a Google Play.
+- [x] La configuración de iOS conserva el identificador
+      `app.navacloud.nava`, el dominio asociado de reservas, la declaración de
+      cifrado no exento y el `ascAppId` de App Store Connect. El perfil EAS
+      `production` autoincrementa el número de build remoto. La validación de
+      configuración, typecheck, 152 pruebas móviles y Expo Doctor finalizaron
+      correctamente.
+- [ ] Falta lanzar el build EAS de iOS desde una sesión autenticada de Expo con
+      acceso a Apple Developer, y después enviarlo a TestFlight. No se deben
+      incluir credenciales de Apple, certificados ni archivos `.env` en Git.
+- [ ] Antes de producción, cargar el AAB en una pista interna o cerrada de Play
+      Console, completar las comprobaciones de consola y ejecutar el protocolo
+      VPS de este documento; no se ha desplegado ningún servicio en el VPS.
+
 ## Reservas: disponibilidad sincronizada e intervalo configurable — 5 de septiembre de 2026
 
 Los commits `9d66a46`, `b093c78` y `7c524aa` están publicados en `main`. El
