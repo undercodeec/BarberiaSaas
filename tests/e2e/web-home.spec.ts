@@ -7,11 +7,15 @@ test('abre el portal y muestra la propuesta comercial de Nava', async ({
   await page.goto('/');
   await page.evaluate(() => window.scrollTo(0, window.innerHeight));
   await expect(
-    page.getByRole('heading', {
-      name: 'Haz crecer tu barbería con más orden y menos complicaciones.',
-    }),
+    page
+      .getByRole('heading', {
+        name: 'Haz crecer tu barbería con más orden y menos complicaciones.',
+      })
+      .first(),
   ).toBeVisible();
-  await expect(page.getByText('10 días para probar Nava')).toBeVisible();
+  await expect(
+    page.getByText('Prueba Nava durante 10 días. Después, tu cuenta pasa a Nava Free.'),
+  ).toHaveCount(1);
 });
 
 test('muestra controles de cookies y la página de privacidad', async ({
@@ -32,7 +36,7 @@ test('muestra controles de cookies y la página de privacidad', async ({
     }),
   ).toBeVisible();
   await expect(
-    page.getByRole('link', { name: 'soporte@navacloud.app' }),
+    page.getByRole('link', { name: 'soporte@navacloud.app' }).first(),
   ).toBeVisible();
 });
 
