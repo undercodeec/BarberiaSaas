@@ -1,8 +1,8 @@
 @import 'tailwindcss';
 
 :root {
-  --gold: #c89449;
-  --gold-deep: #ad7730;
+  --gold: #a66d25;
+  --gold-deep: #865519;
   --gold-pale: #e3c38e;
   --paper: #0a0c0e;
   --secondary: #101317;
@@ -1720,14 +1720,14 @@ a {
 }
 .close-wordmark {
   bottom: -0.18em;
-  color: var(--on-light);
+  color: #666;
   font-family: Arial, sans-serif;
   font-size: clamp(150px, 25vw, 440px);
   font-weight: 900;
   left: 14vw;
   letter-spacing: -0.1em;
   line-height: 0.7;
-  opacity: 0.08;
+  opacity: 1;
   position: absolute;
   white-space: nowrap;
 }
