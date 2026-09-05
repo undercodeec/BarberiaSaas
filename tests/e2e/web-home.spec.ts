@@ -40,6 +40,15 @@ test('muestra controles de cookies y la página de privacidad', async ({
   ).toBeVisible();
 });
 
+test('no pide consentimiento de cookies durante una reserva pública', async ({
+  page,
+}) => {
+  await page.goto('/booking/token-de-prueba');
+  await expect(
+    page.getByRole('dialog', { name: 'Preferencias de cookies' }),
+  ).toBeHidden();
+});
+
 test('no presenta infracciones críticas o serias de accesibilidad', async ({
   page,
 }) => {

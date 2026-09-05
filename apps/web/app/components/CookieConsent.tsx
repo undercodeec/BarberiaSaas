@@ -1,10 +1,18 @@
 'use client';
 
 import { type CSSProperties, useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 
 const STORAGE_KEY = 'nava.cookie-consent.v1';
 const PRIVACY_URL = 'https://navacloud.app/tratamiento-de-datos';
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim();
+const NAVA_PAGE_ROOTS = new Set([
+  'accept-invitation',
+  'checkout',
+  'politicas',
+  'suscripciones',
+  'tratamiento-de-datos',
+]);
 
 type ConsentChoice = 'accepted' | 'rejected';
 
@@ -35,7 +43,20 @@ function configureAnalytics(consent: ConsentChoice) {
   document.head.append(script);
 }
 
+function isPublicBookingPath(pathname: string) {
+  const segments = pathname.split('/').filter(Boolean);
+  const [root] = segments;
+  if (!root) return false;
+  if (root === 'booking' && segments.length === 2) return true;
+  return (
+    segments.length >= 1 &&
+    segments.length <= 2 &&
+    !NAVA_PAGE_ROOTS.has(root)
+  );
+}
+
 export function CookieConsent() {
+  const pathname = usePathname();
   const [choice, setChoice] = useState<ConsentChoice | null>(null);
   const [configured, setConfigured] = useState(false);
   const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
@@ -59,7 +80,7 @@ export function CookieConsent() {
     configureAnalytics(next);
   };
 
-  if (choice && !configured) {
+  if (isPublicBookingPath(pathname) || (choice && !configured)) {
     return null;
   }
 
