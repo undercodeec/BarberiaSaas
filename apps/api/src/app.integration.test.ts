@@ -62,6 +62,10 @@ describe('CORS', () => {
       expect(health.headers['x-content-type-options']).toBe('nosniff');
       expect(health.headers['x-frame-options']).toBe('SAMEORIGIN');
       expect(health.headers['strict-transport-security']).toBeUndefined();
+      expect(health.headers['x-nava-query-count']).toBe('0');
+      expect(Number(health.headers['x-nava-response-bytes'])).toBeGreaterThan(
+        0,
+      );
     } finally {
       await app.close();
     }
@@ -1042,7 +1046,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     });
     expect(emailAvailability.statusCode).toBe(200);
     expect(emailAvailability.json()).toMatchObject({
-      conflicts: { email: 'Ese correo ya estÃ¡ registrado.' },
+      conflicts: { email: 'Ese correo ya está registrado.' },
     });
     const phoneAvailability = await app.inject({
       method: 'POST',
@@ -1051,7 +1055,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     });
     expect(phoneAvailability.statusCode).toBe(200);
     expect(phoneAvailability.json()).toMatchObject({
-      conflicts: { phone: 'Ese nÃºmero telefÃ³nico ya estÃ¡ registrado.' },
+      conflicts: { phone: 'Ese número telefónico ya está registrado.' },
     });
     const retryRegistration = await app.inject({
       method: 'POST',
@@ -1129,7 +1133,7 @@ describeWithDatabase('API con PostgreSQL', () => {
       organizationId: string;
     }>();
 
-    expect(firstResult.bookingUrl).toMatch(/^https:\/\/book\.nava\.app\//u);
+    expect(firstResult.bookingUrl).toMatch(/^https:\/\/navacloud\.app\//u);
     expect(
       await database.organization.count({
         where: { id: firstResult.organizationId },
@@ -1671,7 +1675,7 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(accountDetails.statusCode).toBe(200);
     expect(
       accountDetails.json<{ bookingUrl: string | null }>().bookingUrl,
-    ).toMatch(/^https:\/\/book\.nava\.app\//u);
+    ).toMatch(/^https:\/\/navacloud\.app\//u);
 
     const invitedUser = await database.user.findUniqueOrThrow({
       where: { email: invitedEmail },
@@ -1780,8 +1784,10 @@ describeWithDatabase('API con PostgreSQL', () => {
 
     await database.subscription.update({
       data: {
+        currentPeriodEnd: new Date(Date.now() - 24 * 60 * 60 * 1000),
         graceEndsAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        trialEndsAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        status: 'ACTIVE',
+        trialEndsAt: null,
       },
       where: { organizationId: organization.organizationId },
     });
@@ -2101,7 +2107,7 @@ describeWithDatabase('API con PostgreSQL', () => {
       suspendedResponse.json<{
         current: { readOnly: boolean; status: string };
       }>().current,
-    ).toMatchObject({ readOnly: true, status: 'suspended' });
+    ).toMatchObject({ readOnly: false, status: 'free' });
 
     const blockedWrite = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },
@@ -2113,14 +2119,20 @@ describeWithDatabase('API con PostgreSQL', () => {
       },
       url: '/v1/services',
     });
-    expect(blockedWrite.statusCode).toBe(423);
-    expect(blockedWrite.json<{ code: string }>().code).toBe(
-      'SUBSCRIPTION_READ_ONLY',
-    );
+    expect(blockedWrite.statusCode).toBe(201);
   });
   it('configura equipo, servicios y horarios con auditoría', async () => {
     const ownerToken = await register('phase2-owner@example.com');
     const organization = await onboard(ownerToken, 'fase-dos');
+    const subscription = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      url: '/v1/subscription',
+    });
+    expect(
+      subscription.json<{ current: { limits: { teamMembers: number } } }>()
+        .current.limits.teamMembers,
+    ).toBe(12);
 
     const invitationResponse = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },
@@ -2238,7 +2250,7 @@ describeWithDatabase('API con PostgreSQL', () => {
       },
       url: '/v1/services/assignments',
     });
-    expect(assignmentResponse.statusCode).toBe(201);
+    expect(assignmentResponse.statusCode, assignmentResponse.body).toBe(201);
 
     const scheduleResponse = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },
@@ -2905,12 +2917,12 @@ describeWithDatabase('API con PostgreSQL', () => {
         currencyCode: 'USD',
         name: 'Sucursal Centro',
         phone: '0999999997',
-        slug: 'owner-new-location-centro',
+        slug: 'owner-new-location-sur',
         timezone: 'America/Guayaquil',
       },
       url: '/v1/locations',
     });
-    expect(locationResponse.statusCode).toBe(201);
+    expect(locationResponse.statusCode, locationResponse.body).toBe(201);
     const locationId = locationResponse.json<{ location: { id: string } }>()
       .location.id;
     const owner = await database.membership.findFirstOrThrow({

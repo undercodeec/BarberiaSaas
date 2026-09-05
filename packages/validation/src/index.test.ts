@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   appEnvironmentSchema,
+  agendaPageQuerySchema,
+  appointmentCalendarSummaryQuerySchema,
   businessScheduleDaySchema,
+  clientImportSchema,
+  clientPageQuerySchema,
   createOnboardingCollaboratorSchema,
   createPublicBookingSchema,
   createTeamInvitationSchema,
@@ -66,6 +70,47 @@ describe('rango de agenda', () => {
         to: '2026-09-01',
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('lecturas v2 escalables', () => {
+  it('normaliza límites, búsquedas y rechaza rangos o lotes fuera de alcance', () => {
+    expect(
+      clientPageQuerySchema.parse({ limit: '100', search: ' Ana ' }),
+    ).toMatchObject({ limit: 100, search: 'Ana' });
+    expect(() => clientPageQuerySchema.parse({ limit: '101' })).toThrow();
+    expect(() =>
+      agendaPageQuerySchema.parse({
+        from: '2026-01-01',
+        locationIds: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        to: '2026-02-02',
+      }),
+    ).toThrow();
+    expect(
+      appointmentCalendarSummaryQuerySchema.parse({
+        from: '2026-01-01',
+        locationIds: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        to: '2026-01-31',
+      }),
+    ).toMatchObject({
+      locationIds: ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'],
+    });
+    expect(() =>
+      agendaPageQuerySchema.parse({
+        activeAfter: 'not-an-instant',
+        from: '2026-01-01',
+        locationIds: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        to: '2026-01-01',
+      }),
+    ).toThrow();
+    expect(() =>
+      clientImportSchema.parse({
+        contacts: Array.from({ length: 101 }, (_, index) => ({
+          fullName: `Cliente ${index}`,
+          phone: `+59399000${index}`,
+        })),
+      }),
+    ).toThrow();
   });
 });
 

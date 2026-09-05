@@ -30,7 +30,11 @@
     "test:e2e": "playwright test",
     "test:e2e:admin": "playwright test --config playwright.admin.config.ts",
     "test:performance": "node tests/performance/api-smoke.mjs",
-    "typecheck": "pnpm db:generate && turbo run typecheck"
+    "test:performance:data": "node tests/performance/api-workflows.mjs",
+    "test:performance:explain": "node tests/performance/explain-workflows.mjs",
+    "seed:performance": "pnpm --filter @barber-saas/api exec tsx scripts/seed-performance.mjs",
+    "typecheck": "pnpm db:generate && turbo run typecheck",
+    "with:test-db": "node scripts/test-database-env.mjs --run-pnpm"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",

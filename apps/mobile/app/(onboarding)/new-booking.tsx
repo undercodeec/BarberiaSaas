@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { ClientRecord, ClientsResponse } from '@barber-saas/api-client';
-import { useQuery } from '@tanstack/react-query';
+import type { ClientRecord } from '@barber-saas/api-client';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -10,6 +10,10 @@ import { requireApiClient } from '../../src/lib/api';
 import { clientAccessForRole } from '../../src/lib/client-access';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
+import {
+  clientPageQueryOptions,
+  flattenClientPages,
+} from '../../src/features/clients/client-queries';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 import {
@@ -29,25 +33,28 @@ export default function NewBookingScreen() {
     organizationQuery.data?.membership.role,
   );
   const [isCreateClientOpen, setIsCreateClientOpen] = useState(false);
-  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
-  const clientsQuery = useQuery({
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchInput.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+  const clientPageOptions = useMemo(
+    () =>
+      clientPageQueryOptions(requireApiClient(), tenant.scope, {
+        ...(debouncedSearch ? { search: debouncedSearch } : {}),
+      }),
+    [debouncedSearch, tenant.scope],
+  );
+  const clientsQuery = useInfiniteQuery({
+    ...clientPageOptions,
     enabled: Boolean(session),
-    queryFn: () => requireApiClient().request<ClientsResponse>('/v1/clients'),
-    queryKey: tenant.key('clients'),
   });
-  const clients = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase('es-EC');
-    if (!query) return clientsQuery.data?.clients ?? [];
-    return (clientsQuery.data?.clients ?? []).filter((client) =>
-      [
-        client.fullName,
-        client.lastName ?? '',
-        client.phone ?? '',
-        client.email ?? '',
-      ].some((value) => value.toLocaleLowerCase('es-EC').includes(query)),
-    );
-  }, [clientsQuery.data?.clients, search]);
+  const clients = useMemo(
+    () => flattenClientPages(clientsQuery.data),
+    [clientsQuery.data],
+  );
 
   if (!session) return <Redirect href="/(auth)/login" />;
 
@@ -109,7 +116,7 @@ export default function NewBookingScreen() {
           />
           <TextInput
             accessibilityLabel="Buscar cliente"
-            onChangeText={setSearch}
+            onChangeText={setSearchInput}
             placeholder={
               clientAccess.canManage
                 ? 'Buscar por nombre, teléfono o correo'
@@ -117,7 +124,7 @@ export default function NewBookingScreen() {
             }
             placeholderTextColor="#8B96A5"
             style={styles.searchInput}
-            value={search}
+            value={searchInput}
           />
         </View>
         <Pressable
@@ -155,6 +162,20 @@ export default function NewBookingScreen() {
             selected={selectedClientId === client.id}
           />
         ))}
+        {clientsQuery.hasNextPage ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={clientsQuery.isFetchingNextPage}
+            onPress={() => void clientsQuery.fetchNextPage()}
+            style={styles.loadMoreButton}
+          >
+            <Text style={styles.loadMoreLabel}>
+              {clientsQuery.isFetchingNextPage
+                ? 'Cargando...'
+                : 'Ver más clientes'}
+            </Text>
+          </Pressable>
+        ) : null}
         {!clientsQuery.isLoading && !clients.length ? (
           <Text style={styles.muted}>
             No hay clientes que coincidan con la búsqueda.
@@ -403,6 +424,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     marginTop: 25,
+  },
+  loadMoreButton: {
+    alignItems: 'center',
+    borderColor: appTheme.colors.border,
+    borderRadius: appTheme.radii.control,
+    borderWidth: 1,
+    marginTop: 14,
+    minHeight: 46,
+    justifyContent: 'center',
+  },
+  loadMoreLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 14,
+    fontWeight: '800',
   },
   muted: { color: appTheme.colors.textMuted, fontSize: 14, marginTop: 14 },
   nextButton: {

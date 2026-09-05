@@ -26,6 +26,7 @@ import {
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import { reconcileAppointmentCommissions } from './commissions';
+import { buildAvailability } from './availability-engine';
 import { ApiError } from './errors';
 import {
   assertCanCreateBooking,
@@ -168,8 +169,13 @@ async function findOrCreateCompletedPublicBookingClient(
   );
 }
 
-function partsInTimeZone(value: Date, timeZone: string) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
+const timeZoneFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function timeZoneFormatter(timeZone: string) {
+  const cached = timeZoneFormatters.get(timeZone);
+  if (cached) return cached;
+  if (timeZoneFormatters.size >= 64) timeZoneFormatters.clear();
+  const formatter = new Intl.DateTimeFormat('en-CA', {
     day: '2-digit',
     hour: '2-digit',
     hourCycle: 'h23',
@@ -177,7 +183,13 @@ function partsInTimeZone(value: Date, timeZone: string) {
     month: '2-digit',
     timeZone,
     year: 'numeric',
-  }).formatToParts(value);
+  });
+  timeZoneFormatters.set(timeZone, formatter);
+  return formatter;
+}
+
+function partsInTimeZone(value: Date, timeZone: string) {
+  const parts = timeZoneFormatter(timeZone).formatToParts(value);
   const part = (type: Intl.DateTimeFormatPartTypes) =>
     Number(parts.find((item) => item.type === type)?.value);
   return {
@@ -229,15 +241,6 @@ function localDateFor(value: Date, timeZone: string): string {
 
 function weekdayFor(localDate: string): number {
   return new Date(`${localDate}T00:00:00.000Z`).getUTCDay();
-}
-
-function overlaps(
-  startsAt: Date,
-  endsAt: Date,
-  blockedStartsAt: Date,
-  blockedEndsAt: Date,
-): boolean {
-  return startsAt < blockedEndsAt && endsAt > blockedStartsAt;
 }
 
 export async function loadBookingContext(
@@ -376,6 +379,51 @@ export async function assertBookable(
       400,
       'OUTSIDE_BUSINESS_HOURS',
       'El horario seleccionado está fuera del horario del negocio.',
+    );
+  }
+  const [schedules, block] = await Promise.all([
+    database.weeklySchedule.findMany({
+      orderBy: { startMinute: 'asc' },
+      where: {
+        locationId: input.locationId,
+        membershipId: input.professionalMembershipId,
+        weekday,
+      },
+    }),
+    database.scheduleBlock.findFirst({
+      where: {
+        endsAt: { gt: input.startsAt },
+        locationId: input.locationId,
+        membershipId: input.professionalMembershipId,
+        startsAt: { lt: input.endsAt },
+      },
+    }),
+  ]);
+  const insideWorkingHours = schedules.some((schedule) => {
+    const scheduleStart = zonedDateTimeToUtc(
+      localDate,
+      schedule.startMinute,
+      input.timeZone,
+    );
+    const scheduleEnd = zonedDateTimeToUtc(
+      localDate,
+      schedule.endMinute,
+      input.timeZone,
+    );
+    return input.startsAt >= scheduleStart && input.endsAt <= scheduleEnd;
+  });
+  if (!insideWorkingHours) {
+    throw new ApiError(
+      400,
+      'OUTSIDE_WORKING_HOURS',
+      'El horario seleccionado esta fuera de la jornada del profesional.',
+    );
+  }
+  if (block) {
+    throw new ApiError(
+      409,
+      'SCHEDULE_BLOCKED',
+      'El profesional tiene un bloqueo en ese horario.',
     );
   }
   const appointment = await database.appointment.findFirst({
@@ -589,6 +637,7 @@ export function registerAgendaRoutes(
         },
       }),
       database.appointment.findMany({
+        select: { endsAt: true, startsAt: true },
         where: {
           endsAt: { gt: dayStart },
           professionalMembershipId: input.membershipId,
@@ -600,52 +649,26 @@ export function registerAgendaRoutes(
     if (!businessSchedule?.isOpen) {
       return { durationMinutes, slots: [] };
     }
-    const occupiedRanges = [
-      ...appointments.map((appointment) => ({
-        endsAt: appointment.endsAt,
-        startsAt: appointment.startsAt,
+    const availability = buildAvailability({
+      date: input.date,
+      durationMinutes,
+      occupied: appointments.map(({ endsAt, startsAt }) => ({
+        endsAt,
+        startsAt,
       })),
-    ];
-    const slots: { endsAt: string; startsAt: string }[] = [];
-    for (const schedule of schedules) {
-      const effectiveStartMinute = Math.max(
-        schedule.startMinute,
-        businessSchedule.startMinute,
-      );
-      const effectiveEndMinute = Math.min(
-        schedule.endMinute,
-        businessSchedule.endMinute,
-      );
-      const scheduleEnd = zonedDateTimeToUtc(
-        input.date,
-        effectiveEndMinute,
-        context.location.timezone,
-      );
-      for (
-        let minute = effectiveStartMinute;
-        minute + durationMinutes <= effectiveEndMinute;
-        minute += context.location.bookingSlotIntervalMinutes
-      ) {
-        const startsAt = zonedDateTimeToUtc(
-          input.date,
-          minute,
-          context.location.timezone,
-        );
-        const endsAt = new Date(startsAt.getTime() + durationMinutes * 60_000);
-        if (
-          endsAt <= scheduleEnd &&
-          !occupiedRanges.some((range) =>
-            overlaps(startsAt, endsAt, range.startsAt, range.endsAt),
-          )
-        ) {
-          slots.push({
-            endsAt: endsAt.toISOString(),
-            startsAt: startsAt.toISOString(),
-          });
-        }
-      }
-    }
-    return { durationMinutes, slots };
+      respectWindowEnd: true,
+      stepMinutes: context.location.bookingSlotIntervalMinutes,
+      timeZone: context.location.timezone,
+      toUtc: zonedDateTimeToUtc,
+      windows: schedules.map((schedule) => ({
+        endMinute: Math.min(schedule.endMinute, businessSchedule.endMinute),
+        startMinute: Math.max(
+          schedule.startMinute,
+          businessSchedule.startMinute,
+        ),
+      })),
+    });
+    return { durationMinutes, slots: availability.slots };
   });
 
   app.get('/v1/appointments', async (request) => {
@@ -757,17 +780,8 @@ export function registerAgendaRoutes(
       0,
     );
     const endsAt = new Date(startsAt.getTime() + durationMinutes * 60_000);
-    await assertBookable(database, {
-      endsAt,
-      locationId: input.locationId,
-      professionalMembershipId: input.professionalMembershipId,
-      startsAt,
-      timeZone: context.location.timezone,
-    });
     try {
       const appointment = await database.$transaction(async (transaction) => {
-        await transaction.$queryRaw`WITH lock AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtext(${input.professionalMembershipId}))) SELECT 1 AS locked FROM lock`;
-        await transaction.$queryRaw`WITH lock AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtext(${current.organizationId}))) SELECT 1 AS locked FROM lock`;
         await assertCanCreateBooking(transaction, current.organizationId);
         await assertCanUseProfessional(
           transaction,

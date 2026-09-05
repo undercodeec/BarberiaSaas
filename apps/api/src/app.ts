@@ -46,13 +46,25 @@ import { z, ZodError } from 'zod';
 
 import type { ApiConfig } from './config';
 import { ApiError, isUniqueConstraintError } from './errors';
+import {
+  installRequestMetricsHooks,
+  observeDatabaseQuery,
+} from './request-metrics';
+import {
+  SESSION_ACTIVITY_TOUCH_INTERVAL_MS,
+  shouldTouchSession,
+} from './session-activity';
+import { createOperationalAccessLoader } from './operational-access';
 import { createGoogleMapsClient } from './google-maps';
 import { registerAgendaRoutes } from './agenda';
+import { registerAgendaV2Routes } from './agenda-v2';
 import { registerBusinessScheduleRoutes } from './business-schedule';
 import { registerCashRegisterRoutes } from './cash-register';
 import { registerCommissionRoutes } from './commissions';
 import { registerClientRoutes } from './clients';
+import { registerClientV2Routes } from './clients-v2';
 import { registerInventoryRoutes } from './inventory';
+import { registerInventoryV2Routes } from './inventory-v2';
 import { registerOperationsRoutes } from './operations';
 import { sendPushNotifications } from './fcm';
 import {
@@ -81,6 +93,7 @@ import {
   registerPublicBookingRoutes,
   type PublicBookingMailer,
 } from './public-booking';
+import { registerPublicBookingV2Routes } from './public-booking-v2';
 import type {
   InvitationMailer,
   PlatformAccessMailer,
@@ -1180,16 +1193,26 @@ async function authenticate(database: DatabaseClient, request: FastifyRequest) {
       'Tu sesión venció. Inicia sesión nuevamente.',
     );
   }
-  await database.session.update({
-    data: { lastActiveAt: now },
-    where: { id: session.id },
-  });
+  if (shouldTouchSession(session.lastActiveAt, now)) {
+    await database.session.updateMany({
+      data: { lastActiveAt: now },
+      where: {
+        id: session.id,
+        lastActiveAt: {
+          lte: new Date(now.getTime() - SESSION_ACTIVITY_TOUCH_INTERVAL_MS),
+        },
+      },
+    });
+  }
   return { session, token, user: session.user };
 }
 
 export async function buildApi({
   config,
-  database = createDatabaseClient({ connectionString: config.DATABASE_URL }),
+  database = createDatabaseClient({
+    connectionString: config.DATABASE_URL,
+    queryObserver: ({ durationMs }) => observeDatabaseQuery(durationMs),
+  }),
   googleMapsFetch,
   invitationMailer = null,
   platformAccessMailer = null,
@@ -1213,6 +1236,8 @@ export async function buildApi({
           : config.APP_ENV === 'local'
         : false,
   });
+  installRequestMetricsHooks(app, config.APP_ENV);
+  const loadOperationalAccess = createOperationalAccessLoader(database);
   const authRateLimitBuckets = new Map<string, AuthRateLimitBucket>();
   const googleMapsRateLimitBuckets = new Map<string, AuthRateLimitBucket>();
   const authRateLimitWindowMs = config.AUTH_IP_RATE_LIMIT_WINDOW_SECONDS * 1000;
@@ -3275,6 +3300,7 @@ export async function buildApi({
     config.PUBLIC_WEB_URL,
     appointmentNotifier,
   );
+  registerAgendaV2Routes(app, database, authenticate, loadOperationalAccess);
   registerPublicBookingRoutes(
     app,
     database,
@@ -3285,9 +3311,12 @@ export async function buildApi({
     config.PUBLIC_WEB_URL,
     config,
   );
+  registerPublicBookingV2Routes(app, database);
   registerNotificationRoutes(app, database, authenticate);
   registerBusinessScheduleRoutes(app, database, authenticate);
   registerClientRoutes(app, database, authenticate);
+  registerClientV2Routes(app, database, authenticate, loadOperationalAccess);
+  registerInventoryV2Routes(app, database, authenticate, loadOperationalAccess);
   registerInventoryRoutes(app, database, authenticate, appointmentNotifier);
   registerCashRegisterRoutes(app, database, authenticate, appointmentNotifier);
   registerCommissionRoutes(app, database, authenticate);

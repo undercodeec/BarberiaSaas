@@ -1,8 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type {
-  AppointmentRecord,
-  AvailabilityResponse,
-} from '@barber-saas/api-client';
+import type { AppointmentRecord } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -23,6 +20,7 @@ import {
   useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
+import { availabilityQueryOptions } from '../../src/features/agenda/agenda-queries';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -93,23 +91,12 @@ export default function RescheduleBookingScreen() {
   const locationId = organizationQuery.data?.location?.id ?? null;
   const availabilityQuery = useQuery({
     enabled: Boolean(locationId && membershipId && serviceIds.length),
-    queryFn: () => {
-      const query = new URLSearchParams({
-        date: localDateValue(date),
-        locationId: locationId!,
-        membershipId,
-        serviceIds: serviceIds.join(','),
-      });
-      return requireApiClient().request<AvailabilityResponse>(
-        `/v1/availability?${query.toString()}`,
-      );
-    },
-    queryKey: tenant.key(
-      'availability',
-      localDateValue(date),
+    ...availabilityQueryOptions(requireApiClient(), tenant.scope, {
+      date: localDateValue(date),
+      locationId: locationId ?? '',
       membershipId,
       serviceIds,
-    ),
+    }),
   });
   const reschedule = useMutation({
     mutationFn: () =>

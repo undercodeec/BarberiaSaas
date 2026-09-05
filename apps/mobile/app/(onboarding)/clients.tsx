@@ -8,17 +8,15 @@ import {
 import type {
   ClientLabelsResponse,
   ClientExportResponse,
-  ClientRecord,
-  ClientsResponse,
+  ClientImportResponse,
   SubscriptionResponse,
 } from '@barber-saas/api-client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Redirect,
-  useFocusEffect,
-  useLocalSearchParams,
-  useRouter,
-} from 'expo-router';
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 /* eslint-disable react-hooks/refs -- React Native Animated and PanResponder expose stable imperative values used by the floating control. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -41,9 +39,13 @@ import {
 } from '../../src/components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
+import {
+  chunkContacts,
+  clientPageQueryOptions,
+  flattenClientPages,
+} from '../../src/features/clients/client-queries';
 import { requireApiClient } from '../../src/lib/api';
 import { clientAccessForRole } from '../../src/lib/client-access';
-import { normalizeClientsResponse } from '../../src/lib/client-record';
 import { phoneNumberToE164 } from '../../src/lib/phone-number';
 import { ensurePermissionAccess } from '../../src/lib/permission-access';
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
@@ -167,6 +169,7 @@ export default function ClientsScreen() {
     }),
   ).current;
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeLabelId, setActiveLabelId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -276,9 +279,6 @@ export default function ClientsScreen() {
         );
         return;
       }
-      const existingClients = normalizeClientsResponse(
-        await requireApiClient().request<ClientsResponse>('/v1/clients'),
-      );
       const currentOrganization =
         organizationQuery.data ?? (await organizationQuery.refetch()).data;
       const countryCode = currentOrganization?.location?.countryCode;
@@ -289,11 +289,7 @@ export default function ClientsScreen() {
         );
         return;
       }
-      const knownPhones = new Set(
-        existingClients.clients
-          .map((client) => phoneNumberToE164(client.phone, countryCode))
-          .filter((phone): phone is string => Boolean(phone)),
-      );
+      const knownPhones = new Set<string>();
       const importable = contacts.flatMap((contact) => {
         const fullName = contact.fullName?.trim();
         const phone = contact.phones
@@ -355,41 +351,41 @@ export default function ClientsScreen() {
   }, [importCandidates]);
   const importSelectedContacts = useCallback(async () => {
     if (!selectedImportContacts.length) return;
-    let nextContactIndex = 0;
     let importedCount = 0;
     const failureMessages: string[] = [];
     setIsImporting(true);
     try {
-      const importContact = async () => {
-        while (true) {
-          const contact = selectedImportContacts[nextContactIndex];
-          nextContactIndex += 1;
-          if (!contact) return;
-          try {
-            await requireApiClient().request<{ readonly client: ClientRecord }>(
-              '/v1/clients',
-              {
-                body: { fullName: contact.fullName, phone: contact.phone },
-                method: 'POST',
-              },
-            );
+      for (const contacts of chunkContacts(selectedImportContacts)) {
+        const result = await requireApiClient().request<ClientImportResponse>(
+          '/v2/clients/import',
+          {
+            body: {
+              contacts: contacts.map(({ fullName, phone }) => ({
+                fullName,
+                phone,
+              })),
+            },
+            method: 'POST',
+          },
+        );
+        for (const item of result.results) {
+          if (item.status === 'created') {
             importedCount += 1;
-          } catch (error) {
-            failureMessages.push(
-              `${contact.fullName}: ${
-                error instanceof Error ? error.message : 'Error desconocido.'
-              }`,
-            );
+            continue;
           }
+          const contact = contacts[item.inputIndex];
+          if (!contact) continue;
+          failureMessages.push(
+            `${contact.fullName}: ${
+              item.reason === 'already_exists'
+                ? 'Ya existe un cliente con este teléfono.'
+                : 'Se alcanzó el límite del plan.'
+            }`,
+          );
         }
-      };
-      await Promise.all(
-        Array.from({ length: Math.min(4, selectedImportContacts.length) }, () =>
-          importContact(),
-        ),
-      );
+      }
       await queryClient.invalidateQueries({
-        queryKey: tenantQueryPrefix('clients'),
+        queryKey: tenantQueryPrefix('clients-v2'),
       });
       await queryClient.invalidateQueries({
         queryKey: tenant.key('subscription'),
@@ -411,45 +407,36 @@ export default function ClientsScreen() {
       setIsImporting(false);
     }
   }, [openDialog, queryClient, selectedImportContacts, tenant]);
-  const clientsQuery = useQuery({
-    enabled: Boolean(session),
-    queryFn: () => requireApiClient().request<ClientsResponse>('/v1/clients'),
-    queryKey: tenant.key('clients'),
-    refetchInterval: 30_000,
-    select: normalizeClientsResponse,
-  });
-  const refetchClients = clientsQuery.refetch;
-  useFocusEffect(
-    useCallback(() => {
-      void refetchClients();
-    }, [refetchClients]),
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+  const clientPageOptions = useMemo(
+    () =>
+      clientPageQueryOptions(requireApiClient(), tenant.scope, {
+        ...(activeLabelId ? { labelId: activeLabelId } : {}),
+        ...(debouncedSearch ? { search: debouncedSearch } : {}),
+      }),
+    [activeLabelId, debouncedSearch, tenant.scope],
   );
+  const clientsQuery = useInfiniteQuery({
+    ...clientPageOptions,
+    enabled: Boolean(session),
+  });
   const labelsQuery = useQuery({
     enabled: Boolean(session && clientAccess.canManageLabels),
     queryFn: () =>
       requireApiClient().request<ClientLabelsResponse>('/v1/clients/labels'),
     queryKey: tenant.key('client-labels'),
   });
-  const visibleClients = useMemo(() => {
-    const value = search.trim().toLocaleLowerCase('es-EC');
-    return (clientsQuery.data?.clients ?? []).filter((client) => {
-      const matchesLabel =
-        !activeLabelId ||
-        client.labels.some((label) => label.id === activeLabelId);
-      const matchesSearch =
-        !value ||
-        [client.fullName, client.phone ?? ''].some((item) =>
-          item.toLocaleLowerCase('es-EC').includes(value),
-        );
-      return matchesLabel && matchesSearch;
-    });
-  }, [activeLabelId, clientsQuery.data?.clients, search]);
+  const visibleClients = useMemo(
+    () => flattenClientPages(clientsQuery.data),
+    [clientsQuery.data],
+  );
   const selectedClients = useMemo(() => {
     const selectedIds = new Set(selectedClientIds);
-    return (clientsQuery.data?.clients ?? []).filter((client) =>
-      selectedIds.has(client.id),
-    );
-  }, [clientsQuery.data?.clients, selectedClientIds]);
+    return visibleClients.filter((client) => selectedIds.has(client.id));
+  }, [selectedClientIds, visibleClients]);
   const isSelectingClients =
     clientAccess.canManage && selectedClients.length > 0;
   const areAllVisibleClientsSelected =
@@ -549,18 +536,6 @@ export default function ClientsScreen() {
               method: 'DELETE',
             });
             deletedClientIds.add(client.id);
-            queryClient.setQueryData<ClientsResponse>(
-              tenant.key('clients'),
-              (current) =>
-                current
-                  ? {
-                      ...current,
-                      clients: current.clients.filter(
-                        (currentClient) => currentClient.id !== client.id,
-                      ),
-                    }
-                  : current,
-            );
           } catch (error) {
             failedClientIds.add(client.id);
             failureMessages.push(
@@ -581,7 +556,7 @@ export default function ClientsScreen() {
       );
       setSelectedClientIds([...failedClientIds]);
       await queryClient.invalidateQueries({
-        queryKey: tenantQueryPrefix('clients'),
+        queryKey: tenantQueryPrefix('clients-v2'),
       });
       if (failureMessages.length) {
         openDialog(
@@ -604,13 +579,13 @@ export default function ClientsScreen() {
         error instanceof Error ? error.message : 'Inténtalo nuevamente.',
       );
       await queryClient.invalidateQueries({
-        queryKey: tenantQueryPrefix('clients'),
+        queryKey: tenantQueryPrefix('clients-v2'),
       });
     } finally {
       setIsDeletingSelected(false);
       setDeletionProgress(null);
     }
-  }, [openDialog, queryClient, selectedClients, tenant]);
+  }, [openDialog, queryClient, selectedClients]);
 
   const confirmDeleteSelectedClients = useCallback(() => {
     if (!selectedClients.length) return;
@@ -901,6 +876,20 @@ export default function ClientsScreen() {
                 </Pressable>
               );
             })}
+            {clientsQuery.hasNextPage ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={clientsQuery.isFetchingNextPage}
+                onPress={() => void clientsQuery.fetchNextPage()}
+                style={styles.loadMoreButton}
+              >
+                <Text style={styles.loadMoreLabel}>
+                  {clientsQuery.isFetchingNextPage
+                    ? 'Cargando clientes...'
+                    : 'Ver más clientes'}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : (
           <View style={styles.empty}>

@@ -15,6 +15,10 @@ El estado verificable y sus pendientes viven en
 del plan de pagos está en
 [`ProyectoMD/AVANCE_PLAN_DESARROLLO_INTEGRAL_2026-08-20.md`](./ProyectoMD/AVANCE_PLAN_DESARROLLO_INTEGRAL_2026-08-20.md).
 
+La evidencia reproducible de procesamiento escalable (fixture local de
+100.000 registros, p50/p95, bytes y `EXPLAIN`) está en
+[`docs/testing/data-processing-performance.md`](./docs/testing/data-processing-performance.md).
+
 Las invitaciones de equipo y la recuperación de contraseña usan SMTP. En local
 puede utilizarse Mailpit; en producción debe configurarse un proveedor real.
 

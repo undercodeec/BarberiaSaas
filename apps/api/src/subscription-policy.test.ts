@@ -5,12 +5,14 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  assertCanCreateClients,
   assertCanCreateTeamMember,
   ensureOrganizationSubscription,
   getEntitlements,
   GRACE_DAYS,
   TRIAL_DAYS,
   planDefinition,
+  SUBSCRIPTION_PLANS,
 } from './subscription-policy';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -29,8 +31,12 @@ interface StoredSubscription {
   updatedAt: Date;
 }
 
-function subscriptionTransaction(initial: StoredSubscription) {
+function subscriptionTransaction(initial: StoredSubscription, clientCount = 0) {
   let current = { ...initial };
+  const plans = SUBSCRIPTION_PLANS.map((definition) => ({
+    ...definition,
+    id: `plan-${definition.code}`,
+  }));
   const findOverrides = vi.fn(async (): Promise<unknown[]> => []);
   const update = vi.fn(
     async ({ data }: { data: Partial<StoredSubscription> }) => {
@@ -40,23 +46,12 @@ function subscriptionTransaction(initial: StoredSubscription) {
   );
   const transaction = {
     plan: {
-      upsert: vi.fn(
-        async ({
-          create,
-          where,
-        }: {
-          create: Record<string, unknown>;
-          where: { code: string };
-        }) => ({
-          ...create,
-          code: where.code,
-          id: `plan-${where.code}`,
-        }),
-      ),
+      createMany: vi.fn(async () => ({ count: 0 })),
+      findMany: vi.fn(async () => plans),
       findUnique: vi.fn(async () => null),
     },
     appointment: { count: vi.fn(async () => 0) },
-    client: { count: vi.fn(async () => 0) },
+    client: { count: vi.fn(async () => clientCount) },
     location: { count: vi.fn(async () => 1) },
     membership: { count: vi.fn(async () => 12) },
     platformFeatureOverride: {
@@ -336,5 +331,14 @@ describe('política de suscripciones', () => {
         'Alcanzaste el límite de 12 profesionales activos de Nava Local. El límite es total para toda la organización, independientemente de sus sucursales.',
       statusCode: 409,
     });
+  });
+
+  it('devuelve solo la capacidad de clientes restante para un lote', async () => {
+    const original = storedSubscription({ planId: 'plan-free' });
+    const context = subscriptionTransaction(original, 98);
+
+    await expect(
+      assertCanCreateClients(context.transaction, original.organizationId, 5),
+    ).resolves.toBe(2);
   });
 });

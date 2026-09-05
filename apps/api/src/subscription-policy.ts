@@ -200,33 +200,36 @@ export async function ensureOrganizationSubscription(
   organizationId: string,
   now = new Date(),
 ) {
-  const storedPlans = [];
-  for (const definition of SUBSCRIPTION_PLANS) {
-    storedPlans.push(
-      await transaction.plan.upsert({
-        create: {
-          code: definition.code,
-          featureFlags: definition.featureFlags,
-          features: [...definition.features],
-          isPublic: definition.available,
-          limits: definition.limits,
-          monthlyPriceCents: definition.monthlyPriceCents,
-          name: definition.name,
-          sortOrder: definition.sortOrder,
-        },
-        update: {
-          featureFlags: definition.featureFlags,
-          features: [...definition.features],
-          isActive: true,
-          isPublic: definition.available,
-          limits: definition.limits,
-          monthlyPriceCents: definition.monthlyPriceCents,
-          name: definition.name,
-          sortOrder: definition.sortOrder,
-        },
-        where: { code: definition.code },
-      }),
-    );
+  const planCodes = SUBSCRIPTION_PLANS.map(({ code }) => code);
+  let storedPlans = await transaction.plan.findMany({
+    where: { code: { in: planCodes } },
+  });
+  const existingPlanCodes = new Set(storedPlans.map(({ code }) => code));
+  const missingPlans = SUBSCRIPTION_PLANS.filter(
+    ({ code }) => !existingPlanCodes.has(code),
+  );
+
+  if (missingPlans.length > 0) {
+    // Plan catalog changes are deployed through migrations.  This bootstrap is
+    // deliberately insert-only, so routine booking requests do not serialize
+    // on updates to the same shared plan rows.
+    await transaction.plan.createMany({
+      data: missingPlans.map((definition) => ({
+        code: definition.code,
+        featureFlags: definition.featureFlags,
+        features: [...definition.features],
+        isActive: true,
+        isPublic: definition.available,
+        limits: definition.limits,
+        monthlyPriceCents: definition.monthlyPriceCents,
+        name: definition.name,
+        sortOrder: definition.sortOrder,
+      })),
+      skipDuplicates: true,
+    });
+    storedPlans = await transaction.plan.findMany({
+      where: { code: { in: planCodes } },
+    });
   }
 
   const free = storedPlans.find(({ code }) => code === 'free');
@@ -527,7 +530,9 @@ export async function getEntitlements(
     organizationId,
     now,
   );
-  const plan = plans.find(({ id }) => id === subscription.planId);
+  const plan =
+    plans.find(({ id }) => id === subscription.planId) ??
+    (await database.plan.findUnique({ where: { id: subscription.planId } }));
   if (!plan) throw new Error('La suscripcion no tiene un plan valido.');
   const overrides = await database.platformFeatureOverride.findMany({
     orderBy: { createdAt: 'desc' },
@@ -639,8 +644,8 @@ export async function getAllowedProfessionalIds(
   database: Prisma.TransactionClient,
   organizationId: string,
 ) {
-  const result = await getSubscriptionUsage(database, organizationId);
-  const limit = result.limits.teamMembers;
+  const entitlements = await getEntitlements(database, organizationId);
+  const limit = entitlements.limits.teamMembers;
   if (limit === null) return null;
   const memberships = await database.membership.findMany({
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
@@ -649,7 +654,9 @@ export async function getAllowedProfessionalIds(
     where: {
       organizationId,
       role: { in: [MembershipRole.OWNER, MembershipRole.BARBER] },
-      status: MembershipStatus.ACTIVE,
+      status: {
+        in: [MembershipStatus.ACTIVE, MembershipStatus.INVITED],
+      },
     },
   });
   return memberships.map(({ id }) => id);
@@ -675,11 +682,24 @@ export async function assertCanCreateBooking(
   organizationId: string,
   audience: 'owner' | 'public' = 'owner',
 ) {
-  const result = await getSubscriptionUsage(database, organizationId);
-  if (
-    result.effectiveBookingLimit !== null &&
-    result.usage.rolling30DayBookings >= result.effectiveBookingLimit
-  ) {
+  const entitlements = await getEntitlements(database, organizationId);
+  const baseBookingLimit = entitlements.limits.rolling30DayBookings;
+  if (baseBookingLimit === null) return;
+  await database.$queryRaw`WITH lock AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtext(${organizationId}))) SELECT 1 AS locked FROM lock`;
+  const effectiveBookingLimit =
+    baseBookingLimit +
+    (entitlements.subscription.freeBookingGraceUsed ? FREE_BOOKING_GRACE : 0);
+  const rolling30DayBookings = await database.appointment.count({
+    where: {
+      createdAt: {
+        gte: new Date(
+          Date.now() - ROLLING_BOOKING_WINDOW_DAYS * DAY_MS,
+        ),
+      },
+      organizationId,
+    },
+  });
+  if (rolling30DayBookings >= effectiveBookingLimit) {
     throw new ApiError(
       409,
       audience === 'public'
@@ -687,12 +707,13 @@ export async function assertCanCreateBooking(
         : 'PLAN_BOOKING_LIMIT_REACHED',
       audience === 'public'
         ? 'Las reservas online de este negocio estan temporalmente pausadas. Puedes contactar directamente con el negocio.'
-        : result.grace.available
+        : entitlements.plan.code === 'free' &&
+            !entitlements.subscription.freeBookingGraceUsed &&
+            rolling30DayBookings >= baseBookingLimit
           ? 'Alcanzaste las 25 reservas de Nava Free. Activa tus 5 reservas de cortesia para continuar.'
           : 'Alcanzaste el limite de reservas de Nava Free. Actualiza tu plan para crear nuevas reservas.',
     );
   }
-  return result;
 }
 
 export async function assertCanCreateClient(
@@ -711,6 +732,23 @@ export async function assertCanCreateClient(
     );
   }
   return result;
+}
+
+/** Returns how many client records may be created without exceeding the plan. */
+export async function assertCanCreateClients(
+  database: Prisma.TransactionClient,
+  organizationId: string,
+  requestedCount: number,
+): Promise<number> {
+  if (!Number.isInteger(requestedCount) || requestedCount < 0) {
+    throw new Error('La cantidad solicitada de clientes no es válida.');
+  }
+  const result = await getSubscriptionUsage(database, organizationId);
+  if (result.limits.clients === null) return requestedCount;
+  return Math.max(
+    0,
+    Math.min(requestedCount, result.limits.clients - result.usage.clients),
+  );
 }
 
 export async function assertCanCreateTeamMember(
@@ -737,14 +775,18 @@ export async function recordBookingMilestone(
   transaction: Prisma.TransactionClient,
   organizationId: string,
 ) {
-  const bookings = await transaction.appointment.count({
+  // The final milestone is 25.  A bounded probe avoids a full COUNT over an
+  // organization's appointment history for every later booking.
+  const bookings = await transaction.appointment.findMany({
+    select: { id: true },
+    take: 25,
     where: { organizationId },
   });
-  if (![5, 10, 20, 25].includes(bookings)) return;
+  if (![5, 10, 20, 25].includes(bookings.length)) return;
   await transaction.auditLog.create({
     data: {
-      action: `organization.reached_${bookings}_bookings`,
-      afterData: { bookings },
+      action: `organization.reached_${bookings.length}_bookings`,
+      afterData: { bookings: bookings.length },
       entityId: organizationId,
       entityType: 'organization',
       organizationId,

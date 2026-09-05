@@ -17,6 +17,7 @@ services:
 
   postgres-test:
     image: postgres:18-alpine
+    shm_size: 256mb
     environment:
       POSTGRES_DB: barber_saas_test
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}

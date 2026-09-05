@@ -1,6 +1,6 @@
 'use client';
 
-import type { PublicBookingCatalog } from '@barber-saas/api-client';
+import type { PublicBookingCatalogV2 } from '@barber-saas/api-client';
 import { Country } from 'country-state-city';
 import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
@@ -93,7 +93,7 @@ export function BookingExperience({
   catalog,
 }: {
   apiBaseUrl: string;
-  catalog: PublicBookingCatalog;
+  catalog: PublicBookingCatalogV2;
 }) {
   const apiUrl = apiBaseUrl.replace(/\/$/u, '');
   const [step, setStep] = useState<Step>('landing');
@@ -200,7 +200,7 @@ export function BookingExperience({
         serviceIds: serviceIds.join(','),
       });
       const response = await fetch(
-        `${apiUrl}/v1/public/${catalog.organization.slug}/${catalog.location.slug}/availability?${query.toString()}`,
+        `${apiUrl}/v2/public/${catalog.organization.slug}/${catalog.location.slug}/availability?${query.toString()}`,
         { cache: 'no-store' },
       );
       if (!response.ok) throw new Error(await readError(response));
@@ -390,12 +390,12 @@ export function BookingExperience({
                         type="button"
                       >
                         <span className="flex min-w-0 items-center gap-3">
-                          {service.imageData ? (
+                          {service.imageUrl ? (
                             <Image
                               alt={`Foto de ${service.name}`}
                               className="h-14 w-14 shrink-0 rounded-xl object-cover"
                               height={56}
-                              src={service.imageData}
+                              src={service.imageUrl}
                               unoptimized
                               width={56}
                             />
@@ -714,7 +714,7 @@ function Landing({
   onBook,
 }: {
   apiBaseUrl: string;
-  catalog: PublicBookingCatalog;
+  catalog: PublicBookingCatalogV2;
   onBook: () => void;
 }) {
   return (
@@ -837,9 +837,9 @@ function BookingSummary({
   totalCents,
   totalMinutes,
 }: {
-  catalog: PublicBookingCatalog;
+  catalog: PublicBookingCatalogV2;
   professionalName: string | null;
-  selectedServices: PublicBookingCatalog['services'];
+  selectedServices: PublicBookingCatalogV2['services'];
   startsAt: string | null;
   totalCents: number;
   totalMinutes: number;
@@ -1007,7 +1007,7 @@ function PublicBookingLanding({
   onBook,
 }: {
   apiBaseUrl: string;
-  catalog: PublicBookingCatalog;
+  catalog: PublicBookingCatalogV2;
   onBook: () => void;
 }) {
   const [activeSection, setActiveSection] =
@@ -1111,12 +1111,12 @@ function PublicBookingLanding({
         <div className="sticky top-0 z-30 border-b border-[#E4E1DA] bg-[#FAF9F6]/95 shadow-[0_8px_24px_rgba(28,28,28,.05)] backdrop-blur">
           <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-5 lg:px-8">
             <div className="flex max-w-xl items-center gap-3">
-              {catalog.organization.profilePhotoData ? (
+              {catalog.organization.profilePhotoUrl ? (
                 <Image
                   alt={`Foto de perfil de ${catalog.organization.name}`}
                   className="h-11 w-11 shrink-0 rounded-full border-2 border-white object-cover shadow-sm"
                   height={44}
-                  src={catalog.organization.profilePhotoData}
+                  src={catalog.organization.profilePhotoUrl}
                   unoptimized
                   width={44}
                 />
@@ -1279,12 +1279,12 @@ function PublicBookingLanding({
                   className="min-w-36 snap-start rounded-[20px] border border-[#E4E1DA] bg-white p-4 text-center shadow-[0_8px_20px_rgba(180,125,23,.05)]"
                   key={professional.id}
                 >
-                  {professional.photoData ? (
+                  {professional.photoUrl ? (
                     <Image
                       alt={`Foto de ${professional.name}`}
                       className="mx-auto rounded-full object-cover"
                       height={56}
-                      src={professional.photoData}
+                      src={professional.photoUrl}
                       unoptimized
                       width={56}
                     />
@@ -1370,14 +1370,14 @@ function BusinessHero({
   onBook,
   scrolled,
 }: {
-  catalog: PublicBookingCatalog;
+  catalog: PublicBookingCatalogV2;
   onBook: () => void;
   scrolled: boolean;
 }) {
   const address = [catalog.location.addressLine, catalog.location.city]
     .filter(Boolean)
     .join(', ');
-  const coverImage = catalog.organization.coverImageUri;
+  const coverImage = catalog.organization.coverImageUrl;
   return (
     <section className="sticky top-0 isolate z-0 mx-auto h-[min(156vw,39rem)] min-h-[34rem] max-w-6xl overflow-hidden bg-[#574015] shadow-[0_20px_56px_rgba(0,0,0,.28)] sm:h-[35rem] sm:rounded-b-[2rem]">
       <Image
@@ -1516,7 +1516,7 @@ function FeaturedService({
 }: {
   currency: string;
   onBook: () => void;
-  service: PublicBookingCatalog['services'][number];
+  service: PublicBookingCatalogV2['services'][number];
 }) {
   return (
     <article className="grid gap-4 rounded-[20px] border border-[#E4E1DA] bg-white p-3 shadow-[0_12px_36px_rgba(180,125,23,.08)] sm:grid-cols-[9rem_1fr] sm:p-4">
@@ -1526,8 +1526,8 @@ function FeaturedService({
           className="object-cover"
           fill
           sizes="144px"
-          src={service.imageData ?? bookingHero}
-          unoptimized={Boolean(service.imageData)}
+          src={service.imageUrl ?? bookingHero}
+          unoptimized={Boolean(service.imageUrl)}
         />
       </div>
       <div className="min-w-0">
@@ -1575,7 +1575,7 @@ function ServiceCard({
   currency: string;
   onBook: () => void;
   popular: boolean;
-  service: PublicBookingCatalog['services'][number];
+  service: PublicBookingCatalogV2['services'][number];
 }) {
   return (
     <article className="grid min-h-32 grid-cols-[4.75rem_minmax(0,1fr)] gap-3 rounded-[18px] border border-[#E4E1DA] bg-white p-3 shadow-[0_8px_20px_rgba(180,125,23,.05)]">
@@ -1585,8 +1585,8 @@ function ServiceCard({
           className="object-cover"
           fill
           sizes="76px"
-          src={service.imageData ?? bookingHero}
-          unoptimized={Boolean(service.imageData)}
+          src={service.imageUrl ?? bookingHero}
+          unoptimized={Boolean(service.imageUrl)}
         />
       </div>
       <div className="flex min-w-0 flex-col">
@@ -1630,18 +1630,18 @@ function ProductCard({
 }: {
   currency: string;
   onAdd: (productId: string) => void;
-  product: PublicBookingCatalog['products'][number];
+  product: PublicBookingCatalogV2['products'][number];
 }) {
   return (
     <article className="overflow-hidden rounded-[18px] border border-[#E4E1DA] bg-white shadow-[0_8px_20px_rgba(180,125,23,.05)]">
       <div className="relative aspect-[4/3] bg-[#F4F4F3]">
-        {product.imageData ? (
+        {product.imageUrl ? (
           <Image
             alt={`Producto ${product.name}`}
             className="object-cover"
             fill
             sizes="(max-width: 640px) 100vw, 33vw"
-            src={product.imageData}
+            src={product.imageUrl}
             unoptimized
           />
         ) : (
@@ -1700,7 +1700,7 @@ function ProductCartPanel({
 }: {
   apiBaseUrl: string;
   cartItems: ReadonlyArray<{
-    product: PublicBookingCatalog['products'][number];
+    product: PublicBookingCatalogV2['products'][number];
     quantity: number;
   }>;
   currency: string;
@@ -2017,7 +2017,7 @@ function RatingsSummary({
   reviews,
 }: {
   average: number | null;
-  reviews: PublicBookingCatalog['reviews'];
+  reviews: PublicBookingCatalogV2['reviews'];
 }) {
   const distribution = [5, 4, 3, 2, 1].map((rating) => ({
     count: reviews.filter((review) => review.rating === rating).length,
@@ -2063,7 +2063,7 @@ function RatingsSummary({
 function FeaturedReview({
   reviews,
 }: {
-  reviews: PublicBookingCatalog['reviews'];
+  reviews: PublicBookingCatalogV2['reviews'];
 }) {
   const review = reviews.find((item) => item.comment) ?? reviews[0];
   if (!review) {
@@ -2093,7 +2093,7 @@ function BusinessInformation({
   catalog,
   onNavigate,
 }: {
-  catalog: PublicBookingCatalog;
+  catalog: PublicBookingCatalogV2;
   onNavigate: (section: LandingSection) => void;
 }) {
   const address = [catalog.location.addressLine, catalog.location.city]

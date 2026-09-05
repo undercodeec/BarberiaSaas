@@ -27,6 +27,7 @@ import {
   publicAppointment,
   zonedDateTimeToUtc,
 } from './agenda';
+import { buildAvailability } from './availability-engine';
 import type { ApiConfig } from './config';
 import { ApiError } from './errors';
 import type { AppointmentNotifier } from './notifications';
@@ -49,14 +50,14 @@ const PUBLIC_VERIFICATION_DURATION_MS = 10 * 60 * 1000;
 const MANAGEMENT_AFTER_END_MS = 30 * 24 * 60 * 60 * 1000;
 const DEFAULT_PUBLIC_BOOKING_BASE_URL = 'https://navacloud.app';
 
-const publicPathSchema = z.object({
+export const publicPathSchema = z.object({
   locationSlug: z.string().trim().min(1).max(80),
   organizationSlug: z.string().trim().min(1).max(80),
 });
 const organizationPathSchema = z.object({
   organizationSlug: z.string().trim().min(1).max(80),
 });
-const publicAvailabilitySchema = z.object({
+export const publicAvailabilitySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
   membershipId: z.uuid(),
   serviceIds: z
@@ -99,9 +100,20 @@ type Authenticate = (
   request: FastifyRequest,
 ) => Promise<AuthenticatedIdentity>;
 
-const requestBuckets = new Map<string, { count: number; resetAt: number }>();
+const requestBucketsByApp = new WeakMap<
+  FastifyInstance,
+  Map<string, { count: number; resetAt: number }>
+>();
 
-function enforceRateLimit(
+function requestBuckets(request: FastifyRequest) {
+  const existing = requestBucketsByApp.get(request.server);
+  if (existing) return existing;
+  const buckets = new Map<string, { count: number; resetAt: number }>();
+  requestBucketsByApp.set(request.server, buckets);
+  return buckets;
+}
+
+export function enforceRateLimit(
   request: FastifyRequest,
   scope: string,
   limit: number,
@@ -109,9 +121,10 @@ function enforceRateLimit(
 ) {
   const now = Date.now();
   const key = `${scope}:${request.ip}`;
-  const current = requestBuckets.get(key);
+  const buckets = requestBuckets(request);
+  const current = buckets.get(key);
   if (!current || current.resetAt <= now) {
-    requestBuckets.set(key, { count: 1, resetAt: now + windowMs });
+    buckets.set(key, { count: 1, resetAt: now + windowMs });
     return;
   }
   if (current.count >= limit) {
@@ -128,16 +141,7 @@ function weekdayFor(localDate: string) {
   return new Date(`${localDate}T00:00:00.000Z`).getUTCDay();
 }
 
-function overlaps(
-  startsAt: Date,
-  endsAt: Date,
-  occupiedStartsAt: Date,
-  occupiedEndsAt: Date,
-) {
-  return startsAt < occupiedEndsAt && endsAt > occupiedStartsAt;
-}
-
-async function requirePublicLocation(
+export async function requirePublicLocation(
   database: DatabaseClient,
   organizationSlug: string,
   locationSlug: string,
@@ -448,7 +452,7 @@ async function assertPublicOnlineBookingEnabled(
   }
 }
 
-async function calculatePublicAvailability(
+export async function calculatePublicAvailability(
   database: DatabaseClient,
   input: {
     date: string;
@@ -518,44 +522,24 @@ async function calculatePublicAvailability(
     }),
   ]);
   if (!businessSchedule?.isOpen) return { durationMinutes, slots: [] };
-  const occupied = [
-    ...appointments.map((appointment) => ({
-      endsAt: appointment.endsAt,
-      startsAt: appointment.startsAt,
+  const availability = buildAvailability({
+    date: input.date,
+    durationMinutes,
+    excludePast: true,
+    now: new Date(),
+    occupied: appointments.map(({ endsAt, startsAt }) => ({
+      endsAt,
+      startsAt,
     })),
-  ];
-  const slots: Array<{ endsAt: string; startsAt: string }> = [];
-  for (const schedule of schedules) {
-    const startMinute = Math.max(
-      schedule.startMinute,
-      businessSchedule.startMinute,
-    );
-    const endMinute = Math.min(schedule.endMinute, businessSchedule.endMinute);
-    for (
-      let minute = startMinute;
-      minute + durationMinutes <= endMinute;
-      minute += context.location.bookingSlotIntervalMinutes
-    ) {
-      const startsAt = zonedDateTimeToUtc(
-        input.date,
-        minute,
-        context.location.timezone,
-      );
-      const endsAt = new Date(startsAt.getTime() + durationMinutes * 60_000);
-      if (
-        startsAt > new Date() &&
-        !occupied.some((range) =>
-          overlaps(startsAt, endsAt, range.startsAt, range.endsAt),
-        )
-      ) {
-        slots.push({
-          endsAt: endsAt.toISOString(),
-          startsAt: startsAt.toISOString(),
-        });
-      }
-    }
-  }
-  return { durationMinutes, slots };
+    stepMinutes: context.location.bookingSlotIntervalMinutes,
+    timeZone: context.location.timezone,
+    toUtc: zonedDateTimeToUtc,
+    windows: schedules.map((schedule) => ({
+      endMinute: Math.min(schedule.endMinute, businessSchedule.endMinute),
+      startMinute: Math.max(schedule.startMinute, businessSchedule.startMinute),
+    })),
+  });
+  return { durationMinutes, slots: availability.slots };
 }
 
 function publicManagedAppointment(appointment: {

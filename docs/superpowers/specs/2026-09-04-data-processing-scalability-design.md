@@ -1,7 +1,7 @@
 # Diseño de escalabilidad para el tratamiento de datos
 
 **Fecha:** 2026-09-04
-**Estado:** diseño aprobado y documentación de ejecución completada; implementación técnica pendiente
+**Estado:** implementado y verificado localmente
 **Alcance:** reservas públicas y privadas, agenda, clientes, inventario y lecturas resumidas del dashboard
 
 ## Seguimiento de cambios
@@ -10,13 +10,13 @@
 - [x] Diseño arquitectónico escalable, contratos v2 compatibles y presupuestos de consultas documentados.
 - [x] Plan detallado de 15 tareas creado en `docs/superpowers/plans/2026-09-04-data-processing-scalability.md`.
 - [x] Procedimiento de seguridad para pruebas locales documentado: PostgreSQL aislado, `TEST_DATABASE_URL` validada y Neon de producción excluido.
-- [ ] Instrumentación por solicitud, línea base y dataset local de 100.000 registros.
-- [ ] Cursores, contratos y rutas API `v2` para clientes, agenda, disponibilidad, inventario y catálogo público.
-- [ ] Migración de la aplicación móvil y web para consumir los contratos `v2`.
-- [ ] Limitación de escrituras de sesión, contexto operacional memoizado y motor lineal de disponibilidad.
-- [ ] Índices PostgreSQL, migración aditiva, `EXPLAIN` y pruebas de rendimiento/concurrencia.
+- [x] Instrumentación por solicitud, línea base y dataset local de 100.000 registros.
+- [x] Cursores, contratos y rutas API `v2` para clientes, agenda, disponibilidad, inventario y catálogo público.
+- [x] Migración de la aplicación móvil y web para consumir los contratos `v2`.
+- [x] Limitación de escrituras de sesión, contexto operacional memoizado y motor lineal de disponibilidad.
+- [x] Índices PostgreSQL, migración aditiva, `EXPLAIN` y pruebas de rendimiento/concurrencia.
 
-**Nota de estado:** esta actualización documenta el diseño y el plan; no se ha aplicado una migración, creado una ruta `v2`, ejecutado una prueba destructiva ni modificado Neon.
+**Nota de estado:** las migraciones y pruebas destructivas se ejecutaron únicamente sobre PostgreSQL local protegido en `127.0.0.1:5433/barber_saas_test`. No se modificó Neon de producción. La regresión API completa, lint y typecheck pasan; los fixtures de 100.000 registros se ejecutan de forma aislada con sus comandos de rendimiento para no mezclarse con pruebas que limpian tenants.
 
 ## 1. Contexto
 

@@ -37,6 +37,7 @@ integrationDescribe('reservas públicas', () => {
   let accessToken = '';
   let lastVerificationCode = '';
   let reminderMessages = 0;
+  let publicRequestIp = 1;
   const reviewMessages: string[] = [];
   const mailer: PublicBookingMailer = {
     async sendCancellation() {},
@@ -220,6 +221,8 @@ integrationDescribe('reservas públicas', () => {
     email: string,
     phone = clientPhone,
   ) {
+    const remoteAddress = `198.51.100.${publicRequestIp}`;
+    publicRequestIp += 1;
     const createResponse = await app.inject({
       headers: { 'idempotency-key': idempotencyKey },
       method: 'POST',
@@ -232,6 +235,7 @@ integrationDescribe('reservas públicas', () => {
         serviceIds: [serviceId],
         startsAt,
       },
+      remoteAddress,
       url: `/v1/public/${organizationSlug}/principal/bookings`,
     });
     expect(createResponse.statusCode).toBe(201);
@@ -254,6 +258,7 @@ integrationDescribe('reservas públicas', () => {
         serviceIds: [serviceId],
         startsAt,
       },
+      remoteAddress,
       url: `/v1/public/${organizationSlug}/principal/bookings`,
     });
     expect(repeated.statusCode).toBe(200);
@@ -529,6 +534,7 @@ integrationDescribe('reservas públicas', () => {
   });
 
   it('publica una reseña verificada y permite ocultarla', async () => {
+    const reviewMessagesBefore = reviewMessages.length;
     const management = await createAndVerifyBooking(
       `public-review-${randomUUID()}`,
       futureSlot(5, 12),
@@ -546,8 +552,8 @@ integrationDescribe('reservas públicas', () => {
       url: `/v1/appointments/${access.appointmentId}/status`,
     });
     expect(completed.statusCode).toBe(200);
-    expect(reviewMessages).toHaveLength(1);
-    const reviewToken = reviewMessages[0]!.split('/').at(-1)!;
+    expect(reviewMessages).toHaveLength(reviewMessagesBefore + 1);
+    const reviewToken = reviewMessages.at(-1)!.split('/').at(-1)!;
     const reviewResponse = await app.inject({
       method: 'POST',
       payload: { comment: 'Muy buen servicio', rating: 5 },
@@ -656,6 +662,7 @@ integrationDescribe('reservas públicas', () => {
         serviceIds: [serviceId],
         startsAt: futureSlot(7, 9),
       },
+      remoteAddress: '198.51.100.250',
       url: `/v1/public/${organizationSlug}/principal/bookings`,
     });
     expect(newBooking.statusCode).toBe(404);

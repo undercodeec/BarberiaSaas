@@ -374,6 +374,47 @@ export interface InventoryResponse {
   };
 }
 
+export interface CursorPage<T> {
+  readonly items: readonly T[];
+  readonly nextCursor: string | null;
+}
+
+export interface InventoryProductSummary {
+  readonly costCents: number;
+  readonly currencyCode: string;
+  readonly id: string;
+  readonly imageUrl: string | null;
+  readonly isActive: boolean;
+  readonly isLowStock: boolean;
+  readonly minimumStock: number;
+  readonly name: string;
+  readonly quantityOnHand: number;
+  readonly salePriceCents: number;
+  readonly sku: string | null;
+  readonly stockTrackingEnabled: boolean;
+}
+
+export interface InventoryProductsPageResponse
+  extends CursorPage<InventoryProductSummary> {
+  readonly accessibleLocations: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+  }>;
+  readonly currencyCode: string;
+  readonly locationId: string;
+  readonly summary: InventorySummaryResponse | null;
+}
+
+export interface InventorySummaryResponse {
+  readonly activeProducts: number;
+  readonly inventoryCostCents: number;
+  readonly locationId: string;
+  readonly lowStockProducts: number;
+  readonly totalUnits: number;
+}
+
+export type StockMovementsPageResponse = CursorPage<StockMovementRecord>;
+
 export interface ProductOrderRecord {
   readonly customerEmail: string | null;
   readonly customerName: string;
@@ -827,6 +868,16 @@ export interface ClientNoteRecord {
 export interface ClientNotesResponse {
   readonly notes: readonly ClientNoteRecord[];
 }
+
+export interface ClientNoteSummary {
+  readonly createdAt: string;
+  readonly description: string;
+  readonly hasPhoto: boolean;
+  readonly id: string;
+  readonly photoUrl: string | null;
+}
+
+export type ClientNotesPageResponse = CursorPage<ClientNoteSummary>;
 export interface ClientRecord {
   readonly addressLine: string | null;
   readonly birthDate: string | null;
@@ -842,6 +893,19 @@ export interface ClientRecord {
 
 export interface ClientsResponse {
   readonly clients: readonly ClientRecord[];
+}
+
+export type ClientPageResponse = CursorPage<ClientRecord>;
+
+export interface ClientImportItemResult {
+  readonly clientId: string | null;
+  readonly inputIndex: number;
+  readonly reason: 'already_exists' | 'invalid' | 'plan_limit' | null;
+  readonly status: 'created' | 'rejected' | 'skipped';
+}
+
+export interface ClientImportResponse {
+  readonly results: readonly ClientImportItemResult[];
 }
 
 export interface ClientExportResponse {
@@ -944,6 +1008,18 @@ export interface AppointmentRecord {
 
 export interface AppointmentsResponse {
   readonly appointments: readonly AppointmentRecord[];
+}
+
+export type AppointmentsPageResponse = CursorPage<AppointmentRecord>;
+
+export interface AppointmentCalendarSummary {
+  readonly appointmentCount: number;
+  readonly date: string;
+  readonly locationId: string;
+}
+
+export interface AppointmentCalendarSummaryResponse {
+  readonly items: readonly AppointmentCalendarSummary[];
 }
 
 export interface AvailabilityResponse {
@@ -1053,6 +1129,71 @@ export interface PublicBookingCatalog {
     readonly durationMinutes: number;
     readonly id: string;
     readonly imageData: string | null;
+    readonly name: string;
+    readonly priceCents: number;
+  }>;
+}
+
+export interface PublicBookingCatalogV2 {
+  readonly bookingAvailability: {
+    readonly canCreate: boolean;
+    readonly message: string | null;
+  };
+  readonly location: {
+    readonly addressLine: string | null;
+    readonly city: string | null;
+    readonly countryCode: string;
+    readonly currencyCode: string;
+    readonly email: string | null;
+    readonly formattedAddress: string | null;
+    readonly googlePlaceId: string | null;
+    readonly id: string;
+    readonly latitude: number | null;
+    readonly longitude: number | null;
+    readonly name: string;
+    readonly phone: string;
+    readonly slug: string;
+    readonly timezone: string;
+  };
+  readonly organization: {
+    readonly coverImageUrl: string | null;
+    readonly description: string | null;
+    readonly facebookUrl: string | null;
+    readonly id: string;
+    readonly instagramUrl: string | null;
+    readonly name: string;
+    readonly profilePhotoUrl: string | null;
+    readonly slug: string;
+  };
+  readonly policy: BookingSettingsResponse;
+  readonly professionals: ReadonlyArray<{
+    readonly bio: string | null;
+    readonly id: string;
+    readonly name: string;
+    readonly photoUrl: string | null;
+    readonly serviceIds: readonly string[];
+  }>;
+  readonly products: ReadonlyArray<{
+    readonly id: string;
+    readonly imageUrl: string | null;
+    readonly isAvailable: boolean;
+    readonly name: string;
+    readonly priceCents: number;
+  }>;
+  readonly reviews: ReadonlyArray<{
+    readonly clientName: string;
+    readonly comment: string | null;
+    readonly createdAt: string;
+    readonly id: string;
+    readonly professionalName: string;
+    readonly rating: number;
+  }>;
+  readonly services: ReadonlyArray<{
+    readonly category: string | null;
+    readonly description: string | null;
+    readonly durationMinutes: number;
+    readonly id: string;
+    readonly imageUrl: string | null;
     readonly name: string;
     readonly priceCents: number;
   }>;

@@ -31,6 +31,109 @@ su resultado debe registrarse aquí antes de archivarlos.
 - Las integraciones PostgreSQL deben usar únicamente la base local de pruebas;
   no se debe compensar la latencia remota usando producción.
 
+## Procesamiento de datos escalable — 5 de septiembre de 2026
+
+- [x] Las rutas aditivas `v2` de clientes, agenda, disponibilidad, inventario
+      y catálogo público están disponibles; Mobile y Web consumen páginas y
+      resúmenes ligeros. Las rutas `v1` continúan compatibles.
+- [x] Las listas grandes usan cursor, límite de 50 por defecto y 100 máximo.
+      La Agenda sólo hace polling mientras la pantalla está enfocada; la
+      actividad de sesión se persiste como máximo una vez cada cinco minutos.
+- [x] Las migraciones `20260904150000_data_processing_indexes` y
+      `20260905100000_client_search_tenant_index` añaden índices de cursores y
+      búsqueda por tenant. Los planes se validaron con `EXPLAIN` local.
+- [x] El fixture `perf-data-local` cubre 100.000 clientes, citas, productos y
+      movimientos por entidad grande. La evidencia p50/p95, consultas y bytes
+      está en `docs/testing/data-processing-performance.md`; todos los p95
+      medidos cumplen los presupuestos locales.
+- [x] Verificado localmente con migraciones, API completa (150 pruebas), lint
+      y typecheck. Las pruebas destructivas usaron sólo
+      `127.0.0.1:5433/barber_saas_test`; Neon de producción no fue modificado.
+
+## Reservas: disponibilidad sincronizada e intervalo configurable — 5 de septiembre de 2026
+
+Los commits `9d66a46`, `b093c78` y `7c524aa` están publicados en `main`. El
+estado siguiente describe el código integrado; no constituye evidencia de que
+la migración, la API, la Web o la nueva versión Android ya estén desplegadas
+en producción.
+
+### Corrección de reservas pendientes de verificación
+
+- Una reserva pública creada y aún pendiente de validar correo queda en estado
+  `PENDING_VERIFICATION` con `reservesSlot=false`; por ello no oculta horarios
+  ni bloquea una reserva posterior.
+- Al verificar el código, la API toma los locks de profesional y organización,
+  vuelve a comprobar disponibilidad y solo entonces cambia la cita a
+  `CONFIRMED` con `reservesSlot=true`. Si otro cliente ya ocupó el espacio, la
+  verificación devuelve conflicto en lugar de crear un solapamiento.
+- Citas confirmadas, programadas o pendientes de confirmación que reservan
+  espacio bloquean todo su rango real; canceladas, vencidas y pendientes de
+  verificación no lo bloquean.
+
+### Disponibilidad pública y caché
+
+- La Web consulta la disponibilidad con `cache: 'no-store'` y el proxy público
+  responde `Cache-Control: no-store, max-age=0`. Una cancelación, liberación o
+  verificación no debe permanecer almacenada en navegador, proxy o CDN.
+- La API pública y la Agenda usan la misma regla de solapamiento: para un
+  servicio de 60 minutos reservado de 10:00 a 11:00, no se ofrecen inicios
+  entre 10:00 y 10:55; el siguiente inicio elegible es 11:00, sujeto a jornada
+  y a la configuración de intervalo.
+
+### Intervalo de inicios de reserva por sucursal
+
+- La migración `20260904160000_booking_slot_interval` añade
+  `locations.booking_slot_interval_minutes SMALLINT NOT NULL DEFAULT 5`.
+  No modifica citas existentes ni la duración de servicios; toda sucursal
+  existente conserva inicialmente el intervalo de cinco minutos.
+- Cada sucursal puede elegir **5, 10, 15, 20, 30 o 60 minutos** desde
+  **Horario del negocio** en la app móvil. El intervalo define los posibles
+  minutos de inicio; la cita siempre termina según la suma real de duraciones
+  de sus servicios.
+- El valor pertenece a la sucursal, no al profesional. Un negocio de una sola
+  sede tiene una configuración; un negocio con varias sedes puede definir una
+  distinta por cada una.
+- Solo `OWNER` y `MANAGER` poseen `schedule.manage` y pueden guardarlo. La UI
+  deja en modo lectura tanto este control como la edición del horario para
+  `BARBER`; la API conserva la misma autorización como control efectivo.
+- La Agenda, la creación/reprogramación desde móvil y la Web pública consumen
+  el mismo intervalo de la sucursal seleccionada. Varios profesionales de una
+  sede tienen disponibilidad independiente. Si el mismo profesional está
+  asignado a dos sedes, una cita suya bloquea intervalos solapados en ambas,
+  evitando una doble asignación física.
+
+### Validación realizada
+
+- `pnpm db:generate` y `pnpm db:validate`: correctos.
+- `pnpm --filter @barber-saas/validation test`: 32 pruebas correctas.
+- Typecheck correcto para API, cliente API, Web y móvil.
+- `pnpm --filter @barber-saas/api test`: 16 archivos aprobados, 78 pruebas
+  aprobadas; 1 archivo y 58 pruebas de integración se omitieron porque
+  `TEST_DATABASE_URL` no estaba configurada en esta sesión.
+- La prueba de integración de Agenda cubre el valor inicial `5`, la denegación
+  al barbero, el guardado de `10` minutos y la separación de resultados cada
+  diez minutos. Debe ejecutarse contra PostgreSQL local antes de declarar la
+  migración validada para producción.
+
+### Pendiente de despliegue y validación operativa
+
+1. En la VPS, seguir las **REGLAS DE DESPLIEGUE — NO REGRESIONAR**: generar
+   Prisma Client, comprobar `pnpm db:status`, aplicar
+   `pnpm db:migrate:deploy` solo si la migración aparece pendiente, repetir el
+   estado, compilar y reiniciar `nava-api` y `nava-web`.
+2. Antes de producción, ejecutar la cadena de migraciones y las integraciones
+   contra `postgres-test` local, incluida la nueva migración. La adición de
+   columna con `DEFAULT 5` es de riesgo medio por ser `NOT NULL`; el rollback
+   posterior a un despliegue confirmado requiere una migración nueva y
+   aprobada, no editar ni retirar esta migración.
+3. Validar en producción una reserva pendiente, su expiración/cancelación y su
+   verificación; comprobar que la Web libera/muestra el horario correcto y que
+   5/10/15 minutos generan los inicios esperados.
+4. La pantalla móvil nueva requiere el siguiente AAB firmado y publicado por
+   Google Play; este proyecto no usa OTA. Hasta que se instale esa versión, la
+   API y la Web usarán el valor por defecto de cinco minutos o el último valor
+   guardado, pero el selector no será visible en binarios anteriores.
+
 ## Recibos temporales de pago — implementación local pendiente de despliegue
 
 Como transición hasta contar con facturación electrónica SRI operativa en

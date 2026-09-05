@@ -2,16 +2,19 @@ import { styles } from '../../src/features/screens/inventory.styles';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import type {
-  InventoryProduct,
-  InventoryResponse,
+  InventoryProductSummary,
   ProductOrderRecord,
   ProductOrdersResponse,
-  StockMovementHistoryResponse,
   SubscriptionResponse,
 } from '@barber-saas/api-client';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Image,
@@ -27,7 +30,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useNativeLayoutMetrics } from '../../src/components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
-import { requireApiClient } from '../../src/lib/api';
+import { getStoredSessionToken, requireApiClient } from '../../src/lib/api';
+import {
+  inventoryMovementsQueryOptions,
+  inventoryProductsQueryOptions,
+} from '../../src/features/inventory/inventory-queries';
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
@@ -38,6 +45,7 @@ const MAX_IMAGE_DIMENSION = 1_600;
 type SheetMode = 'adjustment' | 'product';
 type AdjustmentType =
   'adjustment_in' | 'adjustment_out' | 'loss' | 'purchase' | 'return';
+type InventoryListProduct = InventoryProductSummary;
 
 function cents(value: string, label: string) {
   const parsed = Number(value.replace(',', '.'));
@@ -62,6 +70,11 @@ function movementLabel(type: string) {
   return 'Ajuste';
 }
 
+function apiMediaUrl(path: string): string {
+  const baseUrl = process.env.EXPO_PUBLIC_API_URL;
+  return baseUrl ? new URL(path, baseUrl).toString() : path;
+}
+
 export default function InventoryScreen() {
   const { session } = useAuth();
   const tenant = useTenantScope();
@@ -78,11 +91,11 @@ export default function InventoryScreen() {
   );
   const [sheetMode, setSheetMode] = useState<SheetMode>('product');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<InventoryProduct | null>(
+  const [editingProduct, setEditingProduct] = useState<InventoryListProduct | null>(
     null,
   );
   const [selectedProduct, setSelectedProduct] =
-    useState<InventoryProduct | null>(null);
+    useState<InventoryListProduct | null>(null);
   const [name, setName] = useState('');
   const [imageData, setImageData] = useState<string | null>(null);
   const [sku, setSku] = useState('');
@@ -94,6 +107,16 @@ export default function InventoryScreen() {
   const [adjustmentNotes, setAdjustmentNotes] = useState('');
   const [adjustmentType, setAdjustmentType] =
     useState<AdjustmentType>('purchase');
+  const [imageToken, setImageToken] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    void getStoredSessionToken().then((token) => {
+      if (active) setImageToken(token);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
   const subscriptionQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -101,32 +124,37 @@ export default function InventoryScreen() {
     queryKey: tenant.key('subscription'),
   });
 
-  const inventorySearch = useMemo(() => {
-    const search = new URLSearchParams();
-    if (locationId) search.set('locationId', locationId);
-    if (lowStockOnly) search.set('lowStockOnly', 'true');
-    return search.toString();
-  }, [locationId, lowStockOnly]);
-  const inventoryQuery = useQuery({
+  const requestedLocationId =
+    locationId ?? (tenant.scope.locationId === 'all' ? null : tenant.scope.locationId);
+  const inventoryQuery = useInfiniteQuery({
+    ...inventoryProductsQueryOptions(requireApiClient(), tenant.scope, {
+      locationId: requestedLocationId ?? '',
+      lowStock: lowStockOnly,
+    }),
     enabled: Boolean(
-      session && subscriptionQuery.data?.current.featureFlags.inventory,
+      session &&
+        requestedLocationId &&
+        subscriptionQuery.data?.current.featureFlags.inventory &&
+        tab === 'products',
     ),
-    queryFn: () =>
-      requireApiClient().request<InventoryResponse>(
-        `/v1/inventory${inventorySearch ? `?${inventorySearch}` : ''}`,
-      ),
-    queryKey: tenant.key('inventory', inventorySearch),
   });
+  const inventoryProducts = useMemo(
+    () => inventoryQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [inventoryQuery.data?.pages],
+  );
+  const inventoryPage = inventoryQuery.data?.pages[0];
   const resolvedLocationId =
-    locationId ?? inventoryQuery.data?.locationId ?? null;
-  const movementQuery = useQuery({
+    locationId ?? inventoryPage?.locationId ?? requestedLocationId ?? null;
+  const movementQuery = useInfiniteQuery({
+    ...inventoryMovementsQueryOptions(requireApiClient(), tenant.scope, {
+      locationId: resolvedLocationId ?? '',
+    }),
     enabled: Boolean(session && tab === 'movements' && resolvedLocationId),
-    queryFn: () =>
-      requireApiClient().request<StockMovementHistoryResponse>(
-        `/v1/inventory/movements?locationId=${resolvedLocationId}`,
-      ),
-    queryKey: tenant.key('inventory-movements', resolvedLocationId),
   });
+  const inventoryMovements = useMemo(
+    () => movementQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [movementQuery.data?.pages],
+  );
 
   const saveProduct = useMutation({
     mutationFn: () => {
@@ -134,7 +162,7 @@ export default function InventoryScreen() {
         throw new Error('Ingresa el nombre del producto.');
       const body = {
         costCents: cents(cost, 'un costo'),
-        imageData,
+        ...(imageData ? { imageData } : {}),
         minimumStock: units(minimumStock, 'un stock mínimo'),
         name: name.trim(),
         salePriceCents: cents(price, 'un precio'),
@@ -169,7 +197,7 @@ export default function InventoryScreen() {
       setIsSheetOpen(false);
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: tenantQueryPrefix('inventory'),
+          queryKey: tenantQueryPrefix('inventory-products'),
         }),
         queryClient.invalidateQueries({
           queryKey: tenantQueryPrefix('inventory-movements'),
@@ -211,7 +239,7 @@ export default function InventoryScreen() {
       setIsSheetOpen(false);
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: tenantQueryPrefix('inventory'),
+          queryKey: tenantQueryPrefix('inventory-products'),
         }),
         queryClient.invalidateQueries({
           queryKey: tenantQueryPrefix('inventory-movements'),
@@ -236,7 +264,7 @@ export default function InventoryScreen() {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: tenantQueryPrefix('inventory'),
+          queryKey: tenantQueryPrefix('inventory-products'),
         }),
         queryClient.invalidateQueries({
           queryKey: tenantQueryPrefix('inventory-movements'),
@@ -275,7 +303,7 @@ export default function InventoryScreen() {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: tenantQueryPrefix('inventory'),
+          queryKey: tenantQueryPrefix('inventory-products'),
         }),
         queryClient.invalidateQueries({
           queryKey: tenantQueryPrefix('inventory-movements'),
@@ -316,7 +344,7 @@ export default function InventoryScreen() {
           queryKey: tenantQueryPrefix('product-orders'),
         }),
         queryClient.invalidateQueries({
-          queryKey: tenantQueryPrefix('inventory'),
+          queryKey: tenantQueryPrefix('inventory-products'),
         }),
         queryClient.invalidateQueries({
           queryKey: tenantQueryPrefix('inventory-movements'),
@@ -373,13 +401,13 @@ export default function InventoryScreen() {
 
   const money = (value: number) =>
     new Intl.NumberFormat('es-EC', {
-      currency: inventoryQuery.data?.currencyCode ?? 'USD',
+      currency: inventoryPage?.currencyCode ?? 'USD',
       style: 'currency',
     }).format(value / 100);
-  const resetProductForm = (product?: InventoryProduct) => {
+  const resetProductForm = (product?: InventoryListProduct) => {
     setEditingProduct(product ?? null);
     setName(product?.name ?? '');
-    setImageData(product?.imageData ?? null);
+    setImageData(null);
     setSku(product?.sku ?? '');
     setCost(((product?.costCents ?? 0) / 100).toFixed(2));
     setPrice(product ? (product.salePriceCents / 100).toFixed(2) : '');
@@ -388,12 +416,12 @@ export default function InventoryScreen() {
     setSheetMode('product');
     setIsSheetOpen(true);
   };
-  const openAdjustment = (product: InventoryProduct) => {
+  const openAdjustment = (product: InventoryListProduct) => {
     setSelectedProduct(product);
     setAdjustmentQuantity('');
     setAdjustmentNotes('');
     setAdjustmentType('purchase');
-    setCost((product.costCents / 100).toFixed(2));
+    setCost('0.00');
     setSheetMode('adjustment');
     setIsSheetOpen(true);
   };
@@ -437,10 +465,10 @@ export default function InventoryScreen() {
         />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        {(inventoryQuery.data?.accessibleLocations.length ?? 0) > 1 ? (
+        {(inventoryPage?.accessibleLocations.length ?? 0) > 1 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.chips}>
-              {inventoryQuery.data?.accessibleLocations.map((location) => (
+              {inventoryPage?.accessibleLocations.map((location) => (
                 <Chip
                   active={resolvedLocationId === location.id}
                   key={location.id}
@@ -456,19 +484,19 @@ export default function InventoryScreen() {
             <View style={styles.summaryGrid}>
               <SummaryCard
                 label="Unidades"
-                value={String(inventoryQuery.data?.summary.totalUnits ?? 0)}
+                value={String(inventoryPage?.summary?.totalUnits ?? 0)}
               />
               <SummaryCard
-                alert={Boolean(inventoryQuery.data?.summary.lowStockProducts)}
+                alert={Boolean(inventoryPage?.summary?.lowStockProducts)}
                 label="Stock bajo"
                 value={String(
-                  inventoryQuery.data?.summary.lowStockProducts ?? 0,
+                  inventoryPage?.summary?.lowStockProducts ?? 0,
                 )}
               />
               <SummaryCard
                 label="Costo inventario"
                 value={money(
-                  inventoryQuery.data?.summary.inventoryCostCents ?? 0,
+                  inventoryPage?.summary?.inventoryCostCents ?? 0,
                 )}
               />
             </View>
@@ -504,7 +532,7 @@ export default function InventoryScreen() {
               </Pressable>
             ) : null}
             <View style={styles.list}>
-              {inventoryQuery.data?.products.map((product) => (
+              {inventoryProducts.map((product) => (
                 <View key={product.id} style={styles.productCard}>
                   <View
                     style={[
@@ -512,9 +540,14 @@ export default function InventoryScreen() {
                       product.isLowStock && styles.productIconAlert,
                     ]}
                   >
-                    {product.imageData ? (
+                    {product.imageUrl ? (
                       <Image
-                        source={{ uri: product.imageData }}
+                        source={{
+                          headers: imageToken
+                            ? { authorization: `Bearer ${imageToken}` }
+                            : undefined,
+                          uri: apiMediaUrl(product.imageUrl),
+                        }}
                         style={styles.productImage}
                       />
                     ) : (
@@ -528,7 +561,6 @@ export default function InventoryScreen() {
                   <View style={styles.productCopy}>
                     <Text style={styles.productName}>{product.name}</Text>
                     <Text style={styles.muted}>
-                      {product.sku ? `${product.sku} · ` : ''}
                       {money(product.salePriceCents)}
                     </Text>
                     <Text
@@ -590,7 +622,7 @@ export default function InventoryScreen() {
               ))}
             </View>
             {!inventoryQuery.isLoading &&
-            !inventoryQuery.data?.products.length ? (
+            !inventoryProducts.length ? (
               <View style={styles.empty}>
                 <Ionicons color="#9AA3AF" name="cube-outline" size={42} />
                 <Text style={styles.emptyTitle}>
@@ -608,7 +640,7 @@ export default function InventoryScreen() {
           </>
         ) : tab === 'movements' ? (
           <View style={styles.list}>
-            {movementQuery.data?.rows.map((movement) => (
+            {inventoryMovements.map((movement) => (
               <View key={movement.id} style={styles.movementCard}>
                 <View>
                   <Text style={styles.productName}>{movement.productName}</Text>
@@ -668,7 +700,7 @@ export default function InventoryScreen() {
             {movementQuery.isLoading ? (
               <Text style={styles.muted}>Cargando movimientos…</Text>
             ) : null}
-            {!movementQuery.isLoading && !movementQuery.data?.rows.length ? (
+            {!movementQuery.isLoading && !inventoryMovements.length ? (
               <Text style={styles.muted}>No hay movimientos registrados.</Text>
             ) : null}
           </View>

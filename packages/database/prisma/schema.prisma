@@ -1414,6 +1414,7 @@ model Client {
   appointments    Appointment[]
 
   @@index([organizationId, fullName])
+  // Partial and GIN/expression indexes for active cursor/search queries are managed in SQL migration 20260904150000.
   @@index([createdByUserId])
   @@map("clients")
 }
@@ -1604,6 +1605,7 @@ model Service {
 
   @@unique([organizationId, name])
   @@index([organizationId, isActive])
+  @@index([organizationId, isActive(sort: Desc), name, id], map: "products_status_name_cursor_idx")
   @@map("services")
 }
 
@@ -1844,6 +1846,7 @@ model StockMovement {
 
   @@index([organizationId, createdAt])
   @@index([locationId, productId, createdAt])
+  @@index([locationId, createdAt(sort: Desc), id(sort: Desc)], map: "stock_movements_location_created_cursor_idx")
   @@index([cashMovementId])
   @@map("stock_movements")
 }
@@ -2011,6 +2014,7 @@ model Appointment {
   @@unique([organizationId, publicIdempotencyKeyHash])
   @@index([organizationId, startsAt])
   @@index([locationId, startsAt])
+  @@index([locationId, startsAt, id], map: "appointments_location_starts_cursor_idx")
   @@index([professionalMembershipId, startsAt])
   @@index([clientId, startsAt])
   @@index([organizationId, paymentStatus, paymentConfirmationRequestedAt])

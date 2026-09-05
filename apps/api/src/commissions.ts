@@ -675,7 +675,6 @@ export function registerCommissionRoutes(
             createdByUserId: user.id,
             description: `Anticipo de comisión · ${professional.user.fullName}`,
             paymentMethod: PaymentMethod.CASH,
-            professionalMembershipId: professional.id,
             professionalNameSnapshot: professional.user.fullName,
             recordedByNameSnapshot: current.user.fullName,
             type: CashMovementType.PROFESSIONAL_ADVANCE,

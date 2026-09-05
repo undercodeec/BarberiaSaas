@@ -14,6 +14,7 @@ import { z } from 'zod';
 
 import { ApiError, isUniqueConstraintError } from './errors';
 import type { AppointmentNotifier } from './notifications';
+import { getEntitlements } from './subscription-policy';
 
 type Authenticate = (
   database: DatabaseClient,
@@ -131,6 +132,21 @@ async function inventoryScope(database: DatabaseClient, userId: string) {
   return { locations, membership };
 }
 
+async function requireInventoryFeature(
+  database: DatabaseClient,
+  organizationId: string,
+) {
+  const entitlements = await database.$transaction((transaction) =>
+    getEntitlements(transaction, organizationId),
+  );
+  if (!entitlements.featureFlags.inventory)
+    throw new ApiError(
+      403,
+      'PLAN_FEATURE_NOT_INCLUDED',
+      'El inventario requiere Nava Esencial o un plan superior.',
+    );
+}
+
 function selectedLocation(
   locations: Awaited<ReturnType<typeof inventoryScope>>['locations'],
   locationId: string | undefined,
@@ -231,6 +247,10 @@ export function registerInventoryRoutes(
     const { user } = await authenticate(database, request);
     const input = inventoryQuerySchema.parse(request.query);
     const currentScope = await inventoryScope(database, user.id);
+    await requireInventoryFeature(
+      database,
+      currentScope.membership.organizationId,
+    );
     const location = selectedLocation(currentScope.locations, input.locationId);
     const products = await database.product.findMany({
       include: {

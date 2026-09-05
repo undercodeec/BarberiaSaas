@@ -576,6 +576,124 @@ const localDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/u, 'La fecha no es válida.');
 
+const cursorSchema = z.string().trim().min(8).max(1_024).optional();
+const pageLimitSchema = z.coerce.number().int().min(1).max(100).default(50);
+const pageSearchSchema = z.string().trim().min(1).max(120).optional();
+const commaSeparatedUuidsSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .transform((value) =>
+    value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean),
+  )
+  .pipe(
+    z
+      .array(uuidSchema)
+      .min(1)
+      .max(25)
+      .refine((values) => new Set(values).size === values.length, {
+        message: 'No repitas sucursales.',
+      }),
+  );
+
+export const clientPageQuerySchema = z.object({
+  cursor: cursorSchema,
+  labelId: uuidSchema.optional(),
+  limit: pageLimitSchema,
+  search: pageSearchSchema,
+});
+
+export const clientNotesPageQuerySchema = z.object({
+  cursor: cursorSchema,
+  limit: pageLimitSchema,
+});
+
+export const clientImportSchema = z.object({
+  contacts: z
+    .array(
+      z.object({
+        addressLine: z.string().trim().max(240).optional(),
+        birthDate: localDateSchema.optional(),
+        documentNumber: z.string().trim().max(64).optional(),
+        email: z.union([emailSchema, z.literal('')]).optional(),
+        fullName: z.string().trim().min(2).max(120),
+        lastName: z.string().trim().max(120).optional(),
+        notes: operationalNotesSchema.optional(),
+        phone: phoneSchema,
+      }),
+    )
+    .min(1)
+    .max(100),
+});
+
+export const agendaPageQuerySchema = z
+  .object({
+    activeAfter: z.iso.datetime().optional(),
+    cursor: cursorSchema,
+    from: localDateSchema,
+    limit: pageLimitSchema,
+    locationIds: commaSeparatedUuidsSchema,
+    membershipId: uuidSchema.optional(),
+    to: localDateSchema,
+  })
+  .superRefine((input, context) => {
+    const fromTime = Date.parse(`${input.from}T00:00:00.000Z`);
+    const toTime = Date.parse(`${input.to}T00:00:00.000Z`);
+    const rangeDays = (toTime - fromTime) / 86_400_000;
+    if (rangeDays < 0 || rangeDays > 30) {
+      context.addIssue({
+        code: 'custom',
+        message: 'El rango debe contener entre 1 y 31 días.',
+        path: ['to'],
+      });
+    }
+  });
+
+export const appointmentCalendarSummaryQuerySchema = z
+  .object({
+    from: localDateSchema,
+    locationIds: commaSeparatedUuidsSchema,
+    to: localDateSchema,
+  })
+  .superRefine((input, context) => {
+    const rangeDays =
+      (Date.parse(`${input.to}T00:00:00.000Z`) -
+        Date.parse(`${input.from}T00:00:00.000Z`)) /
+      86_400_000;
+    if (rangeDays < 0 || rangeDays > 30) {
+      context.addIssue({
+        code: 'custom',
+        message: 'El rango debe contener entre 1 y 31 días.',
+        path: ['to'],
+      });
+    }
+  });
+
+export const inventoryProductsPageQuerySchema = z.object({
+  cursor: cursorSchema,
+  isActive: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
+  limit: pageLimitSchema,
+  locationId: uuidSchema,
+  lowStock: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
+  search: pageSearchSchema,
+});
+
+export const stockMovementsPageQuerySchema = z.object({
+  cursor: cursorSchema,
+  limit: pageLimitSchema,
+  locationId: uuidSchema,
+  productId: uuidSchema.optional(),
+});
+
 export const availabilityQuerySchema = z.object({
   date: localDateSchema,
   locationId: uuidSchema,

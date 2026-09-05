@@ -341,12 +341,18 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
               Amount: input.amountCents,
               Document: 'sensitive-document',
               Email: 'sensitive@example.com',
-              StatusCode: input.providerTransactionId === '9005' ? 2 : 3,
+              StatusCode: ['9005', '9007'].includes(
+                input.providerTransactionId,
+              )
+                ? 2
+                : 3,
               TransactionId: input.providerTransactionId,
             },
             providerTransactionId: input.providerTransactionId,
             status:
-              input.providerTransactionId === '9005' ? 'rejected' : 'approved',
+              ['9005', '9007'].includes(input.providerTransactionId)
+                ? 'rejected'
+                : 'approved',
             storeId: input.storeId,
           };
         },
@@ -618,7 +624,7 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
       method: 'POST',
       payload: {
         clientTransactionId: couponAttempt.internalReference,
-        id: 9005,
+        id: 9007,
       },
       url: '/v1/subscription/payments/confirm',
     });

@@ -3,7 +3,7 @@ import type {
   AppointmentRecord,
   CashRegisterSummaryResponse,
   CurrentCashRegisterResponse,
-  InventoryResponse,
+  InventorySummaryResponse,
   SubscriptionResponse,
   WelcomeSurveyResponseResult,
 } from '@barber-saas/api-client';
@@ -566,7 +566,7 @@ export function dashboardOperations({
   readonly cashSession: CurrentCashRegisterResponse['session'] | undefined;
   readonly cashSummary: CashRegisterSummaryResponse | undefined;
   readonly currencyCode: string;
-  readonly inventory: InventoryResponse | undefined;
+  readonly inventory: InventorySummaryResponse | undefined;
   readonly now: number;
   readonly timeZone: string;
 }): DashboardOperation[] {
@@ -627,7 +627,7 @@ export function dashboardOperations({
     });
   }
 
-  const lowStockProducts = inventory?.summary.lowStockProducts ?? 0;
+  const lowStockProducts = inventory?.lowStockProducts ?? 0;
   if (lowStockProducts > 0) {
     operations.push({
       actionLabel: 'Ver inventario',

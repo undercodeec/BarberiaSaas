@@ -1,0 +1,9 @@
+DROP INDEX IF EXISTS "stock_movements_location_created_cursor_idx";
+DROP INDEX IF EXISTS "products_name_trgm_idx";
+DROP INDEX IF EXISTS "products_status_name_cursor_idx";
+DROP INDEX IF EXISTS "appointments_location_starts_cursor_idx";
+DROP INDEX IF EXISTS "clients_email_trgm_idx";
+DROP INDEX IF EXISTS "clients_phone_digits_idx";
+DROP INDEX IF EXISTS "clients_phone_trgm_idx";
+DROP INDEX IF EXISTS "clients_full_name_trgm_idx";
+DROP INDEX IF EXISTS "clients_active_name_cursor_idx";

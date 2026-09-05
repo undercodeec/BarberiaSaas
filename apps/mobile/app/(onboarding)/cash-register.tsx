@@ -5,14 +5,18 @@ import type {
   CashMovementRecord,
   CashRegisterSummaryResponse,
   CurrentCashRegisterResponse,
-  InventoryResponse,
   ServicesResponse,
   SubscriptionResponse,
   TeamResponse,
 } from '@barber-saas/api-client';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Alert,
@@ -36,6 +40,7 @@ import {
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { requireApiClient } from '../../src/lib/api';
 import { cashRegisterQueryOptions } from '../../src/lib/cash-register-query-keys';
+import { inventoryProductsQueryOptions } from '../../src/features/inventory/inventory-queries';
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
@@ -195,14 +200,16 @@ export default function CashRegisterScreen() {
     queryFn: () => requireApiClient().request<ServicesResponse>('/v1/services'),
     queryKey: tenant.key('services'),
   });
-  const inventoryQuery = useQuery({
-    enabled: Boolean(session),
-    queryFn: () =>
-      requireApiClient().request<InventoryResponse>(
-        `/v1/inventory?locationId=${encodeURIComponent(locationId)}`,
-      ),
-    ...cashRegisterQueryOptions(tenant.scope, 'inventory', locationId),
+  const inventoryQuery = useInfiniteQuery({
+    ...inventoryProductsQueryOptions(requireApiClient(), tenant.scope, {
+      locationId,
+    }),
+    enabled: Boolean(session && locationId !== 'all'),
   });
+  const inventoryProducts = useMemo(
+    () => inventoryQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [inventoryQuery.data?.pages],
+  );
   const subscriptionQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -280,7 +287,7 @@ export default function CashRegisterScreen() {
           productQuantity < 1)
       )
         throw new Error('Selecciona el producto y una cantidad válida.');
-      const selectedProduct = inventoryQuery.data?.products.find(
+      const selectedProduct = inventoryProducts.find(
         (product) => product.id === movementProductId,
       );
       if (
@@ -348,7 +355,7 @@ export default function CashRegisterScreen() {
           queryKey: tenantQueryPrefix('movement-report'),
         }),
         queryClient.invalidateQueries({
-          queryKey: tenantQueryPrefix('inventory'),
+          queryKey: tenantQueryPrefix('inventory-products'),
         }),
         queryClient.invalidateQueries({
           queryKey: tenantQueryPrefix('inventory-movements'),
@@ -399,7 +406,7 @@ export default function CashRegisterScreen() {
   const selectedMovementService = servicesQuery.data?.services.find(
     (service) => service.id === movementServiceId,
   );
-  const selectedMovementProduct = inventoryQuery.data?.products.find(
+  const selectedMovementProduct = inventoryProducts.find(
     (product) => product.id === movementProductId,
   );
   const teamMembers = teamQuery.data?.members ?? [];
@@ -981,7 +988,7 @@ export default function CashRegisterScreen() {
                         <>
                           <Text style={styles.label}>Producto</Text>
                           <View style={styles.members}>
-                            {(inventoryQuery.data?.products ?? []).map(
+                            {inventoryProducts.map(
                               (product) => (
                                 <Pressable
                                   disabled={
@@ -1015,7 +1022,7 @@ export default function CashRegisterScreen() {
                                 </Pressable>
                               ),
                             )}
-                            {!inventoryQuery.data?.products.length ? (
+                            {!inventoryProducts.length ? (
                               <Text style={styles.inlineEmpty}>
                                 Crea productos con existencias desde Inventario.
                               </Text>

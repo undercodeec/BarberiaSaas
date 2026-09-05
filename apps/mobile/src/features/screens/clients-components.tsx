@@ -346,7 +346,7 @@ export function ClientFormSheet({
     },
     onSuccess: async ({ client }) => {
       await queryClient.invalidateQueries({
-        queryKey: tenantQueryPrefix('clients'),
+        queryKey: tenantQueryPrefix('clients-v2'),
       });
       await onCreated?.(client);
       reset();

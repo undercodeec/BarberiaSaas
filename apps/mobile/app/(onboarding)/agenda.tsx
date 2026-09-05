@@ -3,15 +3,24 @@ import { styles } from '../../src/features/screens/agenda.styles';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
   AppointmentRecord,
-  AppointmentsResponse,
   BookingLocationsResponse,
   BusinessScheduleResponse,
   ClientsResponse,
   SchedulesResponse,
   TeamResponse,
 } from '@barber-saas/api-client';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import {
+  Redirect,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -37,6 +46,10 @@ import { KeyboardAwareScrollView as ScrollView } from '../../src/components/Keyb
 import { clampFloatingControl } from '../../src/features/screens/floating-control';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import {
+  agendaPageQueryOptions,
+  calendarSummaryQueryOptions,
+} from '../../src/features/agenda/agenda-queries';
+import {
   agendaRange,
   localCalendarDate,
   type AgendaView,
@@ -44,6 +57,7 @@ import {
 import { requireApiClient } from '../../src/lib/api';
 import { clientAccessForRole } from '../../src/lib/client-access';
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
+import { focusedInterval } from '../../src/lib/use-route-focus';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 import { GuideAnchor } from '../../src/features/guides/GuideAnchor';
@@ -191,11 +205,15 @@ export default function AgendaScreen() {
   const showingAllLocations =
     canViewAllAgendaLocations && selectedLocationId === null;
   const locationId = selectedLocationId ?? defaultLocationId;
-  const appointmentLocationIds = showingAllLocations
-    ? agendaLocations.map((location) => location.id)
-    : locationId
-      ? [locationId]
-      : [];
+  const appointmentLocationIds = useMemo(
+    () =>
+      showingAllLocations
+        ? agendaLocations.map((location) => location.id)
+        : locationId
+          ? [locationId]
+          : [],
+    [agendaLocations, locationId, showingAllLocations],
+  );
   const selectedLocation = agendaLocations.find(
     (location) => location.id === locationId,
   );
@@ -361,6 +379,7 @@ export default function AgendaScreen() {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedAppointment, setSelectedAppointment] =
     useState<AppointmentRecord | null>(null);
+  const [isAgendaRouteFocused, setIsAgendaRouteFocused] = useState(false);
   const [dayContentOpacity] = useState(() => new Animated.Value(1));
   const [timelineTransitionX] = useState(() => new Animated.Value(0));
   const [settingsSheetTranslateY] = useState(() => new Animated.Value(0));
@@ -543,31 +562,40 @@ export default function AgendaScreen() {
       timelineTransitionX,
     ],
   );
-  const appointmentsQuery = useQuery({
+  useFocusEffect(
+    useCallback(() => {
+      setIsAgendaRouteFocused(true);
+      return () => setIsAgendaRouteFocused(false);
+    }, []),
+  );
+  const appointmentFilters = useMemo(
+    () => ({
+      ...agendaRange(calendarView === 'month' ? 'day' : calendarView, selectedDay),
+      locationIds: appointmentLocationIds,
+    }),
+    [appointmentLocationIds, calendarView, selectedDay],
+  );
+  const appointmentsQuery = useInfiniteQuery({
+    ...agendaPageQueryOptions(requireApiClient(), tenant.scope, appointmentFilters),
     enabled: Boolean(session && appointmentLocationIds.length),
-    queryFn: async () => {
-      const results = await Promise.all(
-        appointmentLocationIds.map((appointmentLocationId) => {
-          const search = new URLSearchParams({
-            ...agendaRange(calendarView, selectedDay),
-            locationId: appointmentLocationId,
-          });
-          return requireApiClient().request<AppointmentsResponse>(
-            `/v1/appointments?${search.toString()}`,
-          );
-        }),
-      );
-      return results.flatMap((result) => result.appointments);
-    },
-    queryKey: tenant.key(
-      'agenda-appointments',
-      calendarView,
-      localCalendarDate(selectedDay),
-      ...appointmentLocationIds,
-    ),
-    refetchInterval: 30_000,
+    refetchInterval: focusedInterval(isAgendaRouteFocused, 30_000),
     refetchIntervalInBackground: false,
   });
+  const calendarSummaryQuery = useQuery(
+    calendarSummaryQueryOptions(
+      requireApiClient(),
+      tenant.scope,
+      {
+        ...agendaRange('month', calendarMonth),
+        locationIds: appointmentLocationIds,
+      },
+      Boolean(session && appointmentLocationIds.length && calendarView === 'month'),
+    ),
+  );
+  const appointments = useMemo(
+    () => appointmentsQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [appointmentsQuery.data?.pages],
+  );
   const monthDays = useMemo(() => calendarGrid(calendarMonth), [calendarMonth]);
   const selectedDaySchedules = useMemo(
     () =>
@@ -665,7 +693,7 @@ export default function AgendaScreen() {
   });
   */
   const filteredAppointments = useMemo(() => {
-    return (appointmentsQuery.data ?? []).filter((appointment) => {
+    return appointments.filter((appointment) => {
       if (!showCancelled && appointment.status === 'cancelled') return false;
       if (
         selectedMemberId &&
@@ -686,7 +714,7 @@ export default function AgendaScreen() {
       if (statusFilter === 'paid') return appointment.paymentStatus === 'paid';
       return appointment.status === statusFilter;
     });
-  }, [appointmentsQuery.data, selectedMemberId, showCancelled, statusFilter]);
+  }, [appointments, selectedMemberId, showCancelled, statusFilter]);
   const canRescheduleSelectedAppointment =
     !selectedAppointment ||
     teamQuery.data?.members.find(
@@ -703,6 +731,16 @@ export default function AgendaScreen() {
         day,
       ),
     );
+  const monthAppointmentCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const summary of calendarSummaryQuery.data?.items ?? []) {
+      counts.set(
+        summary.date,
+        (counts.get(summary.date) ?? 0) + summary.appointmentCount,
+      );
+    }
+    return counts;
+  }, [calendarSummaryQuery.data?.items]);
   const weekTimeline = useMemo(() => {
     if (showAllHours || showingAllLocations)
       return Array.from({ length: 25 }, (_, index) => index * 60);
@@ -1163,7 +1201,9 @@ export default function AgendaScreen() {
                   return (
                     <View key={`empty-${index}`} style={styles.monthCell} />
                   );
-                const appointments = appointmentsForDay(day);
+                const appointmentCount = calendarSummaryQuery.data
+                  ? (monthAppointmentCounts.get(localCalendarDate(day)) ?? 0)
+                  : appointmentsForDay(day).length;
                 const isSelected = sameDate(day, selectedDay);
                 return (
                   <Pressable
@@ -1186,10 +1226,10 @@ export default function AgendaScreen() {
                     >
                       {day.getDate()}
                     </Text>
-                    {appointments.length ? (
+                    {appointmentCount ? (
                       <View style={styles.monthAppointmentCount}>
                         <Text style={styles.monthAppointmentCountLabel}>
-                          {appointments.length}
+                          {appointmentCount}
                         </Text>
                       </View>
                     ) : null}

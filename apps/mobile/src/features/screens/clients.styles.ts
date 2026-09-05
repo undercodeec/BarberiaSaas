@@ -404,6 +404,20 @@ export const styles = StyleSheet.create({
   },
   selectionActions: { flexDirection: 'row', gap: 8 },
   list: { marginTop: 23 },
+  loadMoreButton: {
+    alignItems: 'center',
+    borderColor: appTheme.colors.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    justifyContent: 'center',
+    marginBottom: 10,
+    minHeight: 46,
+  },
+  loadMoreLabel: {
+    color: '#101c2d',
+    fontSize: 14,
+    fontWeight: '800',
+  },
   overlay: {
     backgroundColor: 'rgba(16, 28, 45, 0.48)',
     flex: 1,

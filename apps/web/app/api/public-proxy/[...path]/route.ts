@@ -4,15 +4,25 @@ import { getWebApiBaseUrl } from '../../../api-url';
 
 const API_URL = getWebApiBaseUrl();
 
-const forwardedRequestHeaders = ['content-type', 'idempotency-key'] as const;
-const forwardedResponseHeaders = ['content-type', 'retry-after'] as const;
+const forwardedRequestHeaders = [
+  'content-type',
+  'idempotency-key',
+  'if-none-match',
+] as const;
+const forwardedResponseHeaders = [
+  'cache-control',
+  'content-length',
+  'content-type',
+  'etag',
+  'retry-after',
+] as const;
 
 async function proxyPublicRequest(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> },
 ) {
   const { path } = await context.params;
-  if (path[0] !== 'v1' || path[1] !== 'public')
+  if ((path[0] !== 'v1' && path[0] !== 'v2') || path[1] !== 'public')
     return Response.json({ message: 'Ruta no permitida.' }, { status: 404 });
 
   const target = new URL(
@@ -48,9 +58,11 @@ async function proxyPublicRequest(
     const value = upstream.headers.get(name);
     if (value) responseHeaders.set(name, value);
   }
-  // La disponibilidad cambia al verificar, cancelar o modificar una cita.
-  // Nunca debe quedar una respuesta antigua en el navegador, proxy o CDN.
-  responseHeaders.set('cache-control', 'no-store, max-age=0');
+  if (path.at(-1) === 'availability') {
+    // La disponibilidad cambia al verificar, cancelar o modificar una cita.
+    // Nunca debe quedar una respuesta antigua en el navegador, proxy o CDN.
+    responseHeaders.set('cache-control', 'no-store, max-age=0');
+  }
   return new Response(upstream.body, {
     headers: responseHeaders,
     status: upstream.status,

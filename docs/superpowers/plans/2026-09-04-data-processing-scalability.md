@@ -81,7 +81,7 @@
 - Produces: pnpm with:test-db, pnpm seed:performance y pnpm test:performance:data.
 - La instrumentación es observacional: no modifica consultas de negocio, respuestas públicas ni contratos.
 
-- [ ] **Step 1: Escribir la prueba roja de seguridad y distribución**
+- [x] **Step 1: Escribir la prueba roja de seguridad y distribución**
 
 ~~~javascript
 assert.throws(
@@ -115,13 +115,13 @@ assert.deepEqual(distributeRows(100_000, 5), [
 ]);
 ~~~
 
-- [ ] **Step 2: Ejecutar para comprobar RED**
+- [x] **Step 2: Ejecutar para comprobar RED**
 
 Run: node --test scripts/test-database-env.test.mjs && pnpm --filter @barber-saas/api exec node --test scripts/seed-performance.test.mjs
 
 Expected: FAIL porque los dos módulos todavía no existen.
 
-- [ ] **Step 3: Implementar la guardia reutilizable**
+- [x] **Step 3: Implementar la guardia reutilizable**
 
 scripts/test-database-env.mjs usa process.loadEnvFile sobre el .env de la raíz. Si TEST_DATABASE_URL existe, exige protocolo postgresql, host 127.0.0.1 o localhost, puerto 5433 y nombre exacto barber_saas_test; una URL explícita insegura siempre falla. Si falta, usa exclusivamente la credencial local documentada en .env.example y el destino fijo 127.0.0.1:5433/barber_saas_test; nunca lee usuario, contraseña, host o base desde DATABASE_URL. loadLocalTestDatabaseEnvironment asigna DATABASE_URL=TEST_DATABASE_URL después de validar.
 
@@ -135,7 +135,7 @@ Añadir al package.json raíz:
 }
 ~~~
 
-- [ ] **Step 4: Implementar el seed idempotente**
+- [x] **Step 4: Implementar el seed idempotente**
 
 El script importa loadLocalTestDatabaseEnvironment, la ejecuta antes de crear Prisma y nunca usa DATABASE_URL como fallback. Con --reset elimina exclusivamente la organización cuyo slug es perf-data-local y sus relaciones en cascada. Crea owner, membresía, suscripción multi activa con límites/funciones vigentes, cinco sedes, profesionales suficientes, servicios, horarios, token de sesión local y, en lotes de 1.000:
 
@@ -147,7 +147,7 @@ El script importa loadLocalTestDatabaseEnvironment, la ejecuta antes de crear Pr
 
 Guardar ids y token en apps/api/.secrets/performance-session.json, ruta ya ignorada por Git. Imprimir únicamente conteos y duración, nunca conexión o token.
 
-- [ ] **Step 5: Escribir pruebas rojas de métricas aisladas**
+- [x] **Step 5: Escribir pruebas rojas de métricas aisladas**
 
 ~~~typescript
 it('isolates parallel request counters', async () => {
@@ -171,7 +171,7 @@ Run: pnpm --filter @barber-saas/api test -- request-metrics.test.ts
 
 Expected: FAIL porque request-metrics.ts no existe.
 
-- [ ] **Step 6: Implementar observación neutral por solicitud**
+- [x] **Step 6: Implementar observación neutral por solicitud**
 
 request-metrics.ts usa AsyncLocalStorage<RequestMetrics>. packages/database/src/index.ts añade queryObserver opcional y solo habilita eventos Prisma query cuando se suministra; el callback recibe únicamente durationMs. La API pasa observeDatabaseQuery, instala hooks Fastify y registra únicamente route template, statusCode, durationMs, queryCount, databaseMs y responseBytes; nunca query, URL completa, parámetros o cuerpo.
 
@@ -183,7 +183,7 @@ Run: node scripts/test-database-env.mjs --run-pnpm --filter @barber-saas/api tes
 
 Expected: PASS.
 
-- [ ] **Step 8: Crear el runner v1**
+- [x] **Step 8: Crear el runner v1**
 
 api-workflows.mjs lee apps/api/.secrets/performance-session.json y mide:
 
@@ -260,7 +260,7 @@ git commit -m "perf(api): instrument and baseline data workflows"
 - Produces: CursorPage<T>, ClientPageResponse, ClientNotesPageResponse, ClientImportResponse, AppointmentsPageResponse, AppointmentCalendarSummaryResponse, InventoryProductsPageResponse, InventorySummaryResponse, StockMovementsPageResponse y PublicBookingCatalogV2.
 - Consumes: ApiError para mapear cursores inválidos a INVALID_CURSOR.
 
-- [ ] **Step 1: Escribir las pruebas rojas de cursores**
+- [x] **Step 1: Escribir las pruebas rojas de cursores**
 
 ~~~typescript
 import { describe, expect, it } from 'vitest';
@@ -300,13 +300,13 @@ describe('cursor-page', () => {
 });
 ~~~
 
-- [ ] **Step 2: Ejecutar las pruebas para comprobar RED**
+- [x] **Step 2: Ejecutar las pruebas para comprobar RED**
 
 Run: pnpm --filter @barber-saas/api test -- cursor-page.test.ts
 
 Expected: FAIL porque apps/api/src/cursor-page.ts no existe.
 
-- [ ] **Step 3: Implementar el núcleo mínimo de cursor**
+- [x] **Step 3: Implementar el núcleo mínimo de cursor**
 
 ~~~typescript
 export type CursorKind =
@@ -347,7 +347,7 @@ export function decodeCursor(
 
 Implementar sliceCursorPage con filas limit+1; nextCursor debe ser null cuando no existe fila adicional.
 
-- [ ] **Step 4: Añadir pruebas rojas de validación y contratos**
+- [x] **Step 4: Añadir pruebas rojas de validación y contratos**
 
 En packages/validation/src/index.test.ts comprobar:
 
@@ -383,13 +383,13 @@ expect(() =>
 
 En packages/api-client/src/index.test.ts crear valores tipados para CursorPage<ClientRecord>, InventoryProductsPageResponse y PublicBookingCatalogV2 que usen imageUrl y nunca imageData.
 
-- [ ] **Step 5: Ejecutar las pruebas de contratos para comprobar RED**
+- [x] **Step 5: Ejecutar las pruebas de contratos para comprobar RED**
 
 Run: pnpm --filter @barber-saas/validation test && pnpm --filter @barber-saas/api-client test
 
 Expected: FAIL por exports y tipos ausentes.
 
-- [ ] **Step 6: Implementar esquemas y tipos compartidos**
+- [x] **Step 6: Implementar esquemas y tipos compartidos**
 
 Añadir:
 
@@ -419,7 +419,7 @@ export interface ClientImportItemResult {
 
 Definir los demás tipos enumerados en Interfaces. agendaPageQuerySchema admite activeAfter opcional como instante ISO y lo usa solo para exigir endsAt > activeAfter dentro del rango civil; esto permite que dashboard solicite únicamente la cita en curso o siguiente. Mantener intactos ClientsResponse, InventoryResponse, AppointmentsResponse y PublicBookingCatalog.
 
-- [ ] **Step 7: Ejecutar pruebas y typecheck**
+- [x] **Step 7: Ejecutar pruebas y typecheck**
 
 Run: pnpm --filter @barber-saas/api test -- cursor-page.test.ts && pnpm --filter @barber-saas/validation test && pnpm --filter @barber-saas/api-client test && pnpm --filter @barber-saas/api typecheck
 
@@ -448,7 +448,7 @@ git commit -m "feat(api): add scalable cursor contracts"
 - Produces: SESSION_ACTIVITY_TOUCH_INTERVAL_MS y shouldTouchSession(lastActiveAt, now).
 - Consumes: los contadores de Task 0 para demostrar la eliminación de escrituras repetidas.
 
-- [ ] **Step 1: Escribir pruebas rojas del intervalo de sesión**
+- [x] **Step 1: Escribir pruebas rojas del intervalo de sesión**
 
 ~~~typescript
 it('touches activity only after five minutes', () => {
@@ -462,13 +462,13 @@ it('touches activity only after five minutes', () => {
 });
 ~~~
 
-- [ ] **Step 2: Ejecutar para comprobar RED**
+- [x] **Step 2: Ejecutar para comprobar RED**
 
 Run: pnpm --filter @barber-saas/api test -- session-activity.test.ts
 
 Expected: FAIL porque el módulo no existe.
 
-- [ ] **Step 3: Implementar la decisión pura y el UPDATE condicional**
+- [x] **Step 3: Implementar la decisión pura y el UPDATE condicional**
 
 ~~~typescript
 export const SESSION_ACTIVITY_TOUCH_INTERVAL_MS = 5 * 60 * 1_000;
@@ -497,11 +497,11 @@ if (shouldTouchSession(session.lastActiveAt, now)) {
 }
 ~~~
 
-- [ ] **Step 4: Añadir integración roja de no escritura repetida**
+- [x] **Step 4: Añadir integración roja de no escritura repetida**
 
 Crear una sesión con lastActiveAt reciente, inyectar dos GET /v1/auth/session y comprobar que lastActiveAt no cambia. Retroceder lastActiveAt seis minutos, repetir y comprobar que avanza una sola vez. Esta prueba protege la semántica v1.
 
-- [ ] **Step 5: Ejecutar la integración con TEST_DATABASE_URL**
+- [x] **Step 5: Ejecutar la integración con TEST_DATABASE_URL**
 
 Run: node scripts/test-database-env.mjs --run-pnpm --filter @barber-saas/api test -- app.integration.test.ts
 
@@ -532,7 +532,7 @@ git commit -m "perf(api): throttle session activity writes"
 - Produces: createOperationalAccessLoader(database), OperationalAccessLoader y OperationalAccess.
 - OperationalAccess contiene userId, membershipId, organizationId, currencyCode, role, assignedLocationIds y activeOrganizationLocations con id/name/timezone.
 
-- [ ] **Step 1: Escribir prueba roja de memoización y aislamiento**
+- [x] **Step 1: Escribir prueba roja de memoización y aislamiento**
 
 ~~~typescript
 it('loads active membership once per Fastify request', async () => {
@@ -556,13 +556,13 @@ it('does not reuse access across requests', async () => {
 });
 ~~~
 
-- [ ] **Step 2: Ejecutar para comprobar RED**
+- [x] **Step 2: Ejecutar para comprobar RED**
 
 Run: pnpm --filter @barber-saas/api test -- operational-access.test.ts
 
 Expected: FAIL porque el módulo no existe.
 
-- [ ] **Step 3: Implementar loader mediante WeakMap**
+- [x] **Step 3: Implementar loader mediante WeakMap**
 
 ~~~typescript
 export interface OperationalAccess {
@@ -593,11 +593,11 @@ export function createOperationalAccessLoader(database: DatabaseClient) {
 
 loadActiveOperationalAccess ejecuta una sola sentencia SQL parametrizada: selecciona la membresía activa, role, organization.currency_code y agrega por LATERAL/JSONB_AGG tanto las sedes activas de la organización como los location_id asignados al miembro. Eliminar locationIds del ejemplo en favor de activeOrganizationLocations y assignedLocationIds. Rechaza ausencia con ORGANIZATION_REQUIRED. Los permisos de cada endpoint continúan validándose después de cargar el contexto. Añadir una aserción de prueba que el observador registra exactamente una operación aun cuando existan 25 sedes y varias asignaciones.
 
-- [ ] **Step 4: Registrar una instancia por buildApi**
+- [x] **Step 4: Registrar una instancia por buildApi**
 
 Crear loadOperationalAccess una vez después de crear Fastify y pasarlo únicamente a los módulos v2. No cambiar las firmas de los módulos v1 todavía.
 
-- [ ] **Step 5: Ejecutar pruebas**
+- [x] **Step 5: Ejecutar pruebas**
 
 Run: pnpm --filter @barber-saas/api test -- operational-access.test.ts && pnpm --filter @barber-saas/api typecheck
 
@@ -631,7 +631,7 @@ git commit -m "refactor(api): share operational access per request"
 - Produces: assertCanCreateClients(transaction, organizationId, requestedCount): Promise<number>, donde el retorno es la cantidad permitida.
 - Produces: decodeDataUri(value), sendMedia(reply, media, visibility).
 
-- [ ] **Step 1: Escribir pruebas rojas de medios**
+- [x] **Step 1: Escribir pruebas rojas de medios**
 
 ~~~typescript
 it('decodes allowed image data URIs and rejects other content', () => {
@@ -645,7 +645,7 @@ it('decodes allowed image data URIs and rejects other content', () => {
 });
 ~~~
 
-- [ ] **Step 2: Implementar media-response**
+- [x] **Step 2: Implementar media-response**
 
 Aceptar image/jpeg, image/png y image/webp; calcular ETag SHA-256; responder 304 ante If-None-Match; usar private, max-age=300 para medios privados y public, max-age=300 para públicos.
 
@@ -671,7 +671,7 @@ Run: node scripts/test-database-env.mjs --run-pnpm --filter @barber-saas/api tes
 
 Expected: FAIL con 404 para /v2/clients.
 
-- [ ] **Step 5: Implementar listado con select y limit+1**
+- [x] **Step 5: Implementar listado con select y limit+1**
 
 Orden: fullName asc, id asc. Cursor:
 
@@ -683,13 +683,13 @@ const after = cursor
 
 Ejecutar una sola sentencia SQL parametrizada construida con Prisma.sql/Prisma.join. Aplicar organization_id, deleted_at IS NULL, el clientScope equivalente según role y un EXISTS por labelId. La búsqueda escapa literalmente %, _ y \\ y usa LOWER(full_name) LIKE, phone LIKE y LOWER(email) LIKE para coincidir con los índices de Task 12. Agregar etiquetas con LATERAL/JSONB_AGG limitado a id/name/color, seleccionar solo campos de ClientRecord, ordenar full_name/id y pedir limit+1. No ejecutar count ni consultas por relación.
 
-- [ ] **Step 6: Escribir e implementar notas paginadas y fotografía**
+- [x] **Step 6: Escribir e implementar notas paginadas y fotografía**
 
 Prueba roja: la página de notas contiene hasPhoto y photoUrl, pero JSON.stringify(response) no contiene data:image. GET de photoUrl devuelve bytes, Content-Type, ETag y 304. Otro tenant recibe 404.
 
 Orden de notas: createdAt desc, id desc. Ejecutar una sola consulta SQL parametrizada y acotada por tenant/cliente que seleccione id, created_at, description y (photo_data IS NOT NULL) AS has_photo, sin devolver photo_data. La URL se deriva de has_photo. La consulta usa limit+1 y desempate por id; cuenta como una sola operación dentro del presupuesto de cuatro.
 
-- [ ] **Step 7: Escribir prueba roja del límite por lote**
+- [x] **Step 7: Escribir prueba roja del límite por lote**
 
 En subscription-policy.test.ts:
 
@@ -700,7 +700,7 @@ it('returns only the remaining client capacity for a batch', async () => {
 });
 ~~~
 
-- [ ] **Step 8: Implementar importación transaccional**
+- [x] **Step 8: Implementar importación transaccional**
 
 POST /v2/clients/import acepta máximo 100. Dentro de un advisory lock por organization:
 
@@ -768,7 +768,7 @@ git commit -m "feat(api): add scalable client data flows"
 - Consumes: ClientPageResponse y ClientImportResponse.
 - Produces: clientPageQueryOptions(api, scope, filters), flattenClientPages(data), chunkContacts(contacts, 100).
 
-- [ ] **Step 1: Escribir pruebas rojas de opciones y lotes**
+- [x] **Step 1: Escribir pruebas rojas de opciones y lotes**
 
 ~~~typescript
 it('requests one page and forwards cancellation', async () => {
@@ -796,19 +796,19 @@ Run: pnpm --filter @barber-saas/mobile test -- client-queries.test.ts
 
 Expected: FAIL porque el módulo no existe.
 
-- [ ] **Step 3: Implementar useInfiniteQuery y búsqueda con debounce**
+- [x] **Step 3: Implementar useInfiniteQuery y búsqueda con debounce**
 
 clientPageQueryOptions usa initialPageParam null, getNextPageParam response.nextCursor, limit 50 y signal. clients.tsx mantiene searchInput inmediato y debouncedSearch de 300 ms. La lista renderiza flattenClientPages y solicita fetchNextPage al acercarse al final.
 
 Eliminar refetchInterval=30000 y el refetch incondicional de useFocusEffect. Conservar refetch al foco solo cuando la consulta está obsoleta según staleTime=60000.
 
-- [ ] **Step 4: Migrar importación**
+- [x] **Step 4: Migrar importación**
 
 No solicitar /v1/clients para conocer todos los teléfonos. Enviar los contactos seleccionados a POST /v2/clients/import en lotes de 100 y combinar ClientImportItemResult. Una selección de 73 contactos genera exactamente una solicitud.
 
 Actualizar la caché con los created devueltos o invalidar solo tenant.key('clients-v2', filtros activos). Invalidar subscription una vez al terminar todos los lotes.
 
-- [ ] **Step 5: Migrar selección de cliente de nueva reserva**
+- [x] **Step 5: Migrar selección de cliente de nueva reserva**
 
 new-booking.tsx usa el mismo query option, no ClientsResponse. Sin búsqueda muestra la primera página; con texto usa debouncedSearch. Conservar “Continuar sin cliente”, creación inline, permisos y navegación.
 
@@ -816,7 +816,7 @@ new-booking.tsx usa el mismo query option, no ClientsResponse. Sin búsqueda mue
 
 Renderizar el modelo de datos con dos páginas, seleccionar un cliente de la primera, cambiar búsqueda y verificar que selectedClientId se mantiene hasta que el usuario elija otro. Comprobar que una respuesta tardía de “An” no reemplaza “Ana” mediante signal abortado.
 
-- [ ] **Step 7: Ejecutar pruebas y typecheck móvil**
+- [x] **Step 7: Ejecutar pruebas y typecheck móvil**
 
 Run: pnpm --filter @barber-saas/mobile test -- client-queries.test.ts client-record.test.ts && pnpm --filter @barber-saas/mobile typecheck
 
@@ -848,7 +848,7 @@ git commit -m "perf(mobile): paginate client workflows"
 - buildAvailability recibe windows, occupied, durationMinutes, stepMinutes, date, timezone y now; devuelve slots y unavailableSlots.
 - Consumes: zonedDateTimeToUtc mediante callbacks explícitos para mantener pruebas deterministas.
 
-- [ ] **Step 1: Escribir pruebas rojas del motor**
+- [x] **Step 1: Escribir pruebas rojas del motor**
 
 ~~~typescript
 it('merges overlapping and adjacent occupied ranges', () => {
@@ -880,7 +880,7 @@ Run: pnpm --filter @barber-saas/api test -- availability-engine.test.ts
 
 Expected: FAIL porque el módulo no existe.
 
-- [ ] **Step 3: Implementar ordenación, fusión y puntero monotónico**
+- [x] **Step 3: Implementar ordenación, fusión y puntero monotónico**
 
 ~~~typescript
 const merged = mergeRanges(input.occupied);
@@ -898,7 +898,7 @@ for (const window of input.windows) {
 }
 ~~~
 
-- [ ] **Step 4: Sustituir cálculos duplicados en v1 sin cambiar respuestas**
+- [x] **Step 4: Sustituir cálculos duplicados en v1 sin cambiar respuestas**
 
 En agenda.ts y public-booking.ts seleccionar solo startsAt y endsAt. Consultar BusinessWeeklySchedule una vez con findUnique y convertirlo en una ventana. Mantener las diferencias funcionales: paso privado de 5 minutos, paso público igual a duración, exclusión de horas pasadas solo en público.
 
@@ -932,7 +932,7 @@ git commit -m "perf(api): linearize booking availability"
 - Consumes: OperationalAccessLoader, agendaPageQuerySchema, appointmentCalendarSummaryQuerySchema, cursor helpers y publicAppointment.
 - Produces: registerAgendaV2Routes(app, database, authenticate, loadOperationalAccess).
 
-- [ ] **Step 1: Escribir integración roja multi-sede**
+- [x] **Step 1: Escribir integración roja multi-sede**
 
 Crear un owner con tres sedes y otra sede ajena. GET /v2/appointments con dos locationIds debe devolver citas de ambas con una sola respuesta, orden startsAt asc/id asc y nextCursor. Una sede ajena devuelve 403 sin filtrar parcialmente.
 
@@ -940,13 +940,13 @@ Crear un owner con tres sedes y otra sede ajena. GET /v2/appointments con dos lo
 expect(Number(response.headers['x-nava-query-count'])).toBeLessThanOrEqual(4);
 ~~~
 
-- [ ] **Step 2: Ejecutar para comprobar RED**
+- [x] **Step 2: Ejecutar para comprobar RED**
 
 Run: node scripts/test-database-env.mjs --run-pnpm --filter @barber-saas/api test -- agenda-v2.integration.test.ts
 
 Expected: FAIL con 404.
 
-- [ ] **Step 3: Implementar GET /v2/appointments**
+- [x] **Step 3: Implementar GET /v2/appointments**
 
 Validar rango civil <=31 días, activeAfter opcional como instante ISO y máximo 25 locationIds únicas. Owners/managers pueden usar sedes de su organización; otros roles solo locationIds asignadas. Convertir límites por zona horaria de cada sede y construir los predicados por sede con Prisma.sql/Prisma.join dentro de una única sentencia parametrizada. Cuando activeAfter está presente añadir appointment.ends_at > activeAfter sin alterar el orden ni los demás filtros.
 
@@ -978,11 +978,11 @@ ORDER BY appointment.starts_at ASC, appointment.id ASC
 LIMIT page_size_plus_one
 ~~~
 
-- [ ] **Step 4: Escribir prueba roja del resumen mensual**
+- [x] **Step 4: Escribir prueba roja del resumen mensual**
 
 Crear citas cerca de medianoche en dos zonas horarias. Afirmar agrupación por fecha local/sede y exclusión de pending_verification/expired igual que v1.
 
-- [ ] **Step 5: Implementar calendar-summary en PostgreSQL**
+- [x] **Step 5: Implementar calendar-summary en PostgreSQL**
 
 Usar query parametrizada con Prisma.sql/Prisma.join; unir appointments con locations y agrupar por:
 
@@ -992,11 +992,11 @@ TO_CHAR(appointment.starts_at AT TIME ZONE location.timezone, 'YYYY-MM-DD')
 
 La consulta filtra organization_id, location_id IN, estados y rango absoluto ampliado máximo 14 horas por extremos de zona. Aplicar HAVING sobre la fecha civil solicitada. Devolver count como Number.
 
-- [ ] **Step 6: Implementar GET /v2/availability**
+- [x] **Step 6: Implementar GET /v2/availability**
 
 Crear loadBookingContextV2 como una sentencia SQL parametrizada que une location, membership, member_locations, professional_services y services para validar profesional/sede y producir snapshots. Después ejecutar una consulta de BusinessWeeklySchedule y una de rangos Appointment. Reutilizar availability-engine. Con autenticación y OperationalAccess el total estable es como máximo seis operaciones. Afirmar respuesta equivalente a /v1/availability para el mismo fixture.
 
-- [ ] **Step 7: Ejecutar pruebas**
+- [x] **Step 7: Ejecutar pruebas**
 
 Run: node scripts/test-database-env.mjs --run-pnpm --filter @barber-saas/api test -- agenda-v2.integration.test.ts availability-engine.test.ts app.integration.test.ts
 
@@ -1028,7 +1028,7 @@ git commit -m "feat(api): add multi-location agenda queries"
 - Consumes: AppointmentsPageResponse, AppointmentCalendarSummaryResponse y AvailabilityResponse.
 - Produces: agendaPageQueryOptions, calendarSummaryQueryOptions y focusedInterval(isFocused, milliseconds).
 
-- [ ] **Step 1: Escribir pruebas rojas de fan-out y polling**
+- [x] **Step 1: Escribir pruebas rojas de fan-out y polling**
 
 ~~~typescript
 it('uses one request for all selected locations', async () => {
@@ -1052,11 +1052,11 @@ Run: pnpm --filter @barber-saas/mobile test -- agenda-queries.test.ts query-life
 
 Expected: FAIL porque los módulos no existen.
 
-- [ ] **Step 3: Implementar opciones de consulta**
+- [x] **Step 3: Implementar opciones de consulta**
 
 agendaPageQueryOptions realiza una solicitud v2 con todas las sedes, cursor y signal. calendarSummaryQueryOptions solo se habilita en vista mensual. focusedInterval retorna false al perder foco.
 
-- [ ] **Step 4: Migrar agenda.tsx**
+- [x] **Step 4: Migrar agenda.tsx**
 
 Eliminar Promise.all(locationIds.map(request)). Usar useInfiniteQuery para día/semana. Para mes, solicitar calendar-summary y pedir los detalles del día seleccionado. Mantener filtros por profesional, transiciones, selección de cita, acciones y query keys tenant-aware.
 
@@ -1067,7 +1067,7 @@ refetchInterval: isRouteFocused ? 30_000 : false,
 refetchIntervalInBackground: false,
 ~~~
 
-- [ ] **Step 5: Migrar dashboard y reprogramación**
+- [x] **Step 5: Migrar dashboard y reprogramación**
 
 Dashboard solicita una página de citas del día con activeAfter=now y limit=1, suficiente para conservar exactamente la tarjeta de cita en curso o siguiente incluso cuando ya existan más de 50 citas finalizadas; no descarga inventario en esta tarea. Añadir una prueba con 60 citas finalizadas y una futura que confirme que solo la futura se devuelve. Reschedule usa /v2/availability y conserva todos los parámetros.
 
@@ -1106,7 +1106,7 @@ git commit -m "perf(mobile): consolidate agenda requests"
 - Produces: registerInventoryV2Routes(app, database, authenticate, loadOperationalAccess).
 - InventoryProductsPageResponse devuelve items, nextCursor, summary, accessibleLocations, locationId y currencyCode.
 
-- [ ] **Step 1: Escribir integración roja del producto liviano**
+- [x] **Step 1: Escribir integración roja del producto liviano**
 
 Crear dos sedes, un producto con imagen de 1 MB y existencias distintas. GET /v2/inventory/products?locationId=...&limit=1 debe:
 
@@ -1125,7 +1125,7 @@ Run: node scripts/test-database-env.mjs --run-pnpm --filter @barber-saas/api tes
 
 Expected: FAIL con 404.
 
-- [ ] **Step 3: Implementar consulta paginada**
+- [x] **Step 3: Implementar consulta paginada**
 
 Permitir inventario solo a owner/manager, como v1. Para owner, las sedes accesibles son activeOrganizationLocations; para manager, su intersección con assignedLocationIds. Validar locationId contra esa lista antes de consultar. Consultar productos unidos únicamente a location_inventory de la sede seleccionada. Orden isActive desc, name asc, id asc. Aplicar status, search y lowStockOnly en SQL, incluyendo:
 
@@ -1136,13 +1136,13 @@ AND product.stock_tracking_enabled = TRUE
 
 Construir la sentencia con Prisma.sql y parámetros, nunca concatenando input. Seleccionar el booleano imageData IS NOT NULL AS has_image, no el contenido. accessibleLocations y currencyCode provienen del OperationalAccess ya cargado, sin consultas adicionales.
 
-- [ ] **Step 4: Implementar resumen en la primera página**
+- [x] **Step 4: Implementar resumen en la primera página**
 
 La primera página ejecuta en paralelo una agregación SQL para activeProducts, inventoryCostCents, lowStockProducts y totalUnits. Páginas con cursor devuelven summary=null. GET /v2/inventory/summary expone la misma agregación para dashboard.
 
 La agregación usa SUM/COUNT en PostgreSQL y no carga productos en Node.
 
-- [ ] **Step 5: Implementar movimientos por cursor**
+- [x] **Step 5: Implementar movimientos por cursor**
 
 GET /v2/inventory/movements ordena createdAt desc/id desc, solicita limit+1 y filtra:
 
@@ -1155,7 +1155,7 @@ OR: [
 
 No ejecutar count ni skip. Mantener nombres de producto y reversal metadata.
 
-- [ ] **Step 6: Implementar imagen privada**
+- [x] **Step 6: Implementar imagen privada**
 
 GET /v2/inventory/products/:productId/image selecciona solo imageData bajo organizationId. Devuelve 404 si no existe/no hay imagen/otro tenant. Probar ETag y Cache-Control private.
 
@@ -1193,7 +1193,7 @@ git commit -m "feat(api): add scalable inventory reads"
 - Consumes: InventoryProductsPageResponse, InventorySummaryResponse y StockMovementsPageResponse.
 - Produces: inventoryProductsQueryOptions, inventoryMovementsQueryOptions y inventorySummaryQueryOptions.
 
-- [ ] **Step 1: Escribir pruebas rojas de consultas**
+- [x] **Step 1: Escribir pruebas rojas de consultas**
 
 ~~~typescript
 it('does not request movement history until its tab is visible', () => {
@@ -1221,17 +1221,17 @@ Run: pnpm --filter @barber-saas/mobile test -- inventory-queries.test.ts
 
 Expected: FAIL porque el módulo no existe.
 
-- [ ] **Step 3: Implementar páginas y carga por pestaña**
+- [x] **Step 3: Implementar páginas y carga por pestaña**
 
 inventory.tsx usa useInfiniteQuery para productos y movimientos. Solo la pestaña visible habilita su consulta. La primera página conserva summary y accessibleLocations; cambiar sede crea otra clave. Las imágenes usan imageUrl y carga lazy del componente visual.
 
 Eliminar la invalidación indiscriminada de todas las páginas. Después de ajuste, actualizar quantityOnHand del producto en páginas cacheadas, invalidar summary de la sede y la primera página de movimientos.
 
-- [ ] **Step 4: Migrar selector de producto de caja**
+- [x] **Step 4: Migrar selector de producto de caja**
 
 cash-register.tsx deja de solicitar /v1/inventory. Usa búsqueda paginada v2 para el selector de producto. Mantener selección, cálculo de precio, validación de existencias y venta.
 
-- [ ] **Step 5: Migrar dashboard al resumen**
+- [x] **Step 5: Migrar dashboard al resumen**
 
 Sustituir GET /v1/inventory por GET /v2/inventory/summary. dashboard-model recibe InventorySummaryResponse, no InventoryResponse. Confirmar que tarjetas y alertas muestran los mismos valores.
 
@@ -1239,7 +1239,7 @@ Sustituir GET /v1/inventory por GET /v2/inventory/summary. dashboard-model recib
 
 Una reversión de venta invalida solo: producto/sede afectados, inventory-summary de la sede, primera página de inventory-movements, cash-register-summary y business-summary. No invalidar páginas de otra sede.
 
-- [ ] **Step 7: Ejecutar pruebas**
+- [x] **Step 7: Ejecutar pruebas**
 
 Run: pnpm --filter @barber-saas/mobile test -- inventory-queries.test.ts dashboard-model.test.ts && pnpm --filter @barber-saas/mobile typecheck
 
@@ -1295,7 +1295,7 @@ Run: node scripts/test-database-env.mjs --run-pnpm --filter @barber-saas/api tes
 
 Expected: FAIL con 404.
 
-- [ ] **Step 3: Implementar catálogo con select**
+- [x] **Step 3: Implementar catálogo con select**
 
 Extraer requirePublicLocation y la evaluación de políticas a public-booking-context.ts; hacer que v1 y v2 importen esas mismas funciones y demostrar con la regresión que no cambian status/códigos. Seleccionar solo campos usados, reviews limitadas a 40 y banderas hasImage/hasPhoto. Generar URLs:
 
@@ -1308,15 +1308,15 @@ Extraer requirePublicLocation y la evaluación de políticas a public-booking-co
 
 Responder Cache-Control public, max-age=60, stale-while-revalidate=300.
 
-- [ ] **Step 4: Implementar medios públicos**
+- [x] **Step 4: Implementar medios públicos**
 
 Validar kind con enum, pertenencia al organization/location y visibilidad pública. Seleccionar una sola columna Base64. Responder Cache-Control public, max-age=300 y ETag. Un id de otro tenant devuelve 404.
 
-- [ ] **Step 5: Implementar disponibilidad pública v2**
+- [x] **Step 5: Implementar disponibilidad pública v2**
 
 Reutilizar loadBookingContext y availability-engine. Seleccionar rangos del día y business schedule una vez. Respuesta igual a disponibilidad pública v1 para fixtures futuros, ocupados y límites.
 
-- [ ] **Step 6: Migrar web sin cambiar URLs navegables**
+- [x] **Step 6: Migrar web sin cambiar URLs navegables**
 
 La página [organizationSlug]/[locationSlug] obtiene /v2/public/.../catalog con Next:
 
@@ -1326,7 +1326,7 @@ fetch(url, { next: { revalidate: 60 } })
 
 BookingExperience usa imageUrl/photoUrl y /v2/public/.../availability a través del mismo origen /api/public-proxy. Ampliar el proxy para aceptar exclusivamente prefijos v1/public y v2/public; reenviar If-None-Match en GET/HEAD y Cache-Control, ETag, Content-Length y Content-Type desde medios v2. Mantener creación, verificación, pago, cancelación, reprogramación, reseñas y órdenes sobre sus endpoints v1 existentes. La prueba web debe afirmar que una URL de medio v2 atraviesa el proxy y conserva 304/ETag, mientras cualquier otro prefijo devuelve 404.
 
-- [ ] **Step 7: Probar regresión pública**
+- [x] **Step 7: Probar regresión pública**
 
 Run: node scripts/test-database-env.mjs --run-pnpm --filter @barber-saas/api test -- public-booking-v2.integration.test.ts public-booking.integration.test.ts; después pnpm --filter @barber-saas/web test y pnpm --filter @barber-saas/web typecheck.
 
@@ -1356,7 +1356,7 @@ git commit -m "perf(web): load public booking media on demand"
 - Consumes: formas de consulta finalizadas en Tasks 4, 7, 9 y 11.
 - Produces: índices nombrados y documentados; no cambia filas ni contratos.
 
-- [ ] **Step 1: Validar URL local sin imprimirla**
+- [x] **Step 1: Validar URL local sin imprimirla**
 
 ~~~powershell
 node scripts/test-database-env.mjs --start-postgres
@@ -1365,7 +1365,7 @@ node scripts/test-database-env.mjs --run-pnpm db:status
 
 El segundo comando vuelve a cargar y validar .env dentro del mismo proceso que lanza pnpm; Prisma nunca hereda DATABASE_URL de Neon. Todo comando de migración o prueba PostgreSQL de esta tarea debe pasar por este wrapper.
 
-- [ ] **Step 2: Escribir prueba roja de objetos**
+- [x] **Step 2: Escribir prueba roja de objetos**
 
 data-processing-indexes.test.ts consulta pg_indexes/pg_extension y exige:
 
@@ -1386,13 +1386,13 @@ expect(indexNames).toEqual(
 expect(extensions).toContain('pg_trgm');
 ~~~
 
-- [ ] **Step 3: Ejecutar para comprobar RED**
+- [x] **Step 3: Ejecutar para comprobar RED**
 
 Run: pnpm --filter @barber-saas/database test -- data-processing-indexes.test.ts
 
 Expected: FAIL porque los índices no existen.
 
-- [ ] **Step 4: Crear migración aditiva**
+- [x] **Step 4: Crear migración aditiva**
 
 ~~~sql
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
@@ -1425,15 +1425,15 @@ CREATE INDEX "stock_movements_location_created_cursor_idx"
 
 No eliminar índices anteriores en esta migración. Una eliminación por redundancia requiere evidencia de pg_stat_user_indexes de producción y queda fuera de esta fase.
 
-- [ ] **Step 5: Crear rollback explícito**
+- [x] **Step 5: Crear rollback explícito**
 
 rollback.sql elimina solo los nueve índices nuevos. No elimina pg_trgm porque puede ser compartida con otros objetos presentes o futuros.
 
-- [ ] **Step 6: Actualizar schema.prisma**
+- [x] **Step 6: Actualizar schema.prisma**
 
 Representar en Prisma únicamente los índices B-tree no parciales soportados, con map exacto. Los índices parciales de clientes, los índices GIN y el índice de expresión clients_phone_digits_idx permanecen administrados por SQL y se documentan junto a los modelos para impedir que un futuro mantenedor los confunda con objetos huérfanos.
 
-- [ ] **Step 7: Ejecutar migración sobre estado anterior y cadena completa**
+- [x] **Step 7: Ejecutar migración sobre estado anterior y cadena completa**
 
 Sobre copia/instancia temporal local: aplicar hasta 20260901110000, cargar fixtures con cero, uno y varios registros, aplicar 20260904150000 y ejecutar la prueba. En otra base temporal vacía ejecutar toda la cadena con pnpm db:migrate:deploy.
 
@@ -1448,7 +1448,7 @@ node scripts/test-database-env.mjs --run-pnpm db:validate
 
 Expected: schema up to date; test PASS; ninguna migración fallida.
 
-- [ ] **Step 8: Documentar locks, parcialidad y rollback**
+- [x] **Step 8: Documentar locks, parcialidad y rollback**
 
 docs/database/data-processing-indexes.md debe declarar que CREATE INDEX normal puede bloquear escrituras brevemente, estimar duración con el dataset de 100.000, enumerar estado parcial tras cada sentencia y establecer rollback por índice. Si la medición local indica duración incompatible con despliegue, dividir en migración operativa con CREATE INDEX CONCURRENTLY y ejecutar cada sentencia fuera de una transacción, manteniendo los mismos nombres y pruebas.
 
@@ -1479,7 +1479,7 @@ git commit -m "perf(database): index scalable data queries"
 - Consumes: fixture y línea base v1 de Task 0, endpoints v2, headers locales de medición e índices de Task 12.
 - Produces: pnpm test:performance:data y pnpm test:performance:explain.
 
-- [ ] **Step 1: Escribir prueba roja del catálogo de escenarios v2**
+- [x] **Step 1: Escribir prueba roja del catálogo de escenarios v2**
 
 ~~~javascript
 assert.deepEqual(
@@ -1506,7 +1506,7 @@ Run: pnpm --filter @barber-saas/api exec node --test scripts/seed-performance.te
 
 Expected: FAIL porque scalableScenarios todavía no se exporta.
 
-- [ ] **Step 3: Extender el fixture sin cambiar su identidad**
+- [x] **Step 3: Extender el fixture sin cambiar su identidad**
 
 Conservar la validación de TEST_DATABASE_URL, el organization slug perf-data-local y el borrado limitado a ese tenant implementados en Task 0. Extender el fixture para que incluya:
 
@@ -1521,7 +1521,7 @@ Insertar en lotes de 1.000 mediante createMany y transacciones acotadas por tipo
 
 La distribución debe incluir empates deliberados en full_name/name/starts_at/created_at para probar el desempate por id, citas simultáneas entre profesionales, productos activos e inactivos y movimientos con la misma fecha. Volver a ejecutar las pruebas de guardia de Task 0 después de la extensión.
 
-- [ ] **Step 4: Extender carga HTTP**
+- [x] **Step 4: Extender carga HTTP**
 
 api-workflows.mjs ejecuta con concurrencia 20 y 200 solicitudes por escenario:
 
@@ -1543,17 +1543,17 @@ export const scalableScenarios = [
 
 Las lecturas usan 200 iteraciones/concurrencia 20. appointment-create e inventory-adjustment usan 50/concurrencia 10 y claves/recursos deterministas no conflictivos; contact-import-100 usa 10 lotes de 100. Restaurar solo los subrecursos del tenant de performance entre escrituras. Calcular fallos, solicitudes HTTP por interacción, p50, p95, bytes p95 y máximo de x-nava-query-count. Fallar si lectura p95 >300 ms, escritura crítica p95 >500 ms, página >250 KB o uno de los presupuestos SQL de la spec se excede. Para appointment-create, inventory-adjustment y public-catalog, que no tienen presupuesto numérico aprobado, exigir que el conteo SQL no supere la línea base equivalente. Afirmar además una solicitud HTTP por interacción de importación v2 frente a las hasta 101 de la línea base.
 
-- [ ] **Step 5: Añadir EXPLAIN JSON**
+- [x] **Step 5: Añadir EXPLAIN JSON**
 
 explain-workflows.mjs usa EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) con valores del tenant de performance. Guardar planes sanitizados sin literales de búsqueda ni ids. Afirmar que búsquedas y cursores de tablas grandes usan Bitmap Index Scan, Index Scan o Index Only Scan sobre los índices esperados; no prohibir Sequential Scan en tablas pequeñas.
 
 El script importa loadLocalTestDatabaseEnvironment antes de conectarse y rechaza cualquier DATABASE_URL que no sea el TEST_DATABASE_URL local validado.
 
-- [ ] **Step 6: Comparar contra la línea base conservada**
+- [x] **Step 6: Comparar contra la línea base conservada**
 
 Leer la tabla v1 capturada en Task 0 y no sobrescribirla. Ejecutar v2 contra la misma clase de fixture y concurrencia, añadir la tabla de resultados v2 y calcular reducción de p50, p95, consultas, escrituras de sesión y bytes. Si cambió el equipo, runtime o configuración, marcar la comparación como no homologable y regenerar primero ambas mediciones desde el commit base en una rama/worktree separada.
 
-- [ ] **Step 7: Añadir scripts raíz**
+- [x] **Step 7: Añadir scripts raíz**
 
 ~~~json
 {
@@ -1563,7 +1563,7 @@ Leer la tabla v1 capturada en Task 0 y no sobrescribirla. Ejecutar v2 contra la 
 }
 ~~~
 
-- [ ] **Step 8: Ejecutar performance**
+- [x] **Step 8: Ejecutar performance**
 
 Run:
 
@@ -1629,7 +1629,7 @@ pnpm build
 
 Expected: exit 0, sin errores ni warnings nuevos.
 
-- [ ] **Step 3: Ejecutar concurrencia crítica**
+- [x] **Step 3: Ejecutar concurrencia crítica**
 
 Ejecutar pruebas que intentan dos reservas simultáneas para el mismo profesional/franja y dos salidas simultáneas del último stock. Afirmar una reserva aceptada/una conflictiva y stock nunca negativo.
 
@@ -1637,7 +1637,7 @@ Run: node scripts/test-database-env.mjs --run-pnpm --filter @barber-saas/api tes
 
 Expected: PASS.
 
-- [ ] **Step 4: Ejecutar compatibilidad**
+- [x] **Step 4: Ejecutar compatibilidad**
 
 Ejecutar todas las pruebas de endpoints v1 y el e2e móvil/web existente. Confirmar que rutas v1 conservan status, campos y reglas.
 
@@ -1659,7 +1659,7 @@ En ESTADO_PROYECTO registrar:
 
 En README enlazar docs/testing/data-processing-performance.md. Cambiar Estado de la spec a Implementado y verificado solo si todos los comandos anteriores pasan.
 
-- [ ] **Step 6: Revisar diff y secretos**
+- [x] **Step 6: Revisar diff y secretos**
 
 Run:
 

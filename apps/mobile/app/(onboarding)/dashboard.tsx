@@ -2,11 +2,11 @@
 import { styles } from '../../src/features/screens/dashboard.styles';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
-  AppointmentsResponse,
+  AppointmentsPageResponse,
   CashRegisterSummaryResponse,
   CurrentCashRegisterResponse,
   GoogleMapsLocationCandidate,
-  InventoryResponse,
+  InventorySummaryResponse,
   OnboardingAccountDetailsResponse,
   SubscriptionResponse,
   WelcomeSurveyResponseResult,
@@ -136,8 +136,8 @@ export default function DashboardScreen() {
   const appointmentsQuery = useQuery({
     enabled: Boolean(session && operationLocationId),
     queryFn: () =>
-      requireApiClient().request<AppointmentsResponse>(
-        `/v1/appointments?date=${operationDate}&locationId=${encodeURIComponent(operationLocationId ?? '')}`,
+      requireApiClient().request<AppointmentsPageResponse>(
+        `/v2/appointments?from=${operationDate}&to=${operationDate}&locationIds=${encodeURIComponent(operationLocationId ?? '')}&activeAfter=${encodeURIComponent(new Date().toISOString())}&limit=1`,
       ),
     queryKey: tenant.key('agenda-appointments', 'dashboard', operationDate),
   });
@@ -158,10 +158,14 @@ export default function DashboardScreen() {
     queryKey: tenant.key('cash-register-summary'),
   });
   const inventoryQuery = useQuery({
-    enabled: Boolean(session && inventoryEnabled && canAccessFinancialReports),
+    enabled: Boolean(
+      session && inventoryEnabled && canAccessFinancialReports && operationLocationId,
+    ),
     queryFn: () =>
-      requireApiClient().request<InventoryResponse>('/v1/inventory'),
-    queryKey: tenant.key('inventory'),
+      requireApiClient().request<InventorySummaryResponse>(
+        `/v2/inventory/summary?locationId=${encodeURIComponent(operationLocationId ?? '')}`,
+      ),
+    queryKey: tenant.key('inventory-summary', operationLocationId),
   });
 
   const businessName = accountQuery.data?.businessName ?? 'Tu negocio';
@@ -244,7 +248,7 @@ export default function DashboardScreen() {
   const operations = useMemo(
     () =>
       dashboardOperations({
-        appointments: appointmentsQuery.data?.appointments,
+        appointments: appointmentsQuery.data?.items,
         cashSession: cashRegisterQuery.data?.session,
         cashSummary: cashSummaryQuery.data,
         currencyCode:
@@ -256,7 +260,7 @@ export default function DashboardScreen() {
         timeZone: operationTimeZone,
       }),
     [
-      appointmentsQuery.data?.appointments,
+      appointmentsQuery.data?.items,
       cashRegisterQuery.data?.session,
       cashSummaryQuery.data,
       inventoryQuery.data,
