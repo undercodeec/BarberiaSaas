@@ -655,7 +655,7 @@ el código actual y tiene evidencia proporcional a su riesgo.
 | Panel interno                | Funcional, desplegado | Admin está publicado con login/OTP, servicio y HTTPS. El árbol actual añade navegación Usuario↔Organización y administración de Memberships posteriores al commit desplegado; faltan validación autenticada y despliegue de esos avances. |
 | Calidad                      | Bloqueada             | Esquema, tipos, pruebas, E2E básico y builds pasan; lint y formato global fallan. Se omitieron 28 pruebas PostgreSQL.                                                                                                                     |
 | Producción                   | Piloto                | Hay evidencia histórica de API/Web en VPS, Neon, TLS, FCM y Maps. No se revalidaron hoy servicios, migraciones productivas ni recorrido completo.                                                                                         |
-| Android                      | AAB preparado         | `0.1.15` / code `37` está compilado, firmado y archivado; faltan la carga en Play Console, el rollout y la aceptación física desde el track objetivo.                                                                                       |
+| Android                      | AAB preparado         | `0.1.17` / code `39` está compilado, firmado y archivado; faltan la carga en Play Console, el rollout y la aceptación física desde el track objetivo.                                                                                       |
 
 ## Estado del repositorio auditado
 
@@ -1280,25 +1280,26 @@ revalidados por SSH, Google Cloud, Neon ni Play Console durante esta auditoría*
 
 ### Estado actual
 
-- Candidato local de publicación: `versionName` **0.1.15**, `versionCode`
-  **37**. El code 36 ya tenía un artefacto local archivado al iniciar este
-  corte; se incrementó para no sobrescribirlo ni reutilizar un código que pudo
-  haberse cargado en Play Console.
+- Candidato local de publicación: `versionName` **0.1.17**, `versionCode`
+  **39**. Se incrementó respecto del candidato archivado anterior para no
+  sobrescribirlo ni reutilizar un código que pudo haberse cargado en Play
+  Console. La disponibilidad real del code 39 se debe confirmar en consola
+  antes de subirlo.
 - `apps/mobile/app.json` y `apps/mobile/android/app/build.gradle` coinciden.
 - El manifest fusionado del candidato fue verificado:
-  `com.barbersaas.mobile`, `0.1.15`/`37`, `allowBackup=false`, sin permisos
+  `com.barbersaas.mobile`, `0.1.17`/`39`, `allowBackup=false`, sin permisos
   bloqueados y con `compileSdk`/`targetSdk` **36**.
-- `bundleRelease` terminó correctamente el 28 de agosto de 2026 usando las
-  cinco propiedades `NAVA_UPLOAD_*`. `signingReport` confirmó la clave de carga
-  Nava y no `debug.keystore`; el guard de Gradle validó además la huella
-  SHA-256 esperada del certificado.
-- Expo Router y módulos Expo permanecen; EAS Build y Expo Updates/OTA fueron
-  retirados. No hay referencias activas a `expo-updates`, `runtimeVersion` o
-  canal OTA en la configuración auditada.
-- AAB archivado: `apps/mobile/releases/Nava-0.1.15-code37.aab`.
-- Tamaño: 79.202.154 bytes.
+- `bundleRelease` terminó correctamente el 5 de septiembre de 2026 usando las
+  cinco propiedades `NAVA_UPLOAD_*`. El guard de Gradle validó la clave de
+  carga Nava —no `debug.keystore`— y la huella SHA-256 esperada del certificado.
+- Expo Router y módulos Expo permanecen. El build Android se realiza localmente
+  con Gradle; EAS Build se utiliza solamente para iOS. No hay referencias
+  activas a `expo-updates`, `runtimeVersion` o canal OTA en el binario Android
+  auditado.
+- AAB archivado: `apps/mobile/releases/Nava-0.1.17-code39.aab`.
+- Tamaño: 84.919.113 bytes.
 - SHA-256:
-  `566907B3DAAAC93B2F1C499A045683EABB31E83225402209D05428311B5F45A2`.
+  `ECA8BE63BE05CAD4BB47C0DA6CF4E5ED6BB962F95B6DB71D7406F063D2D3A5D8`.
 - `jarsigner` verificó la firma; los avisos corresponden al certificado de carga
   autofirmado y sin timestamp, válido hasta el 20 de diciembre de 2053. El AAB
   contiene `base/assets/index.android.bundle`, incorpora
@@ -1426,7 +1427,7 @@ revalidados por SSH, Google Cloud, Neon ni Play Console durante esta auditoría*
    `https://navacloud.app/tratamiento-de-datos`, que abra sin autenticación y
    que el formulario de acceso de revisores tenga credenciales de prueba o
    instrucciones válidas.
-4. Confirmar en el track que el `versionCode` 37 no está usado y que el AAB
+4. Confirmar en el track que el `versionCode` 39 no está usado y que el AAB
    recibido informa target API 36. Registrar track, porcentaje de rollout,
    SHA-256 y versión instalada tras la prueba física.
 
@@ -1461,7 +1462,7 @@ revalidados por SSH, Google Cloud, Neon ni Play Console durante esta auditoría*
    endurecer su endpoint público con rate limiting/idempotencia.
 6. Ejecutar E2E de los recorridos críticos: autenticación, agenda, reserva,
    Caja, comisiones, inventario/pedidos, suscripción y Admin.
-7. Subir `0.1.15`/37 y completar su aceptación física Android; registrar track,
+7. Subir `0.1.17`/39 y completar su aceptación física Android; registrar track,
    rollout y versión observada.
 8. Ensayar restauración de Neon y documentar RPO/RTO.
 9. Realizar revisión final de autorización multi-tenant, secretos, logs,
