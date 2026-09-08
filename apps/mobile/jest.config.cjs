@@ -1,6 +1,6 @@
 module.exports = {
   modulePathIgnorePatterns: ['<rootDir>/.eas-archive/'],
   preset: 'jest-expo',
-  testMatch: ['<rootDir>/**/*.test.ts?(x)'],
+  testMatch: ['**/*.test.ts', '**/*.test.tsx'],
   testTimeout: 15_000,
 };

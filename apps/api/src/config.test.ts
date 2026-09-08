@@ -40,6 +40,30 @@ describe('configuración SMTP', () => {
   });
 });
 
+describe('configuración del enlace de recuperación', () => {
+  it('usa el enlace HTTPS canónico por defecto', () => {
+    expect(readConfig(baseEnvironment).MOBILE_RESET_URL).toBe(
+      'https://reservas.navacloud.app/reset-password',
+    );
+  });
+
+  it('rechaza enlaces de recuperación que no sean HTTPS en producción', () => {
+    expect(() =>
+      readConfig({
+        ...baseEnvironment,
+        APP_ENV: 'production',
+        CORS_ORIGIN: 'https://admin.example.com',
+        MOBILE_RESET_URL: 'barbersaas://reset-password',
+        PLATFORM_ADMIN_EMAILS: 'operaciones@example.com',
+        PLATFORM_ADMIN_PASSWORD_HASH:
+          'scrypt$32768$8$1$CgoKCgoKCgoKCgoKCgoKCg$5NguO9ktJ7Y-6G9f5CVPg8vW6FFT2m96ghbdE4ThFyHx5UrjjKLKt_-SmEYu_2XldoTe0HI0JG649YRRRc_JhA',
+        SMTP_FROM: 'equipo@example.com',
+        SMTP_HOST: 'smtp.example.com',
+      }),
+    ).toThrow('MOBILE_RESET_URL');
+  });
+});
+
 describe('configuración de cobros de plataforma', () => {
   const encryptionKey = Buffer.alloc(32, 3).toString('base64');
 

@@ -70,7 +70,10 @@ const environmentSchema = z
       .string()
       .min(1)
       .default('https://reservas.navacloud.app/accept-invitation'),
-    MOBILE_RESET_URL: z.string().min(1).default('barbersaas://reset-password'),
+    MOBILE_RESET_URL: z
+      .string()
+      .min(1)
+      .default('https://reservas.navacloud.app/reset-password'),
     PLATFORM_ADMIN_EMAILS: z.string().default(''),
     PLATFORM_DEVELOPMENT_BYPASS: z.enum(['true', 'false']).default('false'),
     PLATFORM_ADMIN_PASSWORD_HASH: optionalText,
@@ -204,6 +207,33 @@ const environmentSchema = z
           code: 'custom',
           message: 'MOBILE_INVITATION_URL debe usar HTTPS en producción.',
           path: ['MOBILE_INVITATION_URL'],
+        });
+      }
+      let mobileResetUrl: URL | undefined;
+      try {
+        mobileResetUrl = new URL(value.MOBILE_RESET_URL);
+      } catch {
+        context.addIssue({
+          code: 'custom',
+          message: 'MOBILE_RESET_URL debe ser una URL HTTPS válida en producción.',
+          path: ['MOBILE_RESET_URL'],
+        });
+      }
+      if (
+        mobileResetUrl &&
+        (mobileResetUrl.protocol !== 'https:' ||
+          mobileResetUrl.username ||
+          mobileResetUrl.password ||
+          mobileResetUrl.hostname !== 'reservas.navacloud.app' ||
+          mobileResetUrl.pathname !== '/reset-password' ||
+          mobileResetUrl.search ||
+          mobileResetUrl.hash)
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'MOBILE_RESET_URL debe ser https://reservas.navacloud.app/reset-password en producción.',
+          path: ['MOBILE_RESET_URL'],
         });
       }
     }
