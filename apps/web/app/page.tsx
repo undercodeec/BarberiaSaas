@@ -76,7 +76,7 @@ const plans = [
       'La operación completa para un local que ya trabaja en equipo.',
     name: 'Nava Local',
     price: '$29.83',
-    summary: 'Barbería completa',
+    summary: 'Operación para tu local',
   },
   {
     benefits: [
@@ -537,13 +537,15 @@ export default function HomePage() {
               </div>
             </div>
             <div className="portal-detail-copy">
-              <p>Software para barberías</p>
+              <p>Software para negocios de cuidado personal</p>
               <h2>
-                Haz crecer tu barbería con más orden y menos complicaciones.
+                Haz crecer tu negocio con más orden y menos complicaciones.
               </h2>
               <span>
-                Nava reúne reservas, agenda, clientes, caja, equipo e inventario
-                en un solo lugar.
+                Reservas, agenda, clientes, caja, equipo, inventario, comisiones
+                y reportes en un solo lugar para barberías, salones de belleza,
+                estudios de uñas, spa y bienestar, centros de estética y otros
+                negocios de cuidado personal.
               </span>
               <div>
                 <a href={trialLink}>
@@ -567,12 +569,12 @@ export default function HomePage() {
           <div className="statement-content">
             <p className="portal-label">Nava / Operación</p>
             <h2>
-              Haz crecer tu barbería con <em>más orden</em> y menos
+              Haz crecer tu negocio con <em>más orden</em> y menos
               complicaciones.
             </h2>
             <p>
-              Nava reúne reservas, agenda, clientes, caja, equipo e inventario
-              en un solo lugar.
+              Organiza reservas, clientes, caja, equipo, inventario, comisiones
+              y reportes desde un solo lugar.
             </p>
             <a className="portal-text-link" href={trialLink}>
               Probar Nava gratis <Arrow />
@@ -606,7 +608,7 @@ export default function HomePage() {
               <div className="deck-copy">
                 <p className="portal-label">Módulos Nava</p>
                 <h2>
-                  La operación de tu barbería, organizada como una sola
+                  La operación de tu negocio, organizada como una sola
                   experiencia.
                 </h2>
                 <p>
