@@ -288,6 +288,15 @@ const platformOrganizationActionSchema = z.discriminatedUnion('action', [
     reason: z.string().trim().min(10).max(500),
   }),
 ]);
+
+export function trialExtensionPlanId(
+  plans: readonly { readonly code: string; readonly id: string }[],
+) {
+  const localPlan = plans.find(({ code }) => code === 'local');
+  if (!localPlan) throw new Error('Nava Local no está disponible.');
+  return localPlan.id;
+}
+
 const platformOrganizationNoteSchema = z.object({
   category: z.enum(['commercial', 'support']).default('commercial'),
   note: z.string().trim().min(5).max(2000),
@@ -4929,7 +4938,7 @@ function registerPlatformRoutes(
           'ORGANIZATION_NOT_FOUND',
           'La organización no existe.',
         );
-      const { subscription } = await ensureOrganizationSubscription(
+      const { plans, subscription } = await ensureOrganizationSubscription(
         transaction,
         organization.id,
       );
@@ -5003,6 +5012,7 @@ function registerPlatformRoutes(
           where: { id: organization.id },
         });
       } else if (input.action === 'extend_trial') {
+        const planId = trialExtensionPlanId(plans);
         const base =
           subscription.trialEndsAt && subscription.trialEndsAt > new Date()
             ? subscription.trialEndsAt
@@ -5014,6 +5024,7 @@ function registerPlatformRoutes(
           data: {
             currentPeriodEnd: trialEndsAt,
             graceEndsAt: null,
+            planId,
             status: SubscriptionStatus.TRIAL,
             trialEndsAt,
           },

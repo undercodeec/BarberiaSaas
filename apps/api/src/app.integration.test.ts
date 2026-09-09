@@ -5575,6 +5575,38 @@ describeWithDatabase('API con PostgreSQL', () => {
     });
     expect(reducedTrial.statusCode).toBe(200);
 
+    await database.subscription.update({
+      data: {
+        currentPeriodEnd: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+        trialEndsAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      },
+      where: { organizationId: pilot.organizationId },
+    });
+    const extendedExpiredTrial = await app.inject({
+      headers: { authorization: `Bearer ${platformToken}` },
+      method: 'PATCH',
+      payload: {
+        action: 'extend_trial',
+        days: 7,
+        reason: 'Se autorizó una extensión de la demo después de vencer.',
+      },
+      url: `/v1/platform/organizations/${pilot.organizationId}`,
+    });
+    expect(extendedExpiredTrial.statusCode).toBe(200);
+    const restoredDemoSubscription = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      url: '/v1/subscription',
+    });
+    expect(restoredDemoSubscription.statusCode).toBe(200);
+    expect(restoredDemoSubscription.json()).toMatchObject({
+      current: {
+        featureFlags: { inventory: true, team: true },
+        planCode: 'local',
+        status: 'trial',
+      },
+    });
+
     const notificationErrors = await app.inject({
       headers: { authorization: `Bearer ${platformToken}` },
       method: 'GET',
