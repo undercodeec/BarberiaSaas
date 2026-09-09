@@ -3581,6 +3581,44 @@ describeWithDatabase('API con PostgreSQL', () => {
     ).toBe(60);
   });
 
+  it('oculta en Agenda v2 las horas ya transcurridas del día actual', async () => {
+    const agenda = await setupAgenda('agenda-sin-horas-pasadas');
+    const parts = new Intl.DateTimeFormat('en-US', {
+      day: '2-digit',
+      month: '2-digit',
+      timeZone: 'America/Guayaquil',
+      year: 'numeric',
+    }).formatToParts(new Date());
+    const value = (type: Intl.DateTimeFormatPartTypes) =>
+      parts.find((part) => part.type === type)?.value;
+    const date = `${value('year')}-${value('month')}-${value('day')}`;
+    const weekday = new Date(`${date}T00:00:00.000Z`).getUTCDay();
+    await database.businessWeeklySchedule.update({
+      data: { endMinute: 1440, isOpen: true, startMinute: 0 },
+      where: {
+        locationId_weekday: { locationId: agenda.locationId, weekday },
+      },
+    });
+    const availability = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'GET',
+      query: {
+        date,
+        locationId: agenda.locationId,
+        membershipId: agenda.membershipId,
+        serviceIds: agenda.serviceId,
+      },
+      url: '/v2/availability',
+    });
+
+    expect(availability.statusCode, availability.body).toBe(200);
+    const startsAt = availability
+      .json<{ slots: Array<{ startsAt: string }> }>()
+      .slots.map((slot) => Date.parse(slot.startsAt));
+    expect(startsAt).not.toHaveLength(0);
+    expect(startsAt.every((slot) => slot > Date.now())).toBe(true);
+  });
+
   it('muestra al administrador las citas de la sucursal elegida y limita al barbero a las propias', async () => {
     const agenda = await setupAgenda('agenda-multi-sucursal-visible');
     const ownerMembership = await database.membership.findFirstOrThrow({

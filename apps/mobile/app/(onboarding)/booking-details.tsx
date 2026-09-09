@@ -1160,7 +1160,7 @@ const styles = StyleSheet.create({
     borderColor: appTheme.colors.border,
     borderRadius: appTheme.radii.control,
     borderWidth: 1,
-    minWidth: '30%',
+    width: '30%',
     paddingHorizontal: 12,
     paddingVertical: 11,
   },

@@ -420,6 +420,8 @@ export function registerAgendaV2Routes(
     const availability = buildAvailability({
       date: input.date,
       durationMinutes,
+      excludePast: true,
+      now: new Date(),
       occupied: appointments.map(({ endsAt, startsAt }) => ({ endsAt, startsAt })),
       respectWindowEnd: true,
       stepMinutes: context.location.bookingSlotIntervalMinutes,

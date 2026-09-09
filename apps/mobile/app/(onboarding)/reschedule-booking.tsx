@@ -469,8 +469,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 7,
     justifyContent: 'center',
-    minWidth: '31%',
-    paddingHorizontal: 8,
+    width: '30%',
+    paddingHorizontal: 4,
     paddingVertical: 13,
   },
   slotCount: {
