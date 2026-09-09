@@ -546,6 +546,36 @@ export default function TeamManagementScreen() {
                     ) : null}
                   </View>
                 ) : null}
+                {canManageTeam &&
+                member.planAvailable &&
+                member.role === 'barber' &&
+                currentLocation ? (
+                  <Pressable
+                    accessibilityLabel={`Editar horario de ${member.user.fullName}`}
+                    accessibilityRole="button"
+                    onPress={() =>
+                      router.push({
+                        params: {
+                          locationId: currentLocation.id,
+                          locationName: currentLocation.name,
+                          membershipId: member.id,
+                          professionalName: member.user.fullName,
+                        },
+                        pathname: '/professional-schedule',
+                      })
+                    }
+                    style={styles.scheduleButton}
+                  >
+                    <Ionicons
+                      color={appTheme.colors.accentDark}
+                      name="time-outline"
+                      size={19}
+                    />
+                    <Text style={styles.scheduleButtonLabel}>
+                      Editar horario
+                    </Text>
+                  </Pressable>
+                ) : null}
               </View>
             );
           })}

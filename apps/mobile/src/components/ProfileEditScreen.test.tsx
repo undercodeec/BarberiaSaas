@@ -15,6 +15,30 @@ jest.mock('@tanstack/react-query', () => ({
             photoData: null,
           },
         }
+      : queryKey.includes('team')
+        ? {
+            members: [
+              {
+                commissionPercentage: null,
+                id: 'membership-1',
+                locations: [
+                  {
+                    id: 'location-1',
+                    name: 'Sucursal Centro',
+                    onlineBookingEnabled: true,
+                  },
+                ],
+                planAvailable: true,
+                role: 'barber',
+                status: 'active',
+                user: {
+                  email: 'barbero@example.com',
+                  fullName: 'Diego Barber',
+                  id: 'user-1',
+                },
+              },
+            ],
+          }
       : {
           accountType: 'business',
           addressLine: 'Av. del Negocio',
@@ -75,7 +99,10 @@ jest.mock('../components/RegistrationSelectors', () => ({
 
 jest.mock('../features/organization/useCurrentOrganization', () => ({
   useCurrentOrganization: () => ({
-    data: { membership: { role: 'barber' } },
+    data: {
+      location: { id: 'location-1', name: 'Sucursal Centro' },
+      membership: { id: 'membership-1', role: 'barber' },
+    },
   }),
 }));
 
@@ -90,6 +117,9 @@ describe('ProfileEditScreen', () => {
     expect(view.getByText('Datos personales')).toBeOnTheScreen();
     expect(view.getByText('Sobre mí')).toBeOnTheScreen();
     expect(view.queryByText('Información del negocio')).toBeNull();
+    expect(
+      view.getByLabelText('Cambiar mi disponibilidad para reservas'),
+    ).toBeOnTheScreen();
     expect(view.queryByLabelText('Cambiar portada del negocio')).toBeNull();
   });
 });

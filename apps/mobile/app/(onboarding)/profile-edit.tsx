@@ -3,6 +3,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
   BusinessCategory,
   OnboardingAccountDetailsResponse,
+  TeamResponse,
   UserProfileResponse,
 } from '@barber-saas/api-client';
 import {
@@ -36,7 +37,10 @@ import { KeyboardAwareScrollView as ScrollView } from '../../src/components/Keyb
 import { CountryCityFields } from '../../src/components/RegistrationSelectors';
 import { requireApiClient } from '../../src/lib/api';
 import { BUSINESS_CATEGORY_OPTIONS } from '../../src/lib/business-category';
-import { accountQueryKey, accountQueryPrefix } from '../../src/lib/query-keys';
+import {
+  accountQueryKey,
+  accountQueryPrefix,
+} from '../../src/lib/query-keys';
 import { detectTimezone } from '../../src/lib/timezones';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -89,6 +93,8 @@ export default function ProfileEditScreen() {
   const canEditBusiness =
     organizationQuery.data?.membership.role !== undefined &&
     organizationQuery.data.membership.role !== 'barber';
+  const isBarber = organizationQuery.data?.membership.role === 'barber';
+  const currentLocation = organizationQuery.data?.location;
   const accountDetailsQuery = useQuery({
     enabled: Boolean(session && canEditBusiness),
     queryFn: () =>
@@ -98,6 +104,43 @@ export default function ProfileEditScreen() {
     queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
   });
   const accountDetails = accountDetailsQuery.data;
+  const teamQuery = useQuery({
+    enabled: Boolean(session && isBarber && currentLocation),
+    queryFn: () => requireApiClient().request<TeamResponse>('/v1/team'),
+    queryKey: accountQueryKey(user?.id, 'team'),
+  });
+  const ownMember = teamQuery.data?.members.find(
+    (member) => member.id === organizationQuery.data?.membership.id,
+  );
+  const ownLocation = ownMember?.locations.find(
+    (location) => location.id === currentLocation?.id,
+  );
+  const updateOnlineBooking = useMutation({
+    mutationFn: (onlineBookingEnabled: boolean) => {
+      if (!currentLocation || !ownMember) {
+        throw new Error('No encontramos tu disponibilidad para esta sucursal.');
+      }
+      return requireApiClient().request(
+        `/v1/team/members/${ownMember.id}/online-booking`,
+        {
+          body: {
+            locationId: currentLocation.id,
+            onlineBookingEnabled,
+          },
+          method: 'PATCH',
+        },
+      );
+    },
+    onError: (error) =>
+      Alert.alert(
+        'No se pudo actualizar tu disponibilidad',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: accountQueryPrefix('team'),
+      }),
+  });
 
   useEffect(() => {
     if (!profile) return;
@@ -295,6 +338,54 @@ export default function ProfileEditScreen() {
             <Text style={styles.readOnlyText}>{profile?.email ?? '...'}</Text>
           </View>
         </View>
+
+        {isBarber && currentLocation ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Disponibilidad</Text>
+            <Text style={styles.availabilityHint}>
+              Decide si apareces para nuevas reservas en {currentLocation.name}.
+            </Text>
+            <Pressable
+              accessibilityLabel="Cambiar mi disponibilidad para reservas"
+              accessibilityRole="switch"
+              accessibilityState={{
+                checked: ownLocation?.onlineBookingEnabled ?? false,
+                disabled: !ownLocation || updateOnlineBooking.isPending,
+              }}
+              disabled={!ownLocation || updateOnlineBooking.isPending}
+              onPress={() =>
+                updateOnlineBooking.mutate(
+                  !(ownLocation?.onlineBookingEnabled ?? false),
+                )
+              }
+              style={styles.availabilityRow}
+            >
+              <View style={styles.availabilityCopy}>
+                <Text style={styles.availabilityLabel}>Reservas online</Text>
+                <Text style={styles.availabilityStatus}>
+                  {ownLocation?.onlineBookingEnabled
+                    ? 'Disponible para nuevas citas'
+                    : 'No disponible para nuevas citas'}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.availabilitySwitch,
+                  ownLocation?.onlineBookingEnabled &&
+                    styles.availabilitySwitchEnabled,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.availabilityKnob,
+                    ownLocation?.onlineBookingEnabled &&
+                      styles.availabilityKnobEnabled,
+                  ]}
+                />
+              </View>
+            </Pressable>
+          </View>
+        ) : null}
 
         {canEditBusiness && accountDetails ? (
           <View style={styles.card}>
@@ -514,6 +605,25 @@ function Field({
 }
 
 const styles = StyleSheet.create({
+  availabilityCopy: { flex: 1, gap: 3 },
+  availabilityHint: { color: '#667080', fontSize: 13, lineHeight: 19 },
+  availabilityKnob: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 11,
+    height: 22,
+    width: 22,
+  },
+  availabilityKnobEnabled: { alignSelf: 'flex-end' },
+  availabilityLabel: { color: '#101C2D', fontSize: 15, fontWeight: '800' },
+  availabilityRow: { alignItems: 'center', flexDirection: 'row', gap: 12 },
+  availabilityStatus: { color: '#667080', fontSize: 13 },
+  availabilitySwitch: {
+    backgroundColor: '#98A1AD',
+    borderRadius: 15,
+    padding: 4,
+    width: 50,
+  },
+  availabilitySwitchEnabled: { backgroundColor: appTheme.colors.accent },
   avatar: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surfaceMuted,
