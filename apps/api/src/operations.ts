@@ -1033,6 +1033,47 @@ async function requireProfessional(
   return professional;
 }
 
+async function initializeProfessionalSchedule(
+  database: Pick<DatabaseClient, 'businessWeeklySchedule' | 'weeklySchedule'>,
+  input: {
+    locationId: string;
+    membershipId: string;
+    organizationId: string;
+  },
+) {
+  const existingSchedules = await database.weeklySchedule.count({
+    where: {
+      locationId: input.locationId,
+      membershipId: input.membershipId,
+    },
+  });
+  if (existingSchedules > 0) return;
+
+  const businessSchedules = await database.businessWeeklySchedule.findMany({
+    orderBy: [{ weekday: 'asc' }, { startMinute: 'asc' }],
+    select: {
+      endMinute: true,
+      startMinute: true,
+      weekday: true,
+    },
+    where: {
+      isOpen: true,
+      locationId: input.locationId,
+      organizationId: input.organizationId,
+    },
+  });
+  if (businessSchedules.length === 0) return;
+
+  await database.weeklySchedule.createMany({
+    data: businessSchedules.map((schedule) => ({
+      ...schedule,
+      locationId: input.locationId,
+      membershipId: input.membershipId,
+    })),
+    skipDuplicates: true,
+  });
+}
+
 function assertNoScheduleOverlaps(
   schedules: ReadonlyArray<{
     endMinute: number;
@@ -5594,6 +5635,11 @@ export function registerOperationsRoutes(
             };
           }),
         });
+        await initializeProfessionalSchedule(transaction, {
+          locationId: created.id,
+          membershipId: current.id,
+          organizationId: current.organizationId,
+        });
         await transaction.auditLog.create({
           data: {
             action: 'location.created',
@@ -6261,6 +6307,12 @@ export function registerOperationsRoutes(
           ? addedLocationIds
           : (input.locationIds ?? previousLocationIds);
     const resultingLocationIds = input.locationIds ?? previousLocationIds;
+    const scheduleInitializationLocationIds =
+      role !== MembershipRole.BARBER
+        ? []
+        : member.role === MembershipRole.BARBER
+          ? addedLocationIds
+          : resultingLocationIds;
     if (
       (role === MembershipRole.BARBER ||
         role === MembershipRole.RECEPTIONIST) &&
@@ -6393,6 +6445,13 @@ export function registerOperationsRoutes(
             membershipId: member.id,
           })),
           skipDuplicates: true,
+        });
+      }
+      for (const locationId of scheduleInitializationLocationIds) {
+        await initializeProfessionalSchedule(transaction, {
+          locationId,
+          membershipId: member.id,
+          organizationId: current.organizationId,
         });
       }
       if (
@@ -6873,6 +6932,11 @@ export function registerOperationsRoutes(
         },
       });
       if (invitation.role === MembershipRole.BARBER) {
+        await initializeProfessionalSchedule(transaction, {
+          locationId: invitation.locationId,
+          membershipId: acceptedMembership.id,
+          organizationId: invitation.organizationId,
+        });
         const activeServices = await transaction.service.findMany({
           select: { id: true },
           where: { isActive: true, organizationId: invitation.organizationId },

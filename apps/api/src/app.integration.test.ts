@@ -449,6 +449,74 @@ describeWithDatabase('API con PostgreSQL', () => {
     };
   }
 
+  it('inicializa la agenda de un barbero invitado con los horarios abiertos del negocio', async () => {
+    const ownerToken = await register('schedule-default-owner@example.com');
+    const organization = await onboard(ownerToken, 'schedule-default');
+    await database.businessWeeklySchedule.update({
+      data: { endMinute: 960, startMinute: 600 },
+      where: {
+        locationId_weekday: {
+          locationId: organization.locationId,
+          weekday: 1,
+        },
+      },
+    });
+    await database.businessWeeklySchedule.update({
+      data: { isOpen: false },
+      where: {
+        locationId_weekday: {
+          locationId: organization.locationId,
+          weekday: 2,
+        },
+      },
+    });
+    const barberToken = await register('schedule-default-barber@example.com');
+    const invitation = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        email: 'schedule-default-barber@example.com',
+        fullName: 'Barbero con horario inicial',
+        locationId: organization.locationId,
+        role: 'barber',
+      },
+      url: '/v1/team/invitations',
+    });
+    expect(invitation.statusCode).toBe(201);
+
+    const acceptance = await app.inject({
+      headers: { authorization: `Bearer ${barberToken}` },
+      method: 'POST',
+      payload: { token: lastInvitationToken() },
+      url: '/v1/team/invitations/accept',
+    });
+    expect(acceptance.statusCode).toBe(200);
+    const membershipId = acceptance.json<{ membership: { id: string } }>()
+      .membership.id;
+
+    const [businessSchedules, professionalSchedules] = await Promise.all([
+      database.businessWeeklySchedule.findMany({
+        orderBy: [{ weekday: 'asc' }, { startMinute: 'asc' }],
+        select: {
+          endMinute: true,
+          startMinute: true,
+          weekday: true,
+        },
+        where: { locationId: organization.locationId, isOpen: true },
+      }),
+      database.weeklySchedule.findMany({
+        orderBy: [{ weekday: 'asc' }, { startMinute: 'asc' }],
+        select: {
+          endMinute: true,
+          startMinute: true,
+          weekday: true,
+        },
+        where: { locationId: organization.locationId, membershipId },
+      }),
+    ]);
+    expect(professionalSchedules).toEqual(businessSchedules);
+  });
+
   it('expone preferencias de notificacion predeterminadas y permite actualizar solo las no criticas', async () => {
     const token = await register('notification-preferences@example.com');
     const headers = { authorization: `Bearer ${token}` };
@@ -2630,6 +2698,30 @@ describeWithDatabase('API con PostgreSQL', () => {
     await expect(
       database.membership.findUniqueOrThrow({ where: { id: membership.id } }),
     ).resolves.toMatchObject({ role: 'BARBER' });
+    expect(
+      await database.weeklySchedule.findMany({
+        orderBy: [{ weekday: 'asc' }, { startMinute: 'asc' }],
+        select: {
+          endMinute: true,
+          startMinute: true,
+          weekday: true,
+        },
+        where: {
+          locationId: organization.locationId,
+          membershipId: membership.id,
+        },
+      }),
+    ).toEqual(
+      await database.businessWeeklySchedule.findMany({
+        orderBy: [{ weekday: 'asc' }, { startMinute: 'asc' }],
+        select: {
+          endMinute: true,
+          startMinute: true,
+          weekday: true,
+        },
+        where: { locationId: organization.locationId, isOpen: true },
+      }),
+    );
   });
 
   it('notifica al profesional cuando se reemplaza su horario semanal', async () => {
@@ -2832,6 +2924,16 @@ describeWithDatabase('API con PostgreSQL', () => {
         whatsappPhone: '0999999998',
       },
     });
+    await database.businessWeeklySchedule.createMany({
+      data: Array.from({ length: 7 }, (_, weekday) => ({
+        endMinute: 1140,
+        isOpen: weekday !== 0,
+        locationId: secondLocation.id,
+        organizationId: organization.organizationId,
+        startMinute: 600,
+        weekday,
+      })),
+    });
     const barber = await database.user.create({
       data: {
         email: 'barber-location@example.com',
@@ -2885,10 +2987,26 @@ describeWithDatabase('API con PostgreSQL', () => {
       }),
     ).not.toBeNull();
     expect(
-      await database.weeklySchedule.count({
+      await database.weeklySchedule.findMany({
+        orderBy: [{ weekday: 'asc' }, { startMinute: 'asc' }],
+        select: {
+          endMinute: true,
+          startMinute: true,
+          weekday: true,
+        },
         where: { locationId: secondLocation.id, membershipId: membership.id },
       }),
-    ).toBe(0);
+    ).toEqual(
+      await database.businessWeeklySchedule.findMany({
+        orderBy: [{ weekday: 'asc' }, { startMinute: 'asc' }],
+        select: {
+          endMinute: true,
+          startMinute: true,
+          weekday: true,
+        },
+        where: { locationId: secondLocation.id, isOpen: true },
+      }),
+    );
   });
 
   it('sincroniza el catálogo del propietario al crear una sucursal', async () => {
@@ -2939,6 +3057,27 @@ describeWithDatabase('API con PostgreSQL', () => {
         },
       }),
     ).not.toBeNull();
+    expect(
+      await database.weeklySchedule.findMany({
+        orderBy: [{ weekday: 'asc' }, { startMinute: 'asc' }],
+        select: {
+          endMinute: true,
+          startMinute: true,
+          weekday: true,
+        },
+        where: { locationId, membershipId: owner.id },
+      }),
+    ).toEqual(
+      await database.businessWeeklySchedule.findMany({
+        orderBy: [{ weekday: 'asc' }, { startMinute: 'asc' }],
+        select: {
+          endMinute: true,
+          startMinute: true,
+          weekday: true,
+        },
+        where: { locationId, isOpen: true },
+      }),
+    );
 
     const secondService = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },
