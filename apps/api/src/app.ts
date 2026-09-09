@@ -583,6 +583,7 @@ function createQueuedAppointmentNotifier(
       try {
         const appointment = await database.appointment.findUnique({
           include: {
+            location: { select: { timezone: true } },
             professional: {
               include: {
                 memberLocations: true,
@@ -608,6 +609,7 @@ function createQueuedAppointmentNotifier(
         const startsAt = new Intl.DateTimeFormat('es-EC', {
           hour: '2-digit',
           minute: '2-digit',
+          timeZone: appointment.location.timezone,
         }).format(appointment.startsAt);
         const created = await database.$transaction(async (transaction) => {
           await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`appointment-reminder:${appointment.id}`}))`;
@@ -703,9 +705,14 @@ async function processAppointmentReminders(
   notifier: AppointmentNotifier,
   now = new Date(),
 ) {
-  const dueAt = new Date(now.getTime() + 30 * 60_000);
+  const maximumReminderMinutes = 10_080;
+  const dueAt = new Date(now.getTime() + maximumReminderMinutes * 60_000);
   const appointments = await database.appointment.findMany({
-    select: { id: true },
+    select: {
+      id: true,
+      organization: { select: { bookingReminderMinutes: true } },
+      startsAt: true,
+    },
     where: {
       appNotifications: {
         none: { type: AppNotificationType.APPOINTMENT_REMINDER },
@@ -718,7 +725,14 @@ async function processAppointmentReminders(
     },
   });
   await Promise.all(
-    appointments.map(({ id }) => notifier.notifyReminder?.(id)),
+    appointments
+      .filter(
+        (appointment) =>
+          appointment.startsAt.getTime() <=
+          now.getTime() +
+            appointment.organization.bookingReminderMinutes * 60_000,
+      )
+      .map(({ id }) => notifier.notifyReminder?.(id)),
   );
 }
 

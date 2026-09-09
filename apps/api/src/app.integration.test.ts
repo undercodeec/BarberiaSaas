@@ -570,6 +570,10 @@ describeWithDatabase('API con PostgreSQL', () => {
 
   it('conserva en bandeja los avisos de agenda silenciados, excluye al actor y crea recordatorios aunque ya exista otro aviso', async () => {
     const agenda = await setupAgenda('preferencias-cola-agenda');
+    await database.location.update({
+      data: { timezone: 'Europe/Madrid' },
+      where: { id: agenda.locationId },
+    });
     const memberships = await database.membership.findMany({
       select: { role: true, userId: true },
       where: { organizationId: agenda.organizationId },
@@ -692,6 +696,16 @@ describeWithDatabase('API con PostgreSQL', () => {
         });
     }
     expect(reminder?.type).toBe('APPOINTMENT_REMINDER');
+    expect(reminder?.body).toBe(
+      `Tu cita con Cliente con avisos silenciados comienza a las ${new Intl.DateTimeFormat(
+        'es-EC',
+        {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Europe/Madrid',
+        },
+      ).format(reminderStartsAt)}.`,
+    );
   });
 
   it('solicita la confirmacion de cobro al completar una cita y solo la registra en Caja al aprobarla', async () => {
