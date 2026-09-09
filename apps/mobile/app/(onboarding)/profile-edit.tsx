@@ -38,6 +38,7 @@ import { requireApiClient } from '../../src/lib/api';
 import { BUSINESS_CATEGORY_OPTIONS } from '../../src/lib/business-category';
 import { accountQueryKey, accountQueryPrefix } from '../../src/lib/query-keys';
 import { detectTimezone } from '../../src/lib/timezones';
+import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 const PRIMARY = appTheme.colors.accent;
@@ -84,8 +85,12 @@ export default function ProfileEditScreen() {
     queryKey: accountQueryKey(user?.id, 'user-profile'),
   });
   const profile = profileQuery.data?.profile;
+  const organizationQuery = useCurrentOrganization();
+  const canEditBusiness =
+    organizationQuery.data?.membership.role !== undefined &&
+    organizationQuery.data.membership.role !== 'barber';
   const accountDetailsQuery = useQuery({
-    enabled: Boolean(session),
+    enabled: Boolean(session && canEditBusiness),
     queryFn: () =>
       requireApiClient().request<OnboardingAccountDetailsResponse>(
         '/v1/onboarding/account-details',
@@ -140,7 +145,7 @@ export default function ProfileEditScreen() {
           },
           method: 'PATCH',
         });
-      if (accountDetails) {
+      if (canEditBusiness && accountDetails) {
         await requireApiClient().request('/v1/onboarding/account-details', {
           body: {
             addressLine: businessAddress.trim() || null,
@@ -165,7 +170,7 @@ export default function ProfileEditScreen() {
     },
     onSuccess: () => {
       void refreshProfile();
-      void refreshBusinessContext();
+      if (canEditBusiness) void refreshBusinessContext();
       Alert.alert('Perfil guardado', 'Tus cambios fueron actualizados.');
     },
     onError: (error) =>
@@ -291,7 +296,7 @@ export default function ProfileEditScreen() {
           </View>
         </View>
 
-        {accountDetails ? (
+        {canEditBusiness && accountDetails ? (
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Información del negocio</Text>
             <Text style={styles.businessHint}>
@@ -403,7 +408,9 @@ export default function ProfileEditScreen() {
           </View>
         ) : null}
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Descripción negocio</Text>
+          <Text style={styles.sectionTitle}>
+            {canEditBusiness ? 'Descripción negocio' : 'Perfil profesional'}
+          </Text>
           <Text style={styles.fieldLabel}>Sobre mí</Text>
           <TextInput
             maxLength={500}
