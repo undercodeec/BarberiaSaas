@@ -27,7 +27,18 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+      - name: Confirmar commit de main reproducible
+        shell: bash
+        run: |
+          test "$GITHUB_REF_NAME" = "main"
+          test -z "$(git status --porcelain)"
+          git rev-parse HEAD
       - run: pnpm install --frozen-lockfile
+      - name: Preflight Mobile
+        run: |
+          pnpm --filter @barber-saas/mobile typecheck
+          pnpm --filter @barber-saas/mobile test
+          pnpm --filter @barber-saas/mobile verify:ios-release-config
       - name: Preparar keystore de upload
         shell: bash
         env:
@@ -38,6 +49,7 @@ jobs:
       - name: Construir AAB firmado
         working-directory: apps/mobile/android
         env:
+          GOOGLE_MAPS_ANDROID_API_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_API_KEY }}
           NAVA_UPLOAD_CERT_SHA256: ${{ vars.NAVA_UPLOAD_CERT_SHA256 }}
           NAVA_UPLOAD_KEY_ALIAS: ${{ secrets.NAVA_UPLOAD_KEY_ALIAS }}
           NAVA_UPLOAD_KEY_PASSWORD: ${{ secrets.NAVA_UPLOAD_KEY_PASSWORD }}
@@ -49,14 +61,41 @@ jobs:
           -PNAVA_UPLOAD_STORE_PASSWORD="$NAVA_UPLOAD_STORE_PASSWORD"
           -PNAVA_UPLOAD_KEY_PASSWORD="$NAVA_UPLOAD_KEY_PASSWORD"
           -PNAVA_UPLOAD_CERT_SHA256="$NAVA_UPLOAD_CERT_SHA256"
-      - name: Verificar manifest fusionado
+      - name: Inspeccionar firma release
+        working-directory: apps/mobile/android
+        env:
+          NAVA_UPLOAD_CERT_SHA256: ${{ vars.NAVA_UPLOAD_CERT_SHA256 }}
+          NAVA_UPLOAD_KEY_ALIAS: ${{ secrets.NAVA_UPLOAD_KEY_ALIAS }}
+          NAVA_UPLOAD_KEY_PASSWORD: ${{ secrets.NAVA_UPLOAD_KEY_PASSWORD }}
+          NAVA_UPLOAD_STORE_PASSWORD: ${{ secrets.NAVA_UPLOAD_STORE_PASSWORD }}
+        run: >-
+          ./gradlew :app:signingReport --no-daemon
+          -PNAVA_UPLOAD_STORE_FILE="$RUNNER_TEMP/nava-upload.jks"
+          -PNAVA_UPLOAD_KEY_ALIAS="$NAVA_UPLOAD_KEY_ALIAS"
+          -PNAVA_UPLOAD_STORE_PASSWORD="$NAVA_UPLOAD_STORE_PASSWORD"
+          -PNAVA_UPLOAD_KEY_PASSWORD="$NAVA_UPLOAD_KEY_PASSWORD"
+          -PNAVA_UPLOAD_CERT_SHA256="$NAVA_UPLOAD_CERT_SHA256"
+      - name: Verificar candidata Android
+        env:
+          NAVA_UPLOAD_CERT_SHA256: ${{ vars.NAVA_UPLOAD_CERT_SHA256 }}
         run: >-
           pnpm --filter @barber-saas/mobile verify:android-release
-          apps/mobile/android/app/build/intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml
-      - name: Verificar firma del AAB
-        run: jarsigner -verify -strict apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
+          --manifest apps/mobile/android/app/build/intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml
+          --aab apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
+      - name: Archivar AAB y SHA-256
+        id: archive
+        shell: bash
+        run: |
+          version="$(node -p "require('./apps/mobile/app.json').expo.version")"
+          code="$(node -p "require('./apps/mobile/app.json').expo.android.versionCode")"
+          name="Nava-${version}-code${code}.aab"
+          cp apps/mobile/android/app/build/outputs/bundle/release/app-release.aab "$RUNNER_TEMP/$name"
+          sha256sum "$RUNNER_TEMP/$name" > "$RUNNER_TEMP/$name.sha256"
+          printf 'name=%s\n' "$name" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
-          name: nava-android-release
-          path: apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
+          name: nava-android-${{ steps.archive.outputs.name }}
+          path: |
+            ${{ runner.temp }}/${{ steps.archive.outputs.name }}
+            ${{ runner.temp }}/${{ steps.archive.outputs.name }}.sha256
           if-no-files-found: error
