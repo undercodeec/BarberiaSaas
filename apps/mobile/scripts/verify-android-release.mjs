@@ -158,7 +158,10 @@ if (aabPath) {
     { stdout: certificatePem },
   ] = await Promise.all([
     execFileAsync('jar', ['tf', aabPath]),
-    execFileAsync('jarsigner', ['-verify', '-strict', '-certs', aabPath]),
+    // El certificado de upload puede ser auto-firmado: `-strict` convierte esa
+    // cadena no pública en error. La identidad se verifica con la huella SHA-256
+    // exigida inmediatamente después.
+    execFileAsync('jarsigner', ['-verify', '-certs', aabPath]),
     execFileAsync('keytool', ['-printcert', '-rfc', '-jarfile', aabPath]),
   ]);
   const entries = jarContents.split(/\r?\n/u).filter(Boolean);
