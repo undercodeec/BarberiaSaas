@@ -2159,6 +2159,44 @@ describeWithDatabase('API con PostgreSQL', () => {
       professionalResponse.json<{ accountType: string }>().accountType,
     ).toBe('professional');
 
+    // El demo usa Nava Local para poder explorar módulos, pero el tipo "Solo
+    // yo" conserva su límite de producto aunque alguien intente usar la API
+    // directamente.
+    const professionalLocationResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        city: 'Quito',
+        countryCode: 'EC',
+        currencyCode: 'USD',
+        name: 'Sucursal no permitida',
+        phone: '0999999999',
+        slug: 'sucursal-no-permitida',
+        timezone: 'America/Guayaquil',
+      },
+      url: '/v1/locations',
+    });
+    expect(professionalLocationResponse.statusCode).toBe(409);
+    expect(professionalLocationResponse.json<{ code: string }>().code).toBe(
+      'BUSINESS_ACCOUNT_REQUIRED',
+    );
+
+    const professionalInvitationResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        email: 'professional-invited@example.com',
+        fullName: 'Invitado no permitido',
+        locationId: organization.locationId,
+        role: 'receptionist',
+      },
+      url: '/v1/team/invitations',
+    });
+    expect(professionalInvitationResponse.statusCode).toBe(409);
+    expect(professionalInvitationResponse.json<{ code: string }>().code).toBe(
+      'BUSINESS_ACCOUNT_REQUIRED',
+    );
+
     const businessResponse = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },
       method: 'PATCH',

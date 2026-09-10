@@ -3,6 +3,7 @@ import type {
   GoogleMapsLocationCandidate,
   ManagedLocation,
   ManagedLocationsResponse,
+  OnboardingAccountDetailsResponse,
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
@@ -28,8 +29,9 @@ import {
 } from '../../src/components/BottomNavigation';
 import { InlineMessage } from '../../src/components/InlineMessage';
 import { requireApiClient } from '../../src/lib/api';
+import { canManageBusinessOnlyFeature } from '../../src/lib/account-capabilities';
 import { partitionManagedLocations } from '../../src/lib/managed-locations';
-import { tenantQueryPrefix } from '../../src/lib/query-keys';
+import { accountQueryKey, tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
@@ -68,7 +70,7 @@ function formFor(location?: ManagedLocation): LocationForm {
 }
 
 export default function LocationManagementScreen() {
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const tenant = useTenantScope();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -79,8 +81,19 @@ export default function LocationManagementScreen() {
   const [isMapPickerOpen, setIsMapPickerOpen] = useState(false);
   const [selectedMap, setSelectedMap] =
     useState<GoogleMapsLocationCandidate | null>(null);
-  const locationsQuery = useQuery({
+  const accountQuery = useQuery({
     enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<OnboardingAccountDetailsResponse>(
+        '/v1/onboarding/account-details',
+      ),
+    queryKey: accountQueryKey(user?.id, 'onboarding-account-details'),
+  });
+  const locationsQuery = useQuery({
+    enabled: Boolean(
+      session &&
+      canManageBusinessOnlyFeature(accountQuery.data?.accountType ?? null),
+    ),
     queryFn: () =>
       requireApiClient().request<ManagedLocationsResponse>('/v1/locations'),
     queryKey: tenant.key('managed-locations'),
@@ -243,6 +256,11 @@ export default function LocationManagementScreen() {
   };
 
   if (!session) return <Redirect href="/(auth)/login" />;
+  if (
+    accountQuery.isSuccess &&
+    !canManageBusinessOnlyFeature(accountQuery.data.accountType)
+  )
+    return <Redirect href="/business-settings" />;
 
   return (
     <SafeAreaView style={styles.screen}>

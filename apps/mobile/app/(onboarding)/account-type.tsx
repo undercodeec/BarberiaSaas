@@ -12,7 +12,11 @@ import {
   goldButtonShadow,
 } from '../../src/components/BottomNavigation';
 import { requireApiClient } from '../../src/lib/api';
-import { accountQueryKey, accountQueryPrefix } from '../../src/lib/query-keys';
+import {
+  accountQueryKey,
+  accountQueryPrefix,
+  tenantQueryPrefix,
+} from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 type AccountType = 'business' | 'professional';
@@ -56,8 +60,19 @@ export default function AccountTypeScreen() {
         { body: { accountType }, method: 'PATCH' },
       ),
     onSuccess: async ({ accountType }) => {
+      queryClient.setQueryData<OnboardingAccountDetailsResponse | undefined>(
+        accountQueryKey(user?.id, 'onboarding-account-details'),
+        (current) => (current ? { ...current, accountType } : current),
+      );
       await queryClient.invalidateQueries({
         queryKey: accountQueryPrefix('onboarding-account-details'),
+      });
+      queryClient.removeQueries({
+        queryKey: tenantQueryPrefix('managed-locations'),
+      });
+      queryClient.removeQueries({ queryKey: tenantQueryPrefix('team') });
+      queryClient.removeQueries({
+        queryKey: tenantQueryPrefix('team-locations'),
       });
       Alert.alert(
         'Tipo de cuenta actualizado',

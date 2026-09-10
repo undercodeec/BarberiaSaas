@@ -71,6 +71,7 @@ import {
   dateInTimeZone,
   dashboardOperations,
 } from '../../src/features/screens/dashboard-model';
+import { canManageBusinessOnlyFeature } from '../../src/lib/account-capabilities';
 import {
   DashboardProgress,
   QuickAction,
@@ -219,6 +220,9 @@ export default function DashboardScreen() {
   const subscriptionCelebrationQueueRef = useRef(Promise.resolve());
   const rawBookingUrl = accountQuery.data?.bookingUrl?.trim() ?? '';
   const isSolo = accountQuery.data?.accountType === 'professional';
+  const canManageBusinessFeatures = canManageBusinessOnlyFeature(
+    accountQuery.data?.accountType ?? null,
+  );
   const bookingUrl = /^https?:\/\/\S+$/i.test(rawBookingUrl)
     ? rawBookingUrl
     : '';
@@ -419,6 +423,7 @@ export default function DashboardScreen() {
       const permittedIds = actionIds.filter(
         (actionId) =>
           (!isSolo || actionId !== 'collaborators') &&
+          (canManageBusinessFeatures || actionId !== 'locations') &&
           canUseExtraQuickAction(membershipRole, actionId),
       );
       if (!isMounted) return;
@@ -430,7 +435,7 @@ export default function DashboardScreen() {
     return () => {
       isMounted = false;
     };
-  }, [isSolo, membershipRole, user]);
+  }, [canManageBusinessFeatures, isSolo, membershipRole, user]);
   useEffect(() => {
     let isMounted = true;
     let notificationPromptTimer: ReturnType<typeof setTimeout> | null = null;
@@ -772,6 +777,7 @@ export default function DashboardScreen() {
       !user ||
       extraQuickActionIds.includes(id) ||
       (isSolo && id === 'collaborators') ||
+      (!canManageBusinessFeatures && id === 'locations') ||
       !canUseExtraQuickAction(membershipRole, id)
     )
       return;
@@ -1165,6 +1171,7 @@ export default function DashboardScreen() {
         visible={isBusinessCategoryPromptOpen}
       />
       <ExtraQuickActionsSheet
+        canManageBusinessFeatures={canManageBusinessFeatures}
         isSolo={isSolo}
         role={membershipRole}
         onClose={() => setIsQuickActionsPickerOpen(false)}

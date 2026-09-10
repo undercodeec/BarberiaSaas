@@ -512,6 +512,8 @@ describeWithDatabase('checkout de suscripción en PostgreSQL', () => {
     expect(attempt.status).toBe(SubscriptionPaymentStatus.APPLIED);
     expect(invoice.status).toBe(SubscriptionInvoiceStatus.PAID);
     expect(subscription.status).toBe(SubscriptionStatus.ACTIVE);
+    expect(subscription.planId).toBe(invoice.planId);
+    expect(invoice.planCode).toBe('essential');
     expect(changes).toBe(1);
     expect(auditEntries).toBe(1);
     expect(events.length).toBeGreaterThanOrEqual(3);

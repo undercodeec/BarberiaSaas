@@ -861,6 +861,7 @@ export function DashboardOperationCard({
 }
 
 export function ExtraQuickActionsSheet({
+  canManageBusinessFeatures,
   isSolo,
   role,
   selectedIds,
@@ -868,6 +869,7 @@ export function ExtraQuickActionsSheet({
   onSelect,
   visible,
 }: {
+  readonly canManageBusinessFeatures: boolean;
   readonly isSolo: boolean;
   readonly role: string | null | undefined;
   readonly selectedIds: readonly ExtraQuickActionId[];
@@ -880,6 +882,7 @@ export function ExtraQuickActionsSheet({
     (action) =>
       !selectedIds.includes(action.id) &&
       (!isSolo || action.id !== 'collaborators') &&
+      (canManageBusinessFeatures || action.id !== 'locations') &&
       canUseExtraQuickAction(role, action.id),
   );
 

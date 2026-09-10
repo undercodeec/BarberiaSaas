@@ -30,6 +30,7 @@ import {
   hasLockedSubscriptionFeature,
   minimumPlanForFeatures,
 } from '../../src/lib/subscription-entitlements';
+import { canManageBusinessOnlyFeature } from '../../src/lib/account-capabilities';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -164,11 +165,15 @@ export default function BusinessSettingsScreen() {
   });
   const featureFlags = subscriptionQuery.data?.current.featureFlags;
   const isSolo = accountQuery.data?.accountType === 'professional';
-  const isBusiness = accountQuery.data?.accountType === 'business';
+  const canManageBusinessFeatures = canManageBusinessOnlyFeature(
+    accountQuery.data?.accountType ?? null,
+  );
   const visibleSections = settingsSections.map((section) => ({
     ...section,
     items: section.items.filter(
-      (item) => item.id !== 'collaborators' || isBusiness,
+      (item) =>
+        (item.id !== 'collaborators' && item.id !== 'locations') ||
+        canManageBusinessFeatures,
     ),
   }));
 

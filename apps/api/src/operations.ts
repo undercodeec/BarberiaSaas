@@ -11,6 +11,7 @@ import {
   PlatformOperatorRole,
   PlatformSupportCaseStatus,
   ProductOrderStatus,
+  RegistrationAccountType,
   SubscriptionInvoiceStatus,
   SubscriptionDiscountKind,
   SubscriptionStatus,
@@ -993,6 +994,37 @@ async function requireMembership(
     );
   }
   return membership;
+}
+
+/**
+ * A trial may unlock all plan features, but it must never turn a "Solo yo"
+ * account into a multi-location/team account. The account mode belongs to the
+ * organization owner, so managers are checked against that owner as well.
+ */
+async function assertBusinessAccount(
+  database: DatabaseClient,
+  organizationId: string,
+) {
+  const owner = await database.membership.findFirst({
+    select: { userId: true },
+    where: {
+      organizationId,
+      role: MembershipRole.OWNER,
+      status: MembershipStatus.ACTIVE,
+    },
+  });
+  if (!owner) return;
+  const profile = await database.userRegistrationProfile.findUnique({
+    select: { accountType: true },
+    where: { userId: owner.userId },
+  });
+  if (profile?.accountType === RegistrationAccountType.PROFESSIONAL) {
+    throw new ApiError(
+      409,
+      'BUSINESS_ACCOUNT_REQUIRED',
+      'Las sucursales y el equipo están disponibles cuando el tipo de cuenta es Tengo un negocio. Cámbialo antes de continuar.',
+    );
+  }
 }
 
 async function requireLocation(
@@ -5524,6 +5556,7 @@ export function registerOperationsRoutes(
         'FORBIDDEN',
         'Solo el propietario puede agregar sucursales.',
       );
+    await assertBusinessAccount(database, current.organizationId);
     const input = createLocationSchema.parse(request.body);
     try {
       const location = await database.$transaction(async (transaction) => {
@@ -5866,6 +5899,7 @@ export function registerOperationsRoutes(
         'FORBIDDEN',
         'Solo el propietario puede restaurar sucursales.',
       );
+      await assertBusinessAccount(database, current.organizationId);
     }
     const { locationId } = z
       .object({ locationId: z.uuid() })
@@ -6695,6 +6729,7 @@ export function registerOperationsRoutes(
       user.id,
       'membership.manage',
     );
+    await assertBusinessAccount(database, current.organizationId);
     const input = createTeamInvitationSchema.parse(request.body);
     await assertCanCreateTeamMember(database, current.organizationId);
     if (!invitationMailer) {
@@ -6870,6 +6905,7 @@ export function registerOperationsRoutes(
         'La invitación no es válida o ya venció.',
       );
     }
+    await assertBusinessAccount(database, invitation.organizationId);
     await assertCanCreateTeamMember(database, invitation.organizationId);
     const membershipInAnotherOrganization = await database.membership.findFirst(
       {
