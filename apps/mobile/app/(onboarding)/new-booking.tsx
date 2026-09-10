@@ -156,6 +156,7 @@ export default function NewBookingScreen() {
         ) : null}
         {clients.map((client) => (
           <ClientOption
+            canViewPhone={clientAccess.canViewPhone}
             client={client}
             key={client.id}
             onPress={() => setSelectedClientId(client.id)}
@@ -226,10 +227,12 @@ export default function NewBookingScreen() {
 }
 
 function ClientOption({
+  canViewPhone,
   client,
   onPress,
   selected,
 }: {
+  canViewPhone: boolean;
   client: ClientRecord;
   onPress: () => void;
   selected: boolean;
@@ -247,7 +250,11 @@ function ClientOption({
       </View>
       <View style={styles.clientCopy}>
         <Text style={styles.clientName}>{name}</Text>
-        <Text style={styles.clientMeta}>{client.phone || 'Sin teléfono'}</Text>
+        {canViewPhone ? (
+          <Text style={styles.clientMeta}>
+            {client.phone || 'Sin teléfono'}
+          </Text>
+        ) : null}
         {client.email ? (
           <Text numberOfLines={1} style={styles.clientEmail}>
             {client.email}

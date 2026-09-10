@@ -164,6 +164,7 @@ export function registerClientV2Routes(
       permissionRole(context.role),
       'client.contact.read_full',
     );
+    const shouldHidePhone = context.role === 'BARBER';
     const search = input.search ? escapeLike(input.search) : undefined;
     const searchSql = search
       ? mayReadFullContact
@@ -232,7 +233,9 @@ export function registerClientV2Routes(
         notes: mayReadFullContact ? client.notes : null,
         phone: mayReadFullContact
           ? client.phone
-          : maskClientPhone(client.phone),
+          : shouldHidePhone
+            ? null
+            : maskClientPhone(client.phone),
       })),
       nextCursor: page.nextCursor,
     };

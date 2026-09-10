@@ -3948,6 +3948,21 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(updated.json<{ client: { phone: string } }>().client.phone).toBe(
       '0991234567',
     );
+
+    const clientsWithoutPhoneForBarber = await app.inject({
+      headers: { authorization: `Bearer ${agenda.barberToken}` },
+      method: 'GET',
+      url: '/v2/clients?limit=50',
+    });
+    expect(
+      clientsWithoutPhoneForBarber.statusCode,
+      clientsWithoutPhoneForBarber.body,
+    ).toBe(200);
+    const barberClient = clientsWithoutPhoneForBarber
+      .json<{ items: Array<{ id: string; phone: string | null }> }>()
+      .items.find((item) => item.id === client.id);
+    expect(barberClient?.phone).toBeNull();
+    expect(clientsWithoutPhoneForBarber.body).not.toContain('4567');
   });
 
   it('evita doble reserva bajo concurrencia y publica el evento', async () => {

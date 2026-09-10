@@ -238,10 +238,10 @@ function publicClient(
     notes: string | null;
     phone: string | null;
   },
-  access: 'full' | 'masked',
+  access: 'full' | 'hidden' | 'masked',
 ) {
   const { labels, ...details } = client;
-  if (access === 'masked') {
+  if (access === 'masked' || access === 'hidden') {
     return {
       ...details,
       addressLine: null,
@@ -250,7 +250,7 @@ function publicClient(
       email: null,
       labels: [],
       notes: null,
-      phone: maskClientPhone(client.phone),
+      phone: access === 'hidden' ? null : maskClientPhone(client.phone),
     };
   }
   return {
@@ -259,7 +259,10 @@ function publicClient(
   };
 }
 
-function clientDataAccess(context: ClientAccessContext): 'full' | 'masked' {
+function clientDataAccess(
+  context: ClientAccessContext,
+): 'full' | 'hidden' | 'masked' {
+  if (context.role === MembershipRole.BARBER) return 'hidden';
   return hasPermission(permissionRole(context.role), 'client.contact.read_full')
     ? 'full'
     : 'masked';
