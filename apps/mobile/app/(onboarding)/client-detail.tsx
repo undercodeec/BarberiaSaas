@@ -157,8 +157,8 @@ export default function ClientDetailScreen() {
 
   const updateClient = useMutation({
     mutationFn: () => {
-      if (!fullName.trim() || !phone.trim()) {
-        throw new Error('El nombre y teléfono son obligatorios.');
+      if (!fullName.trim()) {
+        throw new Error('El nombre es obligatorio.');
       }
       return requireApiClient().request(`/v1/clients/${clientId}`, {
         body: {
@@ -169,7 +169,7 @@ export default function ClientDetailScreen() {
           fullName: fullName.trim(),
           lastName: lastName.trim() || undefined,
           notes: notes.trim() || undefined,
-          phone: phone.trim(),
+          phone: phone.trim() || undefined,
         },
         method: 'PATCH',
       });
@@ -1102,7 +1102,7 @@ export default function ClientDetailScreen() {
                 accessibilityLabel="Teléfono del cliente"
                 keyboardType="phone-pad"
                 onChangeText={setPhone}
-                placeholder="Teléfono"
+                placeholder="Teléfono (opcional)"
                 placeholderTextColor="#8B96A5"
                 style={styles.field}
                 value={phone}

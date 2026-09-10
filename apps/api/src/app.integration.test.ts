@@ -3713,6 +3713,69 @@ describeWithDatabase('API con PostgreSQL', () => {
     ).toEqual([barberAppointment.id]);
   });
 
+  it('crea un cliente editable al completar una cita de mostrador', async () => {
+    const agenda = await setupAgenda('cliente-mostrador-al-completar');
+    const created = await app.inject({
+      headers: { authorization: `Bearer ${agenda.barberToken}` },
+      method: 'POST',
+      payload: {
+        clientName: 'Cliente de mostrador',
+        locationId: agenda.locationId,
+        professionalMembershipId: agenda.membershipId,
+        serviceIds: [agenda.serviceId],
+        startsAt: '2030-01-14T15:00:00.000Z',
+      },
+      url: '/v1/appointments',
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    const appointmentId = created.json<{ appointment: { id: string } }>()
+      .appointment.id;
+
+    const completed = await app.inject({
+      headers: { authorization: `Bearer ${agenda.barberToken}` },
+      method: 'PATCH',
+      payload: { status: 'completed' },
+      url: `/v1/appointments/${appointmentId}/status`,
+    });
+    expect(completed.statusCode, completed.body).toBe(200);
+
+    const appointment = await database.appointment.findUniqueOrThrow({
+      where: { id: appointmentId },
+    });
+    expect(appointment.clientId).not.toBeNull();
+    const client = await database.client.findUniqueOrThrow({
+      where: { id: appointment.clientId! },
+    });
+    expect(client).toMatchObject({
+      fullName: 'Cliente de mostrador',
+      phone: null,
+      source: 'WALK_IN',
+    });
+
+    const visibleToBarber = await app.inject({
+      headers: { authorization: `Bearer ${agenda.barberToken}` },
+      method: 'GET',
+      url: '/v1/clients',
+    });
+    expect(visibleToBarber.statusCode, visibleToBarber.body).toBe(200);
+    expect(
+      visibleToBarber
+        .json<{ clients: Array<{ id: string }> }>()
+        .clients.some((item) => item.id === client.id),
+    ).toBe(true);
+
+    const updated = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'PATCH',
+      payload: { phone: '0991234567' },
+      url: `/v1/clients/${client.id}`,
+    });
+    expect(updated.statusCode, updated.body).toBe(200);
+    expect(updated.json<{ client: { phone: string } }>().client.phone).toBe(
+      '0991234567',
+    );
+  });
+
   it('evita doble reserva bajo concurrencia y publica el evento', async () => {
     const agenda = await setupAgenda('agenda-concurrente');
     const availability = await app.inject({

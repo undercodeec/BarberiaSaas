@@ -123,26 +123,29 @@ function assertLocationScope(
   }
 }
 
-async function findOrCreateCompletedPublicBookingClient(
+async function findOrCreateCompletedAppointmentClient(
   transaction: Prisma.TransactionClient,
   appointment: {
     readonly clientEmail: string | null;
     readonly clientName: string;
     readonly clientPhone: string | null;
     readonly organizationId: string;
+    readonly source: AppointmentSource;
   },
+  completedByUserId: string,
 ) {
-  if (!appointment.clientPhone) return null;
   const normalizedEmail = appointment.clientEmail?.trim().toLowerCase() ?? null;
   await transaction.$queryRaw`WITH lock AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtext(${appointment.organizationId}))) SELECT 1 AS locked FROM lock`;
-  const clientByPhone = await transaction.client.findFirst({
-    orderBy: { createdAt: 'asc' },
-    where: {
-      deletedAt: null,
-      organizationId: appointment.organizationId,
-      phone: appointment.clientPhone,
-    },
-  });
+  const clientByPhone = appointment.clientPhone
+    ? await transaction.client.findFirst({
+        orderBy: { createdAt: 'asc' },
+        where: {
+          deletedAt: null,
+          organizationId: appointment.organizationId,
+          phone: appointment.clientPhone,
+        },
+      })
+    : null;
   const knownClient =
     clientByPhone ??
     (normalizedEmail
@@ -159,11 +162,13 @@ async function findOrCreateCompletedPublicBookingClient(
     knownClient ??
     transaction.client.create({
       data: {
+        createdByUserId: completedByUserId,
         email: normalizedEmail,
         fullName: appointment.clientName,
         organizationId: appointment.organizationId,
         phone: appointment.clientPhone,
-        source: AppointmentSource.PUBLIC_BOOKING,
+        source: appointment.source,
+        updatedByUserId: completedByUserId,
       },
     })
   );
@@ -1106,19 +1111,19 @@ export function registerAgendaRoutes(
       existing.paymentStatus === 'PENDING' &&
       existing.organization.servicePaymentConfirmationEnabled;
     const result = await database.$transaction(async (transaction) => {
-      const completedPublicBookingClient =
+      const completedAppointmentClient =
         status === AppointmentStatus.COMPLETED &&
         existing.status !== AppointmentStatus.COMPLETED &&
-        existing.source === AppointmentSource.PUBLIC_BOOKING &&
         !existing.clientId
-          ? await findOrCreateCompletedPublicBookingClient(
+          ? await findOrCreateCompletedAppointmentClient(
               transaction,
               existing,
+              user.id,
             )
           : null;
       const appointment = await transaction.appointment.update({
         data: {
-          clientId: completedPublicBookingClient?.id ?? existing.clientId,
+          clientId: completedAppointmentClient?.id ?? existing.clientId,
           ...(requestsPaymentConfirmation
             ? {
                 paymentConfirmationRequestedAt: new Date(),
