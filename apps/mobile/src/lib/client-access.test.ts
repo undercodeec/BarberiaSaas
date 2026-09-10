@@ -27,6 +27,7 @@ describe('clientAccessForRole', () => {
       canManage: false,
       canManageLabels: false,
       canReadNotes: false,
+      canViewPhone: true,
       canWriteNotes: false,
     });
   });
@@ -39,6 +40,7 @@ describe('clientAccessForRole', () => {
       canManage: false,
       canManageLabels: false,
       canReadNotes: true,
+      canViewPhone: false,
       canWriteNotes: true,
     });
   });

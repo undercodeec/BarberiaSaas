@@ -29,7 +29,7 @@ const COMMISSION_TYPES = new Set([
   'commission_settlement_approved',
   'commission_settlement_paid',
 ]);
-const INVENTORY_TYPES = new Set(['low_stock']);
+const INVENTORY_TYPES = new Set(['low_stock', 'product_order_reserved']);
 const TEAM_TYPES = new Set(['team_member_accepted', 'team_member_updated']);
 const SUBSCRIPTION_TYPES = new Set(['subscription_renewal']);
 const AGENDA_ROLES = new Set<NotificationRole>([

@@ -1,5 +1,6 @@
 import {
   createDatabaseClient,
+  MembershipRole,
   PlatformOverrideKind,
 } from '@barber-saas/database';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
@@ -289,6 +290,8 @@ describeWithDatabase('API con PostgreSQL', () => {
     await database.cashRegisterSession.deleteMany();
     await database.stockMovement.deleteMany();
     await database.locationInventory.deleteMany();
+    await database.productOrderItem.deleteMany();
+    await database.productOrder.deleteMany();
     await database.product.deleteMany();
     await database.scheduleBlock.deleteMany();
     await database.weeklySchedule.deleteMany();
@@ -5521,6 +5524,135 @@ describeWithDatabase('API con PostgreSQL', () => {
         'inventory.product_created',
         'inventory.stock_adjusted',
         'inventory.product_sale_reversed',
+      ]),
+    );
+  });
+
+  it('notifica una reserva pública de productos solo al propietario y administrador de la sucursal', async () => {
+    const ownerToken = await register('product-order-notification-owner@example.com');
+    const organization = await onboard(ownerToken, 'product-order-notification');
+    const productResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        costCents: 500,
+        initialStock: 4,
+        locationId: organization.locationId,
+        minimumStock: 0,
+        name: 'Cera de reserva',
+        salePriceCents: 1_200,
+        stockTrackingEnabled: true,
+      },
+      url: '/v1/inventory/products',
+    });
+    expect(productResponse.statusCode).toBe(201);
+    const productId = productResponse.json<{ product: { id: string } }>().product
+      .id;
+    const secondLocation = await database.location.create({
+      data: {
+        city: 'Quito',
+        countryCode: 'EC',
+        currencyCode: 'USD',
+        name: 'Sucursal sin reserva',
+        organizationId: organization.organizationId,
+        phone: '0999999988',
+        slug: 'product-order-notification-norte',
+        timezone: 'America/Guayaquil',
+        whatsappPhone: '0999999988',
+      },
+    });
+    const [managerAtLocation, managerElsewhere, barber] = await Promise.all(
+      [
+        {
+          email: 'manager-reserva@example.com',
+          fullName: 'Administradora de reserva',
+          role: MembershipRole.MANAGER,
+        },
+        {
+          email: 'manager-otra-sucursal@example.com',
+          fullName: 'Administradora de otra sucursal',
+          role: MembershipRole.MANAGER,
+        },
+        {
+          email: 'barber-reserva@example.com',
+          fullName: 'Barbero de reserva',
+          role: MembershipRole.BARBER,
+        },
+      ].map(async ({ email, fullName, role }) => {
+        const user = await database.user.create({ data: { email, fullName } });
+        return database.membership.create({
+          data: { organizationId: organization.organizationId, role, userId: user.id },
+        });
+      }),
+    );
+    await database.memberLocation.createMany({
+      data: [
+        { locationId: organization.locationId, membershipId: managerAtLocation!.id },
+        { locationId: secondLocation.id, membershipId: managerElsewhere!.id },
+        { locationId: organization.locationId, membershipId: barber!.id },
+      ],
+    });
+    const owner = await database.membership.findFirstOrThrow({
+      where: { organizationId: organization.organizationId, role: 'OWNER' },
+    });
+    await database.appNotification.deleteMany({
+      where: { organizationId: organization.organizationId },
+    });
+
+    const reserved = await app.inject({
+      method: 'POST',
+      payload: {
+        customerName: 'Cliente de reserva',
+        customerPhone: '+593999999999',
+        items: [{ productId, quantity: 1 }],
+        paymentMethod: 'pickup',
+      },
+      url: '/v1/public/product-order-notification/product-order-notification-centro/orders',
+    });
+
+    expect(reserved.statusCode).toBe(201);
+    const notifications = (
+      await database.appNotification.findMany({
+        where: { organizationId: organization.organizationId },
+      })
+    ).filter(({ type }) => String(type) === 'PRODUCT_ORDER_RESERVED');
+    expect(notifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          body: 'Se reservó 1 producto por $12.00.',
+          title: 'Nueva reserva de productos',
+          userId: owner.userId,
+        }),
+        expect.objectContaining({
+          body: 'Se reservó 1 producto por $12.00.',
+          title: 'Nueva reserva de productos',
+          userId: managerAtLocation!.userId,
+        }),
+      ]),
+    );
+    expect(notifications).toHaveLength(2);
+    expect(notifications.map(({ userId }) => userId)).not.toEqual(
+      expect.arrayContaining([managerElsewhere!.userId, barber!.userId]),
+    );
+    expect(notifications.every(({ body }) => !body.includes('Cliente de reserva'))).toBe(
+      true,
+    );
+
+    const inbox = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      url: '/v1/notifications',
+    });
+    expect(inbox.statusCode).toBe(200);
+    expect(inbox.json<{ notifications: Array<{ data: { route: string; type: string }; type: string }> }>().notifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          data: expect.objectContaining({
+            route: '/inventory',
+            type: 'product_order_reserved',
+          }),
+          type: 'product_order_reserved',
+        }),
       ]),
     );
   });

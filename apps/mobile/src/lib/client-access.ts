@@ -10,6 +10,7 @@ export interface ClientAccess {
   readonly canManage: boolean;
   readonly canManageLabels: boolean;
   readonly canReadNotes: boolean;
+  readonly canViewPhone: boolean;
   readonly canWriteNotes: boolean;
 }
 
@@ -26,6 +27,7 @@ export function clientAccessForRole(
     canManage,
     canManageLabels: canManage,
     canReadNotes: canManage || isBarber,
+    canViewPhone: role !== null && role !== undefined && !isBarber,
     canWriteNotes: canManage || isBarber,
   };
 }

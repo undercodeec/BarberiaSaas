@@ -8,7 +8,7 @@ import type {
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -28,6 +28,9 @@ import {
 } from '../../src/components/BottomNavigation';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
+import { AgendaCalendarModal } from '../../src/features/screens/agenda-components';
+import { calendarGrid } from '../../src/features/screens/agenda-model';
+import { localCalendarDate } from '../../src/lib/agenda-range';
 import { requireApiClient } from '../../src/lib/api';
 import { settlementPeriodForTimeZone } from '../../src/lib/calendar-date';
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
@@ -39,6 +42,25 @@ import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 // PayPhone se habilitará en una futura versión. Conservamos el flujo para
 // reactivarlo sin exponer configuración ni cobros antes de su lanzamiento.
 const PAYPHONE_FEATURE_ENABLED = false;
+
+type WalletCalendarTarget =
+  'filter-end' | 'filter-start' | 'period-end' | 'period-start';
+
+function dateForCalendar(value: string) {
+  const [year = 2000, month = 1, day = 1] = value.split('-').map(Number);
+  return new Date(year, month - 1, day, 12);
+}
+
+function dateDaysAgo(days: number) {
+  const value = new Date();
+  value.setDate(value.getDate() - days);
+  return localCalendarDate(value);
+}
+
+function isWithinDateRange(value: string, start: string, end: string) {
+  const date = value.slice(0, 10);
+  return date >= start && date <= end;
+}
 
 export default function WalletScreen() {
   const router = useRouter();
@@ -81,6 +103,16 @@ export default function WalletScreen() {
   );
   const [periodStart, setPeriodStart] = useState(initialPeriod.periodStart);
   const [periodEnd, setPeriodEnd] = useState(initialPeriod.periodEnd);
+  const [movementDateStart, setMovementDateStart] = useState(() =>
+    dateDaysAgo(29),
+  );
+  const [movementDateEnd, setMovementDateEnd] = useState(() => dateDaysAgo(0));
+  const [calendarTarget, setCalendarTarget] =
+    useState<WalletCalendarTarget | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [chartMetric, setChartMetric] = useState<'base' | 'commission'>(
+    'commission',
+  );
   const organizationQuery = useCurrentOrganization();
   const role = organizationQuery.data?.membership?.role;
   const walletAccess = walletAccessForRole(role);
@@ -228,6 +260,71 @@ export default function WalletScreen() {
   const commissionEntriesForTab = canManageCommissions
     ? selectedEntries
     : commissionEntries.current;
+  const barberMovementEntries = useMemo(
+    () =>
+      commissionEntries.current
+        .filter((entry) =>
+          isWithinDateRange(
+            entry.occurredAt,
+            movementDateStart,
+            movementDateEnd,
+          ),
+        )
+        .sort(
+          (left, right) =>
+            Date.parse(right.occurredAt) - Date.parse(left.occurredAt),
+        ),
+    [commissionEntries.current, movementDateEnd, movementDateStart],
+  );
+  const barberAdvances = useMemo(
+    () =>
+      selectedAdvances
+        .filter((advance) =>
+          isWithinDateRange(
+            advance.occurredAt,
+            movementDateStart,
+            movementDateEnd,
+          ),
+        )
+        .sort(
+          (left, right) =>
+            Date.parse(right.occurredAt) - Date.parse(left.occurredAt),
+        ),
+    [movementDateEnd, movementDateStart, selectedAdvances],
+  );
+  const barberSettlements = useMemo(
+    () =>
+      selectedSettlements
+        .filter(
+          (settlement) =>
+            settlement.periodEnd >= movementDateStart &&
+            settlement.periodStart <= movementDateEnd,
+        )
+        .sort(
+          (left, right) =>
+            Date.parse(right.createdAt) - Date.parse(left.createdAt),
+        ),
+    [movementDateEnd, movementDateStart, selectedSettlements],
+  );
+  const chartData = useMemo(() => {
+    const buckets = new Map<string, { base: number; commission: number }>();
+    for (const entry of barberMovementEntries) {
+      const key = entry.occurredAt.slice(0, 10);
+      const current = buckets.get(key) ?? { base: 0, commission: 0 };
+      buckets.set(key, {
+        base: current.base + entry.baseAmountCents,
+        commission: current.commission + entry.amountCents,
+      });
+    }
+    return [...buckets.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .slice(-7)
+      .map(([date, amounts]) => ({
+        date,
+        value: amounts[chartMetric],
+      }));
+  }, [barberMovementEntries, chartMetric]);
+  const chartMaximum = Math.max(...chartData.map((item) => item.value), 1);
   const refreshCommissions = () =>
     queryClient.invalidateQueries({
       queryKey: tenantQueryPrefix('commission-overview'),
@@ -468,19 +565,208 @@ export default function WalletScreen() {
               </Pressable>
             </>
           ) : (
-            <View style={styles.metrics}>
-              <Text style={styles.metric}>
-                Comisiones{' '}
-                {formatMoney(
-                  effectiveProfessional?.commissionPendingCents ?? 0,
+            <View style={styles.barberSummary}>
+              <View style={styles.metrics}>
+                <Text style={styles.metric}>
+                  Comisiones{' '}
+                  {formatMoney(
+                    effectiveProfessional?.commissionPendingCents ?? 0,
+                  )}
+                </Text>
+                <Text style={styles.metric}>
+                  Anticipos -
+                  {formatMoney(
+                    effectiveProfessional?.outstandingAdvanceCents ?? 0,
+                  )}
+                </Text>
+              </View>
+              <Text style={styles.sectionTitle}>Actividad de comisiones</Text>
+              <View style={styles.dateRow}>
+                <Pressable
+                  accessibilityLabel="Filtrar movimientos desde"
+                  onPress={() => {
+                    setCalendarMonth(dateForCalendar(movementDateStart));
+                    setCalendarTarget('filter-start');
+                  }}
+                  style={styles.calendarField}
+                >
+                  <Ionicons
+                    color={appTheme.colors.accentDark}
+                    name="calendar-outline"
+                    size={18}
+                  />
+                  <View>
+                    <Text style={styles.inputLabel}>Desde</Text>
+                    <Text style={styles.calendarFieldValue}>
+                      {movementDateStart}
+                    </Text>
+                  </View>
+                </Pressable>
+                <Pressable
+                  accessibilityLabel="Filtrar movimientos hasta"
+                  onPress={() => {
+                    setCalendarMonth(dateForCalendar(movementDateEnd));
+                    setCalendarTarget('filter-end');
+                  }}
+                  style={styles.calendarField}
+                >
+                  <Ionicons
+                    color={appTheme.colors.accentDark}
+                    name="calendar-outline"
+                    size={18}
+                  />
+                  <View>
+                    <Text style={styles.inputLabel}>Hasta</Text>
+                    <Text style={styles.calendarFieldValue}>
+                      {movementDateEnd}
+                    </Text>
+                  </View>
+                </Pressable>
+              </View>
+              <View style={styles.quickDateFilters}>
+                {[
+                  ['7 días', 6],
+                  ['30 días', 29],
+                  ['90 días', 89],
+                ].map(([label, days]) => (
+                  <Pressable
+                    key={label}
+                    onPress={() => {
+                      setMovementDateStart(dateDaysAgo(days as number));
+                      setMovementDateEnd(dateDaysAgo(0));
+                    }}
+                    style={styles.dateChip}
+                  >
+                    <Text style={styles.dateChipText}>{label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View style={styles.chartCard}>
+                <View style={styles.chartHeader}>
+                  <View>
+                    <Text style={styles.cardTitle}>Tendencia</Text>
+                    <Text style={styles.cardDescription}>
+                      Toca una métrica para actualizar la gráfica.
+                    </Text>
+                  </View>
+                  <View style={styles.chartToggle}>
+                    {(
+                      [
+                        ['commission', 'Comisión'],
+                        ['base', 'Ventas'],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <Pressable
+                        key={value}
+                        onPress={() => setChartMetric(value)}
+                        style={[
+                          styles.chartToggleOption,
+                          chartMetric === value &&
+                            styles.chartToggleOptionActive,
+                        ]}
+                      >
+                        <Text
+                          style={
+                            chartMetric === value
+                              ? styles.chartToggleTextActive
+                              : styles.chartToggleText
+                          }
+                        >
+                          {label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+                {chartData.length ? (
+                  <View style={styles.chartBars}>
+                    {chartData.map((item) => (
+                      <View key={item.date} style={styles.chartColumn}>
+                        <Text style={styles.chartValue}>
+                          {formatMoney(item.value)}
+                        </Text>
+                        <View style={styles.chartTrack}>
+                          <View
+                            style={[
+                              styles.chartBar,
+                              {
+                                height: Math.max(
+                                  8,
+                                  Math.round((item.value / chartMaximum) * 88),
+                                ),
+                              },
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.chartLabel}>
+                          {item.date.slice(8)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.cardDescription}>
+                    No hay comisiones en el período elegido.
+                  </Text>
                 )}
-              </Text>
-              <Text style={styles.metric}>
-                Anticipos -
-                {formatMoney(
-                  effectiveProfessional?.outstandingAdvanceCents ?? 0,
-                )}
-              </Text>
+              </View>
+              <Text style={styles.sectionTitle}>Movimientos del período</Text>
+              {barberMovementEntries.map((entry) => (
+                <View key={entry.id} style={styles.financialRow}>
+                  <View style={styles.copy}>
+                    <Text style={styles.cardTitle}>
+                      {entry.reversalOfEntryId
+                        ? 'Reverso de comisión'
+                        : 'Comisión'}
+                    </Text>
+                    <Text style={styles.cardDescription}>
+                      {new Date(entry.occurredAt).toLocaleDateString('es-EC')} ·
+                      Venta {formatMoney(entry.baseAmountCents)} ·{' '}
+                      {entry.status.replaceAll('_', ' ')}
+                    </Text>
+                  </View>
+                  <Text style={styles.movementAmount}>
+                    {formatMoney(entry.amountCents)}
+                  </Text>
+                </View>
+              ))}
+              {barberAdvances.map((advance) => (
+                <View key={advance.id} style={styles.financialRow}>
+                  <View style={styles.copy}>
+                    <Text style={styles.cardTitle}>Anticipo recibido</Text>
+                    <Text style={styles.cardDescription}>
+                      {new Date(advance.occurredAt).toLocaleDateString('es-EC')}{' '}
+                      · Pendiente {formatMoney(advance.outstandingAmountCents)}
+                    </Text>
+                  </View>
+                  <Text style={styles.movementExpense}>
+                    -{formatMoney(advance.originalAmountCents)}
+                  </Text>
+                </View>
+              ))}
+              {barberSettlements.map((settlement) => (
+                <View key={settlement.id} style={styles.financialRow}>
+                  <View style={styles.copy}>
+                    <Text style={styles.cardTitle}>
+                      Liquidación {settlement.status}
+                    </Text>
+                    <Text style={styles.cardDescription}>
+                      {settlement.periodStart} → {settlement.periodEnd} ·
+                      Anticipos -{formatMoney(settlement.advanceDeductionCents)}
+                    </Text>
+                  </View>
+                  <Text style={styles.movementAmount}>
+                    {formatMoney(settlement.totalPayableCents)}
+                  </Text>
+                </View>
+              ))}
+              {!barberMovementEntries.length &&
+              !barberAdvances.length &&
+              !barberSettlements.length ? (
+                <Text style={styles.cardDescription}>
+                  No hay movimientos para las fechas seleccionadas.
+                </Text>
+              ) : null}
             </View>
           )
         ) : null}
@@ -1059,6 +1345,45 @@ export default function WalletScreen() {
           </KeyboardAvoidingView>
         </Modal>
       ) : null}
+      <AgendaCalendarModal
+        bottomInset={layout.bottomInset}
+        calendarMonth={calendarMonth}
+        days={calendarGrid(calendarMonth)}
+        onClose={() => setCalendarTarget(null)}
+        onMonthChange={setCalendarMonth}
+        onSelectDay={(day) => {
+          const value = localCalendarDate(day);
+          if (calendarTarget === 'filter-start') {
+            setMovementDateStart(value);
+            if (value > movementDateEnd) setMovementDateEnd(value);
+          }
+          if (calendarTarget === 'filter-end') {
+            setMovementDateEnd(value);
+            if (value < movementDateStart) setMovementDateStart(value);
+          }
+          if (calendarTarget === 'period-start') {
+            setPeriodStart(value);
+            if (value > periodEnd) setPeriodEnd(value);
+          }
+          if (calendarTarget === 'period-end') {
+            setPeriodEnd(value);
+            if (value < periodStart) setPeriodStart(value);
+          }
+          setCalendarTarget(null);
+        }}
+        selectedDay={dateForCalendar(
+          calendarTarget === 'filter-start'
+            ? movementDateStart
+            : calendarTarget === 'filter-end'
+              ? movementDateEnd
+              : calendarTarget === 'period-start'
+                ? periodStart
+                : periodEnd,
+        )}
+        today={new Date()}
+        topInset={layout.topInset}
+        visible={calendarTarget !== null}
+      />
       <Modal
         animationType="slide"
         navigationBarTranslucent
@@ -1148,23 +1473,41 @@ export default function WalletScreen() {
                 <View style={styles.dateRow}>
                   <View style={styles.dateField}>
                     <Text style={styles.inputLabel}>Desde</Text>
-                    <TextInput
-                      accessibilityLabel="Inicio del período"
-                      onChangeText={setPeriodStart}
-                      placeholder="AAAA-MM-DD"
-                      style={styles.input}
-                      value={periodStart}
-                    />
+                    <Pressable
+                      accessibilityLabel="Seleccionar inicio del período"
+                      onPress={() => {
+                        setCalendarMonth(dateForCalendar(periodStart));
+                        setCalendarTarget('period-start');
+                      }}
+                      style={styles.calendarField}
+                    >
+                      <Ionicons
+                        color={appTheme.colors.accentDark}
+                        name="calendar-outline"
+                        size={18}
+                      />
+                      <Text style={styles.calendarFieldValue}>
+                        {periodStart}
+                      </Text>
+                    </Pressable>
                   </View>
                   <View style={styles.dateField}>
                     <Text style={styles.inputLabel}>Hasta</Text>
-                    <TextInput
-                      accessibilityLabel="Fin del período"
-                      onChangeText={setPeriodEnd}
-                      placeholder="AAAA-MM-DD"
-                      style={styles.input}
-                      value={periodEnd}
-                    />
+                    <Pressable
+                      accessibilityLabel="Seleccionar fin del período"
+                      onPress={() => {
+                        setCalendarMonth(dateForCalendar(periodEnd));
+                        setCalendarTarget('period-end');
+                      }}
+                      style={styles.calendarField}
+                    >
+                      <Ionicons
+                        color={appTheme.colors.accentDark}
+                        name="calendar-outline"
+                        size={18}
+                      />
+                      <Text style={styles.calendarFieldValue}>{periodEnd}</Text>
+                    </Pressable>
                   </View>
                 </View>
               )}

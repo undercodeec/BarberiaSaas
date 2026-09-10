@@ -111,6 +111,7 @@ const notificationCategoryByType: Record<
     NotificationCategory.CASH,
   [AppNotificationType.COMMISSION_SETTLEMENT_PAID]: NotificationCategory.CASH,
   [AppNotificationType.LOW_STOCK]: NotificationCategory.INVENTORY,
+  [AppNotificationType.PRODUCT_ORDER_RESERVED]: NotificationCategory.INVENTORY,
   [AppNotificationType.PAYMENT_CONFIRMATION_REQUIRED]:
     NotificationCategory.CASH,
   [AppNotificationType.REVIEW_NEGATIVE]: NotificationCategory.REVIEWS,

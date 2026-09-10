@@ -56,6 +56,9 @@ describe('notificationDestination', () => {
       '/inventory',
     );
     expect(
+      notificationDestination({ type: 'product_order_reserved' }, 'owner'),
+    ).toBe('/inventory');
+    expect(
       notificationDestination({ type: 'cash_income_recorded' }, 'manager'),
     ).toBe('/cash-register');
     expect(

@@ -462,6 +462,28 @@ export function registerProductOrderRoutes(
           include: { items: true },
         });
       });
+      if (notifier?.notifyOperational)
+        try {
+          const userIds = await cashIncomeRecipientUserIds(
+            database,
+            location.organizationId,
+            location.id,
+          );
+          const quantity = order.items.reduce(
+            (total, item) => total + item.quantity,
+            0,
+          );
+          await notifier.notifyOperational({
+            body: `Se reserv\u00f3 ${quantity} ${quantity === 1 ? 'producto' : 'productos'} por $${(order.totalCents / 100).toFixed(2)}.`,
+            data: { route: '/inventory', type: 'product_order_reserved' },
+            organizationId: location.organizationId,
+            title: 'Nueva reserva de productos',
+            type: AppNotificationType.PRODUCT_ORDER_RESERVED,
+            userIds,
+          });
+        } catch {
+          // La reserva ya fue registrada y no debe fallar por una alerta fallida.
+        }
       return reply.code(201).send({
         order: orderResponse(order),
         bankTransfer:

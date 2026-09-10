@@ -466,7 +466,9 @@ export default function ClientDetailScreen() {
               {client.fullName}
               {client.lastName ? ` ${client.lastName}` : ''}
             </Text>
-            <Text style={styles.phone}>{emptyValue(client.phone)}</Text>
+            {clientAccess.canViewPhone ? (
+              <Text style={styles.phone}>{emptyValue(client.phone)}</Text>
+            ) : null}
             <View style={styles.badges}>
               <View style={styles.activeBadge}>
                 <View style={styles.activeDot} />
@@ -573,11 +575,13 @@ export default function ClientDetailScreen() {
         </View>
         {activeTab === 'information' ? (
           <View style={styles.detailsCard}>
-            <InfoRow
-              icon="call-outline"
-              label="Teléfono"
-              value={client.phone}
-            />
+            {clientAccess.canViewPhone ? (
+              <InfoRow
+                icon="call-outline"
+                label="Teléfono"
+                value={client.phone}
+              />
+            ) : null}
             {clientAccess.canManage ? (
               <>
                 <InfoRow

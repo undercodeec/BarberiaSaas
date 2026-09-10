@@ -839,9 +839,11 @@ export default function ClientsScreen() {
                       {client.fullName}
                       {client.lastName ? ' ' + client.lastName : ''}
                     </Text>
-                    <Text style={styles.clientPhone}>
-                      {client.phone || 'Sin teléfono registrado'}
-                    </Text>
+                    {clientAccess.canViewPhone ? (
+                      <Text style={styles.clientPhone}>
+                        {client.phone || 'Sin teléfono registrado'}
+                      </Text>
+                    ) : null}
                     {client.labels.length ? (
                       <View style={styles.clientLabels}>
                         {client.labels.slice(0, 2).map((label) => (
