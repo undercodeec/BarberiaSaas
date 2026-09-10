@@ -34,6 +34,10 @@ import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
+// PayPhone se habilitará en una futura versión. Conservamos el flujo para
+// reactivarlo sin exponer configuración ni cobros antes de su lanzamiento.
+const PAYPHONE_FEATURE_ENABLED = false;
+
 export default function WalletScreen() {
   const router = useRouter();
   const layout = useNativeLayoutMetrics();
@@ -49,7 +53,7 @@ export default function WalletScreen() {
       : searchParams.tab;
     return requestedTab === 'commissions' ||
       requestedTab === 'history' ||
-      requestedTab === 'settings'
+      (PAYPHONE_FEATURE_ENABLED && requestedTab === 'settings')
       ? requestedTab
       : 'summary';
   });
@@ -101,7 +105,7 @@ export default function WalletScreen() {
     queryKey: tenant.key('commission-overview'),
   });
   const payphoneQuery = useQuery({
-    enabled: Boolean(session) && tab === 'settings',
+    enabled: PAYPHONE_FEATURE_ENABLED && Boolean(session) && tab === 'settings',
     queryFn: () =>
       requireApiClient().request<PayphoneConfigurationResponse>(
         '/v1/payphone/configuration',
@@ -380,7 +384,6 @@ export default function WalletScreen() {
               ['summary', 'Resumen'],
               ['history', 'Historial'],
               ['commissions', 'Comisiones'],
-              ['settings', 'Configuración'],
             ] as const
           ).map(([value, label]) => (
             <Pressable key={value} onPress={() => setTab(value)}>
@@ -702,7 +705,7 @@ export default function WalletScreen() {
             ) : null}
           </View>
         ) : null}
-        {tab === 'settings' ? (
+        {PAYPHONE_FEATURE_ENABLED && tab === 'settings' ? (
           <View style={styles.payphoneCard}>
             <View style={styles.icon}>
               <Ionicons
@@ -744,180 +747,186 @@ export default function WalletScreen() {
           </View>
         ) : null}
       </ScrollView>
-      <Modal
-        animationType="slide"
-        navigationBarTranslucent
-        onRequestClose={closePayphoneSheet}
-        statusBarTranslucent
-        transparent
-        visible={payphoneSheetOpen}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalKeyboard}
+      {PAYPHONE_FEATURE_ENABLED ? (
+        <Modal
+          animationType="slide"
+          navigationBarTranslucent
+          onRequestClose={closePayphoneSheet}
+          statusBarTranslucent
+          transparent
+          visible={payphoneSheetOpen}
         >
-          <View style={styles.modalRoot}>
-            <Pressable
-              accessibilityLabel="Cerrar configuracion PayPhone"
-              onPress={closePayphoneSheet}
-              style={styles.modalBackdrop}
-            />
-            <ScrollView
-              contentContainerStyle={[
-                styles.payphoneSheet,
-                { paddingBottom: layout.bottomInset + 20 },
-              ]}
-              keyboardShouldPersistTaps="handled"
-              style={[
-                styles.sheetViewport,
-                { maxHeight: layout.sheetMaxHeight },
-              ]}
-            >
-              <Text style={styles.sheetTitle}>Configurar PayPhone</Text>
-              <Text style={styles.sheetCopy}>
-                Ingresa las credenciales de PayPhone Business de este negocio.
-                El Token se cifra en el servidor y nunca se mostrara nuevamente.
-              </Text>
-              <View style={styles.payphoneGuide}>
-                <Text style={styles.payphoneGuideTitle}>
-                  Como obtener tu Token y StoreID
-                </Text>
-                <Text style={styles.payphoneGuideStep}>
-                  1. Ingresa a PayPhone Business con una cuenta administradora y
-                  crea un usuario con rol Desarrollador.
-                </Text>
-                <Text style={styles.payphoneGuideStep}>
-                  2. Ingresa a PayPhone Developer con ese usuario y pulsa
-                  Agregar para crear una aplicacion.
-                </Text>
-                <Text style={styles.payphoneGuideStep}>
-                  3. Selecciona tipo de aplicacion API, completa los datos y
-                  guarda. PayPhone determina el ambiente con esas credenciales.
-                </Text>
-                <Text style={styles.payphoneGuideStep}>
-                  4. Abre Credenciales, copia solamente Token y StoreID, y
-                  pegalos abajo. No compartas el Token con nadie.
-                </Text>
-                <Pressable
-                  accessibilityLabel="Ver video de configuracion de PayPhone"
-                  onPress={() =>
-                    void Linking.openURL(
-                      'https://www.youtube.com/watch?v=Y7KCMq91QPk&list=PL5vPkGVDdQxRw-tRc5gocIEj9E2iv6fts&index=2',
-                    )
-                  }
-                >
-                  <Text style={styles.linkText}>
-                    Ver video guia — mira solo del minuto 1:00 al 4:00
-                  </Text>
-                </Pressable>
-                <Text style={styles.payphoneGuideNote}>
-                  El resto del video no es necesario para Nava: solo necesitas
-                  los campos Token y StoreID. Nava genera el enlace de cobro,
-                  pero PayPhone no comunica automáticamente el resultado.
-                  Verifica la transacción en PayPhone Business antes de
-                  registrarla como pagada.
-                </Text>
-              </View>
-              <Text style={styles.inputLabel}>Ambiente</Text>
-
-              <Text style={styles.inputLabel}>StoreID</Text>
-              <TextInput
-                autoCapitalize="none"
-                editable={!savePayphone.isPending}
-                onChangeText={setPayphoneStoreId}
-                placeholder="StoreID de PayPhone"
-                placeholderTextColor={appTheme.colors.textMuted}
-                style={styles.input}
-                value={payphoneStoreId}
-              />
-              <Text style={styles.inputLabel}>Token</Text>
-              <TextInput
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!savePayphone.isPending}
-                onChangeText={setPayphoneToken}
-                placeholder={
-                  payphoneQuery.data?.configuration
-                    ? 'Nuevo Token para rotarlo'
-                    : 'Token de PayPhone'
-                }
-                placeholderTextColor={appTheme.colors.textMuted}
-                secureTextEntry
-                style={styles.input}
-                value={payphoneToken}
-              />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalKeyboard}
+          >
+            <View style={styles.modalRoot}>
               <Pressable
-                disabled={
-                  !payphoneStoreId.trim() ||
-                  !payphoneToken.trim() ||
-                  savePayphone.isPending ||
-                  !payphoneQuery.data?.encryptionConfigured
-                }
-                onPress={() => savePayphone.mutate()}
-                style={styles.confirmButton}
+                accessibilityLabel="Cerrar configuracion PayPhone"
+                onPress={closePayphoneSheet}
+                style={styles.modalBackdrop}
+              />
+              <ScrollView
+                contentContainerStyle={[
+                  styles.payphoneSheet,
+                  { paddingBottom: layout.bottomInset + 20 },
+                ]}
+                keyboardShouldPersistTaps="handled"
+                style={[
+                  styles.sheetViewport,
+                  { maxHeight: layout.sheetMaxHeight },
+                ]}
               >
-                <Text style={styles.confirmButtonText}>
-                  {savePayphone.isPending
-                    ? 'Guardando...'
-                    : 'Guardar credenciales'}
+                <Text style={styles.sheetTitle}>Configurar PayPhone</Text>
+                <Text style={styles.sheetCopy}>
+                  Ingresa las credenciales de PayPhone Business de este negocio.
+                  El Token se cifra en el servidor y nunca se mostrara
+                  nuevamente.
                 </Text>
-              </Pressable>
-              {payphoneQuery.data?.configuration ? (
-                <>
+                <View style={styles.payphoneGuide}>
+                  <Text style={styles.payphoneGuideTitle}>
+                    Como obtener tu Token y StoreID
+                  </Text>
+                  <Text style={styles.payphoneGuideStep}>
+                    1. Ingresa a PayPhone Business con una cuenta administradora
+                    y crea un usuario con rol Desarrollador.
+                  </Text>
+                  <Text style={styles.payphoneGuideStep}>
+                    2. Ingresa a PayPhone Developer con ese usuario y pulsa
+                    Agregar para crear una aplicacion.
+                  </Text>
+                  <Text style={styles.payphoneGuideStep}>
+                    3. Selecciona tipo de aplicacion API, completa los datos y
+                    guarda. PayPhone determina el ambiente con esas
+                    credenciales.
+                  </Text>
+                  <Text style={styles.payphoneGuideStep}>
+                    4. Abre Credenciales, copia solamente Token y StoreID, y
+                    pegalos abajo. No compartas el Token con nadie.
+                  </Text>
                   <Pressable
-                    disabled={testPayphone.isPending}
-                    onPress={() => testPayphone.mutate()}
-                    style={styles.secondaryAction}
-                  >
-                    <Text style={styles.secondaryActionText}>
-                      {testPayphone.isPending
-                        ? 'Probando...'
-                        : 'Probar conexion'}
-                    </Text>
-                  </Pressable>
-                  {payphoneQuery.data.configuration.status === 'connected' ? (
-                    <Pressable
-                      disabled={setPayphoneEnabled.isPending}
-                      onPress={() =>
-                        setPayphoneEnabled.mutate(
-                          !payphoneQuery.data?.configuration?.isEnabled,
-                        )
-                      }
-                      style={styles.confirmButton}
-                    >
-                      <Text style={styles.confirmButtonText}>
-                        {payphoneQuery.data.configuration.isEnabled
-                          ? 'Desactivar PayPhone'
-                          : 'Activar PayPhone'}
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                  <Pressable
-                    disabled={disconnectPayphone.isPending}
+                    accessibilityLabel="Ver video de configuracion de PayPhone"
                     onPress={() =>
-                      Alert.alert(
-                        'Desconectar PayPhone',
-                        'Se eliminara el Token cifrado de este negocio.',
-                        [
-                          { style: 'cancel', text: 'Cancelar' },
-                          {
-                            onPress: () => disconnectPayphone.mutate(),
-                            style: 'destructive',
-                            text: 'Desconectar',
-                          },
-                        ],
+                      void Linking.openURL(
+                        'https://www.youtube.com/watch?v=Y7KCMq91QPk&list=PL5vPkGVDdQxRw-tRc5gocIEj9E2iv6fts&index=2',
                       )
                     }
-                    style={styles.dangerButton}
                   >
-                    <Text style={styles.dangerText}>Desconectar PayPhone</Text>
+                    <Text style={styles.linkText}>
+                      Ver video guia — mira solo del minuto 1:00 al 4:00
+                    </Text>
                   </Pressable>
-                </>
-              ) : null}
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+                  <Text style={styles.payphoneGuideNote}>
+                    El resto del video no es necesario para Nava: solo necesitas
+                    los campos Token y StoreID. Nava genera el enlace de cobro,
+                    pero PayPhone no comunica automáticamente el resultado.
+                    Verifica la transacción en PayPhone Business antes de
+                    registrarla como pagada.
+                  </Text>
+                </View>
+                <Text style={styles.inputLabel}>Ambiente</Text>
+
+                <Text style={styles.inputLabel}>StoreID</Text>
+                <TextInput
+                  autoCapitalize="none"
+                  editable={!savePayphone.isPending}
+                  onChangeText={setPayphoneStoreId}
+                  placeholder="StoreID de PayPhone"
+                  placeholderTextColor={appTheme.colors.textMuted}
+                  style={styles.input}
+                  value={payphoneStoreId}
+                />
+                <Text style={styles.inputLabel}>Token</Text>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!savePayphone.isPending}
+                  onChangeText={setPayphoneToken}
+                  placeholder={
+                    payphoneQuery.data?.configuration
+                      ? 'Nuevo Token para rotarlo'
+                      : 'Token de PayPhone'
+                  }
+                  placeholderTextColor={appTheme.colors.textMuted}
+                  secureTextEntry
+                  style={styles.input}
+                  value={payphoneToken}
+                />
+                <Pressable
+                  disabled={
+                    !payphoneStoreId.trim() ||
+                    !payphoneToken.trim() ||
+                    savePayphone.isPending ||
+                    !payphoneQuery.data?.encryptionConfigured
+                  }
+                  onPress={() => savePayphone.mutate()}
+                  style={styles.confirmButton}
+                >
+                  <Text style={styles.confirmButtonText}>
+                    {savePayphone.isPending
+                      ? 'Guardando...'
+                      : 'Guardar credenciales'}
+                  </Text>
+                </Pressable>
+                {payphoneQuery.data?.configuration ? (
+                  <>
+                    <Pressable
+                      disabled={testPayphone.isPending}
+                      onPress={() => testPayphone.mutate()}
+                      style={styles.secondaryAction}
+                    >
+                      <Text style={styles.secondaryActionText}>
+                        {testPayphone.isPending
+                          ? 'Probando...'
+                          : 'Probar conexion'}
+                      </Text>
+                    </Pressable>
+                    {payphoneQuery.data.configuration.status === 'connected' ? (
+                      <Pressable
+                        disabled={setPayphoneEnabled.isPending}
+                        onPress={() =>
+                          setPayphoneEnabled.mutate(
+                            !payphoneQuery.data?.configuration?.isEnabled,
+                          )
+                        }
+                        style={styles.confirmButton}
+                      >
+                        <Text style={styles.confirmButtonText}>
+                          {payphoneQuery.data.configuration.isEnabled
+                            ? 'Desactivar PayPhone'
+                            : 'Activar PayPhone'}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                    <Pressable
+                      disabled={disconnectPayphone.isPending}
+                      onPress={() =>
+                        Alert.alert(
+                          'Desconectar PayPhone',
+                          'Se eliminara el Token cifrado de este negocio.',
+                          [
+                            { style: 'cancel', text: 'Cancelar' },
+                            {
+                              onPress: () => disconnectPayphone.mutate(),
+                              style: 'destructive',
+                              text: 'Desconectar',
+                            },
+                          ],
+                        )
+                      }
+                      style={styles.dangerButton}
+                    >
+                      <Text style={styles.dangerText}>
+                        Desconectar PayPhone
+                      </Text>
+                    </Pressable>
+                  </>
+                ) : null}
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+      ) : null}
       <Modal
         animationType="slide"
         navigationBarTranslucent
