@@ -311,6 +311,11 @@ export interface CommissionOverviewResponse {
     readonly settlementId: string | null;
     readonly status: 'approved' | 'pending' | 'reversed' | 'settled';
   }>;
+  readonly formerProfessionals: readonly {
+    readonly departedAt: string;
+    readonly id: string;
+    readonly name: string;
+  }[];
   readonly professionals: readonly CommissionProfessionalSummary[];
   readonly settlements: readonly CommissionSettlementRecord[];
 }

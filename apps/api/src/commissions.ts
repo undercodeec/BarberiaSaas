@@ -606,44 +606,57 @@ export function registerCommissionRoutes(
             lt: zonedDateTimeToUtc(input.periodEnd, 1440, timeZone),
           }
         : undefined;
-    const [professionals, entries, advances, settlements] = await Promise.all([
-      database.membership.findMany({
-        include: { user: true },
-        where: {
-          ...(professionalIds ? { id: { in: professionalIds } } : {}),
-          organizationId: current.organizationId,
-          role: MembershipRole.BARBER,
-        },
-      }),
-      database.commissionEntry.findMany({
-        orderBy: { occurredAt: 'desc' },
-        where: {
-          ...(occurredAt ? { occurredAt } : {}),
-          organizationId: current.organizationId,
-          ...(professionalIds
-            ? { professionalMembershipId: { in: professionalIds } }
-            : {}),
-        },
-      }),
-      database.professionalAdvance.findMany({
-        orderBy: { occurredAt: 'desc' },
-        where: {
-          organizationId: current.organizationId,
-          ...(professionalIds
-            ? { professionalMembershipId: { in: professionalIds } }
-            : {}),
-        },
-      }),
-      database.commissionSettlement.findMany({
-        orderBy: { createdAt: 'desc' },
-        where: {
-          organizationId: current.organizationId,
-          ...(professionalIds
-            ? { professionalMembershipId: { in: professionalIds } }
-            : {}),
-        },
-      }),
-    ]);
+    const [professionals, formerProfessionals, entries, advances, settlements] =
+      await Promise.all([
+        database.membership.findMany({
+          include: { user: true },
+          where: {
+            ...(professionalIds ? { id: { in: professionalIds } } : {}),
+            organizationId: current.organizationId,
+            role: MembershipRole.BARBER,
+            status: MembershipStatus.ACTIVE,
+          },
+        }),
+        canReadAll && !requestedProfessionalId
+          ? database.membership.findMany({
+              include: { user: true },
+              orderBy: { updatedAt: 'desc' },
+              where: {
+                organizationId: current.organizationId,
+                role: MembershipRole.BARBER,
+                status: MembershipStatus.SUSPENDED,
+              },
+            })
+          : Promise.resolve([]),
+        database.commissionEntry.findMany({
+          orderBy: { occurredAt: 'desc' },
+          where: {
+            ...(occurredAt ? { occurredAt } : {}),
+            organizationId: current.organizationId,
+            ...(professionalIds
+              ? { professionalMembershipId: { in: professionalIds } }
+              : {}),
+          },
+        }),
+        database.professionalAdvance.findMany({
+          orderBy: { occurredAt: 'desc' },
+          where: {
+            organizationId: current.organizationId,
+            ...(professionalIds
+              ? { professionalMembershipId: { in: professionalIds } }
+              : {}),
+          },
+        }),
+        database.commissionSettlement.findMany({
+          orderBy: { createdAt: 'desc' },
+          where: {
+            organizationId: current.organizationId,
+            ...(professionalIds
+              ? { professionalMembershipId: { in: professionalIds } }
+              : {}),
+          },
+        }),
+      ]);
     const rows = professionals.map((professional) => {
       const ownEntries = entries.filter(
         (entry) => entry.professionalMembershipId === professional.id,
@@ -695,6 +708,11 @@ export function registerCommissionRoutes(
         reversalOfEntryId: entry.reversalOfEntryId,
         settlementId: entry.settlementId,
         status: entry.status.toLowerCase(),
+      })),
+      formerProfessionals: formerProfessionals.map((professional) => ({
+        departedAt: professional.updatedAt.toISOString(),
+        id: professional.id,
+        name: professional.user.fullName,
       })),
       professionals: rows,
       settlements: settlements.map(settlementRecord),

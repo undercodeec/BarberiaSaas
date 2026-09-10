@@ -116,11 +116,13 @@ export default function WalletScreen() {
   const organizationQuery = useCurrentOrganization();
   const role = organizationQuery.data?.membership?.role;
   const walletAccess = walletAccessForRole(role);
+  const canManageCommissions = role === 'owner' || role === 'manager';
   const hasKnownRole = role !== null && role !== undefined;
   const shouldLoadCommissions =
     tab === 'commissions' ||
     (walletAccess.summarySource === 'commissions' && tab === 'summary') ||
-    (walletAccess.historySource === 'commissions' && tab === 'history');
+    (walletAccess.historySource === 'commissions' && tab === 'history') ||
+    (canManageCommissions && tab === 'history');
   const summaryQuery = useQuery({
     enabled: Boolean(session) && hasKnownRole && walletAccess.canReadCash,
     queryFn: () =>
@@ -239,7 +241,6 @@ export default function WalletScreen() {
       await refreshPayphone();
     },
   });
-  const canManageCommissions = role === 'owner' || role === 'manager';
   const canApproveCommissions = role === 'owner';
   const selectedProfessional = commissionsQuery.data?.professionals.find(
     (professional) => professional.id === selectedProfessionalId,
@@ -771,126 +772,164 @@ export default function WalletScreen() {
           )
         ) : null}
         {tab === 'history' ? (
-          walletAccess.historySource === 'cash' ? (
-            <View style={styles.history}>
-              {historyQuery.isLoading ? (
-                <Text style={styles.cardDescription}>
-                  Cargando historial...
+          <>
+            {canManageCommissions ? (
+              <View style={styles.history}>
+                <Text style={styles.sectionTitle}>
+                  Colaboradores anteriores
                 </Text>
-              ) : null}
-              {(historyQuery.data?.sessions ?? []).map((cashSession) => (
-                <Pressable
-                  accessibilityLabel={`Ver detalle de caja de ${cashSession.responsibleName}`}
-                  key={cashSession.id}
-                  onPress={() =>
-                    router.push({
-                      params: { sessionId: cashSession.id },
-                      pathname: '/cash-register-detail',
-                    })
-                  }
-                  style={styles.historyRow}
-                >
-                  <View style={styles.copy}>
-                    <Text style={styles.cardTitle}>
-                      {cashSession.responsibleName}
-                    </Text>
-                    <Text style={styles.cardDescription}>
-                      {new Date(cashSession.openedAt).toLocaleDateString()}
-                    </Text>
-                  </View>
-                  <View style={styles.historyValue}>
-                    <Text style={styles.historyAmount}>
-                      {formatMoney(
-                        cashSession.closingAmountCents ??
-                          cashSession.totals.expectedCash,
-                      )}
-                    </Text>
-                    <Text style={styles.historyCaption}>Cierre</Text>
-                  </View>
-                  <Ionicons color="#69717c" name="chevron-forward" size={20} />
-                </Pressable>
-              ))}
-              {!historyQuery.isLoading &&
-              !historyQuery.data?.sessions.length ? (
-                <Text style={styles.cardDescription}>
-                  Aún no hay cierres de caja.
-                </Text>
-              ) : null}
-            </View>
-          ) : (
-            <View style={styles.history}>
-              <Text style={styles.sectionTitle}>Movimientos de comisión</Text>
-              {commissionEntries.historical.map((entry) => (
-                <View key={entry.id} style={styles.financialRow}>
-                  <View style={styles.copy}>
-                    <Text style={styles.cardTitle}>
-                      {entry.reversalOfEntryId ? 'Reverso' : 'Comisión'} ·{' '}
-                      {formatMoney(entry.amountCents)}
-                    </Text>
-                    <Text style={styles.cardDescription}>
-                      {new Date(entry.occurredAt).toLocaleDateString()} ·{' '}
-                      {entry.status.replaceAll('_', ' ')}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-              {!commissionEntries.historical.length ? (
-                <Text style={styles.cardDescription}>
-                  Aún no hay movimientos históricos de comisión.
-                </Text>
-              ) : null}
-              <Text style={styles.sectionTitle}>Anticipos</Text>
-              {selectedAdvances.map((advance) => (
-                <View key={advance.id} style={styles.financialRow}>
-                  <View style={styles.copy}>
-                    <Text style={styles.cardTitle}>
-                      {formatMoney(advance.originalAmountCents)}
-                    </Text>
-                    <Text style={styles.cardDescription}>
-                      {new Date(advance.occurredAt).toLocaleDateString()} ·
-                      Pendiente {formatMoney(advance.outstandingAmountCents)}
-                    </Text>
-                  </View>
-                  <Text style={styles.statusText}>
-                    {advance.status.replaceAll('_', ' ')}
+                {(commissionsQuery.data?.formerProfessionals ?? []).map(
+                  (professional) => (
+                    <View key={professional.id} style={styles.financialRow}>
+                      <View style={styles.copy}>
+                        <Text style={styles.cardTitle}>
+                          {professional.name}
+                        </Text>
+                        <Text style={styles.cardDescription}>
+                          Ya no forma parte del equipo desde{' '}
+                          {new Date(professional.departedAt).toLocaleDateString(
+                            'es-EC',
+                          )}
+                          . Sus movimientos financieros se conservan.
+                        </Text>
+                      </View>
+                    </View>
+                  ),
+                )}
+                {!commissionsQuery.isLoading &&
+                !(commissionsQuery.data?.formerProfessionals ?? []).length ? (
+                  <Text style={styles.cardDescription}>
+                    No hay colaboradores anteriores.
                   </Text>
-                </View>
-              ))}
-              {!selectedAdvances.length ? (
-                <Text style={styles.cardDescription}>
-                  No hay anticipos registrados.
-                </Text>
-              ) : null}
-              <Text style={styles.sectionTitle}>Liquidaciones</Text>
-              {selectedSettlements.map((settlement) => (
-                <View key={settlement.id} style={styles.settlementCard}>
-                  <View style={styles.financialRowHeader}>
+                ) : null}
+              </View>
+            ) : null}
+            {walletAccess.historySource === 'cash' ? (
+              <View style={styles.history}>
+                {historyQuery.isLoading ? (
+                  <Text style={styles.cardDescription}>
+                    Cargando historial...
+                  </Text>
+                ) : null}
+                {(historyQuery.data?.sessions ?? []).map((cashSession) => (
+                  <Pressable
+                    accessibilityLabel={`Ver detalle de caja de ${cashSession.responsibleName}`}
+                    key={cashSession.id}
+                    onPress={() =>
+                      router.push({
+                        params: { sessionId: cashSession.id },
+                        pathname: '/cash-register-detail',
+                      })
+                    }
+                    style={styles.historyRow}
+                  >
                     <View style={styles.copy}>
                       <Text style={styles.cardTitle}>
-                        {settlement.periodStart} → {settlement.periodEnd}
+                        {cashSession.responsibleName}
                       </Text>
                       <Text style={styles.cardDescription}>
-                        Comision {formatMoney(settlement.commissionAmountCents)}
-                        {' · '}Anticipos -
-                        {formatMoney(settlement.advanceDeductionCents)}
+                        {new Date(cashSession.openedAt).toLocaleDateString()}
                       </Text>
                     </View>
-                    <Text style={styles.settlementAmount}>
-                      {formatMoney(settlement.totalPayableCents)}
+                    <View style={styles.historyValue}>
+                      <Text style={styles.historyAmount}>
+                        {formatMoney(
+                          cashSession.closingAmountCents ??
+                            cashSession.totals.expectedCash,
+                        )}
+                      </Text>
+                      <Text style={styles.historyCaption}>Cierre</Text>
+                    </View>
+                    <Ionicons
+                      color="#69717c"
+                      name="chevron-forward"
+                      size={20}
+                    />
+                  </Pressable>
+                ))}
+                {!historyQuery.isLoading &&
+                !historyQuery.data?.sessions.length ? (
+                  <Text style={styles.cardDescription}>
+                    Aún no hay cierres de caja.
+                  </Text>
+                ) : null}
+              </View>
+            ) : (
+              <View style={styles.history}>
+                <Text style={styles.sectionTitle}>Movimientos de comisión</Text>
+                {commissionEntries.historical.map((entry) => (
+                  <View key={entry.id} style={styles.financialRow}>
+                    <View style={styles.copy}>
+                      <Text style={styles.cardTitle}>
+                        {entry.reversalOfEntryId ? 'Reverso' : 'Comisión'} ·{' '}
+                        {formatMoney(entry.amountCents)}
+                      </Text>
+                      <Text style={styles.cardDescription}>
+                        {new Date(entry.occurredAt).toLocaleDateString()} ·{' '}
+                        {entry.status.replaceAll('_', ' ')}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+                {!commissionEntries.historical.length ? (
+                  <Text style={styles.cardDescription}>
+                    Aún no hay movimientos históricos de comisión.
+                  </Text>
+                ) : null}
+                <Text style={styles.sectionTitle}>Anticipos</Text>
+                {selectedAdvances.map((advance) => (
+                  <View key={advance.id} style={styles.financialRow}>
+                    <View style={styles.copy}>
+                      <Text style={styles.cardTitle}>
+                        {formatMoney(advance.originalAmountCents)}
+                      </Text>
+                      <Text style={styles.cardDescription}>
+                        {new Date(advance.occurredAt).toLocaleDateString()} ·
+                        Pendiente {formatMoney(advance.outstandingAmountCents)}
+                      </Text>
+                    </View>
+                    <Text style={styles.statusText}>
+                      {advance.status.replaceAll('_', ' ')}
                     </Text>
                   </View>
-                  <Text style={styles.statusText}>
-                    Estado: {settlement.status}
+                ))}
+                {!selectedAdvances.length ? (
+                  <Text style={styles.cardDescription}>
+                    No hay anticipos registrados.
                   </Text>
-                </View>
-              ))}
-              {!selectedSettlements.length ? (
-                <Text style={styles.cardDescription}>
-                  Aun no existen liquidaciones.
-                </Text>
-              ) : null}
-            </View>
-          )
+                ) : null}
+                <Text style={styles.sectionTitle}>Liquidaciones</Text>
+                {selectedSettlements.map((settlement) => (
+                  <View key={settlement.id} style={styles.settlementCard}>
+                    <View style={styles.financialRowHeader}>
+                      <View style={styles.copy}>
+                        <Text style={styles.cardTitle}>
+                          {settlement.periodStart} → {settlement.periodEnd}
+                        </Text>
+                        <Text style={styles.cardDescription}>
+                          Comision{' '}
+                          {formatMoney(settlement.commissionAmountCents)}
+                          {' · '}Anticipos -
+                          {formatMoney(settlement.advanceDeductionCents)}
+                        </Text>
+                      </View>
+                      <Text style={styles.settlementAmount}>
+                        {formatMoney(settlement.totalPayableCents)}
+                      </Text>
+                    </View>
+                    <Text style={styles.statusText}>
+                      Estado: {settlement.status}
+                    </Text>
+                  </View>
+                ))}
+                {!selectedSettlements.length ? (
+                  <Text style={styles.cardDescription}>
+                    Aun no existen liquidaciones.
+                  </Text>
+                ) : null}
+              </View>
+            )}
+          </>
         ) : null}
         {tab === 'commissions' ? (
           <View style={styles.commissionSection}>

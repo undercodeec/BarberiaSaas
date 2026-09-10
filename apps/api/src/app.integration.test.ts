@@ -982,6 +982,7 @@ describeWithDatabase('API con PostgreSQL', () => {
       overview.json<{
         advances: Array<{ professionalMembershipId: string }>;
         entries: Array<{ professionalMembershipId: string }>;
+        formerProfessionals: unknown[];
         professionals: Array<{ commissionPendingCents: number; id: string }>;
         settlements: unknown[];
       }>(),
@@ -996,6 +997,7 @@ describeWithDatabase('API con PostgreSQL', () => {
           professionalMembershipId: agenda.membershipId,
         }),
       ],
+      formerProfessionals: [],
       professionals: [
         expect.objectContaining({
           commissionPendingCents: 300,
@@ -1003,6 +1005,35 @@ describeWithDatabase('API con PostgreSQL', () => {
         }),
       ],
       settlements: [],
+    });
+
+    const deleted = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'DELETE',
+      url: `/v1/team/members/${otherMembershipId}`,
+    });
+    expect(deleted.statusCode, deleted.body).toBe(204);
+
+    const ownerOverview = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'GET',
+      url: '/v1/commissions/overview',
+    });
+    expect(ownerOverview.statusCode, ownerOverview.body).toBe(200);
+    expect(
+      ownerOverview.json<{
+        entries: Array<{ professionalMembershipId: string }>;
+        formerProfessionals: Array<{ id: string }>;
+        professionals: Array<{ id: string }>;
+      }>(),
+    ).toMatchObject({
+      entries: expect.arrayContaining([
+        expect.objectContaining({
+          professionalMembershipId: otherMembershipId,
+        }),
+      ]),
+      formerProfessionals: [expect.objectContaining({ id: otherMembershipId })],
+      professionals: [expect.objectContaining({ id: agenda.membershipId })],
     });
   });
 

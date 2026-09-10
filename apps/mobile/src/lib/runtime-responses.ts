@@ -183,6 +183,13 @@ const commissionOverviewResponseSchema = z.object({
       status: z.enum(['approved', 'pending', 'reversed', 'settled']),
     }),
   ),
+  formerProfessionals: z.array(
+    z.object({
+      departedAt: isoDateTimeSchema,
+      id: identifierSchema,
+      name: z.string().min(1).max(120),
+    }),
+  ),
   professionals: z.array(
     z.object({
       availableAdvanceCents: moneySchema,
