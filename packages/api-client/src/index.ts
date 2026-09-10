@@ -1240,13 +1240,19 @@ export interface AppNotificationRecord {
     readonly appointmentId?: string;
     readonly appointmentStartsAt?: string;
     readonly route?: string;
+    readonly settlementId?: string;
     readonly type?: string;
   };
   readonly id: string;
   readonly readAt: string | null;
   readonly title: string;
   readonly type:
-    'appointment_cancelled' | 'appointment_created' | 'appointment_rescheduled';
+    | 'appointment_cancelled'
+    | 'appointment_created'
+    | 'appointment_rescheduled'
+    | 'commission_earned'
+    | 'commission_settlement_approved'
+    | 'commission_settlement_paid';
 }
 
 export interface AppNotificationsResponse {

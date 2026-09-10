@@ -24,7 +24,11 @@ const CASH_TYPES = new Set([
   'cash_register_closed',
   'cash_register_variance',
 ]);
-const COMMISSION_TYPES = new Set(['commission_earned']);
+const COMMISSION_TYPES = new Set([
+  'commission_earned',
+  'commission_settlement_approved',
+  'commission_settlement_paid',
+]);
 const INVENTORY_TYPES = new Set(['low_stock']);
 const TEAM_TYPES = new Set(['team_member_accepted', 'team_member_updated']);
 const SUBSCRIPTION_TYPES = new Set(['subscription_renewal']);

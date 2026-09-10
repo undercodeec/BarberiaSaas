@@ -1,4 +1,5 @@
 import {
+  AppNotificationType,
   CashRegisterStatus,
   CashMovementType,
   CommissionSettlementStatus,
@@ -20,6 +21,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import { zonedDateTimeToUtc } from './agenda';
 import { ApiError } from './errors';
+import type { AppointmentNotifier } from './notifications';
 
 interface CommissionRuleCandidate {
   readonly createdAt: Date;
@@ -468,6 +470,55 @@ function settlementRecord(settlement: {
   };
 }
 
+async function notifyCommissionSettlementStatus(
+  database: DatabaseClient,
+  notifier: AppointmentNotifier | null,
+  input: {
+    readonly actorUserId: string;
+    readonly settlement: {
+      readonly id: string;
+      readonly organizationId: string;
+      readonly professionalMembershipId: string;
+      readonly totalPayableCents: number;
+    };
+    readonly status: 'approved' | 'paid';
+  },
+) {
+  if (!notifier?.notifyOperational) return;
+  const professional = await database.membership.findFirst({
+    select: { userId: true },
+    where: {
+      id: input.settlement.professionalMembershipId,
+      organizationId: input.settlement.organizationId,
+      role: MembershipRole.BARBER,
+      status: MembershipStatus.ACTIVE,
+    },
+  });
+  if (!professional) return;
+
+  const amount = `$${(input.settlement.totalPayableCents / 100).toFixed(2)}`;
+  const isPaid = input.status === 'paid';
+  await notifier.notifyOperational({
+    actorUserId: input.actorUserId,
+    body: isPaid
+      ? `Se registró el pago de tu liquidación por ${amount}.`
+      : `Tu liquidación por ${amount} fue aprobada y está pendiente de pago.`,
+    data: {
+      route: '/wallet?tab=commissions',
+      settlementId: input.settlement.id,
+      type: isPaid
+        ? 'commission_settlement_paid'
+        : 'commission_settlement_approved',
+    },
+    organizationId: input.settlement.organizationId,
+    title: isPaid ? 'Liquidación pagada' : 'Liquidación aprobada',
+    type: isPaid
+      ? AppNotificationType.COMMISSION_SETTLEMENT_PAID
+      : AppNotificationType.COMMISSION_SETTLEMENT_APPROVED,
+    userIds: [professional.userId],
+  });
+}
+
 async function openCashRegister(
   database: DatabaseClient | Prisma.TransactionClient,
   organizationId: string,
@@ -516,6 +567,7 @@ export function registerCommissionRoutes(
   app: FastifyInstance,
   database: DatabaseClient,
   authenticate: Authenticate,
+  notifier: AppointmentNotifier | null = null,
 ) {
   app.get('/v1/commissions/overview', async (request) => {
     const { user } = await authenticate(database, request);
@@ -1055,7 +1107,7 @@ export function registerCommissionRoutes(
           'La liquidación no existe.',
         );
       if (settlement.status === CommissionSettlementStatus.APPROVED)
-        return settlement;
+        return { settlement, transitioned: false };
       if (settlement.status !== CommissionSettlementStatus.DRAFT)
         throw new ApiError(
           409,
@@ -1133,9 +1185,15 @@ export function registerCommissionRoutes(
         entityType: 'commission_settlement',
         organizationId: current.organizationId,
       });
-      return approved;
+      return { settlement: approved, transitioned: true };
     });
-    return { settlement: settlementRecord(result) };
+    if (result.transitioned)
+      await notifyCommissionSettlementStatus(database, notifier, {
+        actorUserId: user.id,
+        settlement: result.settlement,
+        status: 'approved',
+      });
+    return { settlement: settlementRecord(result.settlement) };
   });
 
   app.post('/v1/commissions/settlements/:id/cancel', async (request) => {
@@ -1232,7 +1290,7 @@ export function registerCommissionRoutes(
           'La liquidación no existe.',
         );
       if (settlement.status === CommissionSettlementStatus.PAID)
-        return settlement;
+        return { settlement, transitioned: false };
       if (settlement.status !== CommissionSettlementStatus.APPROVED)
         throw new ApiError(
           409,
@@ -1311,8 +1369,14 @@ export function registerCommissionRoutes(
         locationId,
         organizationId: current.organizationId,
       });
-      return paid;
+      return { settlement: paid, transitioned: true };
     });
-    return { settlement: settlementRecord(result) };
+    if (result.transitioned)
+      await notifyCommissionSettlementStatus(database, notifier, {
+        actorUserId: user.id,
+        settlement: result.settlement,
+        status: 'paid',
+      });
+    return { settlement: settlementRecord(result.settlement) };
   });
 }

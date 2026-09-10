@@ -107,6 +107,9 @@ const notificationCategoryByType: Record<
   [AppNotificationType.CASH_REGISTER_CLOSED]: NotificationCategory.CASH,
   [AppNotificationType.CASH_REGISTER_VARIANCE]: NotificationCategory.CASH,
   [AppNotificationType.COMMISSION_EARNED]: NotificationCategory.CASH,
+  [AppNotificationType.COMMISSION_SETTLEMENT_APPROVED]:
+    NotificationCategory.CASH,
+  [AppNotificationType.COMMISSION_SETTLEMENT_PAID]: NotificationCategory.CASH,
   [AppNotificationType.LOW_STOCK]: NotificationCategory.INVENTORY,
   [AppNotificationType.PAYMENT_CONFIRMATION_REQUIRED]:
     NotificationCategory.CASH,

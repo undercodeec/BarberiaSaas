@@ -62,6 +62,15 @@ describe('notificationDestination', () => {
       notificationDestination({ type: 'commission_earned' }, 'barber'),
     ).toBe('/wallet?tab=commissions');
     expect(
+      notificationDestination(
+        { type: 'commission_settlement_approved' },
+        'barber',
+      ),
+    ).toBe('/wallet?tab=commissions');
+    expect(
+      notificationDestination({ type: 'commission_settlement_paid' }, 'barber'),
+    ).toBe('/wallet?tab=commissions');
+    expect(
       notificationDestination({ type: 'team_member_accepted' }, 'receptionist'),
     ).toBeNull();
     expect(

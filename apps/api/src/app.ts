@@ -3333,7 +3333,7 @@ export async function buildApi({
   registerInventoryV2Routes(app, database, authenticate, loadOperationalAccess);
   registerInventoryRoutes(app, database, authenticate, appointmentNotifier);
   registerCashRegisterRoutes(app, database, authenticate, appointmentNotifier);
-  registerCommissionRoutes(app, database, authenticate);
+  registerCommissionRoutes(app, database, authenticate, appointmentNotifier);
   registerProfileRoutes(app, database, authenticate);
   registerWelcomeSurveyRoutes(app, database, authenticate);
   registerPayphoneRoutes(app, database, authenticate, config);
