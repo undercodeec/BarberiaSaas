@@ -35,6 +35,8 @@ jobs:
           git rev-parse HEAD
       - run: pnpm install --frozen-lockfile
       - name: Preflight Mobile
+        env:
+          NODE_ENV: test
         run: |
           pnpm --filter @barber-saas/mobile typecheck
           pnpm --filter @barber-saas/mobile test
