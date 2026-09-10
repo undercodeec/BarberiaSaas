@@ -4,6 +4,7 @@ import {
   CashRegisterStatus,
   MembershipRole,
   MembershipStatus,
+  ProductCommissionType,
   StockDirection,
   StockMovementType,
   type DatabaseClient,
@@ -14,6 +15,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { ApiError, isUniqueConstraintError } from './errors';
+import { reverseCommissionForCashMovement } from './commissions';
 import type { AppointmentNotifier } from './notifications';
 import { getEntitlements } from './subscription-policy';
 
@@ -24,6 +26,8 @@ type Authenticate = (
 
 const productFieldsSchema = z.object({
   barcode: z.string().trim().min(1).max(80).optional(),
+  commissionType: z.enum(['fixed', 'percentage']).nullable().optional(),
+  commissionValue: z.number().int().min(1).max(100_000_000).nullable().optional(),
   costCents: z.number().int().min(0).max(100_000_000),
   imageData: catalogImageDataSchema.nullish(),
   minimumStock: z.number().int().min(0).max(1_000_000),
@@ -32,6 +36,32 @@ const productFieldsSchema = z.object({
   sku: z.string().trim().min(1).max(80).optional(),
   stockTrackingEnabled: z.boolean(),
 });
+
+function validateCommissionConfiguration(
+  type: 'fixed' | 'percentage' | null,
+  value: number | null,
+  salePriceCents: number,
+) {
+  if (type === null && value === null) return;
+  if (type === null || value === null)
+    throw new ApiError(
+      400,
+      'PRODUCT_COMMISSION_INCOMPLETE',
+      'Configura el tipo y valor de comisión del producto, o elimina ambos.',
+    );
+  if (type === 'percentage' && value > 100)
+    throw new ApiError(
+      400,
+      'PRODUCT_COMMISSION_INVALID',
+      'El porcentaje de comisión no puede superar el 100%.',
+    );
+  if (type === 'fixed' && value > salePriceCents)
+    throw new ApiError(
+      400,
+      'PRODUCT_COMMISSION_INVALID',
+      'La comisión fija no puede superar el precio de venta.',
+    );
+}
 const createProductSchema = productFieldsSchema
   .extend({
     initialStock: z.number().int().min(0).max(1_000_000).default(0),
@@ -167,6 +197,8 @@ function selectedLocation(
 function productResponse(
   product: {
     barcode: string | null;
+    commissionType: ProductCommissionType | null;
+    commissionValue: number | null;
     costCents: number;
     createdAt: Date;
     currencyCode: string;
@@ -191,6 +223,8 @@ function productResponse(
       ?.quantityOnHand ?? 0;
   return {
     barcode: product.barcode,
+    commissionType: product.commissionType?.toLowerCase() ?? null,
+    commissionValue: product.commissionValue,
     costCents: product.costCents,
     createdAt: product.createdAt.toISOString(),
     currencyCode: product.currencyCode,
@@ -297,6 +331,13 @@ export function registerInventoryRoutes(
   app.post('/v1/inventory/products', async (request, reply) => {
     const { user } = await authenticate(database, request);
     const input = createProductSchema.parse(request.body);
+    const commissionType = input.commissionType ?? null;
+    const commissionValue = input.commissionValue ?? null;
+    validateCommissionConfiguration(
+      commissionType,
+      commissionValue,
+      input.salePriceCents,
+    );
     const currentScope = await inventoryScope(database, user.id);
     const location = selectedLocation(currentScope.locations, input.locationId);
     try {
@@ -304,6 +345,10 @@ export function registerInventoryRoutes(
         const created = await transaction.product.create({
           data: {
             barcode: input.barcode || null,
+            commissionType: commissionType
+              ? (commissionType.toUpperCase() as ProductCommissionType)
+              : null,
+            commissionValue,
             costCents: input.costCents,
             imageData: input.imageData || null,
             currencyCode: currentScope.membership.organization.currencyCode,
@@ -389,6 +434,24 @@ export function registerInventoryRoutes(
     });
     if (!existing)
       throw new ApiError(404, 'PRODUCT_NOT_FOUND', 'El producto no existe.');
+    const commissionType =
+      input.commissionType === undefined
+        ? existing.commissionType
+        : input.commissionType
+          ? (input.commissionType.toUpperCase() as ProductCommissionType)
+          : null;
+    const commissionValue =
+      input.commissionValue === undefined
+        ? existing.commissionValue
+        : input.commissionValue;
+    const normalizedCommissionType = commissionType
+      ? (commissionType.toLowerCase() as 'fixed' | 'percentage')
+      : null;
+    validateCommissionConfiguration(
+      normalizedCommissionType,
+      commissionValue,
+      input.salePriceCents ?? existing.salePriceCents,
+    );
     if (
       input.initialStock !== undefined &&
       input.stockTrackingEnabled !== true &&
@@ -405,6 +468,12 @@ export function registerInventoryRoutes(
           data: {
             ...(input.barcode !== undefined
               ? { barcode: input.barcode || null }
+              : {}),
+            ...(input.commissionType !== undefined
+              ? { commissionType }
+              : {}),
+            ...(input.commissionValue !== undefined
+              ? { commissionValue }
               : {}),
             ...(input.costCents !== undefined
               ? { costCents: input.costCents }
@@ -799,6 +868,11 @@ export function registerInventoryRoutes(
             reversedByUserId: user.id,
           },
           where: { id: sale.id },
+        });
+        await reverseCommissionForCashMovement(transaction, {
+          cashMovementId: sale.id,
+          occurredAt: reversed.reversedAt ?? new Date(),
+          reason: input.reason,
         });
         await transaction.auditLog.create({
           data: {

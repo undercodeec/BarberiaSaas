@@ -64,6 +64,13 @@ function units(value: string, label: string) {
   return parsed;
 }
 
+function percentage(value: string) {
+  const parsed = Number(value.replace(',', '.'));
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100)
+    throw new Error('Ingresa un porcentaje de comisión entre 1 y 100.');
+  return parsed;
+}
+
 function movementLabel(type: string) {
   if (type === 'opening') return 'Existencia inicial';
   if (type === 'purchase') return 'Compra';
@@ -104,6 +111,10 @@ export default function InventoryScreen() {
   const [sku, setSku] = useState('');
   const [cost, setCost] = useState('0');
   const [price, setPrice] = useState('');
+  const [commissionType, setCommissionType] = useState<
+    'fixed' | 'percentage' | null
+  >(null);
+  const [commissionValue, setCommissionValue] = useState('');
   const [minimumStock, setMinimumStock] = useState('0');
   const [initialStock, setInitialStock] = useState('0');
   const [adjustmentQuantity, setAdjustmentQuantity] = useState('');
@@ -182,7 +193,17 @@ export default function InventoryScreen() {
     mutationFn: () => {
       if (name.trim().length < 2)
         throw new Error('Ingresa el nombre del producto.');
+      const productCommission = commissionType
+        ? {
+            commissionType,
+            commissionValue:
+              commissionType === 'fixed'
+                ? cents(commissionValue, 'un monto de comisión')
+                : percentage(commissionValue),
+          }
+        : { commissionType: null, commissionValue: null };
       const body = {
+        ...productCommission,
         costCents: cents(cost, 'un costo'),
         ...(imageData ? { imageData } : {}),
         minimumStock: units(minimumStock, 'un stock mínimo'),
@@ -467,6 +488,12 @@ export default function InventoryScreen() {
     setSku(product?.sku ?? '');
     setCost(((product?.costCents ?? 0) / 100).toFixed(2));
     setPrice(product ? (product.salePriceCents / 100).toFixed(2) : '');
+    setCommissionType(product?.commissionType ?? null);
+    setCommissionValue(
+      product?.commissionType === 'fixed'
+        ? ((product.commissionValue ?? 0) / 100).toFixed(2)
+        : product?.commissionValue?.toString() ?? '',
+    );
     setMinimumStock(String(product?.minimumStock ?? 0));
     setInitialStock(String(product?.quantityOnHand ?? 0));
     setSheetMode('product');
@@ -647,6 +674,14 @@ export default function InventoryScreen() {
                     <Text style={styles.muted}>
                       {money(product.salePriceCents)}
                     </Text>
+                    {product.commissionType ? (
+                      <Text style={styles.commissionMeta}>
+                        Comisión: {' '}
+                        {product.commissionType === 'fixed'
+                          ? `${money(product.commissionValue ?? 0)} por unidad`
+                          : `${product.commissionValue ?? 0}%`}
+                      </Text>
+                    ) : null}
                     <Text
                       style={[
                         styles.stock,
@@ -964,6 +999,41 @@ export default function InventoryScreen() {
                     onChange={setPrice}
                     value={price}
                   />
+                  <Text style={styles.label}>Comisión para barberos</Text>
+                  <Text style={styles.fieldHint}>
+                    Se aplica cuando un barbero es seleccionado como vendedor en Caja.
+                  </Text>
+                  <View style={styles.chips}>
+                    {(
+                      [
+                        [null, 'Sin comisión'],
+                        ['percentage', 'Porcentaje'],
+                        ['fixed', 'Monto fijo'],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <Chip
+                        active={commissionType === value}
+                        key={label}
+                        label={label}
+                        onPress={() => {
+                          setCommissionType(value);
+                          if (value === null) setCommissionValue('');
+                        }}
+                      />
+                    ))}
+                  </View>
+                  {commissionType ? (
+                    <Field
+                      keyboardType="decimal-pad"
+                      label={
+                        commissionType === 'fixed'
+                          ? 'Monto fijo por unidad'
+                          : 'Porcentaje de comisión'
+                      }
+                      onChange={setCommissionValue}
+                      value={commissionValue}
+                    />
+                  ) : null}
                   <Field
                     keyboardType="number-pad"
                     label="Stock mínimo"

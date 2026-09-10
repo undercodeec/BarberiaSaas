@@ -217,6 +217,11 @@ enum CommissionRuleType {
   SERVICE_FIXED
 }
 
+enum ProductCommissionType {
+  PERCENTAGE
+  FIXED
+}
+
 enum CommissionEntryStatus {
   PENDING
   APPROVED
@@ -1748,6 +1753,8 @@ model Product {
   imageData            String?             @map("image_data") @db.Text
   costCents            Int                 @default(0) @map("cost_cents")
   salePriceCents       Int                 @map("sale_price_cents")
+  commissionType       ProductCommissionType? @map("commission_type")
+  commissionValue      Int?                @map("commission_value")
   currencyCode         String              @default("USD") @map("currency_code") @db.Char(3)
   stockTrackingEnabled Boolean             @default(true) @map("stock_tracking_enabled")
   minimumStock         Int                 @default(0) @map("minimum_stock")

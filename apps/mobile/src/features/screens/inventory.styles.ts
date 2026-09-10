@@ -34,6 +34,7 @@ export const styles = StyleSheet.create({
   chipText: { color: '#805E21', fontSize: 13, fontWeight: '800' },
   chipTextActive: { color: '#FFFFFF' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  commissionMeta: { color: '#805E21', fontSize: 12, fontWeight: '700' },
   confirmButton: {
     alignItems: 'center',
     backgroundColor: '#805E21',
@@ -54,6 +55,7 @@ export const styles = StyleSheet.create({
   empty: { alignItems: 'center', gap: 8, paddingVertical: 48 },
   emptyTitle: { color: '#18202B', fontSize: 18, fontWeight: '800' },
   error: { color: '#B54747', fontSize: 14, fontWeight: '700' },
+  fieldHint: { color: '#6B7480', fontSize: 12, lineHeight: 17, marginTop: 5 },
   filterButton: {
     alignItems: 'center',
     alignSelf: 'flex-start',

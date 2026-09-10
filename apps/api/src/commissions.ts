@@ -6,6 +6,7 @@ import {
   AppointmentStatus,
   CommissionEntryStatus,
   CommissionRuleType,
+  ProductCommissionType,
   MembershipRole,
   MembershipStatus,
   PaymentMethod,
@@ -199,6 +200,103 @@ export async function createManualSaleCommission(
     },
     update: {},
     where: { cashMovementId: input.cashMovementId },
+  });
+}
+
+export async function createProductSaleCommission(
+  transaction: Prisma.TransactionClient,
+  input: {
+    amountCents: number;
+    cashMovementId: string;
+    commissionType: ProductCommissionType;
+    commissionValue: number;
+    locationId: string;
+    occurredAt: Date;
+    organizationId: string;
+    productId: string;
+    productName: string;
+    professionalMembershipId: string;
+    quantity: number;
+  },
+) {
+  const existing = await transaction.commissionEntry.findUnique({
+    where: { cashMovementId: input.cashMovementId },
+  });
+  if (existing) return existing;
+
+  const amount =
+    input.commissionType === ProductCommissionType.PERCENTAGE
+      ? Math.round((input.amountCents * input.commissionValue) / 100)
+      : input.commissionValue * input.quantity;
+  return transaction.commissionEntry.upsert({
+    create: {
+      baseAmountCents: input.amountCents,
+      calculationSnapshot: {
+        baseAmountCents: input.amountCents,
+        cashMovementId: input.cashMovementId,
+        commissionAmountCents: amount,
+        commissionType: input.commissionType.toLowerCase(),
+        commissionValue: input.commissionValue,
+        productId: input.productId,
+        productName: input.productName,
+        quantity: input.quantity,
+        source: 'product_sale',
+      },
+      cashMovementId: input.cashMovementId,
+      commissionAmountCents: amount,
+      locationId: input.locationId,
+      occurredAt: input.occurredAt,
+      organizationId: input.organizationId,
+      professionalMembershipId: input.professionalMembershipId,
+      status: CommissionEntryStatus.PENDING,
+    },
+    update: {},
+    where: { cashMovementId: input.cashMovementId },
+  });
+}
+
+export async function reverseCommissionForCashMovement(
+  transaction: Prisma.TransactionClient,
+  input: { cashMovementId: string; occurredAt: Date; reason: string },
+) {
+  const original = await transaction.commissionEntry.findUnique({
+    where: { cashMovementId: input.cashMovementId },
+  });
+  if (!original) return null;
+  const existing = await transaction.commissionEntry.findUnique({
+    where: { reversalOfEntryId: original.id },
+  });
+  if (existing) return existing;
+  const claimed = await transaction.commissionEntry.updateMany({
+    data: { status: CommissionEntryStatus.REVERSED },
+    where: {
+      id: original.id,
+      status: { not: CommissionEntryStatus.REVERSED },
+    },
+  });
+  if (claimed.count !== 1)
+    return transaction.commissionEntry.findUnique({
+      where: { reversalOfEntryId: original.id },
+    });
+  return transaction.commissionEntry.create({
+    data: {
+      appointmentId: original.appointmentId,
+      baseAmountCents: -original.baseAmountCents,
+      calculationSnapshot: {
+        originalEntryId: original.id,
+        originalSnapshot: original.calculationSnapshot,
+        reason: input.reason,
+        source: 'product_sale_reversal',
+      },
+      commissionAmountCents: -original.commissionAmountCents,
+      locationId: original.locationId,
+      occurredAt: input.occurredAt,
+      organizationId: original.organizationId,
+      professionalMembershipId: original.professionalMembershipId,
+      reversalOfEntryId: original.id,
+      ruleId: original.ruleId,
+      status: CommissionEntryStatus.PENDING,
+    },
   });
 }
 

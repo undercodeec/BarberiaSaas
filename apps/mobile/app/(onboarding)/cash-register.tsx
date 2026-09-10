@@ -1031,6 +1031,22 @@ export default function CashRegisterScreen() {
                               </Text>
                             ) : null}
                           </View>
+                          {selectedMovementProduct &&
+                          !selectedMovementProduct.commissionType ? (
+                            <View style={styles.productCommissionNotice}>
+                              <Ionicons
+                                color="#805E21"
+                                name="information-circle-outline"
+                                size={18}
+                              />
+                              <Text style={styles.productCommissionNoticeText}>
+                                Este producto no tiene comisión configurada.
+                                Puedes venderlo igual; para agregarla ve a
+                                Inventario, edita el producto y elige “Comisión
+                                para barberos”.
+                              </Text>
+                            </View>
+                          ) : null}
                           <Text style={styles.label}>Cantidad</Text>
                           <TextInput
                             accessibilityLabel="Cantidad de producto"

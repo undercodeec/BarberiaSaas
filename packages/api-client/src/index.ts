@@ -342,6 +342,8 @@ export interface FinancialRecordsResponse {
 
 export interface InventoryProduct {
   readonly barcode: string | null;
+  readonly commissionType: 'fixed' | 'percentage' | null;
+  readonly commissionValue: number | null;
   readonly costCents: number;
   readonly createdAt: string;
   readonly currencyCode: string;
@@ -380,6 +382,8 @@ export interface CursorPage<T> {
 }
 
 export interface InventoryProductSummary {
+  readonly commissionType: 'fixed' | 'percentage' | null;
+  readonly commissionValue: number | null;
   readonly costCents: number;
   readonly currencyCode: string;
   readonly id: string;

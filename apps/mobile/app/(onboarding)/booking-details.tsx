@@ -202,7 +202,10 @@ export default function BookingDetailsScreen() {
       (candidate) => localDateValue(candidate) === selectedDateValue,
     ) ?? dates[0]!;
   const professionals = useMemo(() => {
-    if (!locationId) return [];
+    const currentMembership = organizationQuery.data?.membership;
+    if (!locationId || !currentMembership) return [];
+    const currentMembershipId = currentMembership.id;
+    const isBarber = currentMembership.role === 'barber';
     const assignedIds = new Set(
       (servicesQuery.data?.services ?? []).flatMap((service) =>
         service.assignments
@@ -211,9 +214,18 @@ export default function BookingDetailsScreen() {
       ),
     );
     return (teamQuery.data?.members ?? []).filter(
-      (member) => member.status === 'active' && assignedIds.has(member.id),
+      (member) =>
+        member.status === 'active' &&
+        assignedIds.has(member.id) &&
+        (!isBarber || member.id === currentMembershipId),
     );
-  }, [locationId, servicesQuery.data?.services, teamQuery.data?.members]);
+  }, [
+    locationId,
+    organizationQuery.data?.membership.id,
+    organizationQuery.data?.membership.role,
+    servicesQuery.data?.services,
+    teamQuery.data?.members,
+  ]);
 
   const availableServices = useMemo(() => {
     if (!professionalId || !locationId) return [];

@@ -3860,6 +3860,127 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(replacementResponse.statusCode).toBe(201);
   });
 
+  it('genera comisión de producto por porcentaje y monto fijo para el barbero vendedor', async () => {
+    const agenda = await setupAgenda('comision-producto');
+    const createdProduct = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        commissionType: 'percentage',
+        commissionValue: 10,
+        costCents: 500,
+        initialStock: 10,
+        locationId: agenda.locationId,
+        minimumStock: 1,
+        name: 'Cera comisionable',
+        salePriceCents: 1_500,
+        stockTrackingEnabled: true,
+      },
+      url: '/v1/inventory/products',
+    });
+    expect(createdProduct.statusCode, createdProduct.body).toBe(201);
+    expect(
+      createdProduct.json<{
+        product: { commissionType: string | null; commissionValue: number | null };
+      }>().product,
+    ).toMatchObject({ commissionType: 'percentage', commissionValue: 10 });
+    const productId = createdProduct.json<{ product: { id: string } }>().product.id;
+
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${agenda.ownerToken}` },
+          method: 'POST',
+          payload: { locationId: agenda.locationId, openingAmountCents: 0 },
+          url: '/v1/cash-register/open',
+        })
+      ).statusCode,
+    ).toBe(201);
+    const percentageSale = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        amountCents: 3_000,
+        description: 'Dos ceras vendidas por el barbero',
+        paymentMethod: 'cash',
+        productId,
+        productQuantity: 2,
+        sellerMembershipId: agenda.membershipId,
+        type: 'sale',
+      },
+      url: '/v1/cash-register/movements',
+    });
+    expect(percentageSale.statusCode, percentageSale.body).toBe(201);
+    const percentageMovementId = percentageSale.json<{
+      movement: { id: string };
+    }>().movement.id;
+    const percentageCommission = await database.commissionEntry.findUnique({
+      where: { cashMovementId: percentageMovementId },
+    });
+    expect(percentageCommission).toMatchObject({
+      baseAmountCents: 3_000,
+      commissionAmountCents: 300,
+      professionalMembershipId: agenda.membershipId,
+    });
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${agenda.ownerToken}` },
+          method: 'POST',
+          payload: { reason: 'Venta de producto anulada' },
+          url: `/v1/inventory/product-sales/${percentageMovementId}/reverse`,
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      await database.commissionEntry.findUnique({
+        where: { cashMovementId: percentageMovementId },
+      }),
+    ).toMatchObject({ status: 'REVERSED' });
+    expect(
+      await database.commissionEntry.findFirst({
+        where: { reversalOfEntryId: percentageCommission!.id },
+      }),
+    ).toMatchObject({ commissionAmountCents: -300 });
+
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${agenda.ownerToken}` },
+          method: 'PATCH',
+          payload: { commissionType: 'fixed', commissionValue: 125 },
+          url: `/v1/inventory/products/${productId}`,
+        })
+      ).statusCode,
+    ).toBe(200);
+    const fixedSale = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        amountCents: 3_000,
+        description: 'Dos ceras con comisión fija',
+        paymentMethod: 'card',
+        productId,
+        productQuantity: 2,
+        sellerMembershipId: agenda.membershipId,
+        type: 'sale',
+      },
+      url: '/v1/cash-register/movements',
+    });
+    expect(fixedSale.statusCode, fixedSale.body).toBe(201);
+    const fixedMovementId = fixedSale.json<{ movement: { id: string } }>()
+      .movement.id;
+    const fixedCommission = await database.commissionEntry.findUnique({
+      where: { cashMovementId: fixedMovementId },
+    });
+    expect(fixedCommission).toMatchObject({ commissionAmountCents: 250 });
+    expect(fixedCommission?.calculationSnapshot).toMatchObject({
+      commissionType: 'fixed',
+      quantity: 2,
+      source: 'product_sale',
+    });
+  });
+
   it('registra ventas del propietario sin exigir una regla de comision', async () => {
     const agenda = await setupAgenda('venta-propietario-sin-comision');
     const ownerMembership = await database.membership.findFirstOrThrow({
@@ -5028,6 +5149,25 @@ describeWithDatabase('API con PostgreSQL', () => {
     );
     expect((await movement('expense', 'transfer', 500)).statusCode).toBe(201);
     expect((await movement('withdrawal', 'cash', 300)).statusCode).toBe(201);
+
+    const incomeRecords = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: '/v1/financial-records?type=income',
+    });
+    expect(incomeRecords.statusCode).toBe(200);
+    expect(
+      incomeRecords.json<{
+        records: Array<{ amountCents: number; type: string }>;
+        total: number;
+      }>(),
+    ).toMatchObject({
+      records: expect.arrayContaining([
+        { amountCents: 800, type: 'deposit' },
+        { amountCents: 200, type: 'other_income' },
+      ]),
+      total: 2,
+    });
 
     const expenseReport = await app.inject({
       headers: { authorization: `Bearer ${token}` },

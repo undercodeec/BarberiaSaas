@@ -23,6 +23,8 @@ interface InventoryAccess {
 
 interface ProductRow {
   readonly activeProducts: number | bigint | null;
+  readonly commissionType: 'FIXED' | 'PERCENTAGE' | null;
+  readonly commissionValue: number | null;
   readonly currencyCode: string;
   readonly costCents: number;
   readonly hasImage: boolean;
@@ -197,6 +199,8 @@ export function registerInventoryV2Routes(
           product.minimum_stock AS "minimumStock",
           product.cost_cents AS "costCents",
           product.sale_price_cents AS "salePriceCents",
+          product.commission_type AS "commissionType",
+          product.commission_value AS "commissionValue",
           product.sku,
           product.currency_code AS "currencyCode",
           product.stock_tracking_enabled AS "stockTrackingEnabled",
@@ -243,6 +247,8 @@ export function registerInventoryV2Routes(
       accessibleLocations: access.locations,
       currencyCode: access.currencyCode,
       items: page.items.map((product) => ({
+        commissionType: product.commissionType?.toLowerCase() ?? null,
+        commissionValue: product.commissionValue,
         costCents: product.costCents,
         currencyCode: product.currencyCode,
         id: product.id,

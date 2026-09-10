@@ -176,6 +176,23 @@ export const styles = StyleSheet.create({
   },
   memberText: { color: '#111827', fontSize: 14, fontWeight: '800' },
   members: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  productCommissionNotice: {
+    alignItems: 'flex-start',
+    backgroundColor: '#FFF7E7',
+    borderColor: '#F0D6A0',
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+    padding: 12,
+  },
+  productCommissionNoticeText: {
+    color: '#805E21',
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+  },
   moneyLabel: {
     alignItems: 'center',
     flexDirection: 'row',

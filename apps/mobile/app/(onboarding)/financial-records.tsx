@@ -21,7 +21,7 @@ import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 const types = [
   { label: 'Todos', value: undefined },
   { label: 'Ventas', value: 'sale' },
-  { label: 'Ingresos', value: 'deposit' },
+  { label: 'Ingresos', value: 'income' },
   { label: 'Gastos', value: 'expense' },
 ] as const;
 

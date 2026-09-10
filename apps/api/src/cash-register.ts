@@ -6,6 +6,7 @@ import {
   AppointmentPaymentStatus,
   MembershipRole,
   MembershipStatus,
+  ProductCommissionType,
   StockDirection,
   StockMovementType,
   type DatabaseClient,
@@ -15,6 +16,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import {
   createManualSaleCommission,
+  createProductSaleCommission,
   reconcileAppointmentCommissions,
 } from './commissions';
 import { ApiError } from './errors';
@@ -77,6 +79,7 @@ const financialRecordsQuerySchema = z.object({
   type: z
     .enum([
       'sale',
+      'income',
       'deposit',
       'other_income',
       'expense',
@@ -790,9 +793,15 @@ export function registerCashRegisterRoutes(
       ...(input.sellerMembershipId
         ? { sellerMembershipId: input.sellerMembershipId }
         : {}),
-      ...(input.type
-        ? { type: input.type.toUpperCase() as CashMovementType }
-        : {}),
+      ...(input.type === 'income'
+        ? {
+            type: {
+              in: [CashMovementType.DEPOSIT, CashMovementType.OTHER_INCOME],
+            },
+          }
+        : input.type
+          ? { type: input.type.toUpperCase() as CashMovementType }
+          : {}),
       cashRegisterSession: {
         locationId: currentScope.locationId,
         ...(currentScope.organizationId
@@ -1090,13 +1099,20 @@ export function registerCashRegisterRoutes(
       }
 
       let productSale: {
+        commissionType: ProductCommissionType | null;
+        commissionValue: number | null;
         costCents: number;
         id: string;
         name: string;
         quantity: number;
         resultingQuantity: number | null;
       } | null = null;
-      let seller: { id: string; name: string } | null = null;
+      let seller: {
+        id: string;
+        name: string;
+        role: MembershipRole;
+        userId: string;
+      } | null = null;
       if (input.productId && input.productQuantity) {
         if (!currentScope.organizationId || !session.locationId)
           throw new ApiError(
@@ -1116,7 +1132,7 @@ export function registerCashRegisterRoutes(
           );
         const sellerMembership = input.sellerMembershipId
           ? await transaction.membership.findFirst({
-              include: { user: { select: { fullName: true } } },
+              include: { user: { select: { fullName: true, id: true } } },
               where: {
                 id: input.sellerMembershipId,
                 organizationId: currentScope.organizationId,
@@ -1125,7 +1141,7 @@ export function registerCashRegisterRoutes(
               },
             })
           : await transaction.membership.findFirst({
-              include: { user: { select: { fullName: true } } },
+              include: { user: { select: { fullName: true, id: true } } },
               where: {
                 organizationId: currentScope.organizationId,
                 status: MembershipStatus.ACTIVE,
@@ -1139,7 +1155,12 @@ export function registerCashRegisterRoutes(
             'El vendedor no está activo o no pertenece a esta sucursal.',
           );
         seller = sellerMembership
-          ? { id: sellerMembership.id, name: sellerMembership.user.fullName }
+          ? {
+              id: sellerMembership.id,
+              name: sellerMembership.user.fullName,
+              role: sellerMembership.role,
+              userId: sellerMembership.user.id,
+            }
           : null;
         await transaction.$queryRaw`
           WITH lock AS MATERIALIZED (
@@ -1215,6 +1236,8 @@ export function registerCashRegisterRoutes(
           resultingQuantity = updatedInventory.quantityOnHand;
         }
         productSale = {
+          commissionType: product.commissionType,
+          commissionValue: product.commissionValue,
           costCents: product.costCents,
           id: product.id,
           name: product.name,
@@ -1320,6 +1343,37 @@ export function registerCashRegisterRoutes(
           amountCents: commission.commissionAmountCents,
           professionalUserId: commissionableService.professionalUserId,
         };
+      } else if (
+        productSale &&
+        seller?.role === MembershipRole.BARBER &&
+        productSale.commissionType &&
+        productSale.commissionValue !== null &&
+        currentScope.organizationId &&
+        session.locationId
+      ) {
+        const entitlements = await getEntitlements(
+          transaction,
+          currentScope.organizationId,
+        );
+        if (entitlements.featureFlags.commissions) {
+          const commission = await createProductSaleCommission(transaction, {
+            amountCents: created.amountCents,
+            cashMovementId: created.id,
+            commissionType: productSale.commissionType,
+            commissionValue: productSale.commissionValue,
+            locationId: session.locationId,
+            occurredAt: created.createdAt,
+            organizationId: currentScope.organizationId,
+            productId: productSale.id,
+            productName: productSale.name,
+            professionalMembershipId: seller.id,
+            quantity: productSale.quantity,
+          });
+          commissionNotification = {
+            amountCents: commission.commissionAmountCents,
+            professionalUserId: seller.userId,
+          };
+        }
       }
       return { commissionNotification, movement: created };
     });
