@@ -7,7 +7,6 @@ import {
   AppointmentStatus,
   CommissionEntryStatus,
   CommissionRuleType,
-  ProductCommissionType,
   MembershipRole,
   MembershipStatus,
   PaymentMethod,
@@ -34,12 +33,13 @@ interface CommissionRuleCandidate {
 
 function selectRule(
   rules: readonly CommissionRuleCandidate[],
-  serviceId: string,
+  serviceId: string | null,
 ) {
   return [...rules].sort((left, right) => {
-    const specificity =
-      Number(right.serviceId === serviceId) -
-      Number(left.serviceId === serviceId);
+    const specificity = serviceId
+      ? Number(right.serviceId === serviceId) -
+        Number(left.serviceId === serviceId)
+      : 0;
     if (specificity !== 0) return specificity;
     if (right.priority !== left.priority) return right.priority - left.priority;
     return right.createdAt.getTime() - left.createdAt.getTime();
@@ -62,16 +62,19 @@ async function applicableRules(
     occurredAt: Date;
     organizationId: string;
     professionalMembershipId: string;
-    serviceId: string;
+    serviceId: string | null;
   },
 ) {
   return transaction.commissionRule.findMany({
     where: {
       effectiveFrom: { lte: input.occurredAt },
+      isActive: true,
       organizationId: input.organizationId,
       professionalMembershipId: input.professionalMembershipId,
       AND: [
-        { OR: [{ serviceId: input.serviceId }, { serviceId: null }] },
+        input.serviceId
+          ? { OR: [{ serviceId: input.serviceId }, { serviceId: null }] }
+          : { serviceId: null },
         {
           OR: [
             { effectiveTo: null },
@@ -210,8 +213,6 @@ export async function createProductSaleCommission(
   input: {
     amountCents: number;
     cashMovementId: string;
-    commissionType: ProductCommissionType;
-    commissionValue: number;
     locationId: string;
     occurredAt: Date;
     organizationId: string;
@@ -226,10 +227,12 @@ export async function createProductSaleCommission(
   });
   if (existing) return existing;
 
-  const amount =
-    input.commissionType === ProductCommissionType.PERCENTAGE
-      ? Math.round((input.amountCents * input.commissionValue) / 100)
-      : input.commissionValue * input.quantity;
+  const rule = selectRule(
+    await applicableRules(transaction, { ...input, serviceId: null }),
+    null,
+  );
+  if (!rule) return null;
+  const amount = commissionAmount(rule, input.amountCents);
   return transaction.commissionEntry.upsert({
     create: {
       baseAmountCents: input.amountCents,
@@ -237,11 +240,13 @@ export async function createProductSaleCommission(
         baseAmountCents: input.amountCents,
         cashMovementId: input.cashMovementId,
         commissionAmountCents: amount,
-        commissionType: input.commissionType.toLowerCase(),
-        commissionValue: input.commissionValue,
         productId: input.productId,
         productName: input.productName,
+        professionalMembershipId: input.professionalMembershipId,
         quantity: input.quantity,
+        ruleId: rule.id,
+        ruleType: rule.type,
+        ruleValue: rule.value,
         source: 'product_sale',
       },
       cashMovementId: input.cashMovementId,
@@ -250,6 +255,7 @@ export async function createProductSaleCommission(
       occurredAt: input.occurredAt,
       organizationId: input.organizationId,
       professionalMembershipId: input.professionalMembershipId,
+      ruleId: rule.id,
       status: CommissionEntryStatus.PENDING,
     },
     update: {},
@@ -577,7 +583,11 @@ export function registerCommissionRoutes(
       current.role === MembershipRole.OWNER ||
       current.role === MembershipRole.MANAGER;
     const requestedProfessionalId = input.professionalMembershipId;
-    if (!canReadAll && requestedProfessionalId !== current.id)
+    if (
+      !canReadAll &&
+      requestedProfessionalId !== undefined &&
+      requestedProfessionalId !== current.id
+    )
       throw new ApiError(
         403,
         'FORBIDDEN',

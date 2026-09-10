@@ -31,6 +31,8 @@ import { useCurrentOrganization } from '../../src/features/organization/useCurre
 import { requireApiClient } from '../../src/lib/api';
 import { settlementPeriodForTimeZone } from '../../src/lib/calendar-date';
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
+import { walletAccessForRole } from '../../src/lib/wallet-access';
+import { splitCommissionEntries } from '../../src/lib/wallet-commission-records';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
@@ -79,8 +81,16 @@ export default function WalletScreen() {
   );
   const [periodStart, setPeriodStart] = useState(initialPeriod.periodStart);
   const [periodEnd, setPeriodEnd] = useState(initialPeriod.periodEnd);
+  const organizationQuery = useCurrentOrganization();
+  const role = organizationQuery.data?.membership?.role;
+  const walletAccess = walletAccessForRole(role);
+  const hasKnownRole = role !== null && role !== undefined;
+  const shouldLoadCommissions =
+    tab === 'commissions' ||
+    (walletAccess.summarySource === 'commissions' && tab === 'summary') ||
+    (walletAccess.historySource === 'commissions' && tab === 'history');
   const summaryQuery = useQuery({
-    enabled: Boolean(session),
+    enabled: Boolean(session) && hasKnownRole && walletAccess.canReadCash,
     queryFn: () =>
       requireApiClient().request<CashRegisterSummaryResponse>(
         '/v1/cash-register/summary',
@@ -88,16 +98,19 @@ export default function WalletScreen() {
     queryKey: tenant.key('cash-register-summary'),
   });
   const historyQuery = useQuery({
-    enabled: Boolean(session) && tab === 'history',
+    enabled:
+      Boolean(session) &&
+      hasKnownRole &&
+      tab === 'history' &&
+      walletAccess.canReadCash,
     queryFn: () =>
       requireApiClient().request<CashRegisterHistoryResponse>(
         '/v1/cash-register/history',
       ),
     queryKey: tenant.key('cash-register-history'),
   });
-  const organizationQuery = useCurrentOrganization();
   const commissionsQuery = useQuery({
-    enabled: Boolean(session) && tab === 'commissions',
+    enabled: Boolean(session) && hasKnownRole && shouldLoadCommissions,
     queryFn: () =>
       requireApiClient().request<CommissionOverviewResponse>(
         '/v1/commissions/overview',
@@ -194,7 +207,6 @@ export default function WalletScreen() {
       await refreshPayphone();
     },
   });
-  const role = organizationQuery.data?.membership?.role;
   const canManageCommissions = role === 'owner' || role === 'manager';
   const canApproveCommissions = role === 'owner';
   const selectedProfessional = commissionsQuery.data?.professionals.find(
@@ -212,6 +224,10 @@ export default function WalletScreen() {
   const selectedEntries = (commissionsQuery.data?.entries ?? []).filter(
     (entry) => entry.professionalMembershipId === effectiveProfessional?.id,
   );
+  const commissionEntries = splitCommissionEntries(selectedEntries);
+  const commissionEntriesForTab = canManageCommissions
+    ? selectedEntries
+    : commissionEntries.current;
   const refreshCommissions = () =>
     queryClient.invalidateQueries({
       queryKey: tenantQueryPrefix('commission-overview'),
@@ -343,6 +359,11 @@ export default function WalletScreen() {
   const totals = summaryQuery.data?.totals;
   const formatMoney = (amountCents: number) =>
     `$${(amountCents / 100).toFixed(2)}`;
+  const netEstimatedCents = Math.max(
+    0,
+    (effectiveProfessional?.commissionPendingCents ?? 0) -
+      (effectiveProfessional?.availableAdvanceCents ?? 0),
+  );
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
       <View style={styles.header}>
@@ -363,19 +384,33 @@ export default function WalletScreen() {
           <Text accessibilityRole="header" style={styles.title}>
             Nava Wallet
           </Text>
-          <Text style={styles.subtitle}>Pagos y caja de tu actividad</Text>
+          <Text style={styles.subtitle}>
+            {walletAccess.canReadCash
+              ? 'Pagos y caja de tu actividad'
+              : 'Tus comisiones y liquidaciones'}
+          </Text>
         </View>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.balance}>
-          <Text style={styles.balanceLabel}>Resumen de hoy</Text>
+          <Text style={styles.balanceLabel}>
+            {walletAccess.summarySource === 'cash'
+              ? 'Resumen de hoy'
+              : 'Neto estimado'}
+          </Text>
           <Text style={styles.balanceValue}>
-            {formatMoney(totals?.sales ?? 0)}
+            {formatMoney(
+              walletAccess.summarySource === 'cash'
+                ? (totals?.sales ?? 0)
+                : netEstimatedCents,
+            )}
           </Text>
           <Text style={styles.balanceCopy}>
-            {totals
-              ? `${formatMoney(totals.cash)} en efectivo esperado hoy.`
-              : 'Abre tu caja para comenzar a registrar movimientos.'}
+            {walletAccess.summarySource === 'cash'
+              ? totals
+                ? `${formatMoney(totals.cash)} en efectivo esperado hoy.`
+                : 'Abre tu caja para comenzar a registrar movimientos.'
+              : 'Disponible según tus cobros registrados, sin depender del cierre de caja.'}
           </Text>
         </View>
         <View style={styles.tabs}>
@@ -394,87 +429,182 @@ export default function WalletScreen() {
           ))}
         </View>
         {tab === 'summary' ? (
-          <>
-            <View style={styles.metrics}>
-              <Text style={styles.metric}>
-                Tarjeta {formatMoney(totals?.card ?? 0)}
-              </Text>
-              <Text style={styles.metric}>
-                Transferencias {formatMoney(totals?.transfers ?? 0)}
-              </Text>
-              <Text style={styles.metric}>
-                Gastos {formatMoney(totals?.expenses ?? 0)}
-              </Text>
-            </View>
-            <Pressable
-              onPress={() => router.push('/cash-register')}
-              style={styles.card}
-            >
-              <View style={styles.icon}>
-                <Ionicons
-                  color={appTheme.colors.accentDark}
-                  name="cash-outline"
-                  size={25}
-                />
-              </View>
-              <View style={styles.copy}>
-                <Text style={styles.cardTitle}>Caja física</Text>
-                <Text style={styles.cardDescription}>
-                  Abre caja, registra ventas, gastos, retiros y realiza el
-                  cierre.
+          walletAccess.summarySource === 'cash' ? (
+            <>
+              <View style={styles.metrics}>
+                <Text style={styles.metric}>
+                  Tarjeta {formatMoney(totals?.card ?? 0)}
+                </Text>
+                <Text style={styles.metric}>
+                  Transferencias {formatMoney(totals?.transfers ?? 0)}
+                </Text>
+                <Text style={styles.metric}>
+                  Gastos {formatMoney(totals?.expenses ?? 0)}
                 </Text>
               </View>
-              <Ionicons
-                color={appTheme.colors.accentDark}
-                name="chevron-forward"
-                size={22}
-              />
-            </Pressable>
-          </>
+              <Pressable
+                onPress={() => router.push('/cash-register')}
+                style={styles.card}
+              >
+                <View style={styles.icon}>
+                  <Ionicons
+                    color={appTheme.colors.accentDark}
+                    name="cash-outline"
+                    size={25}
+                  />
+                </View>
+                <View style={styles.copy}>
+                  <Text style={styles.cardTitle}>Caja física</Text>
+                  <Text style={styles.cardDescription}>
+                    Abre caja, registra ventas, gastos, retiros y realiza el
+                    cierre.
+                  </Text>
+                </View>
+                <Ionicons
+                  color={appTheme.colors.accentDark}
+                  name="chevron-forward"
+                  size={22}
+                />
+              </Pressable>
+            </>
+          ) : (
+            <View style={styles.metrics}>
+              <Text style={styles.metric}>
+                Comisiones{' '}
+                {formatMoney(
+                  effectiveProfessional?.commissionPendingCents ?? 0,
+                )}
+              </Text>
+              <Text style={styles.metric}>
+                Anticipos -
+                {formatMoney(
+                  effectiveProfessional?.outstandingAdvanceCents ?? 0,
+                )}
+              </Text>
+            </View>
+          )
         ) : null}
         {tab === 'history' ? (
-          <View style={styles.history}>
-            {historyQuery.isLoading ? (
-              <Text style={styles.cardDescription}>Cargando historial...</Text>
-            ) : null}
-            {(historyQuery.data?.sessions ?? []).map((cashSession) => (
-              <Pressable
-                accessibilityLabel={`Ver detalle de caja de ${cashSession.responsibleName}`}
-                key={cashSession.id}
-                onPress={() =>
-                  router.push({
-                    params: { sessionId: cashSession.id },
-                    pathname: '/cash-register-detail',
-                  })
-                }
-                style={styles.historyRow}
-              >
-                <View style={styles.copy}>
-                  <Text style={styles.cardTitle}>
-                    {cashSession.responsibleName}
-                  </Text>
-                  <Text style={styles.cardDescription}>
-                    {new Date(cashSession.openedAt).toLocaleDateString()}
+          walletAccess.historySource === 'cash' ? (
+            <View style={styles.history}>
+              {historyQuery.isLoading ? (
+                <Text style={styles.cardDescription}>
+                  Cargando historial...
+                </Text>
+              ) : null}
+              {(historyQuery.data?.sessions ?? []).map((cashSession) => (
+                <Pressable
+                  accessibilityLabel={`Ver detalle de caja de ${cashSession.responsibleName}`}
+                  key={cashSession.id}
+                  onPress={() =>
+                    router.push({
+                      params: { sessionId: cashSession.id },
+                      pathname: '/cash-register-detail',
+                    })
+                  }
+                  style={styles.historyRow}
+                >
+                  <View style={styles.copy}>
+                    <Text style={styles.cardTitle}>
+                      {cashSession.responsibleName}
+                    </Text>
+                    <Text style={styles.cardDescription}>
+                      {new Date(cashSession.openedAt).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <View style={styles.historyValue}>
+                    <Text style={styles.historyAmount}>
+                      {formatMoney(
+                        cashSession.closingAmountCents ??
+                          cashSession.totals.expectedCash,
+                      )}
+                    </Text>
+                    <Text style={styles.historyCaption}>Cierre</Text>
+                  </View>
+                  <Ionicons color="#69717c" name="chevron-forward" size={20} />
+                </Pressable>
+              ))}
+              {!historyQuery.isLoading &&
+              !historyQuery.data?.sessions.length ? (
+                <Text style={styles.cardDescription}>
+                  Aún no hay cierres de caja.
+                </Text>
+              ) : null}
+            </View>
+          ) : (
+            <View style={styles.history}>
+              <Text style={styles.sectionTitle}>Movimientos de comisión</Text>
+              {commissionEntries.historical.map((entry) => (
+                <View key={entry.id} style={styles.financialRow}>
+                  <View style={styles.copy}>
+                    <Text style={styles.cardTitle}>
+                      {entry.reversalOfEntryId ? 'Reverso' : 'Comisión'} ·{' '}
+                      {formatMoney(entry.amountCents)}
+                    </Text>
+                    <Text style={styles.cardDescription}>
+                      {new Date(entry.occurredAt).toLocaleDateString()} ·{' '}
+                      {entry.status.replaceAll('_', ' ')}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+              {!commissionEntries.historical.length ? (
+                <Text style={styles.cardDescription}>
+                  Aún no hay movimientos históricos de comisión.
+                </Text>
+              ) : null}
+              <Text style={styles.sectionTitle}>Anticipos</Text>
+              {selectedAdvances.map((advance) => (
+                <View key={advance.id} style={styles.financialRow}>
+                  <View style={styles.copy}>
+                    <Text style={styles.cardTitle}>
+                      {formatMoney(advance.originalAmountCents)}
+                    </Text>
+                    <Text style={styles.cardDescription}>
+                      {new Date(advance.occurredAt).toLocaleDateString()} ·
+                      Pendiente {formatMoney(advance.outstandingAmountCents)}
+                    </Text>
+                  </View>
+                  <Text style={styles.statusText}>
+                    {advance.status.replaceAll('_', ' ')}
                   </Text>
                 </View>
-                <View style={styles.historyValue}>
-                  <Text style={styles.historyAmount}>
-                    {formatMoney(
-                      cashSession.closingAmountCents ??
-                        cashSession.totals.expectedCash,
-                    )}
+              ))}
+              {!selectedAdvances.length ? (
+                <Text style={styles.cardDescription}>
+                  No hay anticipos registrados.
+                </Text>
+              ) : null}
+              <Text style={styles.sectionTitle}>Liquidaciones</Text>
+              {selectedSettlements.map((settlement) => (
+                <View key={settlement.id} style={styles.settlementCard}>
+                  <View style={styles.financialRowHeader}>
+                    <View style={styles.copy}>
+                      <Text style={styles.cardTitle}>
+                        {settlement.periodStart} → {settlement.periodEnd}
+                      </Text>
+                      <Text style={styles.cardDescription}>
+                        Comision {formatMoney(settlement.commissionAmountCents)}
+                        {' · '}Anticipos -
+                        {formatMoney(settlement.advanceDeductionCents)}
+                      </Text>
+                    </View>
+                    <Text style={styles.settlementAmount}>
+                      {formatMoney(settlement.totalPayableCents)}
+                    </Text>
+                  </View>
+                  <Text style={styles.statusText}>
+                    Estado: {settlement.status}
                   </Text>
-                  <Text style={styles.historyCaption}>Cierre</Text>
                 </View>
-                <Ionicons color="#69717c" name="chevron-forward" size={20} />
-              </Pressable>
-            ))}
-            {!historyQuery.isLoading && !historyQuery.data?.sessions.length ? (
-              <Text style={styles.cardDescription}>
-                Aún no hay cierres de caja.
-              </Text>
-            ) : null}
-          </View>
+              ))}
+              {!selectedSettlements.length ? (
+                <Text style={styles.cardDescription}>
+                  Aun no existen liquidaciones.
+                </Text>
+              ) : null}
+            </View>
+          )
         ) : null}
         {tab === 'commissions' ? (
           <View style={styles.commissionSection}>
@@ -491,36 +621,38 @@ export default function WalletScreen() {
                 </Text>
               </Pressable>
             ) : null}
-            <ScrollView
-              contentContainerStyle={styles.professionalFilters}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-            >
-              {(commissionsQuery.data?.professionals ?? []).map(
-                (professional) => (
-                  <Pressable
-                    accessibilityRole="button"
-                    key={professional.id}
-                    onPress={() => setSelectedProfessionalId(professional.id)}
-                    style={[
-                      styles.professionalChip,
-                      effectiveProfessional?.id === professional.id &&
-                        styles.professionalChipActive,
-                    ]}
-                  >
-                    <Text
+            {canManageCommissions ? (
+              <ScrollView
+                contentContainerStyle={styles.professionalFilters}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+              >
+                {(commissionsQuery.data?.professionals ?? []).map(
+                  (professional) => (
+                    <Pressable
+                      accessibilityRole="button"
+                      key={professional.id}
+                      onPress={() => setSelectedProfessionalId(professional.id)}
                       style={[
-                        styles.professionalChipText,
+                        styles.professionalChip,
                         effectiveProfessional?.id === professional.id &&
-                          styles.professionalChipTextActive,
+                          styles.professionalChipActive,
                       ]}
                     >
-                      {professional.name}
-                    </Text>
-                  </Pressable>
-                ),
-              )}
-            </ScrollView>
+                      <Text
+                        style={[
+                          styles.professionalChipText,
+                          effectiveProfessional?.id === professional.id &&
+                            styles.professionalChipTextActive,
+                        ]}
+                      >
+                        {professional.name}
+                      </Text>
+                    </Pressable>
+                  ),
+                )}
+              </ScrollView>
+            ) : null}
             {effectiveProfessional ? (
               <>
                 <View style={styles.commissionBalance}>
@@ -599,7 +731,7 @@ export default function WalletScreen() {
                   </Text>
                 ) : null}
                 <Text style={styles.sectionTitle}>Movimientos de comisión</Text>
-                {selectedEntries.map((entry) => (
+                {commissionEntriesForTab.map((entry) => (
                   <View key={entry.id} style={styles.financialRow}>
                     <View style={styles.copy}>
                       <Text style={styles.cardTitle}>
@@ -624,7 +756,7 @@ export default function WalletScreen() {
                     ) : null}
                   </View>
                 ))}
-                {!selectedEntries.length ? (
+                {!commissionEntriesForTab.length ? (
                   <Text style={styles.cardDescription}>
                     Aún no existen movimientos de comisión.
                   </Text>

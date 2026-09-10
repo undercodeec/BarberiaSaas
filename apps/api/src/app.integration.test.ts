@@ -870,6 +870,139 @@ describeWithDatabase('API con PostgreSQL', () => {
     ]);
   });
 
+  it('aísla las comisiones de cada barbero en el overview', async () => {
+    const agenda = await setupAgenda('comisiones-propias-barbero');
+    const otherBarberToken = await register(
+      'comisiones-propias-otro-barbero@example.com',
+    );
+    const invitation = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        email: 'comisiones-propias-otro-barbero@example.com',
+        fullName: 'Otro barbero',
+        locationId: agenda.locationId,
+        role: 'barber',
+      },
+      url: '/v1/team/invitations',
+    });
+    expect(invitation.statusCode).toBe(201);
+    const accepted = await app.inject({
+      headers: { authorization: `Bearer ${otherBarberToken}` },
+      method: 'POST',
+      payload: { token: lastInvitationToken() },
+      url: '/v1/team/invitations/accept',
+    });
+    const otherMembershipId = accepted.json<{
+      membership: { id: string };
+    }>().membership.id;
+    const occurredAt = new Date('2030-01-14T16:00:00.000Z');
+    await database.commissionRule.createMany({
+      data: [
+        {
+          effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+          organizationId: agenda.organizationId,
+          professionalMembershipId: agenda.membershipId,
+          type: 'SERVICE_PERCENTAGE',
+          value: 25,
+        },
+        {
+          effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+          organizationId: agenda.organizationId,
+          professionalMembershipId: otherMembershipId,
+          type: 'SERVICE_PERCENTAGE',
+          value: 25,
+        },
+      ],
+    });
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${agenda.ownerToken}` },
+          method: 'POST',
+          payload: { openingAmountCents: 0 },
+          url: '/v1/cash-register/open',
+        })
+      ).statusCode,
+    ).toBe(201);
+    for (const [amountCents, professionalMembershipId] of [
+      [1_200, agenda.membershipId],
+      [2_000, otherMembershipId],
+    ] as const) {
+      const sale = await app.inject({
+        headers: { authorization: `Bearer ${agenda.ownerToken}` },
+        method: 'POST',
+        payload: {
+          amountCents,
+          description: 'Servicio para verificar aislamiento de comisión',
+          paymentMethod: 'cash',
+          professionalMembershipId,
+          serviceId: agenda.serviceId,
+          type: 'sale',
+        },
+        url: '/v1/cash-register/movements',
+      });
+      expect(sale.statusCode, sale.body).toBe(201);
+    }
+    const ownerMembership = await database.membership.findFirstOrThrow({
+      where: { organizationId: agenda.organizationId, role: 'OWNER' },
+    });
+    await database.professionalAdvance.createMany({
+      data: [
+        {
+          createdByUserId: ownerMembership.userId,
+          occurredAt,
+          organizationId: agenda.organizationId,
+          originalAmountCents: 100,
+          paymentMethod: 'CASH',
+          professionalMembershipId: agenda.membershipId,
+        },
+        {
+          createdByUserId: ownerMembership.userId,
+          occurredAt,
+          organizationId: agenda.organizationId,
+          originalAmountCents: 200,
+          paymentMethod: 'CASH',
+          professionalMembershipId: otherMembershipId,
+        },
+      ],
+    });
+
+    const overview = await app.inject({
+      headers: { authorization: `Bearer ${agenda.barberToken}` },
+      method: 'GET',
+      url: '/v1/commissions/overview',
+    });
+
+    expect(overview.statusCode, overview.body).toBe(200);
+    expect(
+      overview.json<{
+        advances: Array<{ professionalMembershipId: string }>;
+        entries: Array<{ professionalMembershipId: string }>;
+        professionals: Array<{ commissionPendingCents: number; id: string }>;
+        settlements: unknown[];
+      }>(),
+    ).toEqual({
+      advances: [
+        expect.objectContaining({
+          professionalMembershipId: agenda.membershipId,
+        }),
+      ],
+      entries: [
+        expect.objectContaining({
+          professionalMembershipId: agenda.membershipId,
+        }),
+      ],
+      professionals: [
+        expect.objectContaining({
+          commissionPendingCents: 300,
+          id: agenda.membershipId,
+        }),
+      ],
+      settlements: [],
+    });
+  });
+
   it('persiste una única respuesta de bienvenida por usuario', async () => {
     const token = await register('welcome-survey@example.com');
     const headers = { authorization: `Bearer ${token}` };
@@ -3923,8 +4056,174 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(replacementResponse.statusCode).toBe(201);
   });
 
-  it('genera comisión de producto por porcentaje y monto fijo para el barbero vendedor', async () => {
+  it('calcula la comisión de productos por el porcentaje de cada barbero y le notifica solo su valor', async () => {
+    const agenda = await setupAgenda('comision-producto-por-barbero');
+    await database.commissionRule.create({
+      data: {
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        organizationId: agenda.organizationId,
+        professionalMembershipId: agenda.membershipId,
+        type: 'SERVICE_PERCENTAGE',
+        value: 25,
+      },
+    });
+    const otherBarberToken = await register(
+      'comision-producto-por-barbero-otro@example.com',
+    );
+    const invitation = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        commissionPercentage: 40,
+        email: 'comision-producto-por-barbero-otro@example.com',
+        fullName: 'Segundo barbero',
+        locationId: agenda.locationId,
+        role: 'barber',
+      },
+      url: '/v1/team/invitations',
+    });
+    expect(invitation.statusCode, invitation.body).toBe(201);
+    const accepted = await app.inject({
+      headers: { authorization: `Bearer ${otherBarberToken}` },
+      method: 'POST',
+      payload: { token: lastInvitationToken() },
+      url: '/v1/team/invitations/accept',
+    });
+    expect(accepted.statusCode, accepted.body).toBe(200);
+    const otherMembershipId = accepted.json<{
+      membership: { id: string };
+    }>().membership.id;
+    const [barber, otherBarber] = await Promise.all([
+      database.membership.findUniqueOrThrow({
+        include: { user: true },
+        where: { id: agenda.membershipId },
+      }),
+      database.membership.findUniqueOrThrow({
+        include: { user: true },
+        where: { id: otherMembershipId },
+      }),
+    ]);
+    const createdProduct = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        commissionType: 'fixed',
+        commissionValue: 125,
+        costCents: 500,
+        initialStock: 10,
+        locationId: agenda.locationId,
+        minimumStock: 1,
+        name: 'Cera vendida por barberos',
+        salePriceCents: 1_500,
+        stockTrackingEnabled: true,
+      },
+      url: '/v1/inventory/products',
+    });
+    expect(createdProduct.statusCode, createdProduct.body).toBe(201);
+    const productId = createdProduct.json<{ product: { id: string } }>().product
+      .id;
+    expect(
+      (
+        await app.inject({
+          headers: { authorization: `Bearer ${agenda.ownerToken}` },
+          method: 'POST',
+          payload: { locationId: agenda.locationId, openingAmountCents: 0 },
+          url: '/v1/cash-register/open',
+        })
+      ).statusCode,
+    ).toBe(201);
+
+    const firstSale = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        amountCents: 3_000,
+        description: 'Venta del primer barbero',
+        paymentMethod: 'cash',
+        productId,
+        productQuantity: 2,
+        sellerMembershipId: agenda.membershipId,
+        type: 'sale',
+      },
+      url: '/v1/cash-register/movements',
+    });
+    const secondSale = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'POST',
+      payload: {
+        amountCents: 3_000,
+        description: 'Venta del segundo barbero',
+        paymentMethod: 'card',
+        productId,
+        productQuantity: 2,
+        sellerMembershipId: otherMembershipId,
+        type: 'sale',
+      },
+      url: '/v1/cash-register/movements',
+    });
+    expect(firstSale.statusCode, firstSale.body).toBe(201);
+    expect(secondSale.statusCode, secondSale.body).toBe(201);
+
+    const [firstEntry, secondEntry, notifications] = await Promise.all([
+      database.commissionEntry.findUniqueOrThrow({
+        where: {
+          cashMovementId: firstSale.json<{ movement: { id: string } }>()
+            .movement.id,
+        },
+      }),
+      database.commissionEntry.findUniqueOrThrow({
+        where: {
+          cashMovementId: secondSale.json<{ movement: { id: string } }>()
+            .movement.id,
+        },
+      }),
+      database.appNotification.findMany({
+        orderBy: { userId: 'asc' },
+        select: { body: true, type: true, userId: true },
+        where: {
+          organizationId: agenda.organizationId,
+          type: 'COMMISSION_EARNED',
+        },
+      }),
+    ]);
+    expect(firstEntry).toMatchObject({
+      baseAmountCents: 3_000,
+      commissionAmountCents: 750,
+      professionalMembershipId: agenda.membershipId,
+    });
+    expect(secondEntry).toMatchObject({
+      baseAmountCents: 3_000,
+      commissionAmountCents: 1_200,
+      professionalMembershipId: otherMembershipId,
+    });
+    expect(notifications).toEqual(
+      expect.arrayContaining([
+        {
+          body: 'Se registró una comisión de $7.50 a tu favor.',
+          type: 'COMMISSION_EARNED',
+          userId: barber.userId,
+        },
+        {
+          body: 'Se registró una comisión de $12.00 a tu favor.',
+          type: 'COMMISSION_EARNED',
+          userId: otherBarber.userId,
+        },
+      ]),
+    );
+    expect(notifications).toHaveLength(2);
+  });
+
+  it('genera y revierte la comisión de producto asignada al barbero vendedor', async () => {
     const agenda = await setupAgenda('comision-producto');
+    await database.commissionRule.create({
+      data: {
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        organizationId: agenda.organizationId,
+        professionalMembershipId: agenda.membershipId,
+        type: 'SERVICE_PERCENTAGE',
+        value: 10,
+      },
+    });
     const createdProduct = await app.inject({
       headers: { authorization: `Bearer ${agenda.ownerToken}` },
       method: 'POST',
@@ -3944,10 +4243,14 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(createdProduct.statusCode, createdProduct.body).toBe(201);
     expect(
       createdProduct.json<{
-        product: { commissionType: string | null; commissionValue: number | null };
+        product: {
+          commissionType: string | null;
+          commissionValue: number | null;
+        };
       }>().product,
     ).toMatchObject({ commissionType: 'percentage', commissionValue: 10 });
-    const productId = createdProduct.json<{ product: { id: string } }>().product.id;
+    const productId = createdProduct.json<{ product: { id: string } }>().product
+      .id;
 
     expect(
       (
@@ -4036,10 +4339,11 @@ describeWithDatabase('API con PostgreSQL', () => {
     const fixedCommission = await database.commissionEntry.findUnique({
       where: { cashMovementId: fixedMovementId },
     });
-    expect(fixedCommission).toMatchObject({ commissionAmountCents: 250 });
+    expect(fixedCommission).toMatchObject({ commissionAmountCents: 300 });
     expect(fixedCommission?.calculationSnapshot).toMatchObject({
-      commissionType: 'fixed',
       quantity: 2,
+      ruleType: 'SERVICE_PERCENTAGE',
+      ruleValue: 10,
       source: 'product_sale',
     });
   });
@@ -4167,6 +4471,49 @@ describeWithDatabase('API con PostgreSQL', () => {
       commissionAmountCents: 300,
       professionalMembershipId: agenda.membershipId,
       status: 'PENDING',
+    });
+    const barber = await database.membership.findUniqueOrThrow({
+      include: { user: true },
+      where: { id: agenda.membershipId },
+    });
+    expect(
+      await database.appNotification.findFirst({
+        select: { body: true, type: true, userId: true },
+        where: {
+          organizationId: agenda.organizationId,
+          type: 'COMMISSION_EARNED',
+          userId: barber.userId,
+        },
+      }),
+    ).toEqual({
+      body: 'Se registró una comisión de $3.00 a tu favor.',
+      type: 'COMMISSION_EARNED',
+      userId: barber.userId,
+    });
+
+    const barberOverview = await app.inject({
+      headers: { authorization: `Bearer ${agenda.barberToken}` },
+      method: 'GET',
+      url: '/v1/commissions/overview',
+    });
+    expect(barberOverview.statusCode, barberOverview.body).toBe(200);
+    expect(
+      barberOverview.json<{
+        entries: Array<{ professionalMembershipId: string }>;
+        professionals: Array<{ commissionPendingCents: number; id: string }>;
+      }>(),
+    ).toMatchObject({
+      entries: [
+        expect.objectContaining({
+          professionalMembershipId: agenda.membershipId,
+        }),
+      ],
+      professionals: [
+        expect.objectContaining({
+          commissionPendingCents: 300,
+          id: agenda.membershipId,
+        }),
+      ],
     });
 
     const repeatedCompletion = await app.inject({

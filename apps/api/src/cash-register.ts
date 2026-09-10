@@ -6,7 +6,6 @@ import {
   AppointmentPaymentStatus,
   MembershipRole,
   MembershipStatus,
-  ProductCommissionType,
   StockDirection,
   StockMovementType,
   type DatabaseClient,
@@ -1099,8 +1098,6 @@ export function registerCashRegisterRoutes(
       }
 
       let productSale: {
-        commissionType: ProductCommissionType | null;
-        commissionValue: number | null;
         costCents: number;
         id: string;
         name: string;
@@ -1236,8 +1233,6 @@ export function registerCashRegisterRoutes(
           resultingQuantity = updatedInventory.quantityOnHand;
         }
         productSale = {
-          commissionType: product.commissionType,
-          commissionValue: product.commissionValue,
           costCents: product.costCents,
           id: product.id,
           name: product.name,
@@ -1346,8 +1341,6 @@ export function registerCashRegisterRoutes(
       } else if (
         productSale &&
         seller?.role === MembershipRole.BARBER &&
-        productSale.commissionType &&
-        productSale.commissionValue !== null &&
         currentScope.organizationId &&
         session.locationId
       ) {
@@ -1359,8 +1352,6 @@ export function registerCashRegisterRoutes(
           const commission = await createProductSaleCommission(transaction, {
             amountCents: created.amountCents,
             cashMovementId: created.id,
-            commissionType: productSale.commissionType,
-            commissionValue: productSale.commissionValue,
             locationId: session.locationId,
             occurredAt: created.createdAt,
             organizationId: currentScope.organizationId,
@@ -1369,10 +1360,11 @@ export function registerCashRegisterRoutes(
             professionalMembershipId: seller.id,
             quantity: productSale.quantity,
           });
-          commissionNotification = {
-            amountCents: commission.commissionAmountCents,
-            professionalUserId: seller.userId,
-          };
+          if (commission)
+            commissionNotification = {
+              amountCents: commission.commissionAmountCents,
+              professionalUserId: seller.userId,
+            };
         }
       }
       return { commissionNotification, movement: created };
