@@ -394,8 +394,7 @@ export interface InventoryProductSummary {
   readonly stockTrackingEnabled: boolean;
 }
 
-export interface InventoryProductsPageResponse
-  extends CursorPage<InventoryProductSummary> {
+export interface InventoryProductsPageResponse extends CursorPage<InventoryProductSummary> {
   readonly accessibleLocations: ReadonlyArray<{
     readonly id: string;
     readonly name: string;
@@ -448,6 +447,18 @@ export interface ProductOrderRecord {
 
 export interface ProductOrdersResponse {
   readonly orders: readonly ProductOrderRecord[];
+}
+
+export interface ProductPaymentSettingsResponse {
+  readonly settings: {
+    readonly accountHolderName: string;
+    readonly accountNumber: string;
+    readonly accountType: 'checking' | 'other' | 'savings';
+    readonly bankName: string;
+    readonly holderIdentification: string;
+    readonly instructions: string | null;
+    readonly isEnabled: boolean;
+  } | null;
 }
 
 export interface StockMovementRecord {
@@ -1166,6 +1177,9 @@ export interface PublicBookingCatalogV2 {
     readonly slug: string;
   };
   readonly policy: BookingSettingsResponse;
+  readonly productPayments: {
+    readonly transferAvailable: boolean;
+  };
   readonly professionals: ReadonlyArray<{
     readonly bio: string | null;
     readonly id: string;

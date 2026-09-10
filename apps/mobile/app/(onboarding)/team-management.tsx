@@ -30,6 +30,7 @@ import {
   goldButtonShadow,
   useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
+import { ConfirmationDialog } from '../../src/components/ConfirmationDialog';
 import { requireApiClient } from '../../src/lib/api';
 import { accountQueryKey, tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -70,6 +71,8 @@ export default function TeamManagementScreen() {
   const current = organizationQuery.data;
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
+  const [memberPendingRemoval, setMemberPendingRemoval] =
+    useState<TeamMember | null>(null);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<InvitationRole>('barber');
@@ -163,8 +166,7 @@ export default function TeamManagementScreen() {
         method: assigned ? 'DELETE' : 'POST',
       }),
     onError: (error) =>
-      Alert.alert(
-        'No pudimos actualizar el servicio',
+      setInviteError(
         error instanceof Error ? error.message : 'Inténtalo nuevamente.',
       ),
     onSuccess: async () => {
@@ -938,20 +940,7 @@ export default function TeamManagementScreen() {
                   accessibilityLabel="Eliminar colaborador"
                   accessibilityRole="button"
                   disabled={isInviting}
-                  onPress={() =>
-                    Alert.alert(
-                      'Eliminar colaborador',
-                      `¿Quieres retirar a ${editingMember.user.fullName} del equipo? Su historial se conservará.`,
-                      [
-                        { style: 'cancel', text: 'Cancelar' },
-                        {
-                          onPress: () => void deleteMember(editingMember),
-                          style: 'destructive',
-                          text: 'Eliminar',
-                        },
-                      ],
-                    )
-                  }
+                  onPress={() => setMemberPendingRemoval(editingMember)}
                   style={styles.deleteButton}
                 >
                   <Ionicons color="#bd2d2d" name="trash-outline" size={20} />
@@ -964,6 +953,23 @@ export default function TeamManagementScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      <ConfirmationDialog
+        confirmLabel="Eliminar"
+        description={
+          memberPendingRemoval
+            ? `¿Quieres retirar a ${memberPendingRemoval.user.fullName} del equipo? Su historial se conservará.`
+            : ''
+        }
+        isPending={isInviting}
+        onCancel={() => setMemberPendingRemoval(null)}
+        onConfirm={() => {
+          if (!memberPendingRemoval) return;
+          void deleteMember(memberPendingRemoval);
+          setMemberPendingRemoval(null);
+        }}
+        title="Eliminar colaborador"
+        visible={memberPendingRemoval !== null}
+      />
     </SafeAreaView>
   );
 }

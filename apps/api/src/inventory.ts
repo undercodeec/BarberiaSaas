@@ -9,6 +9,7 @@ import {
   type DatabaseClient,
   type Prisma,
 } from '@barber-saas/database';
+import { catalogImageDataSchema } from '@barber-saas/validation';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
@@ -24,7 +25,7 @@ type Authenticate = (
 const productFieldsSchema = z.object({
   barcode: z.string().trim().min(1).max(80).optional(),
   costCents: z.number().int().min(0).max(100_000_000),
-  imageData: z.string().trim().max(2_000_000).nullish(),
+  imageData: catalogImageDataSchema.nullish(),
   minimumStock: z.number().int().min(0).max(1_000_000),
   name: z.string().trim().min(2).max(120),
   salePriceCents: z.number().int().min(1).max(100_000_000),

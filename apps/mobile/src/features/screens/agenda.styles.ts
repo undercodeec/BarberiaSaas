@@ -50,6 +50,17 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     marginTop: 6,
   },
+  modalNotice: {
+    backgroundColor: appTheme.colors.dangerSurface,
+    borderColor: appTheme.colors.dangerBorder,
+    borderRadius: 12,
+    borderWidth: 1,
+    color: appTheme.colors.danger,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 14,
+    padding: 12,
+  },
   confirmationCheck: {
     alignItems: 'flex-start',
     flexDirection: 'row',

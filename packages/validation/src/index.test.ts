@@ -193,6 +193,22 @@ describe('reglas de reservas públicas', () => {
 });
 
 describe('servicios y horarios', () => {
+  it('acepta una imagen de catálogo de 15 MiB de un iPhone de alta gama', () => {
+    const prefix = 'data:image/jpeg;base64,';
+    const imageData = `${prefix}${'A'.repeat(
+      MAX_HIGH_END_IPHONE_IMAGE_DATA_URI_LENGTH - prefix.length,
+    )}`;
+
+    expect(
+      createServiceSchema.safeParse({
+        durationMinutes: 30,
+        imageData,
+        name: 'Corte clásico',
+        priceCents: 1200,
+      }).success,
+    ).toBe(true);
+  });
+
   it('acepta duraciones en intervalos de cinco minutos', () => {
     expect(
       createServiceSchema.safeParse({

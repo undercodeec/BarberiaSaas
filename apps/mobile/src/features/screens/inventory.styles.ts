@@ -3,6 +3,15 @@ import { StyleSheet } from 'react-native';
 import { appTheme, goldButtonShadow } from '../../components/BottomNavigation';
 
 export const styles = StyleSheet.create({
+  bankTransferCard: {
+    alignItems: 'center',
+    backgroundColor: '#FFF9ED',
+    borderColor: '#E3D7BF',
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: 'row',
+    padding: 15,
+  },
   backdrop: StyleSheet.absoluteFill,
   cancelButton: {
     alignItems: 'center',
@@ -124,10 +133,16 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
   },
+  movementDetail: { flex: 1, flexShrink: 1, minWidth: 0 },
   movementIn: { color: '#288B52', fontSize: 17, fontWeight: '900' },
   movementNotes: { color: '#46505C', fontSize: 13, marginTop: 6 },
   movementOut: { color: '#B54747', fontSize: 17, fontWeight: '900' },
-  movementValue: { alignItems: 'flex-end', marginLeft: 12 },
+  movementValue: {
+    alignItems: 'flex-end',
+    flexShrink: 0,
+    marginLeft: 12,
+    minWidth: 56,
+  },
   muted: { color: '#6B7480', fontSize: 13, lineHeight: 19 },
   overlay: {
     backgroundColor: 'rgba(17,24,39,0.35)',
@@ -148,7 +163,13 @@ export const styles = StyleSheet.create({
   orderActions: { flexDirection: 'row', gap: 18 },
   orderCancelButton: { alignSelf: 'flex-start', marginTop: 8 },
   orderCancelText: { color: '#805E21', fontSize: 13, fontWeight: '800' },
-  orderTotal: { color: '#18202B', fontSize: 16, fontWeight: '900' },
+  orderTotal: {
+    color: '#18202B',
+    flexShrink: 0,
+    fontSize: 16,
+    fontWeight: '900',
+    marginLeft: 12,
+  },
   deleteSmallButton: { backgroundColor: '#FDECEC' },
   photoPickerImage: { height: '100%', width: '100%' },
   photoPickerLabel: {
@@ -213,11 +234,13 @@ export const styles = StyleSheet.create({
   summaryCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 17,
+    flexBasis: '48%',
     flex: 1,
-    minWidth: 100,
+    minWidth: 0,
     padding: 14,
   },
   summaryCardAlert: { backgroundColor: '#FFF1F1' },
+  summaryCardFullWidth: { flexBasis: '100%' },
   summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   summaryValue: { color: '#18202B', fontSize: 19, fontWeight: '900' },
   tab: {

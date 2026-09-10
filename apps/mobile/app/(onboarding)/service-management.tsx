@@ -1,5 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ServiceRecord, ServicesResponse } from '@barber-saas/api-client';
+import {
+  MAX_HIGH_END_IPHONE_IMAGE_BYTES,
+  MAX_HIGH_END_IPHONE_IMAGE_DIMENSION,
+} from '@barber-saas/validation';
 import * as ImagePicker from 'expo-image-picker';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -30,9 +34,6 @@ import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 import { GuideAnchor } from '../../src/features/guides/GuideAnchor';
 import { useGuides } from '../../src/features/guides/GuideProvider';
-
-const MAX_IMAGE_BYTES = 1_500_000;
-const MAX_IMAGE_DIMENSION = 1_600;
 
 const COLORS = {
   border: appTheme.colors.border,
@@ -239,22 +240,19 @@ export default function ServiceManagementScreen() {
       Alert.alert('No pudimos leer la foto', 'Inténtalo con otra imagen.');
       return;
     }
-    const bytes = asset.fileSize ?? Math.ceil((asset.base64.length * 3) / 4);
+    const bytes = Math.ceil((asset.base64.length * 3) / 4);
     if (
-      bytes > MAX_IMAGE_BYTES ||
-      asset.width > MAX_IMAGE_DIMENSION ||
-      asset.height > MAX_IMAGE_DIMENSION
+      bytes > MAX_HIGH_END_IPHONE_IMAGE_BYTES ||
+      asset.width > MAX_HIGH_END_IPHONE_IMAGE_DIMENSION ||
+      asset.height > MAX_HIGH_END_IPHONE_IMAGE_DIMENSION
     ) {
       Alert.alert(
         'Imagen demasiado grande',
-        'Máximo: 1.5 MB y 1600 × 1600 píxeles.',
+        'Máximo: 15 MB y 8064 × 8064 píxeles.',
       );
       return;
     }
-    const mimeType = asset.mimeType?.startsWith('image/')
-      ? asset.mimeType
-      : 'image/jpeg';
-    setServiceImageData(`data:${mimeType};base64,${asset.base64}`);
+    setServiceImageData(`data:image/jpeg;base64,${asset.base64}`);
   };
 
   const requestError =

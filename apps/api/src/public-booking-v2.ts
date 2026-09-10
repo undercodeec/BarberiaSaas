@@ -16,7 +16,10 @@ import {
 } from './public-booking';
 import { ApiError } from './errors';
 import { decodeDataUri, sendMedia } from './media-response';
-import { getAllowedProfessionalIds, getSubscriptionUsage } from './subscription-policy';
+import {
+  getAllowedProfessionalIds,
+  getSubscriptionUsage,
+} from './subscription-policy';
 
 const publicMediaPathSchema = publicPathSchema.extend({
   asset: z.enum([
@@ -52,7 +55,13 @@ async function publicCatalogV2(
     getSubscriptionUsage(database, location.organizationId),
     getAllowedProfessionalIds(database, location.organizationId),
   ]);
-  const [assignments, reviews, products, ownerMembership] = await Promise.all([
+  const [
+    assignments,
+    reviews,
+    products,
+    ownerMembership,
+    bankTransferSettings,
+  ] = await Promise.all([
     database.professionalService.findMany({
       select: {
         customDurationMinutes: true,
@@ -134,60 +143,71 @@ async function publicCatalogV2(
         status: MembershipStatus.ACTIVE,
       },
     }),
+    database.organizationBankTransferSettings.findUnique({
+      select: { isEnabled: true },
+      where: { organizationId: location.organizationId },
+    }),
   ]);
-  const serviceIds = [...new Set(assignments.map(({ serviceId }) => serviceId))];
+  const serviceIds = [
+    ...new Set(assignments.map(({ serviceId }) => serviceId)),
+  ];
   const membershipIds = [
     ...new Set(assignments.map(({ membershipId }) => membershipId)),
   ];
   const productIds = products.map(({ id }) => id);
-  const [servicesWithImages, productsWithImages, professionalsWithPhotos, ownerWithPhoto, ownerWithCover] =
-    await Promise.all([
-      database.service.findMany({
-        select: { id: true },
-        where: {
-          id: { in: serviceIds },
-          imageData: { not: null },
-        },
-      }),
-      database.product.findMany({
-        select: { id: true },
-        where: {
-          id: { in: productIds },
-          imageData: { not: null },
-        },
-      }),
-      database.membership.findMany({
-        select: { id: true },
-        where: {
-          id: { in: membershipIds },
-          user: { profilePhotoData: { not: null } },
-        },
-      }),
-      database.membership.findFirst({
-        select: { id: true },
-        where: {
-          organizationId: location.organizationId,
-          role: MembershipRole.OWNER,
-          status: MembershipStatus.ACTIVE,
-          user: { profilePhotoData: { not: null } },
-        },
-      }),
-      database.userRegistrationProfile.findFirst({
-        select: { userId: true },
-        where: {
-          coverImageUri: { not: null },
-          user: {
-            memberships: {
-              some: {
-                organizationId: location.organizationId,
-                role: MembershipRole.OWNER,
-                status: MembershipStatus.ACTIVE,
-              },
+  const [
+    servicesWithImages,
+    productsWithImages,
+    professionalsWithPhotos,
+    ownerWithPhoto,
+    ownerWithCover,
+  ] = await Promise.all([
+    database.service.findMany({
+      select: { id: true },
+      where: {
+        id: { in: serviceIds },
+        imageData: { not: null },
+      },
+    }),
+    database.product.findMany({
+      select: { id: true },
+      where: {
+        id: { in: productIds },
+        imageData: { not: null },
+      },
+    }),
+    database.membership.findMany({
+      select: { id: true },
+      where: {
+        id: { in: membershipIds },
+        user: { profilePhotoData: { not: null } },
+      },
+    }),
+    database.membership.findFirst({
+      select: { id: true },
+      where: {
+        organizationId: location.organizationId,
+        role: MembershipRole.OWNER,
+        status: MembershipStatus.ACTIVE,
+        user: { profilePhotoData: { not: null } },
+      },
+    }),
+    database.userRegistrationProfile.findFirst({
+      select: { userId: true },
+      where: {
+        coverImageUri: { not: null },
+        user: {
+          memberships: {
+            some: {
+              organizationId: location.organizationId,
+              role: MembershipRole.OWNER,
+              status: MembershipStatus.ACTIVE,
             },
           },
         },
-      }),
-    ]);
+      },
+    }),
+  ]);
   const serviceImageIds = new Set(servicesWithImages.map(({ id }) => id));
   const productImageIds = new Set(productsWithImages.map(({ id }) => id));
   const professionalPhotoIds = new Set(
@@ -231,14 +251,18 @@ async function publicCatalogV2(
   return {
     bookingAvailability: {
       canCreate:
-        subscriptionUsage.subscription.status !== SubscriptionStatus.SUSPENDED &&
-        subscriptionUsage.subscription.status !== SubscriptionStatus.CANCELLED &&
+        subscriptionUsage.subscription.status !==
+          SubscriptionStatus.SUSPENDED &&
+        subscriptionUsage.subscription.status !==
+          SubscriptionStatus.CANCELLED &&
         (subscriptionUsage.effectiveBookingLimit === null ||
           subscriptionUsage.usage.rolling30DayBookings <
             subscriptionUsage.effectiveBookingLimit),
       message:
-        subscriptionUsage.subscription.status === SubscriptionStatus.SUSPENDED ||
-        subscriptionUsage.subscription.status === SubscriptionStatus.CANCELLED ||
+        subscriptionUsage.subscription.status ===
+          SubscriptionStatus.SUSPENDED ||
+        subscriptionUsage.subscription.status ===
+          SubscriptionStatus.CANCELLED ||
         (subscriptionUsage.effectiveBookingLimit !== null &&
           subscriptionUsage.usage.rolling30DayBookings >=
             subscriptionUsage.effectiveBookingLimit)
@@ -263,7 +287,12 @@ async function publicCatalogV2(
     },
     organization: {
       coverImageUrl: ownerWithCover
-        ? mediaUrl(organizationSlug, locationSlug, 'organization-cover', organizationId)
+        ? mediaUrl(
+            organizationSlug,
+            locationSlug,
+            'organization-cover',
+            organizationId,
+          )
         : null,
       description: ownerMembership?.user.profileBio ?? null,
       facebookUrl:
@@ -273,12 +302,18 @@ async function publicCatalogV2(
         ownerMembership?.user.registrationProfile?.instagramUrl ?? null,
       name: location.organization.name,
       profilePhotoUrl: ownerWithPhoto
-        ? mediaUrl(organizationSlug, locationSlug, 'organization-profile', organizationId)
+        ? mediaUrl(
+            organizationSlug,
+            locationSlug,
+            'organization-profile',
+            organizationId,
+          )
         : null,
       slug: location.organization.slug,
     },
     policy: {
-      cancellationLeadMinutes: location.organization.bookingCancellationLeadMinutes,
+      cancellationLeadMinutes:
+        location.organization.bookingCancellationLeadMinutes,
       confirmationDeadlineMinutes:
         location.organization.bookingConfirmationDeadlineMinutes,
       confirmationEnabled: location.organization.bookingConfirmationEnabled,
@@ -288,12 +323,21 @@ async function publicCatalogV2(
       rescheduleLeadMinutes: location.organization.bookingRescheduleLeadMinutes,
       servicePaymentConfirmationEnabled:
         location.organization.servicePaymentConfirmationEnabled,
-      unconfirmedAction: location.organization.bookingUnconfirmedAction.toLowerCase(),
+      unconfirmedAction:
+        location.organization.bookingUnconfirmedAction.toLowerCase(),
+    },
+    productPayments: {
+      transferAvailable: bankTransferSettings?.isEnabled === true,
     },
     professionals: [...professionalMap.values()].map((professional) => ({
       ...professional,
       photoUrl: professionalPhotoIds.has(professional.id)
-        ? mediaUrl(organizationSlug, locationSlug, 'professional', professional.id)
+        ? mediaUrl(
+            organizationSlug,
+            locationSlug,
+            'professional',
+            professional.id,
+          )
         : null,
     })),
     products: products.map((product) => ({
@@ -340,30 +384,47 @@ async function publicMedia(
   );
   let imageData: string | null = null;
   if (input.asset === 'service') {
-    imageData = (await database.service.findFirst({
-      select: { imageData: true },
-      where: { id: input.assetId, organizationId: location.organizationId },
-    }))?.imageData ?? null;
+    imageData =
+      (
+        await database.service.findFirst({
+          select: { imageData: true },
+          where: { id: input.assetId, organizationId: location.organizationId },
+        })
+      )?.imageData ?? null;
   } else if (input.asset === 'product') {
-    imageData = (await database.product.findFirst({
-      select: { imageData: true },
-      where: { id: input.assetId, isActive: true, organizationId: location.organizationId },
-    }))?.imageData ?? null;
+    imageData =
+      (
+        await database.product.findFirst({
+          select: { imageData: true },
+          where: {
+            id: input.assetId,
+            isActive: true,
+            organizationId: location.organizationId,
+          },
+        })
+      )?.imageData ?? null;
   } else if (input.asset === 'professional') {
-    imageData = (await database.membership.findFirst({
-      select: { user: { select: { profilePhotoData: true } } },
-      where: {
-        id: input.assetId,
-        organizationId: location.organizationId,
-        memberLocations: {
-          some: { locationId: location.id, onlineBookingEnabled: true },
-        },
-        status: MembershipStatus.ACTIVE,
-      },
-    }))?.user.profilePhotoData ?? null;
+    imageData =
+      (
+        await database.membership.findFirst({
+          select: { user: { select: { profilePhotoData: true } } },
+          where: {
+            id: input.assetId,
+            organizationId: location.organizationId,
+            memberLocations: {
+              some: { locationId: location.id, onlineBookingEnabled: true },
+            },
+            status: MembershipStatus.ACTIVE,
+          },
+        })
+      )?.user.profilePhotoData ?? null;
   } else {
     if (input.assetId !== location.organizationId)
-      throw new ApiError(404, 'MEDIA_NOT_FOUND', 'La imagen no estÃ¡ disponible.');
+      throw new ApiError(
+        404,
+        'MEDIA_NOT_FOUND',
+        'La imagen no estÃ¡ disponible.',
+      );
     const owner = await database.membership.findFirst({
       select: {
         user: {
@@ -381,11 +442,15 @@ async function publicMedia(
     });
     imageData =
       input.asset === 'organization-cover'
-        ? owner?.user.registrationProfile?.coverImageUri ?? null
-        : owner?.user.profilePhotoData ?? null;
+        ? (owner?.user.registrationProfile?.coverImageUri ?? null)
+        : (owner?.user.profilePhotoData ?? null);
   }
   if (!imageData)
-    throw new ApiError(404, 'MEDIA_NOT_FOUND', 'La imagen no estÃ¡ disponible.');
+    throw new ApiError(
+      404,
+      'MEDIA_NOT_FOUND',
+      'La imagen no estÃ¡ disponible.',
+    );
   if (/^https?:\/\//iu.test(imageData)) return reply.redirect(imageData);
   return sendMedia(reply, decodeDataUri(imageData), 'public');
 }
@@ -396,56 +461,75 @@ export function registerPublicBookingV2Routes(
 ): void {
   const catalogCache = new Map<
     string,
-    { readonly expiresAt: number; readonly value: Awaited<ReturnType<typeof publicCatalogV2>> }
+    {
+      readonly expiresAt: number;
+      readonly value: Awaited<ReturnType<typeof publicCatalogV2>>;
+    }
   >();
   const catalogLoads = new Map<
     string,
     Promise<Awaited<ReturnType<typeof publicCatalogV2>>>
   >();
-  app.get('/v2/public/:organizationSlug/:locationSlug/catalog', async (request, reply) => {
-    enforceRateLimit(request, 'catalog-v2', 120, 60_000);
-    const input = publicPathSchema.parse(request.params);
-    const key = `${input.organizationSlug}:${input.locationSlug}`;
-    const cached = catalogCache.get(key);
-    const now = Date.now();
-    reply.header('cache-control', 'public, max-age=60, stale-while-revalidate=300');
-    if (cached && cached.expiresAt > now) return cached.value;
-    const pending = catalogLoads.get(key);
-    if (pending) return pending;
-    const load = publicCatalogV2(
-      database,
-      input.organizationSlug,
-      input.locationSlug,
-    ).then((value) => {
-      catalogCache.set(key, { expiresAt: Date.now() + 60_000, value });
-      return value;
-    });
-    catalogLoads.set(key, load);
-    try {
-      return await load;
-    } finally {
-      catalogLoads.delete(key);
-    }
-  });
+  app.get(
+    '/v2/public/:organizationSlug/:locationSlug/catalog',
+    async (request, reply) => {
+      enforceRateLimit(request, 'catalog-v2', 120, 60_000);
+      const input = publicPathSchema.parse(request.params);
+      const key = `${input.organizationSlug}:${input.locationSlug}`;
+      const cached = catalogCache.get(key);
+      const now = Date.now();
+      reply.header(
+        'cache-control',
+        'public, max-age=60, stale-while-revalidate=300',
+      );
+      if (cached && cached.expiresAt > now) return cached.value;
+      const pending = catalogLoads.get(key);
+      if (pending) return pending;
+      const load = publicCatalogV2(
+        database,
+        input.organizationSlug,
+        input.locationSlug,
+      ).then((value) => {
+        catalogCache.set(key, { expiresAt: Date.now() + 60_000, value });
+        return value;
+      });
+      catalogLoads.set(key, load);
+      try {
+        return await load;
+      } finally {
+        catalogLoads.delete(key);
+      }
+    },
+  );
 
-  app.get('/v2/public/:organizationSlug/:locationSlug/availability', async (request) => {
-    enforceRateLimit(request, 'availability-v2', 90, 60_000);
-    const path = publicPathSchema.parse(request.params);
-    const query = publicAvailabilitySchema.parse(request.query);
-    const location = await requirePublicLocation(
-      database,
-      path.organizationSlug,
-      path.locationSlug,
-    );
-    return calculatePublicAvailability(database, {
-      ...query,
-      locationId: location.id,
-      organizationId: location.organizationId,
-    });
-  });
+  app.get(
+    '/v2/public/:organizationSlug/:locationSlug/availability',
+    async (request) => {
+      enforceRateLimit(request, 'availability-v2', 90, 60_000);
+      const path = publicPathSchema.parse(request.params);
+      const query = publicAvailabilitySchema.parse(request.query);
+      const location = await requirePublicLocation(
+        database,
+        path.organizationSlug,
+        path.locationSlug,
+      );
+      return calculatePublicAvailability(database, {
+        ...query,
+        locationId: location.id,
+        organizationId: location.organizationId,
+      });
+    },
+  );
 
-  app.get('/v2/public/:organizationSlug/:locationSlug/media/:asset/:assetId', async (request, reply) => {
-    enforceRateLimit(request, 'media-v2', 240, 60_000);
-    return publicMedia(database, publicMediaPathSchema.parse(request.params), reply);
-  });
+  app.get(
+    '/v2/public/:organizationSlug/:locationSlug/media/:asset/:assetId',
+    async (request, reply) => {
+      enforceRateLimit(request, 'media-v2', 240, 60_000);
+      return publicMedia(
+        database,
+        publicMediaPathSchema.parse(request.params),
+        reply,
+      );
+    },
+  );
 }

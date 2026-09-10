@@ -31,6 +31,7 @@ const catalog: PublicBookingCatalogV2 = {
     profilePhotoUrl: null,
     slug: 'nava',
   },
+  productPayments: { transferAvailable: true },
   policy: {
     cancellationLeadMinutes: 60,
     confirmationDeadlineMinutes: 60,

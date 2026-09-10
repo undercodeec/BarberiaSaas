@@ -3346,13 +3346,7 @@ export async function buildApi({
   );
   registerSriBillingRoutes(app, database, authenticate, config);
   registerSubscriptionPaymentReceiptRoutes(app, database, authenticate, config);
-  registerProductOrderRoutes(
-    app,
-    database,
-    authenticate,
-    config,
-    appointmentNotifier,
-  );
+  registerProductOrderRoutes(app, database, authenticate, appointmentNotifier);
   registerReportRoutes(app, database, authenticate);
 
   const publicBookingLifecycleTimer = setInterval(() => {

@@ -921,6 +921,7 @@ model Organization {
   stockMovements                     StockMovement[]
   paymentAttempts                    PaymentAttempt[]
   productOrders                      ProductOrder[]
+  bankTransferSettings               OrganizationBankTransferSettings?
   payphoneConfiguration              PayphoneConfiguration?
   platformSupportCases               PlatformSupportCase[]
   platformAlerts                     PlatformAlert[]
@@ -1792,6 +1793,7 @@ model ProductOrder {
   paymentReference   String?                   @map("payment_reference") @db.VarChar(100)
   paymentUrl         String?                   @map("payment_url") @db.Text
   paymentRequestedAt DateTime?                 @map("payment_requested_at") @db.Timestamptz(3)
+  bankTransferSnapshot Json?                   @map("bank_transfer_snapshot")
   paidAt             DateTime?                 @map("paid_at") @db.Timestamptz(3)
   readyAt            DateTime?                 @map("ready_at") @db.Timestamptz(3)
   fulfilledAt        DateTime?                 @map("fulfilled_at") @db.Timestamptz(3)
@@ -2038,6 +2040,24 @@ model AppNotification {
 
   @@index([userId, readAt, createdAt])
   @@map("app_notifications")
+}
+
+model OrganizationBankTransferSettings {
+  id                   String       @id @default(uuid()) @db.Uuid
+  organizationId       String       @unique @map("organization_id") @db.Uuid
+  bankName             String       @map("bank_name") @db.VarChar(120)
+  accountHolderName    String       @map("account_holder_name") @db.VarChar(160)
+  accountType          String       @map("account_type") @db.VarChar(20)
+  accountNumber        String       @map("account_number") @db.VarChar(80)
+  holderIdentification String       @map("holder_identification") @db.VarChar(40)
+  instructions         String?      @map("instructions") @db.VarChar(1000)
+  isEnabled            Boolean      @default(true) @map("is_enabled")
+  updatedByUserId      String?      @map("updated_by_user_id") @db.Uuid
+  createdAt            DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("organization_bank_transfer_settings")
 }
 
 model NotificationPreference {

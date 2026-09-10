@@ -3,10 +3,15 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import type {
   InventoryProductSummary,
+  ProductPaymentSettingsResponse,
   ProductOrderRecord,
   ProductOrdersResponse,
   SubscriptionResponse,
 } from '@barber-saas/api-client';
+import {
+  MAX_HIGH_END_IPHONE_IMAGE_BYTES,
+  MAX_HIGH_END_IPHONE_IMAGE_DIMENSION,
+} from '@barber-saas/validation';
 import {
   useInfiniteQuery,
   useMutation,
@@ -38,11 +43,9 @@ import {
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
+import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 
-const MAX_IMAGE_BYTES = 1_500_000;
-const MAX_IMAGE_DIMENSION = 1_600;
-
-type SheetMode = 'adjustment' | 'product';
+type SheetMode = 'adjustment' | 'bank-transfer' | 'product';
 type AdjustmentType =
   'adjustment_in' | 'adjustment_out' | 'loss' | 'purchase' | 'return';
 type InventoryListProduct = InventoryProductSummary;
@@ -81,6 +84,7 @@ export default function InventoryScreen() {
   const layout = useNativeLayoutMetrics();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const organizationQuery = useCurrentOrganization();
   const params = useLocalSearchParams<{ filter?: string }>();
   const [locationId, setLocationId] = useState<string | null>(null);
   const [lowStockOnly, setLowStockOnly] = useState(
@@ -91,9 +95,8 @@ export default function InventoryScreen() {
   );
   const [sheetMode, setSheetMode] = useState<SheetMode>('product');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<InventoryListProduct | null>(
-    null,
-  );
+  const [editingProduct, setEditingProduct] =
+    useState<InventoryListProduct | null>(null);
   const [selectedProduct, setSelectedProduct] =
     useState<InventoryListProduct | null>(null);
   const [name, setName] = useState('');
@@ -107,6 +110,15 @@ export default function InventoryScreen() {
   const [adjustmentNotes, setAdjustmentNotes] = useState('');
   const [adjustmentType, setAdjustmentType] =
     useState<AdjustmentType>('purchase');
+  const [bankName, setBankName] = useState('');
+  const [accountHolderName, setAccountHolderName] = useState('');
+  const [accountType, setAccountType] = useState<
+    'checking' | 'other' | 'savings'
+  >('savings');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [holderIdentification, setHolderIdentification] = useState('');
+  const [bankInstructions, setBankInstructions] = useState('');
+  const [bankTransferEnabled, setBankTransferEnabled] = useState(true);
   const [imageToken, setImageToken] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
@@ -123,9 +135,19 @@ export default function InventoryScreen() {
       requireApiClient().request<SubscriptionResponse>('/v1/subscription'),
     queryKey: tenant.key('subscription'),
   });
+  const isOwner = organizationQuery.data?.membership.role === 'owner';
+  const productPaymentSettingsQuery = useQuery({
+    enabled: Boolean(session && isOwner && tab === 'products'),
+    queryFn: () =>
+      requireApiClient().request<ProductPaymentSettingsResponse>(
+        '/v1/product-payment-settings',
+      ),
+    queryKey: tenant.key('product-payment-settings'),
+  });
 
   const requestedLocationId =
-    locationId ?? (tenant.scope.locationId === 'all' ? null : tenant.scope.locationId);
+    locationId ??
+    (tenant.scope.locationId === 'all' ? null : tenant.scope.locationId);
   const inventoryQuery = useInfiniteQuery({
     ...inventoryProductsQueryOptions(requireApiClient(), tenant.scope, {
       locationId: requestedLocationId ?? '',
@@ -133,9 +155,9 @@ export default function InventoryScreen() {
     }),
     enabled: Boolean(
       session &&
-        requestedLocationId &&
-        subscriptionQuery.data?.current.featureFlags.inventory &&
-        tab === 'products',
+      requestedLocationId &&
+      subscriptionQuery.data?.current.featureFlags.inventory &&
+      tab === 'products',
     ),
   });
   const inventoryProducts = useMemo(
@@ -311,6 +333,43 @@ export default function InventoryScreen() {
       ]);
     },
   });
+  const saveProductPaymentSettings = useMutation({
+    mutationFn: () => {
+      if (
+        bankName.trim().length < 2 ||
+        accountHolderName.trim().length < 2 ||
+        accountNumber.trim().length < 4 ||
+        holderIdentification.trim().length < 4
+      )
+        throw new Error('Completa los datos obligatorios de la cuenta.');
+      return requireApiClient().request<ProductPaymentSettingsResponse>(
+        '/v1/product-payment-settings',
+        {
+          body: {
+            accountHolderName: accountHolderName.trim(),
+            accountNumber: accountNumber.trim(),
+            accountType,
+            bankName: bankName.trim(),
+            holderIdentification: holderIdentification.trim(),
+            instructions: bankInstructions.trim() || undefined,
+            isEnabled: bankTransferEnabled,
+          },
+          method: 'PUT',
+        },
+      );
+    },
+    onError: (error) =>
+      Alert.alert(
+        'No pudimos guardar la cuenta',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      ),
+    onSuccess: async () => {
+      setIsSheetOpen(false);
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('product-payment-settings'),
+      });
+    },
+  });
   const processOrder = useMutation({
     mutationFn: ({
       action,
@@ -381,22 +440,19 @@ export default function InventoryScreen() {
       Alert.alert('No pudimos leer la foto', 'Inténtalo con otra imagen.');
       return;
     }
-    const bytes = asset.fileSize ?? Math.ceil((asset.base64.length * 3) / 4);
+    const bytes = Math.ceil((asset.base64.length * 3) / 4);
     if (
-      bytes > MAX_IMAGE_BYTES ||
-      asset.width > MAX_IMAGE_DIMENSION ||
-      asset.height > MAX_IMAGE_DIMENSION
+      bytes > MAX_HIGH_END_IPHONE_IMAGE_BYTES ||
+      asset.width > MAX_HIGH_END_IPHONE_IMAGE_DIMENSION ||
+      asset.height > MAX_HIGH_END_IPHONE_IMAGE_DIMENSION
     ) {
       Alert.alert(
         'Imagen demasiado grande',
-        'Máximo: 1.5 MB y 1600 × 1600 píxeles.',
+        'Máximo: 15 MB y 8064 × 8064 píxeles.',
       );
       return;
     }
-    const mimeType = asset.mimeType?.startsWith('image/')
-      ? asset.mimeType
-      : 'image/jpeg';
-    setImageData(`data:${mimeType};base64,${asset.base64}`);
+    setImageData(`data:image/jpeg;base64,${asset.base64}`);
   };
 
   const money = (value: number) =>
@@ -423,6 +479,18 @@ export default function InventoryScreen() {
     setAdjustmentType('purchase');
     setCost('0.00');
     setSheetMode('adjustment');
+    setIsSheetOpen(true);
+  };
+  const openBankTransferSettings = () => {
+    const settings = productPaymentSettingsQuery.data?.settings;
+    setBankName(settings?.bankName ?? '');
+    setAccountHolderName(settings?.accountHolderName ?? '');
+    setAccountType(settings?.accountType ?? 'savings');
+    setAccountNumber(settings?.accountNumber ?? '');
+    setHolderIdentification(settings?.holderIdentification ?? '');
+    setBankInstructions(settings?.instructions ?? '');
+    setBankTransferEnabled(settings?.isEnabled ?? true);
+    setSheetMode('bank-transfer');
     setIsSheetOpen(true);
   };
 
@@ -489,17 +557,33 @@ export default function InventoryScreen() {
               <SummaryCard
                 alert={Boolean(inventoryPage?.summary?.lowStockProducts)}
                 label="Stock bajo"
-                value={String(
-                  inventoryPage?.summary?.lowStockProducts ?? 0,
-                )}
+                value={String(inventoryPage?.summary?.lowStockProducts ?? 0)}
               />
               <SummaryCard
                 label="Costo inventario"
-                value={money(
-                  inventoryPage?.summary?.inventoryCostCents ?? 0,
-                )}
+                value={money(inventoryPage?.summary?.inventoryCostCents ?? 0)}
+                wide
               />
             </View>
+            {isOwner ? (
+              <Pressable
+                accessibilityLabel="Configurar cuenta para transferencias"
+                onPress={openBankTransferSettings}
+                style={styles.bankTransferCard}
+              >
+                <View style={styles.productCopy}>
+                  <Text style={styles.productName}>
+                    Cuenta para transferencias
+                  </Text>
+                  <Text style={styles.muted}>
+                    {productPaymentSettingsQuery.data?.settings
+                      ? `${productPaymentSettingsQuery.data.settings.bankName} · ${productPaymentSettingsQuery.data.settings.isEnabled ? 'Activa' : 'Desactivada'}`
+                      : 'Configúrala para ofrecer transferencia en las compras web.'}
+                  </Text>
+                </View>
+                <Ionicons color="#805E21" name="chevron-forward" size={22} />
+              </Pressable>
+            ) : null}
             <Pressable
               onPress={() => setLowStockOnly((value) => !value)}
               style={[
@@ -621,8 +705,7 @@ export default function InventoryScreen() {
                 </View>
               ))}
             </View>
-            {!inventoryQuery.isLoading &&
-            !inventoryProducts.length ? (
+            {!inventoryQuery.isLoading && !inventoryProducts.length ? (
               <View style={styles.empty}>
                 <Ionicons color="#9AA3AF" name="cube-outline" size={42} />
                 <Text style={styles.emptyTitle}>
@@ -642,14 +725,18 @@ export default function InventoryScreen() {
           <View style={styles.list}>
             {inventoryMovements.map((movement) => (
               <View key={movement.id} style={styles.movementCard}>
-                <View>
-                  <Text style={styles.productName}>{movement.productName}</Text>
-                  <Text style={styles.muted}>
+                <View style={styles.movementDetail}>
+                  <Text numberOfLines={2} style={styles.productName}>
+                    {movement.productName}
+                  </Text>
+                  <Text numberOfLines={2} style={styles.muted}>
                     {movementLabel(movement.type)} ·{' '}
                     {new Date(movement.createdAt).toLocaleString('es-EC')}
                   </Text>
                   {movement.notes ? (
-                    <Text style={styles.movementNotes}>{movement.notes}</Text>
+                    <Text numberOfLines={3} style={styles.movementNotes}>
+                      {movement.notes}
+                    </Text>
                   ) : null}
                   {movement.type === 'sale' &&
                   movement.cashMovementId &&
@@ -895,6 +982,94 @@ export default function InventoryScreen() {
                     onConfirm={() => saveProduct.mutate()}
                   />
                 </>
+              ) : sheetMode === 'bank-transfer' ? (
+                <>
+                  <Text style={styles.sheetTitle}>
+                    Cuenta para transferencias
+                  </Text>
+                  <Text style={styles.sheetSubtitle}>
+                    Estos datos se mostrarán al cliente después de reservar una
+                    compra por transferencia.
+                  </Text>
+                  <Field
+                    label="Banco"
+                    onChange={setBankName}
+                    value={bankName}
+                  />
+                  <Field
+                    label="Titular de la cuenta"
+                    onChange={setAccountHolderName}
+                    value={accountHolderName}
+                  />
+                  <Field
+                    keyboardType="number-pad"
+                    label="Número de cuenta"
+                    onChange={setAccountNumber}
+                    value={accountNumber}
+                  />
+                  <Text style={styles.label}>Tipo de cuenta</Text>
+                  <View style={styles.chips}>
+                    {(
+                      [
+                        ['savings', 'Ahorros'],
+                        ['checking', 'Corriente'],
+                        ['other', 'Otra'],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <Chip
+                        active={accountType === value}
+                        key={value}
+                        label={label}
+                        onPress={() => setAccountType(value)}
+                      />
+                    ))}
+                  </View>
+                  <Field
+                    keyboardType="number-pad"
+                    label="Cédula o RUC del titular"
+                    onChange={setHolderIdentification}
+                    value={holderIdentification}
+                  />
+                  <Field
+                    label="Indicaciones (opcional)"
+                    onChange={setBankInstructions}
+                    value={bankInstructions}
+                  />
+                  <Pressable
+                    onPress={() =>
+                      setBankTransferEnabled((enabled) => !enabled)
+                    }
+                    style={[
+                      styles.filterButton,
+                      bankTransferEnabled && styles.filterButtonActive,
+                    ]}
+                  >
+                    <Ionicons
+                      color={bankTransferEnabled ? '#FFFFFF' : '#805E21'}
+                      name={
+                        bankTransferEnabled
+                          ? 'checkmark-circle'
+                          : 'close-circle-outline'
+                      }
+                      size={18}
+                    />
+                    <Text
+                      style={[
+                        styles.filterText,
+                        bankTransferEnabled && styles.filterTextActive,
+                      ]}
+                    >
+                      {bankTransferEnabled
+                        ? 'Transferencias activas'
+                        : 'Transferencias desactivadas'}
+                    </Text>
+                  </Pressable>
+                  <SheetActions
+                    isPending={saveProductPaymentSettings.isPending}
+                    onCancel={() => setIsSheetOpen(false)}
+                    onConfirm={() => saveProductPaymentSettings.mutate()}
+                  />
+                </>
               ) : (
                 <>
                   <Text style={styles.sheetTitle}>Ajustar existencias</Text>
@@ -1001,14 +1176,27 @@ function SummaryCard({
   alert,
   label,
   value,
+  wide,
 }: {
   readonly alert?: boolean;
   readonly label: string;
   readonly value: string;
+  readonly wide?: boolean;
 }) {
   return (
-    <View style={[styles.summaryCard, alert && styles.summaryCardAlert]}>
-      <Text style={[styles.summaryValue, alert && styles.stockAlert]}>
+    <View
+      style={[
+        styles.summaryCard,
+        wide && styles.summaryCardFullWidth,
+        alert && styles.summaryCardAlert,
+      ]}
+    >
+      <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
+        numberOfLines={1}
+        style={[styles.summaryValue, alert && styles.stockAlert]}
+      >
         {value}
       </Text>
       <Text style={styles.muted}>{label}</Text>

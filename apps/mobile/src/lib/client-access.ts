@@ -5,6 +5,7 @@ export type OrganizationRole =
 
 export interface ClientAccess {
   readonly canCommunicate: boolean;
+  readonly canEnterWalkInContact: boolean;
   readonly canExport: boolean;
   readonly canManage: boolean;
   readonly canManageLabels: boolean;
@@ -19,6 +20,8 @@ export function clientAccessForRole(
   const isBarber = role === 'barber';
   return {
     canCommunicate: canManage,
+    canEnterWalkInContact:
+      role !== null && role !== undefined && !isBarber,
     canExport: role === 'owner',
     canManage,
     canManageLabels: canManage,

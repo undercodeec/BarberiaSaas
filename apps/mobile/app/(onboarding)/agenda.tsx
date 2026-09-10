@@ -42,6 +42,7 @@ import {
   BottomNavigation,
   useNativeLayoutMetrics,
 } from '../../src/components/BottomNavigation';
+import { ConfirmationDialog } from '../../src/components/ConfirmationDialog';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { clampFloatingControl } from '../../src/features/screens/floating-control';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
@@ -287,11 +288,11 @@ export default function AgendaScreen() {
         },
       ),
     onError: (error) =>
-      Alert.alert(
-        'No pudimos cancelar la cita',
+      setAppointmentActionNotice(
         error instanceof Error ? error.message : 'Inténtalo nuevamente.',
       ),
     onSuccess: async () => {
+      setAppointmentActionNotice(null);
       setSelectedAppointment(null);
       await queryClient.invalidateQueries({
         queryKey: tenantQueryPrefix('agenda-appointments'),
@@ -308,11 +309,11 @@ export default function AgendaScreen() {
         method: 'PATCH',
       }),
     onError: (error) =>
-      Alert.alert(
-        'No pudimos completar la cita',
+      setAppointmentActionNotice(
         error instanceof Error ? error.message : 'Inténtalo nuevamente.',
       ),
     onSuccess: async ({ paymentConfirmationRequested }) => {
+      setAppointmentActionNotice(null);
       setSelectedAppointment(null);
       await queryClient.invalidateQueries({
         queryKey: tenantQueryPrefix('agenda-appointments'),
@@ -347,6 +348,7 @@ export default function AgendaScreen() {
       );
       return;
     }
+    setAppointmentActionNotice(null);
     setSelectedAppointment(appointment);
   };
   const today = useMemo(() => calendarDateForTimeZone(timeZone), [timeZone]);
@@ -379,6 +381,11 @@ export default function AgendaScreen() {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedAppointment, setSelectedAppointment] =
     useState<AppointmentRecord | null>(null);
+  const [appointmentPendingCompletion, setAppointmentPendingCompletion] =
+    useState<AppointmentRecord | null>(null);
+  const [appointmentActionNotice, setAppointmentActionNotice] = useState<
+    string | null
+  >(null);
   const [isAgendaRouteFocused, setIsAgendaRouteFocused] = useState(false);
   const [dayContentOpacity] = useState(() => new Animated.Value(1));
   const [timelineTransitionX] = useState(() => new Animated.Value(0));
@@ -771,6 +778,10 @@ export default function AgendaScreen() {
 
   floatingBookingPressRef.current = () => {
     completeGuide('first-booking');
+    if (!clientAccess.canEnterWalkInContact) {
+      router.push('/new-booking');
+      return;
+    }
     if (
       clientsQuery.isLoading ||
       clientsQuery.isError ||
@@ -1629,6 +1640,11 @@ export default function AgendaScreen() {
                 .map((service) => service.serviceName)
                 .join(', ') || 'Sin servicio'}
             </Text>
+            {appointmentActionNotice ? (
+              <Text accessibilityRole="alert" style={styles.modalNotice}>
+                {appointmentActionNotice}
+              </Text>
+            ) : null}
             <Pressable
               onPress={() => {
                 if (!selectedAppointment) return;
@@ -1660,20 +1676,7 @@ export default function AgendaScreen() {
               disabled={completeAppointment.isPending}
               onPress={() => {
                 if (!selectedAppointment) return;
-                Alert.alert(
-                  'Completar cita',
-                  selectedAppointment.source === 'public_booking'
-                    ? 'La cita se marcará como completada y se enviará al cliente un correo para dejar su reseña.'
-                    : 'La cita se marcará como completada.',
-                  [
-                    { style: 'cancel', text: 'Cancelar' },
-                    {
-                      onPress: () =>
-                        completeAppointment.mutate(selectedAppointment.id),
-                      text: 'Completar',
-                    },
-                  ],
-                );
+                setAppointmentPendingCompletion(selectedAppointment);
               }}
               style={styles.modalPrimaryAction}
             >
@@ -1709,8 +1712,7 @@ export default function AgendaScreen() {
               <Pressable
                 onPress={() => {
                   if (!selectedAppointment?.clientPhone) {
-                    Alert.alert(
-                      'WhatsApp no disponible',
+                    setAppointmentActionNotice(
                       'Esta cita no tiene un teléfono de cliente.',
                     );
                     return;
@@ -1777,6 +1779,24 @@ export default function AgendaScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <ConfirmationDialog
+        confirmLabel="Completar"
+        description={
+          appointmentPendingCompletion?.source === 'public_booking'
+            ? 'La cita se marcará como completada y se enviará al cliente un correo para dejar su reseña.'
+            : 'La cita se marcará como completada.'
+        }
+        isPending={completeAppointment.isPending}
+        onCancel={() => setAppointmentPendingCompletion(null)}
+        onConfirm={() => {
+          if (!appointmentPendingCompletion) return;
+          completeAppointment.mutate(appointmentPendingCompletion.id);
+          setAppointmentPendingCompletion(null);
+        }}
+        title="Completar cita"
+        visible={appointmentPendingCompletion !== null}
+      />
 
       {/* <PayphonePaymentModal
         bottomInset={layout.bottomInset}

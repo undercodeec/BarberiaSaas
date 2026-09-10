@@ -22,6 +22,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requireApiClient } from '../../src/lib/api';
+import { clientAccessForRole } from '../../src/lib/client-access';
 import { KeyboardAwareScrollView as ScrollView } from '../../src/components/KeyboardAwareScrollView';
 import { useCurrentOrganization } from '../../src/features/organization/useCurrentOrganization';
 import { tenantQueryPrefix } from '../../src/lib/query-keys';
@@ -148,6 +149,9 @@ export default function BookingDetailsScreen() {
     useState<AppointmentRecord | null>(null);
 
   const organizationQuery = useCurrentOrganization();
+  const canEnterWalkInContact = clientAccessForRole(
+    organizationQuery.data?.membership.role,
+  ).canEnterWalkInContact;
   const teamQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () => requireApiClient().request<TeamResponse>('/v1/team'),
@@ -296,9 +300,13 @@ export default function BookingDetailsScreen() {
           body: {
             ...(withoutClient
               ? {
-                  clientEmail: walkInEmail.trim() || undefined,
                   clientName: walkInName.trim(),
-                  clientPhone: walkInPhone.trim() || undefined,
+                  ...(canEnterWalkInContact
+                    ? {
+                        clientEmail: walkInEmail.trim() || undefined,
+                        clientPhone: walkInPhone.trim() || undefined,
+                      }
+                    : {}),
                 }
               : { clientId }),
             locationId,
@@ -327,11 +335,6 @@ export default function BookingDetailsScreen() {
       await queryClient.invalidateQueries({
         queryKey: tenantQueryPrefix('client-detail'),
       });
-      Alert.alert(
-        'Cita agendada',
-        'El horario quedó reservado correctamente.',
-        [{ onPress: () => router.replace('/agenda'), text: 'Ver Agenda' }],
-      );
     },
   });
 
@@ -719,23 +722,27 @@ export default function BookingDetailsScreen() {
                   style={styles.input}
                   value={walkInName}
                 />
-                <TextInput
-                  keyboardType="phone-pad"
-                  onChangeText={setWalkInPhone}
-                  placeholder="Teléfono"
-                  placeholderTextColor="#87909D"
-                  style={styles.input}
-                  value={walkInPhone}
-                />
-                <TextInput
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  onChangeText={setWalkInEmail}
-                  placeholder="Correo"
-                  placeholderTextColor="#87909D"
-                  style={styles.input}
-                  value={walkInEmail}
-                />
+                {canEnterWalkInContact ? (
+                  <>
+                    <TextInput
+                      keyboardType="phone-pad"
+                      onChangeText={setWalkInPhone}
+                      placeholder="Teléfono"
+                      placeholderTextColor="#87909D"
+                      style={styles.input}
+                      value={walkInPhone}
+                    />
+                    <TextInput
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                      onChangeText={setWalkInEmail}
+                      placeholder="Correo"
+                      placeholderTextColor="#87909D"
+                      style={styles.input}
+                      value={walkInEmail}
+                    />
+                  </>
+                ) : null}
               </View>
             ) : null}
 

@@ -256,10 +256,10 @@ const optionalCoverImage = z
   ])
   .transform((value) => value || null);
 
-const imageDataSchema = z
+export const catalogImageDataSchema = z
   .string()
   .trim()
-  .max(2_000_000)
+  .max(MAX_HIGH_END_IPHONE_IMAGE_DATA_URI_LENGTH)
   .regex(
     /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/u,
     'La imagen debe ser un archivo JPEG, PNG o WebP válido.',
@@ -482,7 +482,7 @@ export const createServiceSchema = z.object({
   categoryId: uuidSchema.nullish(),
   description: z.string().trim().max(500).nullish(),
   durationMinutes: durationMinutesSchema,
-  imageData: imageDataSchema.nullish(),
+  imageData: catalogImageDataSchema.nullish(),
   name: z.string().trim().min(2, 'Ingresa el nombre del servicio.').max(120),
   onlineBooking: z.boolean().default(true),
   priceCents: z.number().int().min(0, 'El precio no puede ser negativo.'),

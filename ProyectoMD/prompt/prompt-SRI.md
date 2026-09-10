@@ -1,49 +1,63 @@
+No hubo un rediseño visual grande: se mantuvo el estilo actual y se cambió principalmente cómo cada pantalla carga
+  datos para que siga siendo fluida con muchos registros.
 
-## Estado de desarrollo — cupones de descuento para suscripciones
+  Cambios que podrás percibir:
 
-**Actualizado:** 2026-08-28
+   Área                                   Qué verás
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   App móvil · Clientes                   Búsqueda con pequeña espera al escribir; carga inicial más ligera; botón
+                                          “Ver más clientes” cuando existan más resultados. La importación de
+                                          contactos ahora se procesa por lotes, conservando el resumen de creados,
+                                          duplicados y límites.
+  ─────────────────────────────────────  ───────────────────────────────────────────────────────────────────────────
+   App móvil · Nueva reserva              Selector de cliente con búsqueda remota y botón “Ver más clientes”.
+  ─────────────────────────────────────  ───────────────────────────────────────────────────────────────────────────
+   App móvil · Agenda                     En vista mensual, los contadores de citas por día se cargan sin descargar
+                                          todas las citas del mes. Al ver todas las sedes, la agenda las consulta
+                                          juntas. La actualización automática solo corre mientras esa pantalla está
+                                          enfocada.
+  ─────────────────────────────────────  ───────────────────────────────────────────────────────────────────────────
+   App móvil · Inventario y Caja          Inventario muestra imágenes bajo demanda; productos, movimientos y
+                                          resumen cargan por separado según la pestaña. Caja usa el catálogo ligero
+                                          de productos. La apariencia de tarjetas y acciones se conserva.
+  ─────────────────────────────────────  ───────────────────────────────────────────────────────────────────────────
+   App móvil · Dashboard / reprogramar    Dashboard obtiene solo el resumen y la próxima cita; reprogramar usa la
+                                          nueva disponibilidad, con la misma experiencia de selección de horario.
+  ─────────────────────────────────────  ───────────────────────────────────────────────────────────────────────────
+   Reserva pública web                    Misma URL y diseño de landing/reserva. Fotos de negocio, servicios,
+                                          profesionales y productos ahora se cargan individualmente y se cachean;
+                                          la página pública se refresca cada 60 segundos en vez de recargarse por
+                                          completo.
+  ─────────────────────────────────────  ───────────────────────────────────────────────────────────────────────────
+   Inicio, checkout y admin               Sin cambio visual intencional; solo ajustes de accesibilidad y
+                                          estabilidad de React/lint. El menú de inicio ahora tiene etiqueta
+                                          accesible para lector de pantalla.
 
-### Rama y aislamiento
+  Cómo probarlo:
 
-- Trabajo aislado: `D:\Documentos\BarberiaSaas\.worktrees\subscription-discount-coupons`
-- Rama: `feat/subscription-discount-coupons`
-- Base: `main` en `21e8169`
-- El cambio local existente en `main` (`ProyectoMD/prompt/prompt-SRI.md`) no se tocó desde el worktree.
+  1. En un ambiente de pruebas con las migraciones aplicadas, inicia API, web y móvil:
 
-### Diseño y plan aprobados
+  pnpm dev:api
+  pnpm dev:web
+  pnpm dev:mobile
 
-- Diseño: `docs/superpowers/specs/2026-08-28-subscription-discount-coupons-design.md`
-- Plan: `docs/superpowers/plans/2026-08-28-subscription-discount-coupons.md`
-- Alcance aprobado: cupones porcentuales de 1–99 %, un canje por cupón y organización, descuentos temporales con fecha fija, beneficios vitalicios revocados al concluir el período de gracia, administración/auditoría y compatibilidad con el precio fundador legado.
+  2. En móvil, prueba con suficientes datos:
 
-### Implementado y revisado
+  - Clientes: busca por nombre/teléfono/correo, espera ~300 ms, y pulsa “Ver más clientes”.
+  - Nueva reserva: repite búsqueda y paginación del selector.
+  - Agenda: alterna día/semana/mes, selecciona “todas las sedes” si tienes permisos y cambia de pantalla para
+    comprobar que no refresca en segundo plano.
 
-La **Tarea 1 — Persistencia y dominio de descuentos** está completa y aprobada por una revisión independiente.
+  - Inventario: alterna Productos/Movimientos; comprueba imágenes, resumen y ajuste de stock.
+  - Caja: crea una venta con producto y verifica que el inventario se actualice.
+  - Reprogramar: abre una cita y valida que los horarios disponibles coincidan con la agenda.
 
-- Commit: `7c9fd63 feat(billing): add subscription discount domain`
-- Incluye los enums y modelos Prisma para cupón, planes aplicables, concesión y reserva; columnas opcionales de snapshot en la factura; migración y rollback; normalización de código; cálculo porcentual; y selección/reserva de descuento por organización.
-- Verificaciones ejecutadas: validación y generación Prisma; 8 pruebas de dominio; regresión focalizada de fundador; typecheck de API.
-- La base inicial también quedó verificada: 14 pruebas pasaron y 1 fue omitida en política/pagos de suscripción.
-- Hallazgo menor pendiente para la revisión final: agregar cobertura directa de la rama que rechaza una reserva activa; la Tarea 2 la cubre desde el checkout PostgreSQL.
+  3. En web, visita la URL pública de una barbería y comprueba:
 
-### Punto exacto de pausa
+  - Portada, logo, fotos de servicios, profesionales y productos.
+  - Flujo completo: elegir servicio → profesional → fecha/hora → datos → reserva.
+  - Recarga la página y revisa que las imágenes sigan apareciendo correctamente.
 
-La **Tarea 2 — Checkout, factura y confirmación transaccional** fue preparada, pero se interrumpió antes de realizar cambios o commits.
-
-Al reanudar, debe:
-
-1. Integrar `resolveOrganizationDiscount` en `apps/api/src/subscription-payments.ts`.
-2. Aplicar el descuento antes del desglose tributario y guardar snapshots inmutables en `SubscriptionInvoice`.
-3. Crear la concesión solo al confirmarse el pago de PayPhone.
-4. Liberar la reserva ante pago fallido, rechazado o vencido.
-5. Mantener idempotencia, recibos, SRI y fundador legado sin cambios de contrato.
-6. Ejecutar pruebas PostgreSQL de checkout, recibos y typecheck, luego revisión independiente.
-
-No hay cambios sin commit en el worktree al momento de esta pausa. No se ejecutaron migraciones contra una base de datos ni pagos reales.
-
-### Cómo reanudar
-
-1. Entrar en `D:\Documentos\BarberiaSaas\.worktrees\subscription-discount-coupons`.
-2. Confirmar que la rama sigue en `feat/subscription-discount-coupons` y que `git status --short --branch` está limpio.
-3. Retomar desde la Tarea 2 del plan indicado, conservando la evidencia de pruebas y revisando cada tarea antes de iniciar la siguiente.
-4. Al terminar todas las tareas y la revisión final, fusionar `feat/subscription-discount-coupons` hacia `main` mediante merge o pull request.
+  Un punto que te conviene evaluar con atención: agenda e inventario ya usan consultas paginadas internamente, pero
+  hoy no exponen un botón/scroll de “cargar más” como sí lo hacen Clientes y Nueva reserva. Con más de 50 citas o
+  productos, podrías querer que añada esa interacción visual antes de darlo por cerrado.

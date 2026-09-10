@@ -33,6 +33,7 @@ const catalog: PublicBookingCatalogV2 = {
       '/v2/public/nava/centro/media/organization-profile/organization-1',
     slug: 'nava',
   },
+  productPayments: { transferAvailable: true },
   policy: {
     cancellationLeadMinutes: 60,
     confirmationDeadlineMinutes: 60,

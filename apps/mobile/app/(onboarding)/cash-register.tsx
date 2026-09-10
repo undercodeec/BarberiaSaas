@@ -401,7 +401,10 @@ export default function CashRegisterScreen() {
   const sessionData = cashQuery.data?.session;
   const totals = summaryQuery.data?.totals;
   const availableResponsibles = (teamQuery.data?.members ?? []).filter(
-    (member) => member.planAvailable && member.user.id !== user?.id,
+    (member) =>
+      member.planAvailable &&
+      member.user.id !== user?.id &&
+      (member.role === 'manager' || member.role === 'owner'),
   );
   const selectedMovementService = servicesQuery.data?.services.find(
     (service) => service.id === movementServiceId,

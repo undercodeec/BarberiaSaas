@@ -15,11 +15,7 @@ import {
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
-import type { ApiConfig } from './config';
 import { ApiError } from './errors';
-import { payphoneEncryptionKey } from './payphone';
-import { requestPayphoneLink } from './payphone-payments';
-import { decryptPaymentCredential } from './security';
 import {
   cashIncomeRecipientUserIds,
   type AppointmentNotifier,
@@ -44,7 +40,7 @@ const publicOrderSchema = z
       )
       .min(1)
       .max(20),
-    paymentMethod: z.enum(['card', 'pickup', 'transfer']),
+    paymentMethod: z.enum(['pickup', 'transfer']),
   })
   .superRefine((value, context) => {
     const ids = new Set<string>();
@@ -70,6 +66,15 @@ const orderQuery = z.object({
 const paymentConfirmationSchema = z.object({
   paymentMethod: z.enum(['card', 'cash', 'transfer']),
   providerReference: z.string().trim().min(1).max(100).optional(),
+});
+const productPaymentSettingsSchema = z.object({
+  accountHolderName: z.string().trim().min(2).max(160),
+  accountNumber: z.string().trim().min(4).max(80),
+  accountType: z.enum(['checking', 'savings', 'other']),
+  bankName: z.string().trim().min(2).max(120),
+  holderIdentification: z.string().trim().min(4).max(40),
+  instructions: z.string().trim().max(1000).nullish(),
+  isEnabled: z.boolean().default(true),
 });
 
 function lockKey(locationId: string, productId: string) {
@@ -115,6 +120,42 @@ async function managerScope(database: DatabaseClient, userId: string) {
           },
         });
   return { locations, membership };
+}
+
+async function ownerScope(database: DatabaseClient, userId: string) {
+  const membership = await database.membership.findFirst({
+    where: { status: MembershipStatus.ACTIVE, userId },
+  });
+  if (!membership || membership.role !== MembershipRole.OWNER)
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      'Solo el propietario puede configurar la cuenta para transferencias.',
+    );
+  return membership;
+}
+
+function bankTransferSettingsResponse(
+  settings: {
+    accountHolderName: string;
+    accountNumber: string;
+    accountType: string;
+    bankName: string;
+    holderIdentification: string;
+    instructions: string | null;
+    isEnabled: boolean;
+  } | null,
+) {
+  if (!settings) return null;
+  return {
+    accountHolderName: settings.accountHolderName,
+    accountNumber: settings.accountNumber,
+    accountType: settings.accountType.toLowerCase(),
+    bankName: settings.bankName,
+    holderIdentification: settings.holderIdentification,
+    instructions: settings.instructions,
+    isEnabled: settings.isEnabled,
+  };
 }
 
 function orderResponse(order: {
@@ -217,9 +258,76 @@ export function registerProductOrderRoutes(
   app: FastifyInstance,
   database: DatabaseClient,
   authenticate: Authenticate,
-  config: ApiConfig,
   notifier: AppointmentNotifier | null = null,
 ) {
+  app.get('/v1/product-payment-settings', async (request) => {
+    const { user } = await authenticate(database, request);
+    const membership = await ownerScope(database, user.id);
+    const settings = await database.organizationBankTransferSettings.findUnique(
+      {
+        where: { organizationId: membership.organizationId },
+      },
+    );
+    return { settings: bankTransferSettingsResponse(settings) };
+  });
+
+  app.put('/v1/product-payment-settings', async (request) => {
+    const { user } = await authenticate(database, request);
+    const membership = await ownerScope(database, user.id);
+    const input = productPaymentSettingsSchema.parse(request.body);
+    const settings = await database.organizationBankTransferSettings.upsert({
+      create: {
+        ...input,
+        instructions: input.instructions || null,
+        organizationId: membership.organizationId,
+        updatedByUserId: user.id,
+      },
+      update: {
+        ...input,
+        instructions: input.instructions || null,
+        updatedByUserId: user.id,
+      },
+      where: { organizationId: membership.organizationId },
+    });
+    await database.auditLog.create({
+      data: {
+        action: 'product_payment_settings.updated',
+        actorUserId: user.id,
+        entityId: settings.id,
+        entityType: 'organization_bank_transfer_settings',
+        organizationId: membership.organizationId,
+      },
+    });
+    return { settings: bankTransferSettingsResponse(settings) };
+  });
+
+  app.get(
+    '/v1/public/:organizationSlug/:locationSlug/product-payment-options',
+    async (request) => {
+      const params = publicLocationParams.parse(request.params);
+      const location = await database.location.findFirst({
+        select: { organizationId: true },
+        where: {
+          isActive: true,
+          organization: { slug: params.organizationSlug },
+          slug: params.locationSlug,
+        },
+      });
+      if (!location)
+        throw new ApiError(
+          404,
+          'PUBLIC_LOCATION_NOT_FOUND',
+          'Este enlace no está disponible.',
+        );
+      const settings =
+        await database.organizationBankTransferSettings.findUnique({
+          select: { isEnabled: true },
+          where: { organizationId: location.organizationId },
+        });
+      return { transferAvailable: settings?.isEnabled === true };
+    },
+  );
+
   app.post(
     '/v1/public/:organizationSlug/:locationSlug/orders',
     async (request, reply) => {
@@ -239,26 +347,23 @@ export function registerProductOrderRoutes(
           'PUBLIC_LOCATION_NOT_FOUND',
           'Este enlace no está disponible.',
         );
-      const payphone =
-        input.paymentMethod === 'card'
-          ? await database.payphoneConfiguration.findUnique({
+      const bankTransferSettings =
+        input.paymentMethod === 'transfer'
+          ? await database.organizationBankTransferSettings.findUnique({
               where: { organizationId: location.organizationId },
             })
           : null;
       if (
-        input.paymentMethod === 'card' &&
-        (!payphone?.isEnabled || payphone.connectionStatus !== 'CONNECTED')
+        input.paymentMethod === 'transfer' &&
+        !bankTransferSettings?.isEnabled
       )
         throw new ApiError(
           409,
-          'PAYPHONE_NOT_AVAILABLE',
-          'Este negocio no tiene pagos con tarjeta disponibles.',
+          'BANK_TRANSFER_NOT_AVAILABLE',
+          'Este negocio no tiene una cuenta activa para transferencias.',
         );
       const now = new Date();
-      const expiresAt = new Date(
-        now.getTime() +
-          (input.paymentMethod === 'pickup' ? 2 * 60 : 30) * 60_000,
-      );
+      const expiresAt = new Date(now.getTime() + 2 * 60 * 60_000);
       const order = await database.$transaction(async (transaction) => {
         const products = await transaction.product.findMany({
           where: {
@@ -313,6 +418,19 @@ export function registerProductOrderRoutes(
         }
         return transaction.productOrder.create({
           data: {
+            ...(input.paymentMethod === 'transfer'
+              ? {
+                  bankTransferSnapshot: {
+                    accountHolderName: bankTransferSettings!.accountHolderName,
+                    accountNumber: bankTransferSettings!.accountNumber,
+                    accountType: bankTransferSettings!.accountType,
+                    bankName: bankTransferSettings!.bankName,
+                    holderIdentification:
+                      bankTransferSettings!.holderIdentification,
+                    instructions: bankTransferSettings!.instructions,
+                  },
+                }
+              : {}),
             customerEmail: input.customerEmail ?? null,
             customerName: input.customerName,
             customerPhone: input.customerPhone,
@@ -333,10 +451,7 @@ export function registerProductOrderRoutes(
             organizationId: location.organizationId,
             paymentMethod:
               input.paymentMethod.toUpperCase() as ProductOrderPaymentMethod,
-            status:
-              input.paymentMethod === 'pickup'
-                ? ProductOrderStatus.RESERVED
-                : ProductOrderStatus.PENDING_PAYMENT,
+            status: ProductOrderStatus.RESERVED,
             totalCents: input.items.reduce(
               (total, item) =>
                 total +
@@ -347,43 +462,13 @@ export function registerProductOrderRoutes(
           include: { items: true },
         });
       });
-      if (input.paymentMethod !== 'card')
-        return reply.code(201).send({ order: orderResponse(order) });
-      const activePayphone = payphone!;
-      try {
-        const paymentUrl = await requestPayphoneLink({
-          amountCents: order.totalCents,
-          clientTransactionId: `O${order.id.replace(/-/gu, '').slice(0, 14)}`,
-          reference: `Pedido Nava ${order.id.slice(0, 8)}`,
-          storeId: activePayphone.storeId,
-          token: decryptPaymentCredential({
-            encodedKey: payphoneEncryptionKey(config),
-            encryptedSecret: activePayphone.encryptedToken,
-            organizationId: location.organizationId,
-          }),
-        });
-        const updated = await database.productOrder.update({
-          data: { paymentRequestedAt: now, paymentUrl },
-          include: { items: true },
-          where: { id: order.id },
-        });
-        return reply.code(201).send({ order: orderResponse(updated) });
-      } catch (error) {
-        await database.$transaction(async (transaction) => {
-          const current = await transaction.productOrder.findUnique({
-            include: { items: true },
-            where: { id: order.id },
-          });
-          if (!current || current.status !== ProductOrderStatus.PENDING_PAYMENT)
-            return;
-          await releaseOrderReservation(transaction, current);
-          await transaction.productOrder.update({
-            data: { status: ProductOrderStatus.CANCELLED },
-            where: { id: current.id },
-          });
-        });
-        throw error;
-      }
+      return reply.code(201).send({
+        order: orderResponse(order),
+        bankTransfer:
+          input.paymentMethod === 'transfer'
+            ? bankTransferSettingsResponse(bankTransferSettings)
+            : null,
+      });
     },
   );
 

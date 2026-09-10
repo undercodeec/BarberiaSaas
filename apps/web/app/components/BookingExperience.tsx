@@ -17,7 +17,7 @@ type Step =
   | 'confirmed';
 
 type TimeOfDay = 'afternoon' | 'all' | 'evening' | 'morning';
-type ProductPaymentMethod = 'card' | 'pickup' | 'transfer';
+type ProductPaymentMethod = 'pickup' | 'transfer';
 
 const TIME_OF_DAY_OPTIONS: ReadonlyArray<{
   id: TimeOfDay;
@@ -1021,7 +1021,9 @@ function PublicBookingLanding({
     'cart' | 'checkout' | 'confirmed'
   >('cart');
   const [productPaymentMethod, setProductPaymentMethod] =
-    useState<ProductPaymentMethod>('card');
+    useState<ProductPaymentMethod>(
+      catalog.productPayments.transferAvailable ? 'transfer' : 'pickup',
+    );
 
   useEffect(() => {
     const updateHeroState = () => setHeroScrolled(window.scrollY > 8);
@@ -1354,6 +1356,7 @@ function PublicBookingLanding({
           paymentMethod={productPaymentMethod}
           step={productCheckoutStep}
           totalCents={cartTotalCents}
+          transferAvailable={catalog.productPayments.transferAvailable}
           onPaymentMethodChange={setProductPaymentMethod}
         />
       ) : null}
@@ -1697,6 +1700,7 @@ function ProductCartPanel({
   paymentMethod,
   step,
   totalCents,
+  transferAvailable,
 }: {
   apiBaseUrl: string;
   cartItems: ReadonlyArray<{
@@ -1714,27 +1718,31 @@ function ProductCartPanel({
   paymentMethod: ProductPaymentMethod;
   step: 'cart' | 'checkout' | 'confirmed';
   totalCents: number;
+  transferAvailable: boolean;
 }) {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [placingOrder, setPlacingOrder] = useState(false);
+  const [transferEnabled, setTransferEnabled] = useState(transferAvailable);
   const [createdOrder, setCreatedOrder] = useState<{
+    bankTransfer: {
+      accountHolderName: string;
+      accountNumber: string;
+      accountType: string;
+      bankName: string;
+      holderIdentification: string;
+      instructions: string | null;
+    } | null;
     expiresAt: string;
     id: string;
-    paymentUrl: string | null;
   } | null>(null);
   const methods: ReadonlyArray<{
     id: ProductPaymentMethod;
     label: string;
     note: string;
   }> = [
-    {
-      id: 'card',
-      label: 'Tarjeta / PayPhone',
-      note: 'Pago seguro antes del retiro.',
-    },
     {
       id: 'transfer',
       label: 'Transferencia',
@@ -1746,6 +1754,28 @@ function ProductCartPanel({
       note: 'Reserva el pedido por 2 horas.',
     },
   ];
+  useEffect(() => {
+    let active = true;
+    void fetch(
+      `${apiBaseUrl}/v1/public/${encodeURIComponent(organizationSlug)}/${encodeURIComponent(locationSlug)}/product-payment-options`,
+      { cache: 'no-store' },
+    )
+      .then(async (response) => {
+        if (!response.ok) return;
+        const result = (await response.json()) as {
+          transferAvailable: boolean;
+        };
+        if (active) setTransferEnabled(result.transferAvailable);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [apiBaseUrl, locationSlug, organizationSlug]);
+  useEffect(() => {
+    if (!transferEnabled && paymentMethod === 'transfer')
+      onPaymentMethodChange('pickup');
+  }, [onPaymentMethodChange, paymentMethod, transferEnabled]);
   const createOrder = async () => {
     if (customerName.trim().length < 2 || customerPhone.trim().length < 7) {
       setCheckoutError('Ingresa tu nombre y un teléfono válido.');
@@ -1773,9 +1803,17 @@ function ProductCartPanel({
       );
       if (!response.ok) throw new Error(await readError(response));
       const result = (await response.json()) as {
-        order: { expiresAt: string; id: string; paymentUrl: string | null };
+        bankTransfer: {
+          accountHolderName: string;
+          accountNumber: string;
+          accountType: string;
+          bankName: string;
+          holderIdentification: string;
+          instructions: string | null;
+        } | null;
+        order: { expiresAt: string; id: string };
       };
-      setCreatedOrder(result.order);
+      setCreatedOrder({ ...result.order, bankTransfer: result.bankTransfer });
       onStepChange('confirmed');
     } catch (cause) {
       setCheckoutError(
@@ -1839,20 +1877,36 @@ function ProductCartPanel({
                 : ''}
               .
             </p>
-            {createdOrder?.paymentUrl ? (
-              <a
-                className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#B47D17] px-5 text-sm font-black text-white"
-                href={createdOrder.paymentUrl}
-              >
-                Pagar ahora con PayPhone
-              </a>
-            ) : null}
             {paymentMethod === 'transfer' ? (
-              <p className="mt-4 rounded-xl bg-[#FFF4D9] p-3 text-xs leading-5 text-[#72531B]">
-                Solicita los datos bancarios al negocio y conserva tu
-                comprobante. El pedido se prepara cuando validen la
-                transferencia.
-              </p>
+              <div className="mt-4 rounded-xl bg-[#FFF4D9] p-4 text-left text-xs leading-5 text-[#72531B]">
+                <p className="font-black">Realiza la transferencia a:</p>
+                <p className="mt-2">
+                  <strong>Banco:</strong> {createdOrder?.bankTransfer?.bankName}
+                </p>
+                <p>
+                  <strong>Titular:</strong>{' '}
+                  {createdOrder?.bankTransfer?.accountHolderName}
+                </p>
+                <p>
+                  <strong>Cuenta:</strong>{' '}
+                  {createdOrder?.bankTransfer?.accountNumber} (
+                  {createdOrder?.bankTransfer?.accountType})
+                </p>
+                <p>
+                  <strong>Identificación:</strong>{' '}
+                  {createdOrder?.bankTransfer?.holderIdentification}
+                </p>
+                {createdOrder?.bankTransfer?.instructions ? (
+                  <p className="mt-2">
+                    <strong>Indicaciones:</strong>{' '}
+                    {createdOrder.bankTransfer.instructions}
+                  </p>
+                ) : null}
+                <p className="mt-3">
+                  Conserva tu comprobante. El negocio validará la transferencia
+                  al retirar.
+                </p>
+              </div>
             ) : null}
             {paymentMethod === 'pickup' ? (
               <p className="mt-4 rounded-xl bg-[#FFF4D9] p-3 text-xs leading-5 text-[#72531B]">
@@ -1953,28 +2007,34 @@ function ProductCartPanel({
                 </div>
                 <p className="text-sm font-bold">¿Cómo deseas pagar?</p>
                 <div className="mt-4 grid gap-3">
-                  {methods.map((method) => (
-                    <label
-                      className={`cursor-pointer rounded-xl border p-4 ${paymentMethod === method.id ? 'border-[#B47D17] bg-[#FFF9EE]' : 'border-[#E4E1DA] bg-white'}`}
-                      key={method.id}
-                    >
-                      <input
-                        checked={paymentMethod === method.id}
-                        className="mr-3 accent-[#B47D17]"
-                        name="product-payment"
-                        onChange={() => onPaymentMethodChange(method.id)}
-                        type="radio"
-                      />
-                      <span className="text-sm font-black">{method.label}</span>
-                      <span className="mt-1 block pl-6 text-xs text-[#555A63]">
-                        {method.note}
-                      </span>
-                    </label>
-                  ))}
+                  {methods
+                    .filter(
+                      (method) => method.id !== 'transfer' || transferEnabled,
+                    )
+                    .map((method) => (
+                      <label
+                        className={`cursor-pointer rounded-xl border p-4 ${paymentMethod === method.id ? 'border-[#B47D17] bg-[#FFF9EE]' : 'border-[#E4E1DA] bg-white'}`}
+                        key={method.id}
+                      >
+                        <input
+                          checked={paymentMethod === method.id}
+                          className="mr-3 accent-[#B47D17]"
+                          name="product-payment"
+                          onChange={() => onPaymentMethodChange(method.id)}
+                          type="radio"
+                        />
+                        <span className="text-sm font-black">
+                          {method.label}
+                        </span>
+                        <span className="mt-1 block pl-6 text-xs text-[#555A63]">
+                          {method.note}
+                        </span>
+                      </label>
+                    ))}
                 </div>
                 <p className="mt-5 rounded-xl bg-[#FFF4D9] p-3 text-xs leading-5 text-[#72531B]">
-                  El checkout real solicitará datos de contacto y confirmará el
-                  pedido únicamente tras pago o validación de transferencia.
+                  Si eliges transferencia, verás los datos bancarios del negocio
+                  inmediatamente después de reservar el pedido.
                 </p>
               </div>
             )}
@@ -2001,9 +2061,7 @@ function ProductCartPanel({
                   ? 'Creando pedido...'
                   : paymentMethod === 'pickup'
                     ? 'Reservar para retiro'
-                    : paymentMethod === 'transfer'
-                      ? 'Solicitar validación'
-                      : 'Crear pedido y pagar'}
+                    : 'Reservar y ver datos bancarios'}
             </button>
           </div>
         ) : null}
