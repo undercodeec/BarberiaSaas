@@ -5958,6 +5958,28 @@ describeWithDatabase('API con PostgreSQL', () => {
     });
     expect(history.json<{ sessions: unknown[] }>().sessions).toHaveLength(1);
     const sessionId = closed.json<{ session: { id: string } }>().session.id;
+    await database.cashRegisterSession.update({
+      data: { closedAt: new Date('2026-06-18T17:00:00.000Z') },
+      where: { id: sessionId },
+    });
+    const emptyDayHistory = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: '/v1/cash-register/history?date=2026-06-19',
+    });
+    expect(emptyDayHistory.statusCode).toBe(200);
+    expect(
+      emptyDayHistory.json<{ sessions: unknown[] }>().sessions,
+    ).toHaveLength(0);
+    const matchingDayHistory = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: 'GET',
+      url: '/v1/cash-register/history?date=2026-06-18',
+    });
+    expect(matchingDayHistory.statusCode).toBe(200);
+    expect(
+      matchingDayHistory.json<{ sessions: unknown[] }>().sessions,
+    ).toHaveLength(1);
     const detail = await app.inject({
       headers: { authorization: `Bearer ${token}` },
       method: 'GET',

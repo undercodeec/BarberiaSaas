@@ -69,6 +69,22 @@ function isWithinDateRange(value: string, start: string, end: string) {
   return date >= start && date <= end;
 }
 
+function calendarDateInTimeZone(value: string, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone,
+    year: 'numeric',
+  }).formatToParts(new Date(value));
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value;
+  const year = part('year');
+  const month = part('month');
+  const day = part('day');
+
+  return year && month && day ? `${year}-${month}-${day}` : null;
+}
+
 function commissionConcept(snapshot: unknown): string {
   if (!snapshot || typeof snapshot !== 'object') return 'Venta registrada';
   const record = snapshot as {
@@ -175,7 +191,7 @@ export default function WalletScreen() {
       walletAccess.canReadCash,
     queryFn: () =>
       requireApiClient().request<CashRegisterHistoryResponse>(
-        `/v1/cash-register/history?date=${historyDate}`,
+        `/v1/cash-register/history?date=${encodeURIComponent(historyDate)}`,
       ),
     queryKey: tenant.key('cash-register-history', historyDate),
   });
@@ -283,6 +299,24 @@ export default function WalletScreen() {
     },
   });
   const canApproveCommissions = role === 'owner';
+  const cashHistoryTimeZone =
+    organizationQuery.data?.location?.timezone ??
+    organizationQuery.data?.organization.defaultTimezone ??
+    'America/Guayaquil';
+  // La API ya filtra por la fecha civil de la sucursal. Esta comprobación evita
+  // que una respuesta conservada durante un cambio de fecha llegue a mostrarse
+  // como si perteneciera al nuevo día seleccionado.
+  const historySessions = useMemo(
+    () =>
+      (historyQuery.data?.sessions ?? []).filter((session) => {
+        const closedAt = session.closedAt;
+        return (
+          typeof closedAt === 'string' &&
+          calendarDateInTimeZone(closedAt, cashHistoryTimeZone) === historyDate
+        );
+      }),
+    [cashHistoryTimeZone, historyDate, historyQuery.data?.sessions],
+  );
   const selectedProfessional = commissionsQuery.data?.professionals.find(
     (professional) => professional.id === selectedProfessionalId,
   );
@@ -863,7 +897,7 @@ export default function WalletScreen() {
                     Cargando historial...
                   </Text>
                 ) : null}
-                {(historyQuery.data?.sessions ?? []).map((cashSession) => (
+                {historySessions.map((cashSession) => (
                   <Pressable
                     accessibilityLabel={`Ver detalle de caja de ${cashSession.responsibleName}`}
                     key={cashSession.id}
@@ -901,8 +935,7 @@ export default function WalletScreen() {
                     />
                   </Pressable>
                 ))}
-                {!historyQuery.isLoading &&
-                !historyQuery.data?.sessions.length ? (
+                {!historyQuery.isLoading && !historySessions.length ? (
                   <Text style={styles.cardDescription}>
                     Aún no hay cierres de caja.
                   </Text>
