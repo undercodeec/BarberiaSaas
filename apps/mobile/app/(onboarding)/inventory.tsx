@@ -80,6 +80,16 @@ function movementLabel(type: string) {
   return 'Ajuste';
 }
 
+function orderStatusLabel(status: ProductOrderRecord['status']) {
+  if (status === 'pending_payment') return 'Pendiente de pago';
+  if (status === 'reserved') return 'Reservado';
+  if (status === 'paid') return 'Pagado';
+  if (status === 'ready_for_pickup') return 'Listo para retiro';
+  if (status === 'fulfilled') return 'Entregado';
+  if (status === 'cancelled') return 'Cancelado';
+  return 'Vencido';
+}
+
 function apiMediaUrl(path: string): string {
   const baseUrl = process.env.EXPO_PUBLIC_API_URL;
   return baseUrl ? new URL(path, baseUrl).toString() : path;
@@ -492,7 +502,7 @@ export default function InventoryScreen() {
     setCommissionValue(
       product?.commissionType === 'fixed'
         ? ((product.commissionValue ?? 0) / 100).toFixed(2)
-        : product?.commissionValue?.toString() ?? '',
+        : (product?.commissionValue?.toString() ?? ''),
     );
     setMinimumStock(String(product?.minimumStock ?? 0));
     setInitialStock(String(product?.quantityOnHand ?? 0));
@@ -676,7 +686,7 @@ export default function InventoryScreen() {
                     </Text>
                     {product.commissionType ? (
                       <Text style={styles.commissionMeta}>
-                        Comisión: {' '}
+                        Comisión:{' '}
                         {product.commissionType === 'fixed'
                           ? `${money(product.commissionValue ?? 0)} por unidad`
                           : `${product.commissionValue ?? 0}%`}
@@ -850,7 +860,7 @@ export default function InventoryScreen() {
                       : order.paymentMethod === 'transfer'
                         ? 'Transferencia'
                         : 'Tarjeta'}{' '}
-                    · {order.status.replaceAll('_', ' ')}
+                    · {orderStatusLabel(order.status)}
                   </Text>
                   {['pending_payment', 'reserved'].includes(order.status) ? (
                     <View style={styles.orderActions}>
@@ -1001,7 +1011,8 @@ export default function InventoryScreen() {
                   />
                   <Text style={styles.label}>Comisión para barberos</Text>
                   <Text style={styles.fieldHint}>
-                    Se aplica cuando un barbero es seleccionado como vendedor en Caja.
+                    Se aplica cuando un barbero es seleccionado como vendedor en
+                    Caja.
                   </Text>
                   <View style={styles.chips}>
                     {(

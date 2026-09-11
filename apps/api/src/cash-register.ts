@@ -548,6 +548,53 @@ async function notifyCashIncome(
   }
 }
 
+async function notifyProductSale(
+  notifier: AppointmentNotifier | null,
+  database: DatabaseClient,
+  input: {
+    actorUserId: string;
+    amountCents: number;
+    locationId: string | null;
+    organizationId: string | null;
+    productId: string;
+    productName: string;
+    quantity: number;
+  },
+) {
+  if (
+    !notifier?.notifyOperational ||
+    !input.organizationId ||
+    !input.locationId
+  )
+    return;
+  try {
+    const userIds = await cashIncomeRecipientUserIds(
+      database,
+      input.organizationId,
+      input.locationId,
+    );
+    const quantity = `${input.quantity} ${
+      input.quantity === 1 ? 'unidad' : 'unidades'
+    }`;
+    await notifier.notifyOperational({
+      actorUserId: input.actorUserId,
+      body: `Se vendieron ${quantity} de ${input.productName} por ${money(input.amountCents)}.`,
+      data: {
+        locationId: input.locationId,
+        productId: input.productId,
+        route: '/inventory',
+        type: 'product_sold',
+      },
+      organizationId: input.organizationId,
+      title: 'Nueva venta de producto',
+      type: AppNotificationType.PRODUCT_SOLD,
+      userIds,
+    });
+  } catch {
+    // La venta ya fue registrada y no debe revertirse por una alerta fallida.
+  }
+}
+
 async function notifyCommissionEarned(
   notifier: AppointmentNotifier | null,
   input: {
@@ -1386,7 +1433,7 @@ export function registerCashRegisterRoutes(
             };
         }
       }
-      return { commissionNotification, movement: created };
+      return { commissionNotification, movement: created, productSale };
     });
     const movement = result.movement;
     await recordAudit(
@@ -1408,7 +1455,17 @@ export function registerCashRegisterRoutes(
         type: movement.type,
       },
     );
-    if (
+    if (result.productSale)
+      await notifyProductSale(notifier, database, {
+        actorUserId: user.id,
+        amountCents: movement.amountCents,
+        locationId: currentScope.locationId,
+        organizationId: currentScope.organizationId,
+        productId: result.productSale.id,
+        productName: result.productSale.name,
+        quantity: result.productSale.quantity,
+      });
+    else if (
       movement.type === CashMovementType.SALE ||
       movement.type === CashMovementType.DEPOSIT ||
       movement.type === CashMovementType.OTHER_INCOME
