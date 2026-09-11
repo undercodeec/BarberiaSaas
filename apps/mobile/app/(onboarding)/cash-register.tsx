@@ -15,8 +15,8 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { Redirect, useRouter } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Alert,
@@ -74,6 +74,10 @@ type AccessibleLocationsResponse = {
 
 export default function CashRegisterScreen() {
   const { session, user } = useAuth();
+  const { action, saleRequest } = useLocalSearchParams<{
+    action?: string;
+    saleRequest?: string;
+  }>();
   const tenant = useTenantScope();
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(
     null,
@@ -170,6 +174,7 @@ export default function CashRegisterScreen() {
   const [closingAmount, setClosingAmount] = useState('');
   const [closingNote, setClosingNote] = useState('');
   const [isBaseInfoVisible, setIsBaseInfoVisible] = useState(false);
+  const handledRouteActionRef = useRef<string | null>(null);
   const accessibleLocationsQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -397,8 +402,28 @@ export default function CashRegisterScreen() {
       ]);
     },
   });
-  if (!session) return <Redirect href="/(auth)/login" />;
   const sessionData = cashQuery.data?.session;
+
+  useEffect(() => {
+    const requestKey = `${action ?? ''}:${saleRequest ?? ''}`;
+    if (action !== 'sale' || !sessionData) return;
+    if (handledRouteActionRef.current === requestKey) return;
+    handledRouteActionRef.current = requestKey;
+    setMovementType('sale');
+    setSaleKind('service');
+    setMovementAmount('');
+    setMovementDescription('');
+    setMovementProductId(null);
+    setMovementProductQuantity('1');
+    setMovementProfessionalId(null);
+    setMovementSellerId(null);
+    setMovementServiceId(null);
+    setSheetMode('movement');
+    setIsSheetOpen(true);
+  }, [action, saleRequest, sessionData]);
+
+  if (!session) return <Redirect href="/(auth)/login" />;
+
   const totals = summaryQuery.data?.totals;
   const availableResponsibles = (teamQuery.data?.members ?? []).filter(
     (member) =>

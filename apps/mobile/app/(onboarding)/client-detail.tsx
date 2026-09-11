@@ -877,10 +877,13 @@ export default function ClientDetailScreen() {
                 <Pressable
                   onPress={() => {
                     setIsOptionsOpen(false);
-                    Alert.alert(
-                      'Próximamente',
-                      'La creación de ventas estará disponible próximamente.',
-                    );
+                    router.push({
+                      params: {
+                        action: 'sale',
+                        saleRequest: String(Date.now()),
+                      },
+                      pathname: '/cash-register',
+                    });
                   }}
                   style={styles.optionRow}
                 >
