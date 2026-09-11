@@ -843,7 +843,10 @@ export default function ClientDetailScreen() {
             <Pressable
               onPress={() => {
                 setIsOptionsOpen(false);
-                router.push('/agenda');
+                router.push({
+                  params: { clientId },
+                  pathname: '/booking-details',
+                });
               }}
               style={styles.optionRow}
             >
