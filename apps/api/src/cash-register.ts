@@ -63,7 +63,13 @@ const openCashRegisterSchema = z.object({
   openingAmountCents: z.number().int().min(0).max(100_000_000),
   responsibleMembershipId: z.string().uuid().optional(),
 });
-const cashLocationQuerySchema = z.object({ locationId: z.uuid().optional() });
+const cashLocationQuerySchema = z.object({
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/u)
+    .optional(),
+  locationId: z.uuid().optional(),
+});
 const financialRecordsQuerySchema = z.object({
   date: z
     .string()
@@ -731,12 +737,25 @@ export function registerCashRegisterRoutes(
       input.locationId,
     );
     requireCashPermission(currentScope, 'cash.read');
+    const location = currentScope.locationId
+      ? await database.location.findUnique({
+          select: { timezone: true },
+          where: { id: currentScope.locationId },
+        })
+      : null;
+    const dateRange = input.date
+      ? {
+          gte: zonedDateTimeToUtc(input.date, 0, location?.timezone ?? 'UTC'),
+          lt: zonedDateTimeToUtc(input.date, 1440, location?.timezone ?? 'UTC'),
+        }
+      : undefined;
     const sessions = await database.cashRegisterSession.findMany({
       include: { movements: true },
       orderBy: { openedAt: 'desc' },
       take: 60,
       where: {
         status: CashRegisterStatus.CLOSED,
+        ...(dateRange ? { closedAt: dateRange } : {}),
         ...(currentScope.organizationId
           ? {
               organizationId: currentScope.organizationId,

@@ -170,9 +170,9 @@ export default function WalletScreen() {
       walletAccess.canReadCash,
     queryFn: () =>
       requireApiClient().request<CashRegisterHistoryResponse>(
-        '/v1/cash-register/history',
+        `/v1/cash-register/history?date=${historyDate}`,
       ),
-    queryKey: tenant.key('cash-register-history'),
+    queryKey: tenant.key('cash-register-history', historyDate),
   });
   const commissionsQuery = useQuery({
     enabled: Boolean(session) && hasKnownRole && shouldLoadCommissions,
@@ -842,6 +842,27 @@ export default function WalletScreen() {
             ) : null}
             {walletAccess.historySource === 'cash' ? (
               <View style={styles.history}>
+                <Text style={styles.cardDescription}>
+                  Consulta los cierres registrados en un dÃ­a especÃ­fico.
+                </Text>
+                <Pressable
+                  accessibilityLabel="Seleccionar fecha del historial"
+                  onPress={() => {
+                    setCalendarMonth(dateForCalendar(historyDate));
+                    setCalendarTarget('history-date');
+                  }}
+                  style={styles.calendarField}
+                >
+                  <Ionicons
+                    color={appTheme.colors.accentDark}
+                    name="calendar-outline"
+                    size={18}
+                  />
+                  <View>
+                    <Text style={styles.inputLabel}>Fecha</Text>
+                    <Text style={styles.calendarFieldValue}>{historyDate}</Text>
+                  </View>
+                </Pressable>
                 {historyQuery.isLoading ? (
                   <Text style={styles.cardDescription}>
                     Cargando historial...
@@ -864,7 +885,9 @@ export default function WalletScreen() {
                         {cashSession.responsibleName}
                       </Text>
                       <Text style={styles.cardDescription}>
-                        {new Date(cashSession.openedAt).toLocaleDateString()}
+                        {new Date(
+                          cashSession.closedAt ?? cashSession.openedAt,
+                        ).toLocaleDateString()}
                       </Text>
                     </View>
                     <View style={styles.historyValue}>
