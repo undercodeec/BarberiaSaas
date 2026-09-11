@@ -56,7 +56,13 @@ su resultado debe registrarse aquí antes de archivarlos.
 4. Verificar el AAB antes de subirlo:
 
    ```powershell
-   node ..\scripts\verify-android-release.mjs "D:\Documentos\BarberiaSaas\apps\mobile\android\app\build\outputs\bundle\release\app-release.aab"
+   $certificate = (Get-Content "$env:USERPROFILE\.gradle\gradle.properties" |
+     Where-Object { $_ -match '^NAVA_UPLOAD_CERT_SHA256=' } |
+     Select-Object -First 1) -replace '^NAVA_UPLOAD_CERT_SHA256=', ''
+   node ..\scripts\verify-android-release.mjs `
+     --manifest ".\app\build\intermediates\merged_manifest\release\processReleaseMainManifest\AndroidManifest.xml" `
+     --aab ".\app\build\outputs\bundle\release\app-release.aab" `
+     --expected-certificate-sha256 $certificate
    ```
 
 5. Subir el archivo resultante a la pista de Google Play correspondiente y comprobar que el código detectado coincide con el previsto.
