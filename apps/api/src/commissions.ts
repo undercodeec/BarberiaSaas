@@ -641,6 +641,7 @@ export function registerCommissionRoutes(
         database.professionalAdvance.findMany({
           orderBy: { occurredAt: 'desc' },
           where: {
+            ...(occurredAt ? { occurredAt } : {}),
             organizationId: current.organizationId,
             ...(professionalIds
               ? { professionalMembershipId: { in: professionalIds } }
@@ -650,6 +651,7 @@ export function registerCommissionRoutes(
         database.commissionSettlement.findMany({
           orderBy: { createdAt: 'desc' },
           where: {
+            ...(occurredAt ? { createdAt: occurredAt } : {}),
             organizationId: current.organizationId,
             ...(professionalIds
               ? { professionalMembershipId: { in: professionalIds } }

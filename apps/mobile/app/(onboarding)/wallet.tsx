@@ -44,7 +44,11 @@ import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 const PAYPHONE_FEATURE_ENABLED = false;
 
 type WalletCalendarTarget =
-  'filter-end' | 'filter-start' | 'period-end' | 'period-start';
+  | 'filter-end'
+  | 'filter-start'
+  | 'history-date'
+  | 'period-end'
+  | 'period-start';
 
 function dateForCalendar(value: string) {
   const [year = 2000, month = 1, day = 1] = value.split('-').map(Number);
@@ -60,6 +64,32 @@ function dateDaysAgo(days: number) {
 function isWithinDateRange(value: string, start: string, end: string) {
   const date = value.slice(0, 10);
   return date >= start && date <= end;
+}
+
+function commissionConcept(snapshot: unknown): string {
+  if (!snapshot || typeof snapshot !== 'object') return 'Venta registrada';
+  const record = snapshot as {
+    originalSnapshot?: unknown;
+    productName?: unknown;
+    serviceName?: unknown;
+  };
+  if (typeof record.serviceName === 'string' && record.serviceName.trim())
+    return record.serviceName;
+  if (typeof record.productName === 'string' && record.productName.trim())
+    return record.productName;
+  if (record.originalSnapshot)
+    return commissionConcept(record.originalSnapshot);
+  return 'Venta registrada';
+}
+
+function advanceDetail(
+  notes: string | null,
+  reference: string | null,
+): string | null {
+  const values = [notes, reference ? `Referencia: ${reference}` : null].filter(
+    (value): value is string => Boolean(value?.trim()),
+  );
+  return values.length ? values.join(' · ') : null;
 }
 
 export default function WalletScreen() {
@@ -107,6 +137,7 @@ export default function WalletScreen() {
     dateDaysAgo(29),
   );
   const [movementDateEnd, setMovementDateEnd] = useState(() => dateDaysAgo(0));
+  const [historyDate, setHistoryDate] = useState(() => dateDaysAgo(0));
   const [calendarTarget, setCalendarTarget] =
     useState<WalletCalendarTarget | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
@@ -147,9 +178,14 @@ export default function WalletScreen() {
     enabled: Boolean(session) && hasKnownRole && shouldLoadCommissions,
     queryFn: () =>
       requireApiClient().request<CommissionOverviewResponse>(
-        '/v1/commissions/overview',
+        tab === 'history'
+          ? `/v1/commissions/overview?periodStart=${historyDate}&periodEnd=${historyDate}`
+          : '/v1/commissions/overview',
       ),
-    queryKey: tenant.key('commission-overview'),
+    queryKey: tenant.key(
+      'commission-overview',
+      tab === 'history' ? historyDate : 'all',
+    ),
   });
   const payphoneQuery = useQuery({
     enabled: PAYPHONE_FEATURE_ENABLED && Boolean(session) && tab === 'settings',
@@ -856,19 +892,42 @@ export default function WalletScreen() {
               </View>
             ) : (
               <View style={styles.history}>
+                <Text style={styles.cardDescription}>
+                  Consulta los movimientos registrados en un día específico.
+                </Text>
+                <Pressable
+                  accessibilityLabel="Seleccionar fecha del historial"
+                  onPress={() => {
+                    setCalendarMonth(dateForCalendar(historyDate));
+                    setCalendarTarget('history-date');
+                  }}
+                  style={styles.calendarField}
+                >
+                  <Ionicons
+                    color={appTheme.colors.accentDark}
+                    name="calendar-outline"
+                    size={18}
+                  />
+                  <View>
+                    <Text style={styles.inputLabel}>Fecha</Text>
+                    <Text style={styles.calendarFieldValue}>{historyDate}</Text>
+                  </View>
+                </Pressable>
                 <Text style={styles.sectionTitle}>Movimientos de comisión</Text>
                 {commissionEntries.historical.map((entry) => (
                   <View key={entry.id} style={styles.financialRow}>
                     <View style={styles.copy}>
                       <Text style={styles.cardTitle}>
                         {entry.reversalOfEntryId ? 'Reverso' : 'Comisión'} ·{' '}
-                        {formatMoney(entry.amountCents)}
+                        {commissionConcept(entry.calculationSnapshot)}
                       </Text>
                       <Text style={styles.cardDescription}>
-                        {new Date(entry.occurredAt).toLocaleDateString()} ·{' '}
-                        {entry.status.replaceAll('_', ' ')}
+                        {new Date(entry.occurredAt).toLocaleDateString()}
                       </Text>
                     </View>
+                    <Text style={styles.movementAmount}>
+                      {formatMoney(entry.amountCents)}
+                    </Text>
                   </View>
                 ))}
                 {!commissionEntries.historical.length ? (
@@ -887,6 +946,11 @@ export default function WalletScreen() {
                         {new Date(advance.occurredAt).toLocaleDateString()} ·
                         Pendiente {formatMoney(advance.outstandingAmountCents)}
                       </Text>
+                      {advanceDetail(advance.notes, advance.reference) ? (
+                        <Text style={styles.cardDescription}>
+                          {advanceDetail(advance.notes, advance.reference)}
+                        </Text>
+                      ) : null}
                     </View>
                     <Text style={styles.statusText}>
                       {advance.status.replaceAll('_', ' ')}
@@ -1400,6 +1464,7 @@ export default function WalletScreen() {
             setMovementDateEnd(value);
             if (value < movementDateStart) setMovementDateStart(value);
           }
+          if (calendarTarget === 'history-date') setHistoryDate(value);
           if (calendarTarget === 'period-start') {
             setPeriodStart(value);
             if (value > periodEnd) setPeriodEnd(value);
@@ -1415,9 +1480,11 @@ export default function WalletScreen() {
             ? movementDateStart
             : calendarTarget === 'filter-end'
               ? movementDateEnd
-              : calendarTarget === 'period-start'
-                ? periodStart
-                : periodEnd,
+              : calendarTarget === 'history-date'
+                ? historyDate
+                : calendarTarget === 'period-start'
+                  ? periodStart
+                  : periodEnd,
         )}
         today={new Date()}
         topInset={layout.topInset}

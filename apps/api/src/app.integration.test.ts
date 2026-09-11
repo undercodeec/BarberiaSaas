@@ -968,8 +968,26 @@ describeWithDatabase('API con PostgreSQL', () => {
           paymentMethod: 'CASH',
           professionalMembershipId: otherMembershipId,
         },
+        {
+          createdByUserId: ownerMembership.userId,
+          occurredAt: new Date('2030-01-15T16:00:00.000Z'),
+          organizationId: agenda.organizationId,
+          originalAmountCents: 300,
+          paymentMethod: 'CASH',
+          professionalMembershipId: otherMembershipId,
+        },
       ],
     });
+
+    const dayOverview = await app.inject({
+      headers: { authorization: `Bearer ${agenda.ownerToken}` },
+      method: 'GET',
+      url: '/v1/commissions/overview?periodStart=2030-01-14&periodEnd=2030-01-14',
+    });
+    expect(dayOverview.statusCode, dayOverview.body).toBe(200);
+    expect(
+      dayOverview.json<{ advances: Array<{ occurredAt: string }> }>().advances,
+    ).toHaveLength(2);
 
     const overview = await app.inject({
       headers: { authorization: `Bearer ${agenda.barberToken}` },
