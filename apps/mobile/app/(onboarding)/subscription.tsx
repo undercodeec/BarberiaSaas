@@ -3,12 +3,14 @@ import type { SubscriptionResponse } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { Redirect, useRouter } from 'expo-router';
+import { useState } from 'react';
 import {
-  Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  ToastAndroid,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -94,6 +96,7 @@ export default function SubscriptionScreen() {
   const router = useRouter();
   const { session, user } = useAuth();
   const queryClient = useQueryClient();
+  const [isWebsiteCopied, setIsWebsiteCopied] = useState(false);
   const subscriptionQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -129,7 +132,12 @@ export default function SubscriptionScreen() {
 
   const copySubscriptionWebsite = async () => {
     await Clipboard.setStringAsync('navacloud.app');
-    Alert.alert('Sitio copiado', 'navacloud.app se copió al portapapeles.');
+    if (Platform.OS === 'android') {
+      ToastAndroid.show('Texto copiado', ToastAndroid.SHORT);
+      return;
+    }
+    setIsWebsiteCopied(true);
+    setTimeout(() => setIsWebsiteCopied(false), 1_800);
   };
 
   const subscription = subscriptionQuery.data;
@@ -447,6 +455,16 @@ export default function SubscriptionScreen() {
           </View>
         ) : null}
       </ScrollView>
+      {isWebsiteCopied ? (
+        <View
+          accessibilityLiveRegion="polite"
+          accessibilityRole="alert"
+          pointerEvents="none"
+          style={styles.clipboardToast}
+        >
+          <Text style={styles.clipboardToastText}>Texto copiado</Text>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -525,6 +543,16 @@ const styles = StyleSheet.create({
     padding: 17,
     ...goldButtonShadow,
   },
+  clipboardToast: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(16, 28, 45, 0.92)',
+    borderRadius: 999,
+    bottom: 28,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    position: 'absolute',
+  },
+  clipboardToastText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   capabilityRow: {
     alignItems: 'center',
     flexDirection: 'row',
