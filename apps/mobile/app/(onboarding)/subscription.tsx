@@ -200,8 +200,8 @@ export default function SubscriptionScreen() {
             size={22}
           />
           <Text style={styles.websiteNotice}>
-            Para gestionar tu suscripción, visita nuestro sitio web
-            navacloud.app
+            Para gestionar tu suscripción, visita nuestro sitio web{' '}
+            <Text style={styles.websiteDomain}>navacloud.app</Text>
           </Text>
         </View>
         <View style={styles.currentCard}>
@@ -668,5 +668,9 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 16,
     ...goldButtonShadow,
+  },
+  websiteDomain: {
+    color: appTheme.colors.accentDark,
+    fontWeight: '900',
   },
 });
