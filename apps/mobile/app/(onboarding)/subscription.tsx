@@ -1,8 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { SubscriptionResponse } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as Clipboard from 'expo-clipboard';
 import { Redirect, useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InlineMessage } from '../../src/components/InlineMessage';
@@ -119,6 +127,11 @@ export default function SubscriptionScreen() {
   });
   if (!session) return <Redirect href="/(auth)/login" />;
 
+  const copySubscriptionWebsite = async () => {
+    await Clipboard.setStringAsync('navacloud.app');
+    Alert.alert('Sitio copiado', 'navacloud.app se copió al portapapeles.');
+  };
+
   const subscription = subscriptionQuery.data;
   const subscriptionPlan = subscription?.plans.find(
     ({ code }) => code === subscription.current.planCode,
@@ -199,10 +212,19 @@ export default function SubscriptionScreen() {
             name="globe-outline"
             size={22}
           />
-          <Text style={styles.websiteNotice}>
-            Para gestionar tu suscripción, visita nuestro sitio web{' '}
-            <Text style={styles.websiteDomain}>navacloud.app</Text>
-          </Text>
+          <View style={styles.websiteNoticeCopy}>
+            <Text style={styles.websiteNotice}>
+              Para gestionar tu suscripción, visita nuestro sitio web
+            </Text>
+            <Pressable
+              accessibilityHint="Copia el sitio web al portapapeles"
+              accessibilityLabel="Copiar navacloud.app"
+              accessibilityRole="button"
+              onPress={() => void copySubscriptionWebsite()}
+            >
+              <Text style={styles.websiteDomain}>navacloud.app</Text>
+            </Pressable>
+          </View>
         </View>
         <View style={styles.currentCard}>
           <View style={styles.currentHeading}>
@@ -656,10 +678,10 @@ const styles = StyleSheet.create({
   warningTitle: { color: '#7A4300', fontSize: 15, fontWeight: '900' },
   websiteNotice: {
     color: appTheme.colors.text,
-    flex: 1,
     fontSize: 14,
     lineHeight: 21,
   },
+  websiteNoticeCopy: { flex: 1, gap: 2 },
   websiteNoticeCard: {
     alignItems: 'center',
     backgroundColor: appTheme.colors.surface,
