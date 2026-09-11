@@ -2,11 +2,20 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
   SubscriptionResponse,
   TeamMember,
+  TeamLocationsResponse,
   TeamResponse,
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InlineMessage } from '../../src/components/InlineMessage';
@@ -22,6 +31,13 @@ import { useAuth } from '../../src/providers/AuthProvider';
 import { useTenantScope } from '../../src/providers/TenantScopeProvider';
 
 type EditableRole = 'barber' | 'manager' | 'receptionist';
+
+interface RoleDraft {
+  readonly commissionPercentage: string;
+  readonly locationIds: readonly string[];
+  readonly member: TeamMember;
+  readonly role: EditableRole;
+}
 
 const PROFILES: ReadonlyArray<{
   capabilities: readonly string[];
@@ -64,6 +80,9 @@ export default function CollaboratorPermissionsScreen() {
   const { session, user } = useAuth();
   const tenant = useTenantScope();
   const organizationQuery = useCurrentOrganization();
+  const [draft, setDraft] = useState<RoleDraft | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const isOwner = organizationQuery.data?.membership.role === 'owner';
   const subscriptionQuery = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
@@ -75,24 +94,48 @@ export default function CollaboratorPermissionsScreen() {
     queryFn: () => requireApiClient().request<TeamResponse>('/v1/team'),
     queryKey: tenant.key('team'),
   });
+  const teamEnabled =
+    teamQuery.data?.teamEnabled ??
+    subscriptionQuery.data?.current.featureFlags.team ??
+    false;
+  const teamLocationsQuery = useQuery({
+    enabled: Boolean(
+      session &&
+      isOwner &&
+      teamEnabled &&
+      draft &&
+      (draft.role === 'barber' || draft.role === 'receptionist'),
+    ),
+    queryFn: () =>
+      requireApiClient().request<TeamLocationsResponse>('/v1/team/locations'),
+    queryKey: tenant.key('team-locations'),
+  });
   const mutation = useMutation({
     mutationFn: ({
-      member,
+      commissionPercentage,
+      fullName,
+      locationIds,
+      memberId,
       role,
     }: {
-      member: TeamMember;
+      commissionPercentage: number | null;
+      fullName: string;
+      locationIds?: readonly string[];
+      memberId: string;
       role: EditableRole;
     }) =>
-      requireApiClient().request(`/v1/team/members/${member.id}`, {
+      requireApiClient().request(`/v1/team/members/${memberId}`, {
         body: {
-          commissionPercentage:
-            role === 'barber' ? (member.commissionPercentage ?? 0) : null,
-          fullName: member.user.fullName,
+          commissionPercentage,
+          ...(locationIds ? { locationIds } : {}),
+          fullName,
           role,
         },
         method: 'PATCH',
       }),
     onSuccess: async () => {
+      setDraft(null);
+      setDraftError(null);
       await queryClient.invalidateQueries({
         queryKey: tenantQueryPrefix('team'),
       });
@@ -100,13 +143,53 @@ export default function CollaboratorPermissionsScreen() {
   });
   if (!session) return <Redirect href="/(auth)/login" />;
 
-  const teamEnabled =
-    subscriptionQuery.data?.current.featureFlags.team ?? false;
-  const canManage =
-    organizationQuery.data?.membership.role === 'owner' && teamEnabled;
+  const canManage = isOwner && teamEnabled;
   const editableMembers = (teamQuery.data?.members ?? []).filter(
     (member) => member.role !== 'owner' && member.user.id !== user?.id,
   );
+  const selectRole = (member: TeamMember, role: EditableRole) => {
+    if (member.role === role) {
+      setDraft(null);
+      setDraftError(null);
+      return;
+    }
+    setDraftError(null);
+    setDraft({
+      commissionPercentage:
+        role === 'barber' ? String(member.commissionPercentage ?? 0) : '',
+      locationIds: member.locations.map(({ id }) => id),
+      member,
+      role,
+    });
+  };
+  const saveDraft = () => {
+    if (!draft) return;
+    const requiresLocations =
+      draft.role === 'barber' || draft.role === 'receptionist';
+    if (requiresLocations && draft.locationIds.length === 0) {
+      setDraftError('Selecciona al menos una sucursal para este perfil.');
+      return;
+    }
+    const commissionPercentage = Number(draft.commissionPercentage);
+    if (
+      draft.role === 'barber' &&
+      (!Number.isInteger(commissionPercentage) ||
+        commissionPercentage < 0 ||
+        commissionPercentage > 100)
+    ) {
+      setDraftError('Indica una comisión entera entre 0% y 100%.');
+      return;
+    }
+    setDraftError(null);
+    mutation.mutate({
+      commissionPercentage:
+        draft.role === 'barber' ? commissionPercentage : null,
+      ...(requiresLocations ? { locationIds: draft.locationIds } : {}),
+      fullName: draft.member.user.fullName,
+      memberId: draft.member.id,
+      role: draft.role,
+    });
+  };
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -156,6 +239,7 @@ export default function CollaboratorPermissionsScreen() {
             }
           />
         ) : null}
+        {draftError ? <InlineMessage message={draftError} /> : null}
         {editableMembers.map((member) => (
           <View key={member.id} style={styles.memberCard}>
             <View style={styles.memberHeading}>
@@ -170,19 +254,21 @@ export default function CollaboratorPermissionsScreen() {
               </View>
             </View>
             {PROFILES.map((profile) => {
-              const selected = member.role === profile.role;
+              const isEditing = draft?.member.id === member.id;
+              const selected = isEditing
+                ? draft.role === profile.role
+                : member.role === profile.role;
               return (
                 <Pressable
+                  accessibilityLabel={profile.label}
                   accessibilityRole="radio"
                   accessibilityState={{
                     checked: selected,
                     disabled: !canManage || !teamEnabled,
                   }}
-                  disabled={!canManage || !teamEnabled || mutation.isPending}
+                  disabled={!canManage || mutation.isPending}
                   key={profile.role}
-                  onPress={() =>
-                    mutation.mutate({ member, role: profile.role })
-                  }
+                  onPress={() => selectRole(member, profile.role)}
                   style={({ pressed }) => [
                     styles.profile,
                     selected ? styles.profileSelected : null,
@@ -206,6 +292,114 @@ export default function CollaboratorPermissionsScreen() {
                 </Pressable>
               );
             })}
+            {draft?.member.id === member.id ? (
+              <View style={styles.draftFields}>
+                {draft.role === 'barber' || draft.role === 'receptionist' ? (
+                  <>
+                    <Text style={styles.draftLabel}>Sucursales asignadas</Text>
+                    <Text style={styles.draftHint}>
+                      {draft.role === 'barber'
+                        ? 'El profesional atenderá y aparecerá para reservas en estas sucursales.'
+                        : 'Recepción podrá gestionar clientes y citas solo en estas sucursales.'}
+                    </Text>
+                    {teamLocationsQuery.isLoading ? (
+                      <Text style={styles.draftHint}>Cargando sucursales…</Text>
+                    ) : null}
+                    {teamLocationsQuery.isError ? (
+                      <Text style={styles.draftHint}>
+                        No pudimos cargar las sucursales. Inténtalo nuevamente.
+                      </Text>
+                    ) : null}
+                    {teamLocationsQuery.data?.locations.map((location) => {
+                      const selected = draft.locationIds.includes(location.id);
+                      return (
+                        <Pressable
+                          key={location.id}
+                          accessibilityLabel={`Asignar ${location.name}`}
+                          accessibilityRole="checkbox"
+                          accessibilityState={{ checked: selected }}
+                          onPress={() =>
+                            setDraft((current) =>
+                              current
+                                ? {
+                                    ...current,
+                                    locationIds: selected
+                                      ? current.locationIds.filter(
+                                          (id) => id !== location.id,
+                                        )
+                                      : [...current.locationIds, location.id],
+                                  }
+                                : current,
+                            )
+                          }
+                          style={styles.locationOption}
+                        >
+                          <Ionicons
+                            color={
+                              selected
+                                ? appTheme.colors.accentDark
+                                : appTheme.colors.textMuted
+                            }
+                            name={selected ? 'checkbox' : 'square-outline'}
+                            size={20}
+                          />
+                          <Text style={styles.locationOptionLabel}>
+                            {location.name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </>
+                ) : null}
+                {draft.role === 'barber' ? (
+                  <>
+                    <Text style={styles.draftLabel}>
+                      Comisión por servicios (%)
+                    </Text>
+                    <TextInput
+                      keyboardType="number-pad"
+                      maxLength={3}
+                      onChangeText={(commissionPercentage) =>
+                        setDraft((current) =>
+                          current
+                            ? { ...current, commissionPercentage }
+                            : current,
+                        )
+                      }
+                      placeholder="Ej. 40"
+                      placeholderTextColor="#8b94a1"
+                      style={styles.commissionInput}
+                      value={draft.commissionPercentage}
+                    />
+                  </>
+                ) : null}
+                <View style={styles.draftActions}>
+                  <Pressable
+                    accessibilityLabel="Cancelar cambio de perfil"
+                    accessibilityRole="button"
+                    disabled={mutation.isPending}
+                    onPress={() => {
+                      setDraft(null);
+                      setDraftError(null);
+                    }}
+                    style={styles.cancelButton}
+                  >
+                    <Text style={styles.cancelButtonLabel}>Cancelar</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityLabel="Guardar perfil"
+                    accessibilityRole="button"
+                    disabled={mutation.isPending}
+                    onPress={saveDraft}
+                    style={styles.saveButton}
+                  >
+                    <Text style={styles.saveButtonLabel}>
+                      {mutation.isPending ? 'Guardando…' : 'Guardar perfil'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
           </View>
         ))}
         {!teamQuery.isLoading && editableMembers.length === 0 ? (
@@ -238,6 +432,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
   },
+  cancelButton: {
+    alignItems: 'center',
+    borderColor: appTheme.colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  cancelButtonLabel: {
+    color: appTheme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '800',
+  },
   capability: {
     color: appTheme.colors.textMuted,
     fontSize: 12,
@@ -250,6 +458,32 @@ const styles = StyleSheet.create({
     maxWidth: 720,
     padding: 20,
     width: '100%',
+  },
+  commissionInput: {
+    borderColor: appTheme.colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    color: appTheme.colors.text,
+    fontSize: 14,
+    padding: 12,
+  },
+  draftActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  draftFields: {
+    backgroundColor: appTheme.colors.surfaceMuted,
+    borderRadius: 14,
+    gap: 10,
+    marginTop: 4,
+    padding: 12,
+  },
+  draftHint: {
+    color: appTheme.colors.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  draftLabel: {
+    color: appTheme.colors.text,
+    fontSize: 13,
+    fontWeight: '900',
   },
   empty: {
     color: appTheme.colors.textMuted,
@@ -285,6 +519,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   memberName: { color: appTheme.colors.text, fontSize: 17, fontWeight: '900' },
+  locationOption: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 5,
+  },
+  locationOptionLabel: {
+    color: appTheme.colors.text,
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   notice: {
     alignItems: 'flex-start',
     backgroundColor: appTheme.colors.surfaceMuted,
@@ -324,6 +570,19 @@ const styles = StyleSheet.create({
   },
   profilePlanLocked: { opacity: 0.46 },
   screen: appStyles.screen,
+  saveButton: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.accentWash,
+    borderRadius: 12,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  saveButtonLabel: {
+    color: appTheme.colors.accentDark,
+    fontSize: 13,
+    fontWeight: '900',
+  },
   subtitle: { color: appTheme.colors.textMuted, fontSize: 13, marginTop: 2 },
   title: { color: appTheme.colors.text, fontSize: 23, fontWeight: '900' },
 });
