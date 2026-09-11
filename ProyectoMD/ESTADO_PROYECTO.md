@@ -35,7 +35,10 @@ su resultado debe registrarse aquí antes de archivarlos.
 
 - [x] Google Play Console rechazó `versionCode 41` porque ya fue usado. El AAB `Nava-0.1.19-code41.aab` queda archivado como evidencia y no debe subirse de nuevo.
 - [x] La siguiente candidata está configurada como `0.1.20` / `versionCode 42` tanto en `apps/mobile/app.json` como en `apps/mobile/android/app/build.gradle`.
-- [ ] Pendiente: compilar, verificar y subir un AAB nuevo con `versionCode 42`. No reutilizar ningún código ya informado por Play Console.
+- [x] AAB de producción generado y archivado: `apps/mobile/releases/Nava-0.1.20-code42.aab`.
+- [x] Verificación ejecutada correctamente: `Release Android verificado: 0.1.20 (42), AAB firmado y sin OTA.`
+- [x] SHA-256 del AAB: `FE12DFE48B71B78E93C3E85C1DA142670106196D75DF1E20E904F31D75837CC6`.
+- [ ] Pendiente: subir este AAB exacto a Google Play. Play debe reconocer `versionCode 42`; no reutilizar ningún código ya informado por Play Console.
 
 ### Procedimiento para los próximos despliegues Android
 
