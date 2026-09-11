@@ -35,9 +35,9 @@ su resultado debe registrarse aquí antes de archivarlos.
 
 - [x] La versión publicada anterior fue `0.1.18` / `versionCode 40`. La siguiente candidata está configurada como `0.1.19` / `versionCode 41` tanto en `apps/mobile/app.json` como en `apps/mobile/android/app/build.gradle`.
 - [x] Se completó el AAB local de producción y quedó firmado con el keystore de subida ya configurado en el equipo.
-- [x] Artefacto generado: `apps/mobile/android/app/build/outputs/bundle/release/app-release.aab`.
+- [x] Artefacto generado y archivado: `apps/mobile/releases/Nava-0.1.19-code41.aab`.
 - [x] Verificación ejecutada correctamente: `Release Android verificado: 0.1.19 (41), AAB firmado y sin OTA.`
-- [x] SHA-256 del AAB: `C4C27A1D0628AFD55791FBA825178AE69D9174D21270F8757EEEADB8EF44C5FE`.
+- [x] SHA-256 del AAB: `D01CD2A000F8FB78B7B2A59BB16B538CD3BB53542B36543FEDC2FC7799339D23`.
 - [ ] Pendiente: subir ese AAB exacto a Google Play. Play debe reconocer `versionCode 41`; no generar ni subir otro código para esta misma versión.
 
 ### Procedimiento para los próximos despliegues Android
