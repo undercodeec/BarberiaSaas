@@ -436,6 +436,11 @@ export function subscriptionNotice(
   subscription: SubscriptionResponse | undefined,
 ): SubscriptionNotice | null {
   if (subscription?.current.planCode === 'free') {
+    if (subscription.current.status === 'free')
+      return {
+        copy: 'Ahora utilizas Nava Free. Tus datos se conservan.\n\nPara recuperar todas las funciones utilizadas durante tu prueba, tu cuenta necesita contar con un plan activo.',
+        title: 'Tu período de prueba ha finalizado',
+      };
     const usage = subscription.usage;
     const limit = usage.bookingLimit;
     if (limit !== null) {

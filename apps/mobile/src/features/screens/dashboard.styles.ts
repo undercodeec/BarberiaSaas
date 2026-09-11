@@ -682,6 +682,17 @@ export const styles = StyleSheet.create({
     height: 112,
     width: 180,
   },
+  subscriptionContinueFreeButton: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  subscriptionContinueFreeLabel: {
+    color: appTheme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '800',
+  },
   subscriptionUpgradeButton: {
     alignItems: 'center',
     alignSelf: 'center',

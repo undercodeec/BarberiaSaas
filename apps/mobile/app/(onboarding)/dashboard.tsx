@@ -208,6 +208,8 @@ export default function DashboardScreen() {
     isSubscriptionCelebrationVisible,
     setIsSubscriptionCelebrationVisible,
   ] = useState(false);
+  const [isFreePlanNoticeDismissed, setIsFreePlanNoticeDismissed] =
+    useState(false);
   const [subscriptionCelebrationPlanName, setSubscriptionCelebrationPlanName] =
     useState('Nava Premium');
   const subscriptionCelebrationStateRef = useRef<{
@@ -245,6 +247,9 @@ export default function DashboardScreen() {
   );
   const currentSubscriptionPlanCode = subscriptionQuery.data?.current.planCode;
   const currentSubscriptionStatus = subscriptionQuery.data?.current.status;
+  const isFreePlanNotice =
+    currentSubscriptionPlanCode === 'free' &&
+    currentSubscriptionStatus === 'free';
   const currentSubscriptionPlanName =
     subscriptionQuery.data?.plans.find(
       ({ code }) => code === currentSubscriptionPlanCode,
@@ -1059,7 +1064,8 @@ export default function DashboardScreen() {
           </View>
         ) : null}
 
-        {planRenewalNotice ? (
+        {planRenewalNotice &&
+        (!isFreePlanNotice || !isFreePlanNoticeDismissed) ? (
           <View style={styles.subscriptionNoticeCard}>
             <View style={styles.subscriptionNoticeImageColumn}>
               <Image
@@ -1078,13 +1084,26 @@ export default function DashboardScreen() {
                 onPress={() => router.push('/subscription')}
                 style={styles.subscriptionUpgradeButton}
               >
-                <Text style={styles.subscriptionUpgradeLabel}>Ver planes</Text>
+                <Text style={styles.subscriptionUpgradeLabel}>
+                  {isFreePlanNotice ? 'Ver mi plan' : 'Ver planes'}
+                </Text>
                 <Ionicons
                   color={appTheme.colors.white}
                   name="arrow-forward"
                   size={18}
                 />
               </Pressable>
+              {isFreePlanNotice ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setIsFreePlanNoticeDismissed(true)}
+                  style={styles.subscriptionContinueFreeButton}
+                >
+                  <Text style={styles.subscriptionContinueFreeLabel}>
+                    Continuar con Nava Free
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           </View>
         ) : null}
