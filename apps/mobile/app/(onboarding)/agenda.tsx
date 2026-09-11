@@ -727,10 +727,9 @@ export default function AgendaScreen() {
     teamQuery.data?.members.find(
       (member) => member.id === selectedAppointment.professionalMembershipId,
     )?.planAvailable !== false;
-  const displayedTimeline =
-    showAllHours || showingAllLocations
-      ? Array.from({ length: 25 }, (_, index) => index * 60)
-      : configuredTimeline;
+  const displayedTimeline = showAllHours
+    ? Array.from({ length: 25 }, (_, index) => index * 60)
+    : configuredTimeline;
   const appointmentsForDay = (day: Date) =>
     filteredAppointments.filter((appointment) =>
       sameDate(
@@ -749,7 +748,7 @@ export default function AgendaScreen() {
     return counts;
   }, [calendarSummaryQuery.data?.items]);
   const weekTimeline = useMemo(() => {
-    if (showAllHours || showingAllLocations)
+    if (showAllHours)
       return Array.from({ length: 25 }, (_, index) => index * 60);
     return timelineMinutes(
       weekDays.flatMap((day) => {
@@ -769,7 +768,6 @@ export default function AgendaScreen() {
   }, [
     businessScheduleQuery.data?.days,
     showAllHours,
-    showingAllLocations,
     weekDays,
   ]);
   const moveCalendarPeriod = (offset: number) => {
