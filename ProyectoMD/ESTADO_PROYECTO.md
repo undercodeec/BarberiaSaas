@@ -31,6 +31,38 @@ su resultado debe registrarse aquí antes de archivarlos.
 - Las integraciones PostgreSQL deben usar únicamente la base local de pruebas;
   no se debe compensar la latencia remota usando producción.
 
+## Candidata móvil 0.1.19 / Android 41 — 10 de septiembre de 2026
+
+- [x] La versión publicada anterior fue `0.1.18` / `versionCode 40`. La siguiente candidata está configurada como `0.1.19` / `versionCode 41` tanto en `apps/mobile/app.json` como en `apps/mobile/android/app/build.gradle`.
+- [x] Se completó el AAB local de producción y quedó firmado con el keystore de subida ya configurado en el equipo.
+- [x] Artefacto generado: `apps/mobile/android/app/build/outputs/bundle/release/app-release.aab`.
+- [x] Verificación ejecutada correctamente: `Release Android verificado: 0.1.19 (41), AAB firmado y sin OTA.`
+- [x] SHA-256 del AAB: `C4C27A1D0628AFD55791FBA825178AE69D9174D21270F8757EEEADB8EF44C5FE`.
+- [ ] Pendiente: subir ese AAB exacto a Google Play. Play debe reconocer `versionCode 41`; no generar ni subir otro código para esta misma versión.
+
+### Procedimiento para los próximos despliegues Android
+
+1. Confirmar en Google Play el último `versionCode` publicado y elegir el siguiente entero consecutivo.
+2. Cambiar en conjunto la versión visible y el código nativo:
+   - `apps/mobile/app.json`: `expo.version` y `expo.android.versionCode`.
+   - `apps/mobile/android/app/build.gradle`: fallback `NAVA_VERSION_CODE` y `versionName`.
+3. Desde `apps/mobile/android`, compilar con el keystore existente:
+
+   ```powershell
+   $env:NODE_ENV = 'production'
+   .\gradlew.bat bundleRelease
+   ```
+
+4. Verificar el AAB antes de subirlo:
+
+   ```powershell
+   node ..\scripts\verify-android-release.mjs "D:\Documentos\BarberiaSaas\apps\mobile\android\app\build\outputs\bundle\release\app-release.aab"
+   ```
+
+5. Subir el archivo resultante a la pista de Google Play correspondiente y comprobar que el código detectado coincide con el previsto.
+
+Android se publica mediante Gradle local, no mediante EAS Build. Un registro remoto de EAS con código `42` quedó de una prueba cancelada; no produjo AAB ni se debe usar para definir el versionado Android. Para Android, la fuente de verdad es el código configurado en Gradle local y en Google Play.
+
 ## Procesamiento de datos escalable — 5 de septiembre de 2026
 
 - [x] Las rutas aditivas `v2` de clientes, agenda, disponibilidad, inventario
