@@ -661,14 +661,13 @@ export default function InventoryScreen() {
                       product.isLowStock && styles.productIconAlert,
                     ]}
                   >
-                    {product.imageUrl ? (
+                    {product.imageUrl && imageToken ? (
                       <Image
                         source={{
-                          headers: imageToken
-                            ? { authorization: `Bearer ${imageToken}` }
-                            : undefined,
+                          headers: { Authorization: `Bearer ${imageToken}` },
                           uri: apiMediaUrl(product.imageUrl),
                         }}
+                        resizeMode="cover"
                         style={styles.productImage}
                       />
                     ) : (
@@ -854,14 +853,53 @@ export default function InventoryScreen() {
                       .map((item) => `${item.productName} ×${item.quantity}`)
                       .join(', ')}
                   </Text>
-                  <Text style={styles.muted}>
-                    {order.paymentMethod === 'pickup'
-                      ? 'Pago al retirar'
-                      : order.paymentMethod === 'transfer'
-                        ? 'Transferencia'
-                        : 'Tarjeta'}{' '}
-                    · {orderStatusLabel(order.status)}
-                  </Text>
+                  <View style={styles.orderMeta}>
+                    <Text style={styles.muted}>
+                      {order.paymentMethod === 'pickup'
+                        ? 'Pago al retirar'
+                        : order.paymentMethod === 'transfer'
+                          ? 'Transferencia'
+                          : 'Tarjeta'}
+                    </Text>
+                    <View
+                      style={[
+                        styles.orderStatus,
+                        order.status === 'pending_payment' &&
+                          styles.orderStatusPending,
+                        order.status === 'reserved' &&
+                          styles.orderStatusReserved,
+                        order.status === 'paid' && styles.orderStatusPaid,
+                        order.status === 'ready_for_pickup' &&
+                          styles.orderStatusReady,
+                        order.status === 'fulfilled' &&
+                          styles.orderStatusFulfilled,
+                        order.status === 'cancelled' &&
+                          styles.orderStatusCancelled,
+                        order.status === 'expired' && styles.orderStatusExpired,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.orderStatusText,
+                          order.status === 'pending_payment' &&
+                            styles.orderStatusTextPending,
+                          order.status === 'reserved' &&
+                            styles.orderStatusTextReserved,
+                          order.status === 'paid' && styles.orderStatusTextPaid,
+                          order.status === 'ready_for_pickup' &&
+                            styles.orderStatusTextReady,
+                          order.status === 'fulfilled' &&
+                            styles.orderStatusTextFulfilled,
+                          order.status === 'cancelled' &&
+                            styles.orderStatusTextCancelled,
+                          order.status === 'expired' &&
+                            styles.orderStatusTextExpired,
+                        ]}
+                      >
+                        {orderStatusLabel(order.status)}
+                      </Text>
+                    </View>
+                  </View>
                   {['pending_payment', 'reserved'].includes(order.status) ? (
                     <View style={styles.orderActions}>
                       <Pressable
