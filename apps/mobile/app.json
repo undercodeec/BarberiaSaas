@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nava",
     "slug": "barber-saas-mobile",
-    "version": "0.1.19",
+    "version": "0.1.20",
     "icon": "./assets/icon.png",
     "orientation": "portrait",
     "scheme": "barbersaas",
@@ -12,9 +12,7 @@
       [
         "expo-notifications",
         {
-          "sounds": [
-            "./assets/sounds/cash_income.wav"
-          ]
+          "sounds": ["./assets/sounds/cash_income.wav"]
         }
       ],
       [
@@ -39,7 +37,7 @@
     },
     "android": {
       "allowBackup": false,
-      "versionCode": 41,
+      "versionCode": 42,
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.RECORD_AUDIO",
@@ -54,10 +52,7 @@
         {
           "action": "VIEW",
           "autoVerify": true,
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ],
+          "category": ["BROWSABLE", "DEFAULT"],
           "data": [
             {
               "host": "reservas.navacloud.app",
@@ -79,9 +74,7 @@
       ]
     },
     "ios": {
-      "associatedDomains": [
-        "applinks:reservas.navacloud.app"
-      ],
+      "associatedDomains": ["applinks:reservas.navacloud.app"],
       "bundleIdentifier": "app.navacloud.nava",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
