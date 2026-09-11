@@ -193,9 +193,17 @@ export default function SubscriptionScreen() {
             }
           />
         ) : null}
-        <Text style={styles.websiteNotice}>
-          Para gestionar tu suscripción, visita nuestro sitio web navacloud.app
-        </Text>
+        <View style={styles.websiteNoticeCard}>
+          <Ionicons
+            color={appTheme.colors.accentDark}
+            name="globe-outline"
+            size={22}
+          />
+          <Text style={styles.websiteNotice}>
+            Para gestionar tu suscripción, visita nuestro sitio web
+            navacloud.app
+          </Text>
+        </View>
         <View style={styles.currentCard}>
           <View style={styles.currentHeading}>
             <View>
@@ -647,9 +655,18 @@ const styles = StyleSheet.create({
   },
   warningTitle: { color: '#7A4300', fontSize: 15, fontWeight: '900' },
   websiteNotice: {
-    color: appTheme.colors.textMuted,
-    fontSize: 13,
-    lineHeight: 19,
-    textAlign: 'center',
+    color: appTheme.colors.text,
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  websiteNoticeCard: {
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.surface,
+    borderRadius: 18,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 16,
+    ...goldButtonShadow,
   },
 });
