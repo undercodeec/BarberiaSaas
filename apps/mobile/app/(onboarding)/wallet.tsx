@@ -50,6 +50,9 @@ type WalletCalendarTarget =
   | 'period-end'
   | 'period-start';
 
+type WalletTab =
+  'commissions' | 'former-professionals' | 'history' | 'settings' | 'summary';
+
 function dateForCalendar(value: string) {
   const [year = 2000, month = 1, day = 1] = value.split('-').map(Number);
   return new Date(year, month - 1, day, 12);
@@ -99,13 +102,12 @@ export default function WalletScreen() {
   const { session } = useAuth();
   const tenant = useTenantScope();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<
-    'commissions' | 'history' | 'settings' | 'summary'
-  >(() => {
+  const [tab, setTab] = useState<WalletTab>(() => {
     const requestedTab = Array.isArray(searchParams.tab)
       ? searchParams.tab[0]
       : searchParams.tab;
     return requestedTab === 'commissions' ||
+      requestedTab === 'former-professionals' ||
       requestedTab === 'history' ||
       (PAYPHONE_FEATURE_ENABLED && requestedTab === 'settings')
       ? requestedTab
@@ -138,6 +140,8 @@ export default function WalletScreen() {
   );
   const [movementDateEnd, setMovementDateEnd] = useState(() => dateDaysAgo(0));
   const [historyDate, setHistoryDate] = useState(() => dateDaysAgo(0));
+  const [selectedFormerProfessionalId, setSelectedFormerProfessionalId] =
+    useState<string | null>(null);
   const [calendarTarget, setCalendarTarget] =
     useState<WalletCalendarTarget | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
@@ -153,7 +157,8 @@ export default function WalletScreen() {
     tab === 'commissions' ||
     (walletAccess.summarySource === 'commissions' && tab === 'summary') ||
     (walletAccess.historySource === 'commissions' && tab === 'history') ||
-    (canManageCommissions && tab === 'history');
+    (canManageCommissions &&
+      (tab === 'history' || tab === 'former-professionals'));
   const summaryQuery = useQuery({
     enabled: Boolean(session) && hasKnownRole && walletAccess.canReadCash,
     queryFn: () =>
@@ -178,13 +183,13 @@ export default function WalletScreen() {
     enabled: Boolean(session) && hasKnownRole && shouldLoadCommissions,
     queryFn: () =>
       requireApiClient().request<CommissionOverviewResponse>(
-        tab === 'history'
+        tab === 'history' || tab === 'former-professionals'
           ? `/v1/commissions/overview?periodStart=${historyDate}&periodEnd=${historyDate}`
           : '/v1/commissions/overview',
       ),
     queryKey: tenant.key(
       'commission-overview',
-      tab === 'history' ? historyDate : 'all',
+      tab === 'history' || tab === 'former-professionals' ? historyDate : 'all',
     ),
   });
   const payphoneQuery = useQuery({
@@ -292,6 +297,23 @@ export default function WalletScreen() {
   );
   const selectedEntries = (commissionsQuery.data?.entries ?? []).filter(
     (entry) => entry.professionalMembershipId === effectiveProfessional?.id,
+  );
+  const formerProfessionals = commissionsQuery.data?.formerProfessionals ?? [];
+  const effectiveFormerProfessional =
+    formerProfessionals.find(
+      (professional) => professional.id === selectedFormerProfessionalId,
+    ) ?? formerProfessionals[0];
+  const formerEntries = (commissionsQuery.data?.entries ?? []).filter(
+    (entry) =>
+      entry.professionalMembershipId === effectiveFormerProfessional?.id,
+  );
+  const formerAdvances = (commissionsQuery.data?.advances ?? []).filter(
+    (advance) =>
+      advance.professionalMembershipId === effectiveFormerProfessional?.id,
+  );
+  const formerSettlements = (commissionsQuery.data?.settlements ?? []).filter(
+    (settlement) =>
+      settlement.professionalMembershipId === effectiveFormerProfessional?.id,
   );
   const commissionEntries = splitCommissionEntries(selectedEntries);
   const commissionEntriesForTab = canManageCommissions
@@ -553,9 +575,12 @@ export default function WalletScreen() {
               ['summary', 'Resumen'],
               ['history', 'Historial'],
               ['commissions', 'Comisiones'],
+              ...(canManageCommissions
+                ? [['former-professionals', 'Equipo anterior']]
+                : []),
             ] as const
           ).map(([value, label]) => (
-            <Pressable key={value} onPress={() => setTab(value)}>
+            <Pressable key={value} onPress={() => setTab(value as WalletTab)}>
               <Text style={tab === value ? styles.tabActive : styles.tab}>
                 {label}
               </Text>
@@ -809,39 +834,9 @@ export default function WalletScreen() {
         ) : null}
         {tab === 'history' ? (
           <>
-            {canManageCommissions ? (
-              <View style={styles.history}>
-                <Text style={styles.sectionTitle}>
-                  Colaboradores anteriores
-                </Text>
-                {(commissionsQuery.data?.formerProfessionals ?? []).map(
-                  (professional) => (
-                    <View key={professional.id} style={styles.financialRow}>
-                      <View style={styles.copy}>
-                        <Text style={styles.cardTitle}>
-                          {professional.name}
-                        </Text>
-                        <Text style={styles.cardDescription}>
-                          Ya no forma parte del equipo desde{' '}
-                          {new Date(professional.departedAt).toLocaleDateString(
-                            'es-EC',
-                          )}
-                          . Sus movimientos financieros se conservan.
-                        </Text>
-                      </View>
-                    </View>
-                  ),
-                )}
-                {!commissionsQuery.isLoading &&
-                !(commissionsQuery.data?.formerProfessionals ?? []).length ? (
-                  <Text style={styles.cardDescription}>
-                    No hay colaboradores anteriores.
-                  </Text>
-                ) : null}
-              </View>
-            ) : null}
             {walletAccess.historySource === 'cash' ? (
               <View style={styles.history}>
+                <Text style={styles.sectionTitle}>Historial de caja</Text>
                 <Text style={styles.cardDescription}>
                   Consulta los cierres registrados en un dÃ­a especÃ­fico.
                 </Text>
@@ -1017,6 +1012,163 @@ export default function WalletScreen() {
               </View>
             )}
           </>
+        ) : null}
+        {tab === 'former-professionals' ? (
+          <View style={styles.history}>
+            <Text style={styles.sectionTitle}>Equipo anterior</Text>
+            <Text style={styles.cardDescription}>
+              Consulta los movimientos reales de colaboradores que ya no están
+              activos en el equipo.
+            </Text>
+            <Pressable
+              accessibilityLabel="Seleccionar fecha de movimientos anteriores"
+              onPress={() => {
+                setCalendarMonth(dateForCalendar(historyDate));
+                setCalendarTarget('history-date');
+              }}
+              style={styles.calendarField}
+            >
+              <Ionicons
+                color={appTheme.colors.accentDark}
+                name="calendar-outline"
+                size={18}
+              />
+              <View>
+                <Text style={styles.inputLabel}>Fecha de movimientos</Text>
+                <Text style={styles.calendarFieldValue}>{historyDate}</Text>
+              </View>
+            </Pressable>
+            {commissionsQuery.isLoading ? (
+              <Text style={styles.cardDescription}>
+                Cargando equipo anterior...
+              </Text>
+            ) : null}
+            {formerProfessionals.length ? (
+              <ScrollView
+                contentContainerStyle={styles.professionalFilters}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+              >
+                {formerProfessionals.map((professional) => {
+                  const selected =
+                    professional.id === effectiveFormerProfessional?.id;
+                  return (
+                    <Pressable
+                      accessibilityLabel={`Ver movimientos de ${professional.name}`}
+                      accessibilityRole="button"
+                      key={professional.id}
+                      onPress={() =>
+                        setSelectedFormerProfessionalId(professional.id)
+                      }
+                      style={[
+                        styles.professionalChip,
+                        selected && styles.professionalChipActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.professionalChipText,
+                          selected && styles.professionalChipTextActive,
+                        ]}
+                      >
+                        {professional.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            ) : null}
+            {effectiveFormerProfessional ? (
+              <View style={styles.history}>
+                <Text style={styles.cardTitle}>
+                  {effectiveFormerProfessional.name}
+                </Text>
+                <Text style={styles.cardDescription}>
+                  Fuera del equipo desde{' '}
+                  {new Date(
+                    effectiveFormerProfessional.departedAt,
+                  ).toLocaleDateString('es-EC')}
+                </Text>
+                <Text style={styles.sectionTitle}>Comisiones</Text>
+                {formerEntries.map((entry) => (
+                  <View key={entry.id} style={styles.financialRow}>
+                    <View style={styles.copy}>
+                      <Text style={styles.cardTitle}>
+                        {entry.reversalOfEntryId ? 'Reverso' : 'Comisión'} ·{' '}
+                        {commissionConcept(entry.calculationSnapshot)}
+                      </Text>
+                      <Text style={styles.cardDescription}>
+                        {new Date(entry.occurredAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    <Text style={styles.movementAmount}>
+                      {formatMoney(entry.amountCents)}
+                    </Text>
+                  </View>
+                ))}
+                {!formerEntries.length ? (
+                  <Text style={styles.cardDescription}>
+                    No hay comisiones para esta fecha.
+                  </Text>
+                ) : null}
+                <Text style={styles.sectionTitle}>Anticipos</Text>
+                {formerAdvances.map((advance) => (
+                  <View key={advance.id} style={styles.financialRow}>
+                    <View style={styles.copy}>
+                      <Text style={styles.cardTitle}>
+                        {formatMoney(advance.originalAmountCents)}
+                      </Text>
+                      <Text style={styles.cardDescription}>
+                        {new Date(advance.occurredAt).toLocaleDateString()} ·
+                        Pendiente {formatMoney(advance.outstandingAmountCents)}
+                      </Text>
+                    </View>
+                    <Text style={styles.statusText}>
+                      {advance.status.replaceAll('_', ' ')}
+                    </Text>
+                  </View>
+                ))}
+                {!formerAdvances.length ? (
+                  <Text style={styles.cardDescription}>
+                    No hay anticipos para esta fecha.
+                  </Text>
+                ) : null}
+                <Text style={styles.sectionTitle}>Liquidaciones</Text>
+                {formerSettlements.map((settlement) => (
+                  <View key={settlement.id} style={styles.settlementCard}>
+                    <View style={styles.financialRowHeader}>
+                      <View style={styles.copy}>
+                        <Text style={styles.cardTitle}>
+                          {settlement.periodStart} → {settlement.periodEnd}
+                        </Text>
+                        <Text style={styles.cardDescription}>
+                          Comisión{' '}
+                          {formatMoney(settlement.commissionAmountCents)}
+                          {' · '}Anticipos -
+                          {formatMoney(settlement.advanceDeductionCents)}
+                        </Text>
+                      </View>
+                      <Text style={styles.settlementAmount}>
+                        {formatMoney(settlement.totalPayableCents)}
+                      </Text>
+                    </View>
+                    <Text style={styles.statusText}>
+                      Estado: {settlement.status}
+                    </Text>
+                  </View>
+                ))}
+                {!formerSettlements.length ? (
+                  <Text style={styles.cardDescription}>
+                    No hay liquidaciones para esta fecha.
+                  </Text>
+                ) : null}
+              </View>
+            ) : !commissionsQuery.isLoading ? (
+              <Text style={styles.cardDescription}>
+                No hay colaboradores anteriores con movimientos para consultar.
+              </Text>
+            ) : null}
+          </View>
         ) : null}
         {tab === 'commissions' ? (
           <View style={styles.commissionSection}>
