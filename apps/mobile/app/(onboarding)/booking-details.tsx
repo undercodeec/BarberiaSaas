@@ -217,6 +217,10 @@ export default function BookingDetailsScreen() {
       (member) =>
         member.status === 'active' &&
         assignedIds.has(member.id) &&
+        member.locations.some(
+          (location) =>
+            location.id === locationId && location.onlineBookingEnabled,
+        ) &&
         (!isBarber || member.id === currentMembershipId),
     );
   }, [
@@ -431,7 +435,8 @@ export default function BookingDetailsScreen() {
           <>
             <Text style={styles.title}>Elige al profesional</Text>
             <Text style={styles.copy}>
-              Sólo aparecen integrantes con servicios asignados en esta sede.
+              Sólo aparecen integrantes con servicios asignados y reservas
+              online activas en esta sede.
             </Text>
             {availableLocations.length > 1 ? (
               <>
