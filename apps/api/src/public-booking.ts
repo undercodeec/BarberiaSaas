@@ -66,6 +66,9 @@ export const publicAvailabilitySchema = z.object({
     .transform((value) => value.split(',').filter(Boolean))
     .pipe(z.array(z.uuid()).min(1).max(10)),
 });
+const managedPublicAvailabilityQuerySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+});
 const bookingPathSchema = z.object({ bookingId: z.uuid() });
 const tokenPathSchema = z.object({ token: z.string().min(32).max(512) });
 const reviewPathSchema = z.object({ reviewId: z.uuid() });
@@ -456,6 +459,7 @@ export async function calculatePublicAvailability(
   database: DatabaseClient,
   input: {
     date: string;
+    excludeAppointmentId?: string;
     locationId: string;
     membershipId: string;
     organizationId: string;
@@ -516,6 +520,9 @@ export async function calculatePublicAvailability(
     database.appointment.findMany({
       where: {
         endsAt: { gt: dayStart },
+        ...(input.excludeAppointmentId
+          ? { id: { not: input.excludeAppointmentId } }
+          : {}),
         professionalMembershipId: input.membershipId,
         reservesSlot: true,
         startsAt: { lt: dayEnd },
@@ -1348,6 +1355,24 @@ export function registerPublicBookingRoutes(
     });
     await notifier?.notify(appointment.id, 'cancelled');
     return publicManagedAppointment(appointment);
+  });
+
+  app.get('/v1/public/booking/:token/availability', async (request) => {
+    enforceRateLimit(request, 'manage-booking', 30, 60_000);
+    const { token } = tokenPathSchema.parse(request.params);
+    const { date } = managedPublicAvailabilityQuerySchema.parse(request.query);
+    const access = await requireManagedAppointment(database, token);
+    assertActivePublicAppointment(access.appointment.status);
+    return calculatePublicAvailability(database, {
+      date,
+      excludeAppointmentId: access.appointment.id,
+      locationId: access.appointment.locationId,
+      membershipId: access.appointment.professionalMembershipId,
+      organizationId: access.appointment.organizationId,
+      serviceIds: access.appointment.services.map(
+        (service) => service.serviceId,
+      ),
+    });
   });
 
   app.post('/v1/public/booking/:token/reschedule', async (request) => {

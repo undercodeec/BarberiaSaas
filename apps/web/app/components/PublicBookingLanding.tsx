@@ -168,13 +168,9 @@ export function BookingManager({ token }: { token: string }) {
     try {
       const query = new URLSearchParams({
         date: dateKey(nextDate),
-        membershipId: appointment.professionalMembershipId,
-        serviceIds: appointment.services
-          .map((service) => service.serviceId)
-          .join(','),
       });
       const response = await fetch(
-        `${API_URL}/v1/public/${appointment.organization.slug}/${appointment.location.slug}/availability?${query.toString()}`,
+        `${API_URL}/v1/public/booking/${encodeURIComponent(token)}/availability?${query.toString()}`,
       );
       if (!response.ok) throw new Error(await responseError(response));
       const result = (await response.json()) as {

@@ -389,6 +389,17 @@ integrationDescribe('reservas públicas', () => {
     );
     expect(managed.json().appointment.services).toHaveLength(1);
 
+    const managedAvailability = await app.inject({
+      method: 'GET',
+      url: `/v1/public/booking/${management.managementToken}/availability?date=${startsAt.slice(0, 10)}`,
+    });
+    expect(managedAvailability.statusCode, managedAvailability.body).toBe(200);
+    expect(
+      managedAvailability
+        .json<{ slots: ReadonlyArray<{ startsAt: string }> }>()
+        .slots.map((slot) => slot.startsAt),
+    ).toContain(startsAt);
+
     const rescheduledAt = futureSlot(4, 11);
     const rescheduled = await app.inject({
       method: 'POST',
