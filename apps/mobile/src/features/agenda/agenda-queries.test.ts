@@ -1,5 +1,6 @@
 import {
   agendaPageQueryOptions,
+  availabilityQueryOptions,
   calendarSummaryQueryOptions,
 } from './agenda-queries';
 
@@ -41,5 +42,23 @@ describe('consultas v2 de agenda', () => {
         false,
       ).enabled,
     ).toBe(false);
+  });
+
+  it('excluye la cita que se está reprogramando del cálculo de disponibilidad', async () => {
+    const api = { request: jest.fn().mockResolvedValue({ slots: [] }) };
+    const options = availabilityQueryOptions(api, scope, {
+      date: '2026-09-09',
+      excludeAppointmentId: 'appointment-a',
+      locationId: 'location-a',
+      membershipId: 'membership-a',
+      serviceIds: ['service-a'],
+    });
+
+    await options.queryFn({ signal: new AbortController().signal });
+
+    expect(api.request).toHaveBeenCalledWith(
+      expect.stringContaining('excludeAppointmentId=appointment-a'),
+      expect.anything(),
+    );
   });
 });

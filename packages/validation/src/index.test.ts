@@ -4,6 +4,7 @@ import {
   appEnvironmentSchema,
   agendaPageQuerySchema,
   appointmentCalendarSummaryQuerySchema,
+  availabilityQuerySchema,
   businessScheduleDaySchema,
   clientImportSchema,
   clientPageQuerySchema,
@@ -111,6 +112,22 @@ describe('lecturas v2 escalables', () => {
         })),
       }),
     ).toThrow();
+  });
+});
+
+describe('disponibilidad de agenda', () => {
+  it('admite excluir la cita que se reprograma', () => {
+    expect(
+      availabilityQuerySchema.parse({
+        date: '2026-09-09',
+        excludeAppointmentId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        locationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        membershipId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        serviceIds: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      }),
+    ).toMatchObject({
+      excludeAppointmentId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    });
   });
 });
 

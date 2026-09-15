@@ -696,6 +696,7 @@ export const stockMovementsPageQuerySchema = z.object({
 
 export const availabilityQuerySchema = z.object({
   date: localDateSchema,
+  excludeAppointmentId: uuidSchema.optional(),
   locationId: uuidSchema,
   membershipId: uuidSchema,
   serviceIds: z

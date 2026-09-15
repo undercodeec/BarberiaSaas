@@ -23,6 +23,7 @@ export interface AgendaPageQueryContext {
 
 export interface AvailabilityFilters {
   readonly date: string;
+  readonly excludeAppointmentId?: string;
   readonly locationId: string;
   readonly membershipId: string;
   readonly serviceIds: readonly string[];
@@ -92,6 +93,8 @@ export function availabilityQueryOptions(
     membershipId: filters.membershipId,
     serviceIds: filters.serviceIds.join(','),
   });
+  if (filters.excludeAppointmentId)
+    query.set('excludeAppointmentId', filters.excludeAppointmentId);
   return {
     queryFn: ({ signal }: { readonly signal: AbortSignal }) =>
       api.request<AvailabilityResponse>(

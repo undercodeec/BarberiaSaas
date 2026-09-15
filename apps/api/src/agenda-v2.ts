@@ -397,24 +397,45 @@ export function registerAgendaV2Routes(
       (total, service) => total + service.durationMinutes,
       0,
     );
-    const dayStart = zonedDateTimeToUtc(input.date, 0, context.location.timezone);
-    const dayEnd = zonedDateTimeToUtc(input.date, 1440, context.location.timezone);
+    const dayStart = zonedDateTimeToUtc(
+      input.date,
+      0,
+      context.location.timezone,
+    );
+    const dayEnd = zonedDateTimeToUtc(
+      input.date,
+      1440,
+      context.location.timezone,
+    );
     const weekday = weekdayFor(input.date);
-    const [schedules, appointments] = await Promise.all([
+    const [schedules, excludedAppointment] = await Promise.all([
       database.businessWeeklySchedule.findMany({
         orderBy: { startMinute: 'asc' },
         where: { locationId: input.locationId, weekday },
       }),
-      database.appointment.findMany({
-        select: { endsAt: true, startsAt: true },
-        where: {
-          endsAt: { gt: dayStart },
-          professionalMembershipId: input.membershipId,
-          reservesSlot: true,
-          startsAt: { lt: dayEnd },
-        },
-      }),
+      input.excludeAppointmentId
+        ? database.appointment.findFirst({
+            select: { id: true },
+            where: {
+              id: input.excludeAppointmentId,
+              locationId: input.locationId,
+              organizationId: access.organizationId,
+              professionalMembershipId: input.membershipId,
+              reservesSlot: true,
+            },
+          })
+        : null,
     ]);
+    const appointments = await database.appointment.findMany({
+      select: { endsAt: true, startsAt: true },
+      where: {
+        endsAt: { gt: dayStart },
+        ...(excludedAppointment ? { id: { not: excludedAppointment.id } } : {}),
+        professionalMembershipId: input.membershipId,
+        reservesSlot: true,
+        startsAt: { lt: dayEnd },
+      },
+    });
     const businessSchedule = schedules[0];
     if (!businessSchedule?.isOpen) return { durationMinutes, slots: [] };
     const availability = buildAvailability({
@@ -422,14 +443,20 @@ export function registerAgendaV2Routes(
       durationMinutes,
       excludePast: true,
       now: new Date(),
-      occupied: appointments.map(({ endsAt, startsAt }) => ({ endsAt, startsAt })),
+      occupied: appointments.map(({ endsAt, startsAt }) => ({
+        endsAt,
+        startsAt,
+      })),
       respectWindowEnd: true,
       stepMinutes: context.location.bookingSlotIntervalMinutes,
       timeZone: context.location.timezone,
       toUtc: zonedDateTimeToUtc,
       windows: schedules.map((schedule) => ({
         endMinute: Math.min(schedule.endMinute, businessSchedule.endMinute),
-        startMinute: Math.max(schedule.startMinute, businessSchedule.startMinute),
+        startMinute: Math.max(
+          schedule.startMinute,
+          businessSchedule.startMinute,
+        ),
       })),
     });
     return { durationMinutes, slots: availability.slots };

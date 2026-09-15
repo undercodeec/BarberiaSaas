@@ -150,6 +150,9 @@ export default function BusinessScheduleScreen() {
       await queryClient.invalidateQueries({
         queryKey: tenantQueryPrefix('availability'),
       });
+      await queryClient.invalidateQueries({
+        queryKey: tenantQueryPrefix('agenda-availability'),
+      });
       Alert.alert('Horario guardado', 'Los cambios ya se aplican a tu agenda.');
     },
   });

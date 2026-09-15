@@ -93,6 +93,7 @@ export default function RescheduleBookingScreen() {
     enabled: Boolean(locationId && membershipId && serviceIds.length),
     ...availabilityQueryOptions(requireApiClient(), tenant.scope, {
       date: localDateValue(date),
+      excludeAppointmentId: appointmentId,
       locationId: locationId ?? '',
       membershipId,
       serviceIds,
