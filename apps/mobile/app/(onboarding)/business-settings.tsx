@@ -170,11 +170,22 @@ export default function BusinessSettingsScreen() {
   );
   const visibleSections = settingsSections.map((section) => ({
     ...section,
-    items: section.items.filter(
-      (item) =>
-        (item.id !== 'collaborators' && item.id !== 'locations') ||
-        canManageBusinessFeatures,
-    ),
+    items: section.items
+      .filter(
+        (item) =>
+          (item.id !== 'collaborators' && item.id !== 'locations') ||
+          canManageBusinessFeatures,
+      )
+      .map((item) =>
+        item.id === 'business-schedule' && isSolo
+          ? {
+              ...item,
+              description:
+                'Define tus dÃ­as y horas disponibles para atender clientes.',
+              title: 'Mi horario de atenciÃ³n',
+            }
+          : item,
+      ),
   }));
 
   const unavailable = useCallback((title: string) => {

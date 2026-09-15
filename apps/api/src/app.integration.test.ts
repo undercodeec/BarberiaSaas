@@ -2,6 +2,7 @@ import {
   createDatabaseClient,
   MembershipRole,
   PlatformOverrideKind,
+  RegistrationAccountType,
 } from '@barber-saas/database';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -3779,6 +3780,134 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(audit).not.toBeNull();
   });
 
+  it('usa el horario configurado como horario propio en una cuenta individual', async () => {
+    const ownerToken = await register('horario-individual@example.com');
+    const organization = await onboard(ownerToken, 'horario-individual');
+    const owner = await database.membership.findFirstOrThrow({
+      where: {
+        organizationId: organization.organizationId,
+        role: MembershipRole.OWNER,
+      },
+    });
+    await database.userRegistrationProfile.update({
+      data: { accountType: RegistrationAccountType.PROFESSIONAL },
+      where: { userId: owner.userId },
+    });
+    // Simula el horario profesional heredado de versiones anteriores: empieza
+    // a las 10:30, aunque el usuario edita el horario mostrado como 10:00.
+    await database.weeklySchedule.createMany({
+      data: Array.from({ length: 7 }, (_, weekday) => ({
+        endMinute: 1080,
+        locationId: organization.locationId,
+        membershipId: owner.id,
+        startMinute: 630,
+        weekday,
+      })),
+    });
+    const currentSchedule = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      url: '/v1/business-schedule',
+    });
+    const days = currentSchedule
+      .json<{
+        days: Array<{
+          endMinute: number;
+          isOpen: boolean;
+          startMinute: number;
+          weekday: number;
+        }>;
+      }>()
+      .days.map((day) =>
+        day.weekday === 3 ? { ...day, startMinute: 600 } : day,
+      );
+    const savedSchedule = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'PUT',
+      payload: { days, locationId: organization.locationId },
+      url: '/v1/business-schedule',
+    });
+    expect(savedSchedule.statusCode, savedSchedule.body).toBe(200);
+    expect(
+      await database.weeklySchedule.findFirst({
+        where: {
+          locationId: organization.locationId,
+          membershipId: owner.id,
+          startMinute: 600,
+          weekday: 3,
+        },
+      }),
+    ).not.toBeNull();
+
+    const serviceResponse = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        durationMinutes: 30,
+        name: 'Corte individual',
+        priceCents: 1200,
+      },
+      url: '/v1/services',
+    });
+    expect(serviceResponse.statusCode, serviceResponse.body).toBe(201);
+    const serviceId = serviceResponse.json<{ service: { id: string } }>()
+      .service.id;
+    const assignment = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        locationId: organization.locationId,
+        membershipId: owner.id,
+        serviceId,
+      },
+      url: '/v1/services/assignments',
+    });
+    expect(assignment.statusCode, assignment.body).toBe(201);
+
+    const created = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'POST',
+      payload: {
+        clientName: 'Cliente individual',
+        locationId: organization.locationId,
+        professionalMembershipId: owner.id,
+        serviceIds: [serviceId],
+        startsAt: '2030-01-16T15:30:00.000Z',
+      },
+      url: '/v1/appointments',
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    const appointmentId = created.json<{ appointment: { id: string } }>()
+      .appointment.id;
+
+    const availability = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'GET',
+      query: {
+        date: '2030-01-16',
+        excludeAppointmentId: appointmentId,
+        locationId: organization.locationId,
+        membershipId: owner.id,
+        serviceIds: serviceId,
+      },
+      url: '/v2/availability',
+    });
+    expect(availability.statusCode, availability.body).toBe(200);
+    expect(
+      availability
+        .json<{ slots: Array<{ startsAt: string }> }>()
+        .slots.some((slot) => slot.startsAt === '2030-01-16T15:00:00.000Z'),
+    ).toBe(true);
+
+    const rescheduled = await app.inject({
+      headers: { authorization: `Bearer ${ownerToken}` },
+      method: 'PATCH',
+      payload: { startsAt: '2030-01-16T15:00:00.000Z' },
+      url: `/v1/appointments/${appointmentId}/reschedule`,
+    });
+    expect(rescheduled.statusCode, rescheduled.body).toBe(200);
+  });
+
   it('devuelve en Agenda solamente horarios que pueden reservarse', async () => {
     const agenda = await setupAgenda('agenda-sin-ocupados-sinteticos');
     await database.service.update({
@@ -5631,8 +5760,13 @@ describeWithDatabase('API con PostgreSQL', () => {
   });
 
   it('notifica una reserva pública de productos solo al propietario y administrador de la sucursal', async () => {
-    const ownerToken = await register('product-order-notification-owner@example.com');
-    const organization = await onboard(ownerToken, 'product-order-notification');
+    const ownerToken = await register(
+      'product-order-notification-owner@example.com',
+    );
+    const organization = await onboard(
+      ownerToken,
+      'product-order-notification',
+    );
     const productResponse = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },
       method: 'POST',
@@ -5648,8 +5782,8 @@ describeWithDatabase('API con PostgreSQL', () => {
       url: '/v1/inventory/products',
     });
     expect(productResponse.statusCode).toBe(201);
-    const productId = productResponse.json<{ product: { id: string } }>().product
-      .id;
+    const productId = productResponse.json<{ product: { id: string } }>()
+      .product.id;
     const secondLocation = await database.location.create({
       data: {
         city: 'Quito',
@@ -5683,13 +5817,20 @@ describeWithDatabase('API con PostgreSQL', () => {
       ].map(async ({ email, fullName, role }) => {
         const user = await database.user.create({ data: { email, fullName } });
         return database.membership.create({
-          data: { organizationId: organization.organizationId, role, userId: user.id },
+          data: {
+            organizationId: organization.organizationId,
+            role,
+            userId: user.id,
+          },
         });
       }),
     );
     await database.memberLocation.createMany({
       data: [
-        { locationId: organization.locationId, membershipId: managerAtLocation!.id },
+        {
+          locationId: organization.locationId,
+          membershipId: managerAtLocation!.id,
+        },
         { locationId: secondLocation.id, membershipId: managerElsewhere!.id },
         { locationId: organization.locationId, membershipId: barber!.id },
       ],
@@ -5736,9 +5877,9 @@ describeWithDatabase('API con PostgreSQL', () => {
     expect(notifications.map(({ userId }) => userId)).not.toEqual(
       expect.arrayContaining([managerElsewhere!.userId, barber!.userId]),
     );
-    expect(notifications.every(({ body }) => !body.includes('Cliente de reserva'))).toBe(
-      true,
-    );
+    expect(
+      notifications.every(({ body }) => !body.includes('Cliente de reserva')),
+    ).toBe(true);
 
     const inbox = await app.inject({
       headers: { authorization: `Bearer ${ownerToken}` },
@@ -5746,7 +5887,14 @@ describeWithDatabase('API con PostgreSQL', () => {
       url: '/v1/notifications',
     });
     expect(inbox.statusCode).toBe(200);
-    expect(inbox.json<{ notifications: Array<{ data: { route: string; type: string }; type: string }> }>().notifications).toEqual(
+    expect(
+      inbox.json<{
+        notifications: Array<{
+          data: { route: string; type: string };
+          type: string;
+        }>;
+      }>().notifications,
+    ).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           data: expect.objectContaining({

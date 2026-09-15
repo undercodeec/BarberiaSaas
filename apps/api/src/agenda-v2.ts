@@ -254,9 +254,7 @@ export function registerAgendaV2Routes(
       ? Prisma.sql`AND appointment.ends_at > ${activeAfter}`
       : Prisma.empty;
     const membershipId =
-      access.role === 'BARBER'
-        ? access.membershipId
-        : input.membershipId;
+      access.role === 'BARBER' ? access.membershipId : input.membershipId;
     const membershipSql = membershipId
       ? Prisma.sql`AND appointment.professional_membership_id = ${membershipId}::uuid`
       : Prisma.empty;
@@ -408,24 +406,37 @@ export function registerAgendaV2Routes(
       context.location.timezone,
     );
     const weekday = weekdayFor(input.date);
-    const [schedules, excludedAppointment] = await Promise.all([
-      database.businessWeeklySchedule.findMany({
-        orderBy: { startMinute: 'asc' },
-        where: { locationId: input.locationId, weekday },
-      }),
-      input.excludeAppointmentId
-        ? database.appointment.findFirst({
-            select: { id: true },
-            where: {
-              id: input.excludeAppointmentId,
+    const [schedules, businessSchedule, excludedAppointment] =
+      await Promise.all([
+        database.weeklySchedule.findMany({
+          orderBy: { startMinute: 'asc' },
+          where: {
+            locationId: input.locationId,
+            membershipId: input.membershipId,
+            weekday,
+          },
+        }),
+        database.businessWeeklySchedule.findUnique({
+          where: {
+            locationId_weekday: {
               locationId: input.locationId,
-              organizationId: access.organizationId,
-              professionalMembershipId: input.membershipId,
-              reservesSlot: true,
+              weekday,
             },
-          })
-        : null,
-    ]);
+          },
+        }),
+        input.excludeAppointmentId
+          ? database.appointment.findFirst({
+              select: { id: true },
+              where: {
+                id: input.excludeAppointmentId,
+                locationId: input.locationId,
+                organizationId: access.organizationId,
+                professionalMembershipId: input.membershipId,
+                reservesSlot: true,
+              },
+            })
+          : null,
+      ]);
     const appointments = await database.appointment.findMany({
       select: { endsAt: true, startsAt: true },
       where: {
@@ -436,7 +447,6 @@ export function registerAgendaV2Routes(
         startsAt: { lt: dayEnd },
       },
     });
-    const businessSchedule = schedules[0];
     if (!businessSchedule?.isOpen) return { durationMinutes, slots: [] };
     const availability = buildAvailability({
       date: input.date,

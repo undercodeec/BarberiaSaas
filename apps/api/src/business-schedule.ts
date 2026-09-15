@@ -1,6 +1,7 @@
 import {
   MembershipRole,
   MembershipStatus,
+  RegistrationAccountType,
   type DatabaseClient,
 } from '@barber-saas/database';
 import {
@@ -150,6 +151,24 @@ async function readSchedule(
   return days;
 }
 
+async function individualOwnerMembership(
+  database: DatabaseClient,
+  organizationId: string,
+) {
+  const owner = await database.membership.findFirst({
+    include: { user: { select: { registrationProfile: true } } },
+    where: {
+      organizationId,
+      role: MembershipRole.OWNER,
+      status: MembershipStatus.ACTIVE,
+    },
+  });
+  return owner?.user.registrationProfile?.accountType ===
+    RegistrationAccountType.PROFESSIONAL
+    ? owner
+    : null;
+}
+
 function publicSchedule(
   days: ReadonlyArray<{
     endMinute: number;
@@ -231,6 +250,10 @@ export function registerBusinessScheduleRoutes(
       locationId: input.locationId,
       organizationId: current.organizationId,
     });
+    const soloOwner = await individualOwnerMembership(
+      database,
+      current.organizationId,
+    );
 
     await database.$transaction(async (transaction) => {
       for (const day of input.days) {
@@ -252,6 +275,30 @@ export function registerBusinessScheduleRoutes(
             },
           },
         });
+      }
+      // An individual account has exactly one bookable professional: its
+      // owner. Its only schedule editor is this screen, so mirror its open
+      // days into that professional schedule. Team accounts intentionally
+      // keep their per-professional schedules independent.
+      if (soloOwner) {
+        await transaction.weeklySchedule.deleteMany({
+          where: {
+            locationId: input.locationId,
+            membershipId: soloOwner.id,
+          },
+        });
+        const openDays = input.days.filter((day) => day.isOpen);
+        if (openDays.length > 0) {
+          await transaction.weeklySchedule.createMany({
+            data: openDays.map(({ endMinute, startMinute, weekday }) => ({
+              endMinute,
+              locationId: input.locationId,
+              membershipId: soloOwner.id,
+              startMinute,
+              weekday,
+            })),
+          });
+        }
       }
       if (input.bookingSlotIntervalMinutes !== undefined) {
         await transaction.location.update({

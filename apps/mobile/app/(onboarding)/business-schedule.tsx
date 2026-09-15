@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type {
   BusinessScheduleDay,
   BusinessScheduleResponse,
+  OnboardingAccountDetailsResponse,
 } from '@barber-saas/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Redirect, useRouter } from 'expo-router';
@@ -121,6 +122,15 @@ export default function BusinessScheduleScreen() {
       ),
     queryKey: tenant.key('accessible-locations'),
   });
+  const accountQuery = useQuery({
+    enabled: Boolean(session),
+    queryFn: () =>
+      requireApiClient().request<OnboardingAccountDetailsResponse>(
+        '/v1/onboarding/account-details',
+      ),
+    queryKey: tenant.key('onboarding-account-details'),
+  });
+  const isSolo = accountQuery.data?.accountType === 'professional';
 
   const saveMutation = useMutation({
     mutationFn: (input: {
@@ -251,7 +261,7 @@ export default function BusinessScheduleScreen() {
             />
           </Pressable>
           <Text accessibilityRole="header" style={styles.headerTitle}>
-            Horario del negocio
+            {isSolo ? 'Mi horario de atención' : 'Horario del negocio'}
           </Text>
         </View>
       </View>
